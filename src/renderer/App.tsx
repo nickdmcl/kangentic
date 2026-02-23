@@ -7,6 +7,7 @@ import { useSessionStore } from './stores/session-store';
 
 export function App() {
   const loadProjects = useProjectStore((s) => s.loadProjects);
+  const loadCurrent = useProjectStore((s) => s.loadCurrent);
   const currentProject = useProjectStore((s) => s.currentProject);
   const loadBoard = useBoardStore((s) => s.loadBoard);
   const loadConfig = useConfigStore((s) => s.loadConfig);
@@ -17,6 +18,9 @@ export function App() {
     loadConfig();
     detectClaude();
     loadProjects();
+    // Restore the current project after a page reload (e.g. Vite HMR).
+    // The main process retains currentProjectId across renderer reloads.
+    loadCurrent();
 
     // Listen for auto-opened project (from --cwd CLI arg)
     const cleanup = window.electronAPI.projects.onAutoOpened((project) => {

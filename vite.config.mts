@@ -9,6 +9,14 @@ export default defineConfig({
       '@shared': '/src/shared',
     },
   },
+  server: {
+    watch: {
+      // Ignore worktree directories created inside the project. Without this,
+      // Vite detects tsconfig.json in new worktrees and triggers a full page
+      // reload, which loses all React state.
+      ignored: ['**/.worktrees/**', '**/.kangentic/**'],
+    },
+  },
   build: {
     // Electron loads from disk, so large chunks are not a performance concern.
     // Split xterm into its own chunk to keep the main bundle smaller.
