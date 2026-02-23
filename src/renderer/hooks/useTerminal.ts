@@ -45,6 +45,7 @@ export function useTerminal(options: UseTerminalOptions) {
         brightCyan: '#22d3ee',
         brightWhite: '#fafafa',
       },
+      scrollback: 5000,
       cursorBlink: true,
       allowProposedApi: true,
     });
@@ -114,9 +115,16 @@ export function useTerminal(options: UseTerminalOptions) {
     if (!options.sessionId) return;
 
     const cleanup = window.electronAPI.sessions.onData((sessionId, data) => {
-      if (sessionId === options.sessionId && xtermRef.current) {
-        xtermRef.current.write(data);
-      }
+      if (sessionId !== options.sessionId || !xtermRef.current) return;
+
+      // While scrollback is loading, drop onData — it's duplicate data
+      // already included in the scrollback replay. Any in-flight buffer
+      // flushes that arrive just after scrollbackPending clears may cause
+      // a brief duplicate write, but xterm handles this gracefully for
+      // TUI apps (absolute cursor positioning rewrites the same cells).
+      if (scrollbackPendingRef.current) return;
+
+      xtermRef.current.write(data);
     });
 
     cleanupRef.current = cleanup;
@@ -136,8 +144,18 @@ export function useTerminal(options: UseTerminalOptions) {
   }, []);
 
   const fit = useCallback(() => {
-    fitAddonRef.current?.fit();
-  }, []);
+    if (!fitAddonRef.current) return;
+    fitAddonRef.current.fit();
+    // Always send the current dimensions to the PTY after fitting.
+    // xterm's onResize only fires when cols/rows actually change, but
+    // the container may have resized by pixels that don't cross a row
+    // boundary. Sending an explicit resize ensures the running process
+    // (Claude Code's TUI) re-renders at the correct dimensions.
+    if (xtermRef.current && options.sessionId) {
+      const { cols, rows } = xtermRef.current;
+      window.electronAPI.sessions.resize(options.sessionId, cols, rows);
+    }
+  }, [options.sessionId]);
 
   const focus = useCallback(() => {
     xtermRef.current?.focus();
