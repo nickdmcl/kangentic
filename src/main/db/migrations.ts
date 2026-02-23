@@ -1,7 +1,5 @@
 import type Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
-import os from 'node:os';
-import path from 'node:path';
 
 export function runGlobalMigrations(db: Database.Database): void {
   db.exec(`
@@ -21,22 +19,6 @@ export function runGlobalMigrations(db: Database.Database): void {
     );
   `);
 
-  // Seed sample projects if empty
-  const projectCount = db.prepare('SELECT COUNT(*) as c FROM projects').get() as { c: number };
-  if (projectCount.c === 0) {
-    const now = new Date().toISOString();
-    const insert = db.prepare(
-      'INSERT INTO projects (id, name, path, default_agent, last_opened, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    const ghDir = path.join(os.homedir(), 'Documents', 'GitHub');
-    const samples = [
-      { name: 'sample-api', path: path.join(ghDir, 'sample-api') },
-      { name: 'sample-frontend', path: path.join(ghDir, 'sample-frontend') },
-    ];
-    samples.forEach((p) => {
-      insert.run(uuidv4(), p.name, p.path, 'claude', now, now);
-    });
-  }
 }
 
 export function runProjectMigrations(db: Database.Database): void {
@@ -129,12 +111,6 @@ export function runProjectMigrations(db: Database.Database): void {
       // Seed default skills and transitions
       seedSkillsAndTransitions(db, laneIds, now);
 
-      // Seed test tasks in Backlog
-      const insertTask = db.prepare(
-        'INSERT INTO tasks (id, title, description, swimlane_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      );
-      insertTask.run(uuidv4(), 'Agent 1', 'This is testing agent 1', laneIds[0], 0, now, now);
-      insertTask.run(uuidv4(), 'Agent 2', 'This is testing agent 2', laneIds[0], 1, now, now);
     });
     tx();
   }
