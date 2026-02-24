@@ -124,12 +124,17 @@ export class TransitionEngine {
         : `Task: ${task.title}\n\n${task.description}`;
     }
 
-    // Ensure the status output directory exists and compute the output path
+    // Ensure the per-session directory exists and compute output paths
     const projectRoot = appConfig.projectPath || cwd;
-    const statusDir = path.join(projectRoot, '.kangentic', 'status');
-    fs.mkdirSync(statusDir, { recursive: true });
-    const statusOutputPath = path.join(statusDir, `${claudeSessionId}.json`);
-    const activityOutputPath = path.join(statusDir, `${claudeSessionId}.activity.json`);
+    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', claudeSessionId);
+    try {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    } catch (err) {
+      console.error(`Failed to create session directory: ${sessionDir}`, err);
+      throw new Error(`Cannot create session directory at ${sessionDir}: ${(err as Error).message}`);
+    }
+    const statusOutputPath = path.join(sessionDir, 'status.json');
+    const activityOutputPath = path.join(sessionDir, 'activity.json');
 
     const command = this.commandBuilder.buildClaudeCommand({
       claudePath: claude.path,
@@ -227,7 +232,7 @@ export class TransitionEngine {
         }
       }
 
-      this.sessionManager.kill(task.session_id);
+      this.sessionManager.suspend(task.session_id);
       this.taskRepo.update({
         id: task.id,
         session_id: null,

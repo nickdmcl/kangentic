@@ -166,10 +166,15 @@ export class CommandBuilder {
       };
     }
 
-    // Write to .kangentic/claude-settings-<sessionId>.json
-    const kangenticDir = path.join(projectRoot, '.kangentic');
-    fs.mkdirSync(kangenticDir, { recursive: true });
-    const mergedPath = path.join(kangenticDir, `claude-settings-${options.sessionId || options.taskId}.json`);
+    // Write to .kangentic/sessions/<sessionId>/settings.json
+    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', options.sessionId || options.taskId);
+    try {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    } catch (err) {
+      console.error(`Failed to create session directory: ${sessionDir}`, err);
+      throw new Error(`Cannot create session directory at ${sessionDir}: ${(err as Error).message}`);
+    }
+    const mergedPath = path.join(sessionDir, 'settings.json');
     fs.writeFileSync(mergedPath, JSON.stringify(merged, null, 2));
 
     // Also write hooks to <cwd>/.claude/settings.local.json so Claude Code

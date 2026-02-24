@@ -37,10 +37,16 @@ export class WorktreeManager {
     const shortId = taskId.slice(0, 8);
     const folderName = `${slug}-${shortId}`;
     const branchName = `kanban/${folderName}`;
-    const worktreePath = path.join(this.projectPath, '.worktrees', folderName);
+    const worktreePath = path.join(this.projectPath, '.kangentic', 'worktrees', folderName);
 
-    // Ensure .worktrees dir exists
-    fs.mkdirSync(path.join(this.projectPath, '.worktrees'), { recursive: true });
+    // Ensure worktrees dir exists
+    const worktreesDir = path.join(this.projectPath, '.kangentic', 'worktrees');
+    try {
+      fs.mkdirSync(worktreesDir, { recursive: true });
+    } catch (err) {
+      console.error(`Failed to create worktrees directory: ${worktreesDir}`, err);
+      throw new Error(`Cannot create worktrees directory at ${worktreesDir}: ${(err as Error).message}`);
+    }
 
     // Create worktree with a new branch
     await this.git.raw(['worktree', 'add', '-b', branchName, worktreePath, baseBranch]);

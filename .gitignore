@@ -1,11 +1,8 @@
 # Claude Code
 .claude/settings.local.json
 
-# Per-project data (runtime databases, status files)
+# Per-project data (runtime databases, sessions, worktrees)
 .kangentic/
-
-# Worktrees (runtime)
-.worktrees/
 
 # Build output
 dist/

@@ -32,9 +32,9 @@ export function ensureWorktreeTrust(worktreePath: string): void {
   }
 
   // Copy MCP server approvals from the parent project entry if it exists.
-  // The parent project is the repo root (worktree paths live under .worktrees/).
+  // The parent project is the repo root (worktree paths live under .kangentic/worktrees/).
   let parentMcpServers: string[] = [];
-  const markerIdx = resolvedPath.indexOf('/.worktrees/');
+  const markerIdx = resolvedPath.indexOf('/.kangentic/worktrees/');
   if (markerIdx !== -1) {
     const parentPath = resolvedPath.substring(0, markerIdx);
     const parentEntry = projects[parentPath];

@@ -11,10 +11,10 @@ export default defineConfig({
   },
   server: {
     watch: {
-      // Ignore worktree directories created inside the project. Without this,
-      // Vite detects tsconfig.json in new worktrees and triggers a full page
-      // reload, which loses all React state.
-      ignored: ['**/.worktrees/**', '**/.kangentic/**'],
+      // Ignore .kangentic/ (worktrees, sessions, etc.) created inside the project.
+      // Without this, Vite detects tsconfig.json in worktrees and triggers a
+      // full page reload, which loses all React state.
+      ignored: ['**/.kangentic/**'],
     },
   },
   build: {

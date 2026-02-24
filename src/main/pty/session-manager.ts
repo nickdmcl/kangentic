@@ -157,14 +157,12 @@ export class SessionManager extends EventEmitter {
     });
 
     // Derive merged settings path from statusOutputPath pattern
-    // statusOutputPath = <project>/.kangentic/status/<sessionId>.json
-    // mergedSettingsPath = <project>/.kangentic/claude-settings-<sessionId>.json
+    // statusOutputPath = <project>/.kangentic/sessions/<sessionId>/status.json
+    // mergedSettingsPath = <project>/.kangentic/sessions/<sessionId>/settings.json
     let mergedSettingsPath: string | null = null;
     if (input.statusOutputPath) {
-      const statusDir = input.statusOutputPath.replace(/[/\\][^/\\]+$/, '');
-      const kangenticDir = statusDir.replace(/[/\\]status$/, '');
-      const basename = input.statusOutputPath.replace(/^.*[/\\]/, '').replace(/\.json$/, '');
-      mergedSettingsPath = kangenticDir + '/claude-settings-' + basename + '.json';
+      const sessionDir = input.statusOutputPath.replace(/[/\\][^/\\]+$/, '');
+      mergedSettingsPath = sessionDir + '/settings.json';
     }
 
     const session: ManagedSession = {
@@ -274,6 +272,53 @@ export class SessionManager extends EventEmitter {
       session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
       ptyRef.kill();
     }
+    // Also remove from queue
+    const queueIdx = this.queue.findIndex(q => {
+      const s = this.findByTaskId(q.input.taskId);
+      return s?.id === sessionId;
+    });
+    if (queueIdx >= 0) {
+      this.queue.splice(queueIdx, 1);
+      if (session) {
+        session.status = 'exited';
+        session.exitCode = -1;
+      }
+    }
+  }
+
+  /**
+   * Suspend a session: kill the PTY but preserve session files on disk
+   * so the session can be resumed later (e.g. from archived/backlog state).
+   *
+   * Unlike kill(), the onExit handler will NOT clean up files because
+   * file paths are nulled before the PTY is destroyed.
+   */
+  suspend(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Close watchers — no longer need real-time updates
+    if (session.statusWatcher) {
+      session.statusWatcher.close();
+      session.statusWatcher = null;
+    }
+    if (session.activityWatcher) {
+      session.activityWatcher.close();
+      session.activityWatcher = null;
+    }
+
+    // Null out file paths BEFORE killing so the onExit handler's
+    // cleanupSessionFiles() skips file deletion — files persist for resume
+    session.statusOutputPath = null;
+    session.activityOutputPath = null;
+    session.mergedSettingsPath = null;
+
+    if (session.pty) {
+      const ptyRef = session.pty;
+      session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
+      ptyRef.kill();
+    }
+
     // Also remove from queue
     const queueIdx = this.queue.findIndex(q => {
       const s = this.findByTaskId(q.input.taskId);
@@ -505,6 +550,12 @@ export class SessionManager extends EventEmitter {
     if (session.mergedSettingsPath) {
       try { fs.unlinkSync(session.mergedSettingsPath); } catch { /* may not exist */ }
     }
+
+    // Try to remove the now-empty session directory
+    if (session.statusOutputPath) {
+      const sessionDir = session.statusOutputPath.replace(/[/\\][^/\\]+$/, '');
+      try { fs.rmdirSync(sessionDir); } catch { /* dir may not be empty or already gone */ }
+    }
   }
 
   /**
@@ -552,13 +603,26 @@ export class SessionManager extends EventEmitter {
       await new Promise((resolve) => setTimeout(resolve, timeoutMs));
     }
     for (const session of this.sessions.values()) {
+      // Close watchers but preserve session files — sessions will be
+      // resumed on next app launch via session recovery
+      if (session.statusWatcher) {
+        session.statusWatcher.close();
+        session.statusWatcher = null;
+      }
+      if (session.activityWatcher) {
+        session.activityWatcher.close();
+        session.activityWatcher = null;
+      }
+
       if (session.pty) {
         const ptyRef = session.pty;
         session.pty = null;
+        // Null file paths before kill so onExit doesn't clean them up
+        session.statusOutputPath = null;
+        session.activityOutputPath = null;
+        session.mergedSettingsPath = null;
         try { ptyRef.kill(); } catch { /* already dead */ }
       }
-      // Clean up watchers and files
-      this.cleanupSessionFiles(session);
     }
 
     return taskIds;

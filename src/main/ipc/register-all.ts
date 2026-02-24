@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { ipcMain, BrowserWindow, shell } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type Database from 'better-sqlite3';
@@ -16,6 +17,35 @@ import { SessionRepository } from '../db/repositories/session-repository';
 import { recoverSessions, reconcileSessions, pruneOrphanedWorktrees } from '../engine/session-recovery';
 import { WorktreeManager } from '../git/worktree-manager';
 import { getProjectDb } from '../db/database';
+
+/**
+ * Ensure `.kangentic/` is listed in the project's `.gitignore`.
+ * Fully wrapped in try-catch — a read-only project directory or
+ * permission issue must never prevent the app from opening.
+ */
+function ensureGitignore(projectPath: string): void {
+  try {
+    const gitignorePath = path.join(projectPath, '.gitignore');
+    let content = '';
+    try {
+      content = fs.readFileSync(gitignorePath, 'utf-8');
+    } catch {
+      // No .gitignore yet — we'll create one
+    }
+
+    const lines = content.split('\n');
+    const alreadyIgnored = lines.some(
+      (l) => l.trim() === '.kangentic' || l.trim() === '.kangentic/',
+    );
+    if (alreadyIgnored) return;
+
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+    fs.writeFileSync(gitignorePath, content + separator + '.kangentic/\n');
+  } catch (err) {
+    // Non-fatal: log and continue. Project may be read-only or on a network drive.
+    console.warn(`Could not update .gitignore at ${projectPath}:`, err);
+  }
+}
 
 let currentProjectId: string | null = null;
 let currentProjectPath: string | null = null;
@@ -62,6 +92,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     currentProjectId = id;
     currentProjectPath = project.path;
     projectRepo.updateLastOpened(id);
+    ensureGitignore(project.path);
 
     // Apply project config overrides (always — config may have changed)
     const config = configManager.getEffectiveConfig(project.path);
@@ -165,9 +196,21 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
       }
     }
 
-    // Delete session DB records before the task to avoid FK constraint errors
+    // Clean up session directories from disk before deleting DB records
     const db = getProjectDb(currentProjectId!);
     const sessionRepo = new SessionRepository(db);
+
+    if (currentProjectPath) {
+      const records = db.prepare(
+        `SELECT claude_session_id FROM sessions WHERE task_id = ? AND claude_session_id IS NOT NULL`
+      ).all(id) as Array<{ claude_session_id: string }>;
+      for (const { claude_session_id } of records) {
+        const sessionDir = path.join(currentProjectPath, '.kangentic', 'sessions', claude_session_id);
+        try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch { /* may not exist */ }
+      }
+    }
+
+    // Delete session DB records before the task to avoid FK constraint errors
     sessionRepo.deleteByTaskId(id);
 
     tasks.delete(id);
@@ -204,7 +247,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
         console.log(`[TASK_MOVE] No running session record to suspend for task ${task.id.slice(0, 8)} (latest record: ${record ? `status=${record.status}` : 'none'})`);
       }
 
-      sessionManager.kill(task.session_id);
+      sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });
       return;
     }
@@ -528,8 +571,6 @@ export function getCurrentProjectId(): string | null {
  * already have live PTY sessions.
  */
 export async function openProjectByPath(projectPath: string) {
-  const path = require('node:path');
-
   // Normalize the path for comparison
   const normalized = path.resolve(projectPath);
 
@@ -552,6 +593,7 @@ export async function openProjectByPath(projectPath: string) {
   currentProjectId = project.id;
   currentProjectPath = project.path;
   projectRepo.updateLastOpened(project.id);
+  ensureGitignore(project.path);
 
   const config = configManager.getEffectiveConfig(project.path);
   sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);

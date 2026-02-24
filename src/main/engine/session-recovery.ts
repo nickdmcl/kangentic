@@ -26,8 +26,8 @@ import { ensureWorktreeTrust } from '../agent/trust-manager';
  * Delete tasks whose worktree directories have been removed outside the app.
  *
  * Called on project open, before session recovery. Only prunes if the
- * `.worktrees/` parent directory exists (if missing, the project may be
- * on an unmounted drive — don't prune anything).
+ * `.kangentic/worktrees/` parent directory exists (if missing, the project
+ * may be on an unmounted drive — don't prune anything).
  *
  * Never prunes tasks without a worktree_path or tasks with an active PTY.
  */
@@ -37,7 +37,7 @@ export function pruneOrphanedWorktrees(
   sessionRepo: SessionRepository,
   sessionManager: SessionManager,
 ): number {
-  const worktreesDir = path.join(projectPath, '.worktrees');
+  const worktreesDir = path.join(projectPath, '.kangentic', 'worktrees');
   if (!fs.existsSync(worktreesDir)) return 0; // Parent missing — don't prune
 
   const activeTaskIds = new Set(
@@ -275,11 +275,16 @@ export async function recoverSessions(
           : `Task: ${task.title}\n\n${task.description}`;
       }
 
-      // Ensure the status output directory exists
-      const statusDir = path.join(projectPath, '.kangentic', 'status');
-      fs.mkdirSync(statusDir, { recursive: true });
-      const statusOutputPath = path.join(statusDir, `${claudeSessionId}.json`);
-      const activityOutputPath = path.join(statusDir, `${claudeSessionId}.activity.json`);
+      // Ensure the per-session directory exists
+      const sessionDir = path.join(projectPath, '.kangentic', 'sessions', claudeSessionId);
+      try {
+        fs.mkdirSync(sessionDir, { recursive: true });
+      } catch (err) {
+        console.error(`Failed to create session directory: ${sessionDir}`, err);
+        throw new Error(`Cannot create session directory at ${sessionDir}: ${(err as Error).message}`);
+      }
+      const statusOutputPath = path.join(sessionDir, 'status.json');
+      const activityOutputPath = path.join(sessionDir, 'activity.json');
 
       const command = commandBuilder.buildClaudeCommand({
         claudePath: claude.path,
@@ -457,11 +462,16 @@ export async function reconcileSessions(
             })
           : `Task: ${task.title}\n\n${task.description}`;
 
-        // Ensure the status output directory exists
-        const statusDir = path.join(projectPath, '.kangentic', 'status');
-        fs.mkdirSync(statusDir, { recursive: true });
-        const statusOutputPath = path.join(statusDir, `${claudeSessionId}.json`);
-        const activityOutputPath = path.join(statusDir, `${claudeSessionId}.activity.json`);
+        // Ensure the per-session directory exists
+        const sessionDir = path.join(projectPath, '.kangentic', 'sessions', claudeSessionId);
+        try {
+          fs.mkdirSync(sessionDir, { recursive: true });
+        } catch (err) {
+          console.error(`Failed to create session directory: ${sessionDir}`, err);
+          throw new Error(`Cannot create session directory at ${sessionDir}: ${(err as Error).message}`);
+        }
+        const statusOutputPath = path.join(sessionDir, 'status.json');
+        const activityOutputPath = path.join(sessionDir, 'activity.json');
 
         const command = commandBuilder.buildClaudeCommand({
           claudePath: claude.path,

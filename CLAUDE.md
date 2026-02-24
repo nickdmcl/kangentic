@@ -58,6 +58,12 @@ scripts/          # Build and dev scripts
 - **PTY sessions** handle cross-platform shells (PowerShell needs `& ` prefix, WSL splits into exe + args, fish/nushell skip `--login`)
 - **Claude CLI** is invoked with `cwd` set to the project directory (or worktree path) so that `.claude/`, `CLAUDE.md`, and skills are loaded into context
 
+### Per-Project Directory
+All runtime data lives under `<project>/.kangentic/` (auto-added to `.gitignore` on project open):
+- `config.json` — project config overrides
+- `sessions/<claudeSessionId>/` — per-session files (`settings.json`, `status.json`, `activity.json`)
+- `worktrees/<slug>/` — git worktree checkouts
+
 ### Database
 - Global DB (`~/.kangentic/kangentic.db`) for projects list
 - Per-project DB (`<project>/.kangentic/project.db`) for tasks, swimlanes, skills, sessions
