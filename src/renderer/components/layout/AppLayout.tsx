@@ -12,14 +12,17 @@ import { ToastContainer } from './ToastContainer';
 const MIN_TERMINAL_HEIGHT = 100;
 const MIN_SIDEBAR_WIDTH = 160;
 const MAX_SIDEBAR_WIDTH = 400;
+const SIDEBAR_COLLAPSE_THRESHOLD = 120;
 
 export function AppLayout() {
   const settingsOpen = useConfigStore((s) => s.settingsOpen);
   const config = useConfigStore((s) => s.config);
   const currentProject = useProjectStore((s) => s.currentProject);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(224); // 14rem = 224px (w-56)
+  const initialSidebarWidth = config.sidebar?.width ?? 224;
+  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarWidth);
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const [sidebarReady, setSidebarReady] = useState(false);
   const latestSidebarWidthRef = useRef(sidebarWidth);
   const [terminalHeight, setTerminalHeight] = useState(config.terminal.panelHeight);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
@@ -29,13 +32,20 @@ export function AppLayout() {
   const latestHeightRef = useRef(terminalHeight);
   const availableHeightRef = useRef(0);
 
-  // Sync sidebar width from config on load
+  // Sync sidebar width and terminal height from config on load
   useEffect(() => {
     const saved = config.sidebar?.width;
     if (typeof saved === 'number' && saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH) {
       setSidebarWidth(saved);
       latestSidebarWidthRef.current = saved;
     }
+    const savedHeight = config.terminal?.panelHeight;
+    if (typeof savedHeight === 'number' && savedHeight >= MIN_TERMINAL_HEIGHT) {
+      setTerminalHeight(savedHeight);
+      latestHeightRef.current = savedHeight;
+    }
+    // Enable transitions after the first config-driven update
+    requestAnimationFrame(() => setSidebarReady(true));
   }, [config]);
 
   // Compute max terminal height: 50% of the content column so the board
@@ -129,6 +139,27 @@ export function AppLayout() {
     document.addEventListener('mouseup', onMouseUp);
   }, [terminalHeight, config.terminal, clampHeight]);
 
+  // Track sidebarOpen in a ref so the resize handler always reads the latest value
+  const sidebarOpenRef = useRef(sidebarOpen);
+  sidebarOpenRef.current = sidebarOpen;
+
+  // Track whether the sidebar was closed by drag-collapse vs hamburger toggle
+  const collapsedByDragRef = useRef(false);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      if (!prev) {
+        // Restore to max if auto-collapsed by drag, otherwise use persisted width
+        const w = collapsedByDragRef.current ? MAX_SIDEBAR_WIDTH : latestSidebarWidthRef.current;
+        const restored = w >= MIN_SIDEBAR_WIDTH ? w : MAX_SIDEBAR_WIDTH;
+        setSidebarWidth(restored);
+        latestSidebarWidthRef.current = restored;
+        collapsedByDragRef.current = false;
+      }
+      return !prev;
+    });
+  }, []);
+
   const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsSidebarResizing(true);
@@ -136,15 +167,27 @@ export function AppLayout() {
     document.body.style.userSelect = 'none';
 
     const startX = e.clientX;
-    const startWidth = latestSidebarWidthRef.current;
+    const wasClosed = !sidebarOpenRef.current;
+    const startWidth = wasClosed ? 0 : latestSidebarWidthRef.current;
+    let didCollapse = false;
 
     window.dispatchEvent(new CustomEvent('terminal-panel-drag-start'));
 
     const onMouseMove = (e: MouseEvent) => {
       const delta = e.clientX - startX;
-      const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + delta));
-      setSidebarWidth(newWidth);
-      latestSidebarWidthRef.current = newWidth;
+      const rawWidth = startWidth + delta;
+
+      if (rawWidth < SIDEBAR_COLLAPSE_THRESHOLD) {
+        // Below threshold — visually collapse
+        setSidebarWidth(0);
+        didCollapse = true;
+      } else {
+        const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, rawWidth));
+        setSidebarWidth(newWidth);
+        latestSidebarWidthRef.current = newWidth;
+        didCollapse = false;
+        if (!sidebarOpenRef.current) setSidebarOpen(true);
+      }
     };
 
     const onMouseUp = () => {
@@ -153,10 +196,16 @@ export function AppLayout() {
       setIsSidebarResizing(false);
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
-      // Persist sidebar width
-      window.electronAPI.config.set({
-        sidebar: { width: latestSidebarWidthRef.current },
-      });
+
+      if (didCollapse) {
+        collapsedByDragRef.current = true;
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+        window.electronAPI.config.set({
+          sidebar: { width: latestSidebarWidthRef.current },
+        });
+      }
       window.dispatchEvent(new CustomEvent('terminal-panel-drag-end'));
       requestAnimationFrame(() => {
         window.dispatchEvent(new CustomEvent('terminal-panel-resize'));
@@ -170,7 +219,7 @@ export function AppLayout() {
   if (settingsOpen) {
     return (
       <div className="h-screen flex flex-col bg-zinc-900">
-        <TitleBar sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <TitleBar sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
         <SettingsPage />
         <ToastContainer />
       </div>
@@ -179,25 +228,27 @@ export function AppLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-zinc-900" ref={containerRef}>
-      <TitleBar sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <TitleBar sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
 
       <div className="flex flex-1 min-h-0">
         <div
           className={`flex-shrink-0 overflow-hidden border-r border-zinc-700 ${
-            sidebarOpen ? '' : 'w-0 border-r-0'
-          } ${isSidebarResizing ? '' : 'transition-[width] duration-200 ease-in-out'}`}
-          style={sidebarOpen ? { width: sidebarWidth } : undefined}
+            !sidebarOpen && !isSidebarResizing ? 'w-0 border-r-0' : ''
+          } ${sidebarReady && !isSidebarResizing ? 'transition-[width] duration-200 ease-in-out' : ''}`}
+          style={sidebarOpen || isSidebarResizing ? { width: sidebarWidth } : undefined}
         >
-          <ProjectSidebar />
+          <ProjectSidebar onToggleSidebar={toggleSidebar} />
         </div>
 
-        {/* Sidebar resize handle */}
-        {sidebarOpen && (
-          <div
-            className="w-1 flex-shrink-0 cursor-col-resize bg-zinc-700 hover:bg-zinc-500 transition-colors"
-            onMouseDown={handleSidebarResizeStart}
-          />
-        )}
+        {/* Sidebar resize handle — wider hit target when collapsed so it's easy to drag open */}
+        <div
+          className={`flex-shrink-0 cursor-col-resize transition-colors ${
+            sidebarOpen
+              ? 'w-1 bg-zinc-700 hover:bg-zinc-500'
+              : 'w-1.5 bg-zinc-700/50 hover:bg-zinc-500'
+          }`}
+          onMouseDown={handleSidebarResizeStart}
+        />
 
         <div className="flex-1 flex flex-col min-w-0" ref={contentColRef}>
           {currentProject ? (

@@ -384,6 +384,11 @@ export interface ElectronAPI {
     openPath: (dirPath: string) => Promise<string>;
   };
 
+  // Dialog
+  dialog: {
+    selectFolder: () => Promise<string | null>;
+  };
+
   // Window controls
   window: {
     minimize: () => void;

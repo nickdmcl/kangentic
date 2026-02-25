@@ -217,20 +217,12 @@ export async function waitForBoard(page: Page): Promise<void> {
   await page.locator('[data-swimlane-name="Planning"]').waitFor({ state: 'visible', timeout: 5000 });
 }
 
-// Create a project via the UI
-export async function createProject(page: Page, name: string, projectPath: string): Promise<void> {
-  const addButton = page.locator('button[title="New project"]');
-  await addButton.click();
-
-  const nameInput = page.locator('input[placeholder="Project name"]');
-  const pathInput = page.locator('input[placeholder="Project path"]');
-
-  await nameInput.fill(name);
-  await pathInput.fill(projectPath);
-
-  const createButton = page.locator('button:has-text("Create")');
-  await createButton.click();
-
+// Create a project via IPC (native dialog can't be automated in E2E)
+export async function createProject(page: Page, _name: string, projectPath: string): Promise<void> {
+  // Call openByPath directly — creates the project if needed and opens it
+  await page.evaluate((p: string) => window.electronAPI.projects.openByPath(p), projectPath);
+  // Reload so the renderer picks up the new current project
+  await page.reload();
   await waitForBoard(page);
 }
 

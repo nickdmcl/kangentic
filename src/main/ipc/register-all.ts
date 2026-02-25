@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ipcMain, BrowserWindow, shell } from 'electron';
+import { ipcMain, BrowserWindow, dialog, shell } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type Database from 'better-sqlite3';
 import { ProjectRepository } from '../db/repositories/project-repository';
@@ -618,6 +618,15 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.SHELL_GET_AVAILABLE, () => shellResolver.getAvailableShells());
   ipcMain.handle(IPC.SHELL_GET_DEFAULT, () => shellResolver.getDefaultShell());
   ipcMain.handle(IPC.SHELL_OPEN_PATH, (_, dirPath: string) => shell.openPath(dirPath));
+
+  // === Dialog ===
+  ipcMain.handle(IPC.DIALOG_SELECT_FOLDER, async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
 
   // === Window ===
   ipcMain.on(IPC.WINDOW_MINIMIZE, () => mainWindow.minimize());

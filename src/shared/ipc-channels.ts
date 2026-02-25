@@ -65,6 +65,9 @@ export const IPC = {
   // Shell utilities
   SHELL_OPEN_PATH: 'shell:openPath',
 
+  // Dialog
+  DIALOG_SELECT_FOLDER: 'dialog:selectFolder',
+
   // Window
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',

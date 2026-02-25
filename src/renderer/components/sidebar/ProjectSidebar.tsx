@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Trash2, Plus, Folder } from 'lucide-react';
+import { Trash2, Plus, Folder, FolderOpen, Menu } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useToastStore } from '../../stores/toast-store';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
-import type { Project, ProjectCreateInput } from '../../../shared/types';
+import type { Project } from '../../../shared/types';
 
 /** Show last 3 path segments, e.g. "Users/dev/my-project" */
 function shortenPath(fullPath: string): string {
@@ -12,35 +12,46 @@ function shortenPath(fullPath: string): string {
   return '.../' + parts.slice(-3).join('/');
 }
 
-export function ProjectSidebar() {
+interface ProjectSidebarProps {
+  onToggleSidebar?: () => void;
+}
+
+export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
   const projects = useProjectStore((s) => s.projects);
   const currentProject = useProjectStore((s) => s.currentProject);
   const openProject = useProjectStore((s) => s.openProject);
-  const createProject = useProjectStore((s) => s.createProject);
   const deleteProject = useProjectStore((s) => s.deleteProject);
-  const [showNew, setShowNew] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newPath, setNewPath] = useState('');
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
-  const handleCreate = async () => {
-    if (!newName.trim() || !newPath.trim()) return;
-    const projectName = newName.trim();
-    const project = await createProject({ name: projectName, path: newPath.trim() });
-    useToastStore.getState().addToast({
-      message: `Created project "${projectName}"`,
-      variant: 'info',
-    });
-    await openProject(project.id);
-    setShowNew(false);
-    setNewName('');
-    setNewPath('');
+  const handleNewProject = async () => {
+    const selectedPath = await window.electronAPI.dialog.selectFolder();
+    if (!selectedPath) return;
+
+    // Check if this path already has a project
+    const existing = projects.find(
+      (p) => p.path.replace(/\\/g, '/') === selectedPath.replace(/\\/g, '/'),
+    );
+
+    if (existing) {
+      await openProject(existing.id);
+      useToastStore.getState().addToast({
+        message: `Opened project "${existing.name}"`,
+        variant: 'info',
+      });
+    } else {
+      const project = await window.electronAPI.projects.openByPath(selectedPath);
+      await useProjectStore.getState().loadProjects();
+      await useProjectStore.getState().loadCurrent();
+      useToastStore.getState().addToast({
+        message: `Created project "${project.name}"`,
+        variant: 'info',
+      });
+    }
   };
 
-  const handleCancelNew = () => {
-    setShowNew(false);
-    setNewName('');
-    setNewPath('');
+  const handleOpenInExplorer = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    window.electronAPI.shell.openPath(project.path);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
@@ -61,53 +72,30 @@ export function ProjectSidebar() {
 
   return (
     <div className="w-full h-full bg-zinc-800 flex flex-col flex-shrink-0">
-      <div className="px-3 pt-3 pb-2">
+      <div className="px-3 pt-3 pb-2 border-b border-zinc-700">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Projects</span>
+          <div className="flex items-center gap-2">
+            {onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="p-1 hover:bg-zinc-700 rounded text-zinc-400 hover:text-zinc-100 transition-colors"
+                title="Hide sidebar"
+              >
+                <Menu size={16} />
+              </button>
+            )}
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Projects</span>
+          </div>
           <button
-            onClick={() => setShowNew(!showNew)}
-            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
-            title="New project"
+            onClick={handleNewProject}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded border border-blue-500/40 text-xs text-blue-400 hover:bg-blue-500/15 hover:text-blue-300 transition-colors"
+            title="Open folder as project"
           >
             <Plus size={12} />
             New
           </button>
         </div>
       </div>
-
-      {showNew && (
-        <div className="mx-3 mb-2 p-2.5 border border-zinc-600 rounded-md space-y-2">
-          <input
-            type="text"
-            placeholder="Project name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-600 rounded px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
-            autoFocus
-          />
-          <input
-            type="text"
-            placeholder="Project path"
-            value={newPath}
-            onChange={(e) => setNewPath(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-600 rounded px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded px-2 py-1 transition-colors"
-            >
-              Create
-            </button>
-            <button
-              onClick={handleCancelNew}
-              className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm rounded px-2 py-1 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 overflow-y-auto">
         {projects.map((project) => {
@@ -118,26 +106,39 @@ export function ProjectSidebar() {
               onClick={() => openProject(project.id)}
               className={`group w-full text-left px-3 py-2 text-sm transition-colors border-l-2 ${
                 isActive
-                  ? 'border-blue-500 bg-zinc-700/50 text-zinc-100'
+                  ? 'border-blue-500 bg-zinc-700 text-zinc-100'
                   : 'border-transparent text-zinc-400 hover:bg-zinc-750 hover:text-zinc-200'
               }`}
             >
               <div className="flex items-center gap-2">
-                <Folder size={14} className={isActive ? 'text-blue-400' : 'text-zinc-500'} />
-                <span className="truncate font-medium flex-1">{project.name}</span>
-                <button
-                  onClick={(e) => handleDeleteClick(e, project)}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 transition-all"
-                  title="Delete project"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-              <div
-                className="truncate text-xs text-zinc-500 mt-0.5 ml-[22px]"
-                title={project.path}
-              >
-                {shortenPath(project.path)}
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Folder size={14} className={`flex-shrink-0 ${isActive ? 'text-blue-400' : 'text-zinc-500'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{project.name}</div>
+                    <div
+                      className="truncate text-xs text-zinc-500 mt-0.5"
+                      title={project.path}
+                    >
+                      {shortenPath(project.path)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <button
+                    onClick={(e) => handleOpenInExplorer(e, project)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-zinc-600 hover:text-zinc-300 hover:bg-zinc-600/50 transition-all"
+                    title="Open in file explorer"
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteClick(e, project)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                    title="Delete project"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </button>
           );
@@ -146,9 +147,13 @@ export function ProjectSidebar() {
           <div className="p-6 text-center">
             <Folder size={32} className="mx-auto text-zinc-600 mb-2" />
             <div className="text-sm text-zinc-500">No projects yet</div>
-            <div className="text-xs text-zinc-600 mt-1">Click "+ New" to get started</div>
+            <div className="text-xs text-zinc-600 mt-1">Click "+ New" to open a folder</div>
           </div>
         )}
+      </div>
+
+      <div className="px-3 py-2 border-t border-zinc-700 text-xs text-zinc-600">
+        {projects.length} project{projects.length !== 1 ? 's' : ''}
       </div>
 
       {projectToDelete && (

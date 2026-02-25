@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   timeout: 60000,
   retries: 0,
+  workers: 8,
   use: {
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

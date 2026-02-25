@@ -37,23 +37,21 @@ export async function waitForBoard(page: Page): Promise<void> {
     .waitFor({ state: 'visible', timeout: 5000 });
 }
 
-// Create a project via the UI
+// Create a project via the UI (folder picker flow).
+// The project name is derived from the folder path's basename,
+// so we construct a mock path whose last segment matches the desired name.
 export async function createProject(
   page: Page,
   name: string,
-  projectPath: string,
+  _projectPath?: string,
 ): Promise<void> {
-  const addButton = page.locator('button[title="New project"]');
+  // Set the mock folder selection so basename = project name
+  await page.evaluate((n: string) => {
+    (window as any).__mockFolderPath = '/mock/projects/' + n;
+  }, name);
+
+  const addButton = page.locator('button[title="Open folder as project"]');
   await addButton.click();
-
-  const nameInput = page.locator('input[placeholder="Project name"]');
-  const pathInput = page.locator('input[placeholder="Project path"]');
-
-  await nameInput.fill(name);
-  await pathInput.fill(projectPath);
-
-  const createButton = page.locator('button:has-text("Create")');
-  await createButton.click();
 
   await waitForBoard(page);
 }

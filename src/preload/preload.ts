@@ -96,6 +96,10 @@ const api: ElectronAPI = {
     openPath: (dirPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, dirPath),
   },
 
+  dialog: {
+    selectFolder: () => ipcRenderer.invoke(IPC.DIALOG_SELECT_FOLDER),
+  },
+
   window: {
     minimize: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
     maximize: () => ipcRenderer.send(IPC.WINDOW_MAXIMIZE),

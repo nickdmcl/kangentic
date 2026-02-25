@@ -141,8 +141,30 @@
           }) || null
         );
       },
-      openByPath: async function () {
-        return null;
+      openByPath: async function (projectPath) {
+        var name = projectPath.split('/').pop() || projectPath.split('\\').pop() || 'project';
+        var existing = projects.find(function (p) { return p.path === projectPath; });
+        if (existing) {
+          currentProjectId = existing.id;
+          return existing;
+        }
+        var project = {
+          id: uuid(),
+          name: name,
+          path: projectPath,
+          github_url: null,
+          default_agent: 'claude',
+          last_opened: now(),
+          created_at: now(),
+        };
+        projects.push(project);
+        currentProjectId = project.id;
+        if (swimlanes.length === 0) {
+          swimlanes = DEFAULT_SWIMLANES.map(function (s, i) {
+            return Object.assign({}, s, { id: uuid(), position: i, created_at: now() });
+          });
+        }
+        return project;
       },
       onAutoOpened: function () {
         return noop;
@@ -377,6 +399,17 @@
       },
       openPath: async function () {
         return '';
+      },
+    },
+
+    dialog: {
+      selectFolder: async function () {
+        var override = window.__mockFolderPath;
+        if (override) {
+          window.__mockFolderPath = null;
+          return override;
+        }
+        return '/mock/path/test-project';
       },
     },
 
