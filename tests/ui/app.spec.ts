@@ -1,35 +1,29 @@
 import { test, expect } from '@playwright/test';
-import { launchApp, takeProductScreenshot, waitForBoard, createProject, createTempProject, cleanupTempProject } from './helpers';
-import type { ElectronApplication, Page } from '@playwright/test';
+import { launchPage, waitForBoard, createProject, createTask } from './helpers';
+import type { Browser, Page } from '@playwright/test';
 
-const TEST_NAME = 'app-test';
-const PROJECT_NAME = `E2E Test ${Date.now()}`;
-let app: ElectronApplication;
+const PROJECT_NAME = `UI Test ${Date.now()}`;
+let browser: Browser;
 let page: Page;
-let tmpDir: string;
 
 test.beforeAll(async () => {
-  tmpDir = createTempProject(TEST_NAME);
-  const result = await launchApp();
-  app = result.app;
+  const result = await launchPage();
+  browser = result.browser;
   page = result.page;
 });
 
 test.afterAll(async () => {
-  await app?.close();
-  cleanupTempProject(TEST_NAME);
+  await browser?.close();
 });
 
 /** Dismiss any open dialogs, then ensure the board is visible */
 async function ensureBoardVisible() {
-  // Dismiss any open dialogs
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
   const backlog = page.locator('[data-swimlane-name="Backlog"]');
   if (await backlog.isVisible().catch(() => false)) return;
 
-  // Re-click the project in sidebar
   const projectBtn = page.locator(`button:has-text("${PROJECT_NAME}")`).first();
   await projectBtn.click();
   await waitForBoard(page);
@@ -54,23 +48,14 @@ test.describe('App Launch', () => {
     await expect(page.locator('.font-semibold:has-text("Kangentic")')).toBeVisible();
   });
 
-  test('status bar shows session count', async () => {
-    // Status bar is hidden until a project is open — verify via data-testid after project creation
-    // At launch (no project), status bar shows only claude version info
-    const statusBar = page.locator('[data-testid="session-count"]');
-    // No project open yet, so session count may not be visible
-    const isVisible = await statusBar.isVisible().catch(() => false);
-    // Just verify the status bar container exists
+  test('status bar exists', async () => {
     await expect(page.locator('.h-6.bg-zinc-900.border-t')).toBeVisible();
-    if (isVisible) {
-      await expect(statusBar).toContainText('active');
-    }
   });
 });
 
 test.describe('Project Management', () => {
   test('can create a new project', async () => {
-    await createProject(page, PROJECT_NAME, tmpDir);
+    await createProject(page, PROJECT_NAME, '/tmp/ui-test');
     await expect(page.locator('[data-swimlane-name="Backlog"]')).toBeVisible();
   });
 
@@ -84,7 +69,14 @@ test.describe('Project Management', () => {
   });
 
   test('project appears in sidebar', async () => {
-    await expect(page.locator(`button:has-text("${PROJECT_NAME}")`).first()).toBeVisible();
+    await expect(
+      page.locator(`button:has-text("${PROJECT_NAME}")`).first(),
+    ).toBeVisible();
+  });
+
+  test('status bar shows session and task counts after project open', async () => {
+    await expect(page.locator('[data-testid="session-count"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-count"]')).toBeVisible();
   });
 });
 
@@ -98,7 +90,9 @@ test.describe('Task CRUD', () => {
     await backlog.locator('text=+ Add task').click();
 
     await page.locator('input[placeholder="Task title"]').fill('Test Task Alpha');
-    await page.locator('textarea[placeholder="Description (optional)"]').fill('Description for alpha task');
+    await page
+      .locator('textarea[placeholder="Description (optional)"]')
+      .fill('Description for alpha task');
     await page.locator('button:has-text("Create")').click();
     await page.waitForTimeout(500);
 
@@ -125,20 +119,22 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Alpha').click();
     await page.waitForTimeout(300);
 
-    await page.locator('button:has-text("Edit")').click();
+    // Open kebab menu (the "..." Actions button), then click Edit
+    await page.locator('button[title="Actions"]').click();
     await page.waitForTimeout(200);
 
-    // Target the edit input in the dialog header
+    // Click the Edit menu item (has Pencil icon + "Edit" text)
+    await page.locator('button:has-text("Edit")').first().click();
+    await page.waitForTimeout(200);
+
     const titleInput = page.locator('.fixed input[type="text"]');
     await titleInput.fill('Updated Task Alpha');
 
     await page.locator('button:has-text("Save")').click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    await expect(page.locator('h2:has-text("Updated Task Alpha")')).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    // Dialog closes after save (no session), verify the card shows the updated title
+    await expect(taskCard('Updated Task Alpha')).toBeVisible();
   });
 
   test('can create a second task', async () => {
@@ -149,18 +145,22 @@ test.describe('Task CRUD', () => {
     await page.locator('button:has-text("Create")').click();
     await page.waitForTimeout(500);
 
-    await expect(page.locator('text=Test Task Beta')).toBeVisible();
+    await expect(taskCard('Test Task Beta')).toBeVisible();
   });
 
-  test('can delete a task', async () => {
+  test('can archive a task', async () => {
     await taskCard('Test Task Beta').click();
     await page.waitForTimeout(300);
 
-    await page.locator('button:has-text("Delete")').click();
-    await page.locator('button:has-text("Confirm")').click();
+    // Open kebab menu, click Archive
+    await page.locator('button[title="Actions"]').click();
+    await page.waitForTimeout(200);
+    await page.locator('button:has-text("Archive")').click();
     await page.waitForTimeout(500);
 
-    await expect(taskCard('Test Task Beta')).not.toBeVisible();
+    // Task should no longer appear in the Backlog column
+    const backlog = page.locator('[data-swimlane-name="Backlog"]');
+    await expect(backlog.locator('text=Test Task Beta')).not.toBeVisible({ timeout: 3000 });
   });
 });
 
@@ -188,12 +188,5 @@ test.describe('Column Management', () => {
         await expect(page.locator('[data-swimlane-name="Custom Stage"]')).toBeVisible();
       }
     }
-  });
-});
-
-test.describe('Screenshots', () => {
-  test('capture board with tasks', async () => {
-    await ensureBoardVisible();
-    await takeProductScreenshot(page, 'board-with-tasks');
   });
 });

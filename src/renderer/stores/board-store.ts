@@ -84,7 +84,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
 
   deleteTask: async (id) => {
     await window.electronAPI.tasks.delete(id);
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+    set((s) => ({
+      tasks: s.tasks.filter((t) => t.id !== id),
+      archivedTasks: s.archivedTasks.filter((t) => t.id !== id),
+    }));
     // Remove ALL sessions for this task from the session store
     useSessionStore.setState((s) => ({
       sessions: s.sessions.filter((sess) => sess.taskId !== id),

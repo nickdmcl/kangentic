@@ -22,6 +22,20 @@ export class TransitionEngine {
     private sessionRepo?: SessionRepository,
   ) {}
 
+  /**
+   * Resume a suspended session for a task. Used when moving out of
+   * Backlog/Done into a non-agent column (no spawn_agent transition fires).
+   */
+  async resumeSuspendedSession(task: Task): Promise<void> {
+    await this.executeSpawnAgent({}, task, {
+      title: task.title,
+      description: task.description,
+      taskId: task.id,
+      worktreePath: task.worktree_path || '',
+      branchName: task.branch_name || '',
+    });
+  }
+
   async executeTransition(task: Task, fromSwimlaneId: string, toSwimlaneId: string): Promise<void> {
     const transitions = this.skillRepo.getTransitionsFor(fromSwimlaneId, toSwimlaneId);
     if (transitions.length === 0) return;

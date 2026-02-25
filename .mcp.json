@@ -7,10 +7,6 @@
     "context7": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
-    },
-    "@hypothesi/tauri-mcp-server": {
-      "command": "cmd",
-      "args": ["/c", "npx", "@hypothesi/tauri-mcp-server"]
     }
   }
 }

@@ -10,12 +10,17 @@ import { useProjectStore } from '../../stores/project-store';
 import { ToastContainer } from './ToastContainer';
 
 const MIN_TERMINAL_HEIGHT = 100;
+const MIN_SIDEBAR_WIDTH = 160;
+const MAX_SIDEBAR_WIDTH = 400;
 
 export function AppLayout() {
   const settingsOpen = useConfigStore((s) => s.settingsOpen);
   const config = useConfigStore((s) => s.config);
   const currentProject = useProjectStore((s) => s.currentProject);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(224); // 14rem = 224px (w-56)
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const latestSidebarWidthRef = useRef(sidebarWidth);
   const [terminalHeight, setTerminalHeight] = useState(config.terminal.panelHeight);
   const [terminalCollapsed, setTerminalCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -23,6 +28,15 @@ export function AppLayout() {
   const contentColRef = useRef<HTMLDivElement>(null);
   const latestHeightRef = useRef(terminalHeight);
   const availableHeightRef = useRef(0);
+
+  // Sync sidebar width from config on load
+  useEffect(() => {
+    const saved = config.sidebar?.width;
+    if (typeof saved === 'number' && saved >= MIN_SIDEBAR_WIDTH && saved <= MAX_SIDEBAR_WIDTH) {
+      setSidebarWidth(saved);
+      latestSidebarWidthRef.current = saved;
+    }
+  }, [config]);
 
   // Compute max terminal height: 50% of the content column so the board
   // is always at least 50% visible.  Subtract the 4px resize handle.
@@ -59,11 +73,6 @@ export function AppLayout() {
         latestHeightRef.current = clamped;
         setTerminalHeight(clamped);
       }
-      // Always signal terminals to refit when the content column resizes
-      // (window resize, sidebar toggle, height clamp, etc.)
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent('terminal-panel-resize'));
-      });
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -110,18 +119,53 @@ export function AppLayout() {
         terminal: { ...config.terminal, panelHeight: latestHeightRef.current },
       });
       // End drag suppression then signal terminals to refit.
-      // Double rAF ensures React has committed the final height.
       window.dispatchEvent(new CustomEvent('terminal-panel-drag-end'));
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.dispatchEvent(new CustomEvent('terminal-panel-resize'));
-        });
+        window.dispatchEvent(new CustomEvent('terminal-panel-resize'));
       });
     };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   }, [terminalHeight, config.terminal, clampHeight]);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsSidebarResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const startX = e.clientX;
+    const startWidth = latestSidebarWidthRef.current;
+
+    window.dispatchEvent(new CustomEvent('terminal-panel-drag-start'));
+
+    const onMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + delta));
+      setSidebarWidth(newWidth);
+      latestSidebarWidthRef.current = newWidth;
+    };
+
+    const onMouseUp = () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setIsSidebarResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      // Persist sidebar width
+      window.electronAPI.config.set({
+        sidebar: { width: latestSidebarWidthRef.current },
+      });
+      window.dispatchEvent(new CustomEvent('terminal-panel-drag-end'));
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent('terminal-panel-resize'));
+      });
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   if (settingsOpen) {
     return (
@@ -139,12 +183,21 @@ export function AppLayout() {
 
       <div className="flex flex-1 min-h-0">
         <div
-          className={`flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out border-r border-zinc-700 ${
-            sidebarOpen ? 'w-56' : 'w-0 border-r-0'
-          }`}
+          className={`flex-shrink-0 overflow-hidden border-r border-zinc-700 ${
+            sidebarOpen ? '' : 'w-0 border-r-0'
+          } ${isSidebarResizing ? '' : 'transition-[width] duration-200 ease-in-out'}`}
+          style={sidebarOpen ? { width: sidebarWidth } : undefined}
         >
           <ProjectSidebar />
         </div>
+
+        {/* Sidebar resize handle */}
+        {sidebarOpen && (
+          <div
+            className="w-1 flex-shrink-0 cursor-col-resize bg-zinc-700 hover:bg-zinc-500 transition-colors"
+            onMouseDown={handleSidebarResizeStart}
+          />
+        )}
 
         <div className="flex-1 flex flex-col min-w-0" ref={contentColRef}>
           {currentProject ? (
@@ -164,7 +217,7 @@ export function AppLayout() {
               {/* Terminal panel */}
               <div
                 style={terminalCollapsed ? undefined : { height: terminalHeight }}
-                className={`flex-shrink-0 ${isResizing ? 'pointer-events-none' : ''}`}
+                className={`flex-shrink-0 ${isResizing || isSidebarResizing ? 'pointer-events-none' : ''}`}
               >
                 <TerminalPanel
                   collapsed={terminalCollapsed}

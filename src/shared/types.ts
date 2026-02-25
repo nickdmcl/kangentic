@@ -176,6 +176,10 @@ export interface AppConfig {
     queueOverflow: 'queue' | 'reject';
   };
 
+  sidebar: {
+    width: number;
+  };
+
   git: {
     worktreesEnabled: boolean;
     autoCleanup: boolean;
@@ -204,6 +208,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     cliPath: null,
     maxConcurrentSessions: 5,
     queueOverflow: 'queue',
+  },
+  sidebar: {
+    width: 224,
   },
   git: {
     worktreesEnabled: true,

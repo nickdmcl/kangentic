@@ -32,7 +32,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   deleteProject: async (id) => {
     await window.electronAPI.projects.delete(id);
-    set((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    set((s) => ({
+      projects: s.projects.filter((p) => p.id !== id),
+      currentProject: s.currentProject?.id === id ? null : s.currentProject,
+    }));
   },
 
   openProject: async (id) => {
