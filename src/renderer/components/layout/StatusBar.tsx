@@ -29,14 +29,14 @@ export function StatusBar() {
       {currentProject && (
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5" data-testid="session-count">
-            <SquareTerminal size={12} className={activeSessions > 0 ? 'text-green-400' : 'text-zinc-500'} />
+            <SquareTerminal size={14} className={activeSessions > 0 ? 'text-green-400' : 'text-zinc-500'} />
             <span className={activeSessions > 0 ? 'text-green-400' : ''}>
               {activeSessions} agents
             </span>
             {queued > 0 && <span className="text-yellow-400">({queued} queued)</span>}
           </span>
           <span className="flex items-center gap-1.5" data-testid="task-count">
-            <ClipboardCheck size={12} />
+            <ClipboardCheck size={14} />
             {activeTasks} tasks
           </span>
         </div>
