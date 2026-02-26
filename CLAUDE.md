@@ -71,7 +71,12 @@ All runtime data lives under `<project>/.kangentic/` (auto-added to `.gitignore`
 
 ### Testing
 
-Two test tiers — prefer **UI tests** for anything that doesn't need the real Electron backend.
+Three test tiers — prefer **unit tests** for pure logic, **UI tests** for anything that doesn't need the real Electron backend.
+
+#### Unit tests (`tests/unit/`) — fast, no browser
+- Run with `npm run test:unit` (vitest)
+- Covers: event-bridge script, hook-manager inject/strip logic, session suspend state
+- No build step, no browser — runs directly against source
 
 #### UI tests (`tests/ui/`) — headless, fast, no windows
 - Run with `npx playwright test --project=ui`
@@ -79,7 +84,7 @@ Two test tiers — prefer **UI tests** for anything that doesn't need the real E
 - `mock-electron-api.js` injects a full in-memory mock of `window.electronAPI` via `addInitScript()`
 - Covers: app launch, project CRUD, task CRUD, drag-and-drop, column management
 - No build step needed — runs against Vite HMR directly
-- ~13 seconds for 20 tests
+- ~13 seconds for 23 tests
 
 #### E2E tests (`tests/e2e/`) — real Electron, opens windows
 - Run with `npx playwright test --project=electron`
@@ -93,6 +98,7 @@ Two test tiers — prefer **UI tests** for anything that doesn't need the real E
 - `npx playwright test --project=ui` for quick headless-only validation
 
 #### Adding new tests
+- Pure logic (parsers, filters, state machines) → add to `tests/unit/`
 - Pure UI interactions (clicks, forms, dialogs, drag-and-drop) → add to `tests/ui/`
 - Needs real IPC, PTY, or session spawning → add to `tests/e2e/`
 - The mock in `tests/ui/mock-electron-api.js` supports full CRUD — extend it if new API methods are added
@@ -100,7 +106,7 @@ Two test tiers — prefer **UI tests** for anything that doesn't need the real E
 ### Performance
 
 - **Terminal ownership handoff:** Each PTY session spawns exactly one Claude Code CLI process. The bottom panel and task detail dialog share that single process but never render simultaneously — when the dialog opens, it claims the session via `dialogSessionId` and the panel unmounts its xterm instance. On close, the panel recreates its xterm from the PTY scrollback buffer. This prevents duplicate xterm instances from sending conflicting resize calls (different container widths garble TUI output) and ensures one CLI process per task regardless of which view is active.
-- **Aggregate terminal is read-only:** The "All" tab in the bottom panel uses `useAggregateTerminal`, a separate read-only xterm that filters and interleaves output from all active sessions. It does not wire `onData` to any PTY, so it adds no resize overhead. It only appears when 2+ sessions are active.
+- **Activity log replaces aggregate terminal:** The "Activity" tab shows structured events (tool calls, idle state) from Claude Code hooks instead of raw terminal output. Uses a plain DOM list — no xterm/WebGL overhead. Events flow: hook → event-bridge.js → JSONL file → fs.watch → IPC → Zustand store → ActivityLog component.
 - **WebGL renderer:** xterm instances attempt WebGL acceleration first, with automatic fallback to canvas on context loss or unavailability.
 - **Resize debouncing:** PTY resize calls are debounced (200ms) and suppressed entirely during panel drag operations to prevent scrollback eviction from rapid row-count changes.
 
