@@ -116,6 +116,10 @@ export function injectActivityHooks(
       ...filterActivityHooks(existingHooks.Stop),
       { matcher: '', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" idle` }] },
     ],
+    PermissionRequest: [
+      ...filterActivityHooks(existingHooks.PermissionRequest),
+      { matcher: '', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" idle` }] },
+    ],
   };
 
   fs.writeFileSync(p, JSON.stringify(settings, null, 2));
@@ -165,6 +169,10 @@ export function injectEventHooks(
     ],
     Stop: [
       ...filterEventHooks(existingHooks.Stop),
+      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" idle` }] },
+    ],
+    PermissionRequest: [
+      ...filterEventHooks(existingHooks.PermissionRequest),
       { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" idle` }] },
     ],
   };

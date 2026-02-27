@@ -214,6 +214,29 @@ describe('Event-derived activity state', () => {
     expect(states).toEqual(['thinking', 'idle', 'thinking']);
   });
 
+  it('permission stall: tool_start → idle (PermissionRequest) → resumes thinking', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. Bash tool starts → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: 'tool_start', tool: 'Bash' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('thinking');
+
+    // 2. PermissionRequest fires → idle (permission dialog shown)
+    appendEvent(eventsPath, { ts: Date.now(), type: 'idle' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 3. User approves → tool_end + new tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: 'tool_end', tool: 'Bash' });
+    appendEvent(eventsPath, { ts: Date.now(), type: 'tool_start', tool: 'Read' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('thinking');
+
+    expect(states).toEqual(['thinking', 'idle', 'thinking']);
+  });
+
   it('multiple events in single write batch', async () => {
     const { session, eventsPath } = await spawnWithEvents();
     const states = collectActivity(manager, session.id);

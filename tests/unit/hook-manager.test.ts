@@ -39,11 +39,15 @@ describe('hook-manager', () => {
     expect(settings.hooks.PreToolUse).toHaveLength(1);
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.PermissionRequest).toHaveLength(1);
     expect(settings.hooks.PreToolUse[0].matcher).toBe('AskUserQuestion');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('activity-bridge');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('idle');
     expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('activity-bridge');
     expect(settings.hooks.Stop[0].hooks[0].command).toContain('activity-bridge');
+    expect(settings.hooks.PermissionRequest[0].matcher).toBe('');
+    expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('activity-bridge');
+    expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('idle');
   });
 
   it('injectEventHooks creates settings file with correct hooks', () => {
@@ -54,6 +58,7 @@ describe('hook-manager', () => {
     expect(settings.hooks.PostToolUse).toHaveLength(1);
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(settings.hooks.Stop).toHaveLength(1);
+    expect(settings.hooks.PermissionRequest).toHaveLength(1);
     // First entry: catch-all tool_start
     expect(settings.hooks.PreToolUse[0].matcher).toBe('');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('event-bridge');
@@ -66,6 +71,10 @@ describe('hook-manager', () => {
     expect(settings.hooks.PreToolUse[2].matcher).toBe('ExitPlanMode');
     expect(settings.hooks.PreToolUse[2].hooks[0].command).toContain('event-bridge');
     expect(settings.hooks.PreToolUse[2].hooks[0].command).toContain('idle');
+    // PermissionRequest → idle
+    expect(settings.hooks.PermissionRequest[0].matcher).toBe('');
+    expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('event-bridge');
+    expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('idle');
   });
 
   it('injectActivityHooks preserves event-bridge hooks', () => {
@@ -90,6 +99,14 @@ describe('hook-manager', () => {
     );
     expect(ptuCommands.filter((c: string) => c.includes('event-bridge'))).toHaveLength(3);
     expect(ptuCommands.filter((c: string) => c.includes('activity-bridge'))).toHaveLength(1);
+
+    // PermissionRequest should have both bridge types
+    expect(settings.hooks.PermissionRequest).toHaveLength(2);
+    const prCommands = settings.hooks.PermissionRequest.map(
+      (e: any) => e.hooks[0].command,
+    );
+    expect(prCommands.some((c: string) => c.includes('event-bridge'))).toBe(true);
+    expect(prCommands.some((c: string) => c.includes('activity-bridge'))).toBe(true);
   });
 
   it('injectEventHooks preserves activity-bridge hooks', () => {
@@ -112,6 +129,14 @@ describe('hook-manager', () => {
     );
     expect(ptuCommands.filter((c: string) => c.includes('activity-bridge'))).toHaveLength(1);
     expect(ptuCommands.filter((c: string) => c.includes('event-bridge'))).toHaveLength(3);
+
+    // PermissionRequest should have both bridge types
+    expect(settings.hooks.PermissionRequest).toHaveLength(2);
+    const prCommands = settings.hooks.PermissionRequest.map(
+      (e: any) => e.hooks[0].command,
+    );
+    expect(prCommands.some((c: string) => c.includes('activity-bridge'))).toBe(true);
+    expect(prCommands.some((c: string) => c.includes('event-bridge'))).toBe(true);
   });
 
   it('injectActivityHooks preserves user hooks', () => {
@@ -158,6 +183,10 @@ describe('hook-manager', () => {
           { matcher: '', hooks: [{ type: 'command', command: `node "${ACTIVITY_BRIDGE}" "${ACTIVITY_PATH}" thinking` }] },
           { matcher: '', hooks: [{ type: 'command', command: `node "${EVENT_BRIDGE}" "${EVENTS_PATH}" prompt` }] },
         ],
+        PermissionRequest: [
+          { matcher: '', hooks: [{ type: 'command', command: `node "${ACTIVITY_BRIDGE}" "${ACTIVITY_PATH}" idle` }] },
+          { matcher: '', hooks: [{ type: 'command', command: `node "${EVENT_BRIDGE}" "${EVENTS_PATH}" idle` }] },
+        ],
       },
     };
     fs.writeFileSync(
@@ -172,6 +201,8 @@ describe('hook-manager', () => {
     expect(result.hooks.UserPromptSubmit[0].hooks[0].command).toBe('echo user-hook');
     expect(result.hooks.PreToolUse).toHaveLength(1);
     expect(result.hooks.PreToolUse[0].hooks[0].command).toBe('echo user-pretool');
+    // PermissionRequest had only kangentic hooks — key should be removed entirely
+    expect(result.hooks.PermissionRequest).toBeUndefined();
   });
 
   it('stripActivityHooks cleans up empty settings file', () => {

@@ -179,6 +179,10 @@ export class CommandBuilder {
           ...(existingHooks.Stop || []),
           { matcher: '', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" idle` }] },
         ];
+        merged.hooks.PermissionRequest = [
+          ...(existingHooks.PermissionRequest || []),
+          { matcher: '', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" idle` }] },
+        ];
       }
 
       if (eventsPath) {
@@ -199,6 +203,10 @@ export class CommandBuilder {
         ];
         merged.hooks.Stop = [
           ...(merged.hooks.Stop || existingHooks.Stop || []),
+          { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" idle` }] },
+        ];
+        merged.hooks.PermissionRequest = [
+          ...(merged.hooks.PermissionRequest || existingHooks.PermissionRequest || []),
           { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" idle` }] },
         ];
       }
