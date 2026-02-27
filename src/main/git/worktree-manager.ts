@@ -27,6 +27,11 @@ export class WorktreeManager {
     return fs.existsSync(path.join(projectPath, '.git'));
   }
 
+  /** Check whether the project path is itself inside a .kangentic/worktrees/ directory (preview mode). */
+  static isInsideWorktree(projectPath: string): boolean {
+    return projectPath.replace(/\\/g, '/').includes('.kangentic/worktrees/');
+  }
+
   /**
    * Create a worktree for a task. The worktree folder and branch are named
    * using a slug derived from the task title, with the taskId suffix to

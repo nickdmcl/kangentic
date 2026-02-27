@@ -474,7 +474,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // a fresh session (e.g. Backlog → Review).
     if (!task.worktree_path && currentProjectPath) {
       const config = configManager.getEffectiveConfig(currentProjectPath);
-      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath)) {
+      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath) && !WorktreeManager.isInsideWorktree(currentProjectPath)) {
         try {
           const wm = new WorktreeManager(currentProjectPath);
           const { worktreePath, branchName } = await wm.createWorktree(
@@ -550,7 +550,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // Create worktree if needed (any non-backlog column gets an agent)
     if (!task.worktree_path && currentProjectPath) {
       const config = configManager.getEffectiveConfig(currentProjectPath);
-      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath)) {
+      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath) && !WorktreeManager.isInsideWorktree(currentProjectPath)) {
         try {
           const wm = new WorktreeManager(currentProjectPath);
           const { worktreePath, branchName } = await wm.createWorktree(
@@ -743,7 +743,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // Create worktree if needed
     if (!task.worktree_path && currentProjectPath) {
       const config = configManager.getEffectiveConfig(currentProjectPath);
-      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath)) {
+      if (config.git.worktreesEnabled && WorktreeManager.isGitRepo(currentProjectPath) && !WorktreeManager.isInsideWorktree(currentProjectPath)) {
         try {
           const wm = new WorktreeManager(currentProjectPath);
           const { worktreePath, branchName } = await wm.createWorktree(

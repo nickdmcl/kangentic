@@ -294,6 +294,7 @@ export class TransitionEngine {
     const appConfig = this.getConfig();
     if (!appConfig.projectPath || !appConfig.gitConfig.worktreesEnabled) return;
     if (!WorktreeManager.isGitRepo(appConfig.projectPath)) return;
+    if (WorktreeManager.isInsideWorktree(appConfig.projectPath)) return;
 
     const wm = new WorktreeManager(appConfig.projectPath);
     const baseBranch = task.base_branch || config.baseBranch || appConfig.gitConfig.defaultBaseBranch;

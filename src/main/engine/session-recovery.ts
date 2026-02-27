@@ -207,6 +207,10 @@ export async function recoverSessions(
 
       // --- Guard: CWD must still exist ---
       if (!fs.existsSync(record.cwd)) {
+        // Clear stale worktree_path so reconcileSessions can pick up the task
+        if (task.worktree_path && !fs.existsSync(task.worktree_path)) {
+          taskRepo.update({ id: task.id, worktree_path: null, branch_name: null });
+        }
         console.log(
           `Session recovery: cwd ${record.cwd} missing — marking exited`,
         );
@@ -431,9 +435,14 @@ export async function reconcileSessions(
 
         const permissionMode =
           actionConfig?.permissionMode || config.claude.permissionMode;
-        const cwd = task.worktree_path || projectPath;
+        let cwd = task.worktree_path || projectPath;
 
-        // Guard: CWD must still exist
+        // Guard: CWD must still exist — fall back to projectPath if worktree was deleted
+        if (task.worktree_path && !fs.existsSync(task.worktree_path)) {
+          console.log(`Session reconciliation: worktree missing for task ${task.id} — falling back to project path`);
+          taskRepo.update({ id: task.id, worktree_path: null, branch_name: null });
+          cwd = projectPath;
+        }
         if (!fs.existsSync(cwd)) {
           console.log(
             `Session reconciliation: cwd ${cwd} missing — skipping task ${task.id}`,

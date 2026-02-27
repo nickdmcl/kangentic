@@ -161,12 +161,16 @@ export class SessionManager extends EventEmitter {
       shellArgs = ['--login'];
     }
 
+    // Strip CLAUDECODE so spawned Claude CLI sessions don't refuse to start
+    // when Kangentic itself was launched from inside a Claude Code session.
+    const { CLAUDECODE: _, ...cleanEnv } = { ...process.env, ...input.env };
+
     const ptyProcess = pty.spawn(shellExe, shellArgs, {
       name: 'xterm-256color',
       cols: 120,
       rows: 30,
       cwd: input.cwd,
-      env: { ...process.env, ...input.env } as Record<string, string>,
+      env: cleanEnv as Record<string, string>,
     });
 
     // Derive merged settings path from statusOutputPath pattern
