@@ -65,6 +65,14 @@ export class WorktreeManager {
     // Create worktree with a new branch
     await this.git.raw(['worktree', 'add', '-b', branchName, worktreePath, startPoint]);
 
+    // Remove .claude/commands/ checked out by git — Claude Code discovers
+    // commands from the project root by walking up, so the worktree copy
+    // just produces duplicates in the autocomplete list.
+    const wtCommandsDir = path.join(worktreePath, '.claude', 'commands');
+    if (fs.existsSync(wtCommandsDir)) {
+      fs.rmSync(wtCommandsDir, { recursive: true, force: true });
+    }
+
     // Copy specified files into the worktree
     for (const file of copyFiles) {
       const src = path.join(this.projectPath, file);
