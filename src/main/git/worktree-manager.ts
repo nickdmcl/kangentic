@@ -65,13 +65,12 @@ export class WorktreeManager {
     // Create worktree with a new branch
     await this.git.raw(['worktree', 'add', '-b', branchName, worktreePath, startPoint]);
 
-    // Remove .claude/commands/ checked out by git — Claude Code discovers
-    // commands from the project root by walking up, so the worktree copy
-    // just produces duplicates in the autocomplete list.
-    const wtCommandsDir = path.join(worktreePath, '.claude', 'commands');
-    if (fs.existsSync(wtCommandsDir)) {
-      fs.rmSync(wtCommandsDir, { recursive: true, force: true });
-    }
+    // Claude Code discovers commands and skills by walking up from cwd,
+    // so the worktree copies produce duplicates in the autocomplete list.
+    // Setting skip-worktree before deleting prevents git status from
+    // reporting them as missing (which would block rebase/merge-back).
+    await this.hideWorktreeDir(worktreePath, '.claude/commands');
+    await this.hideWorktreeDir(worktreePath, '.claude/skills');
 
     // Copy specified files into the worktree
     for (const file of copyFiles) {
@@ -137,5 +136,29 @@ export class WorktreeManager {
       }
     }
     return worktrees;
+  }
+
+  /**
+   * Mark all tracked files under a relative directory as skip-worktree,
+   * then delete the directory from disk.  This hides the files from
+   * `git status` so they don't block rebase/merge.
+   */
+  private async hideWorktreeDir(worktreePath: string, relDir: string): Promise<void> {
+    const absDir = path.join(worktreePath, relDir);
+    if (!fs.existsSync(absDir)) return;
+
+    const wtGit = simpleGit(worktreePath);
+    try {
+      const lsOutput = await wtGit.raw(['ls-files', relDir]);
+      const trackedFiles = lsOutput.split('\n').filter(Boolean);
+      if (trackedFiles.length > 0) {
+        await wtGit.raw(['update-index', '--skip-worktree', '--', ...trackedFiles]);
+      }
+    } catch (err) {
+      // skip-worktree failed — fall through to delete anyway; only
+      // consequence is git status will show files as deleted.
+      console.warn(`skip-worktree failed for ${relDir}`, err);
+    }
+    fs.rmSync(absDir, { recursive: true, force: true });
   }
 }
