@@ -110,10 +110,37 @@ Three test tiers — prefer **unit tests** for pure logic, **UI tests** for anyt
 - **WebGL renderer:** xterm instances attempt WebGL acceleration first, with automatic fallback to canvas on context loss or unavailability.
 - **Resize debouncing:** PTY resize calls are debounced (200ms) and suppressed entirely during panel drag operations to prevent scrollback eviction from rapid row-count changes.
 
+## CRITICAL: Single-Command Bash Calls Only
+
+**Every Bash tool call MUST contain exactly ONE command.** Claude Code does not support chained or piped commands — they will error or produce unexpected results.
+
+**Forbidden operators:** `&&`, `||`, `|`, `;`
+
+**Forbidden patterns — NEVER do this:**
+```
+cd /some/path && git status          # WRONG
+git diff | head -20                  # WRONG
+npm run build && npm test            # WRONG
+cat file.json | grep "key"          # WRONG
+command1 ; command2                  # WRONG
+```
+
+**Correct alternatives:**
+```
+git -C /some/path status             # Use git -C for git commands in other directories
+```
+- Use the `Read` tool (with `offset`/`limit`) instead of `cat`, `head`, `tail`
+- Use the `Grep` tool instead of `grep` or piping into `grep`
+- Use the `Glob` tool instead of `find`
+- Use the `Write` tool instead of `echo` redirection
+- Use the `timeout` parameter on Bash instead of `sleep`
+- Run commands separately in individual Bash tool calls
+
+This rule applies everywhere: main sessions, worktree agents, commands, and skills.
+
 ## Conventions
 
 - TypeScript strict mode
-- Single-command bash calls only (no `&&`, `||`, `|`, `;` chaining)
 - Prefer editing existing files over creating new ones
 - Use `data-testid` and `data-swimlane-name` attributes for test selectors
 - All dialogs use global `useEffect` Escape key listener

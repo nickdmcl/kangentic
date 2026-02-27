@@ -74,4 +74,6 @@ If this fails (e.g., non-fast-forward divergence), report the warning but do not
 
 ## Allowed Tools
 
-Use `Read`, `Glob`, `Grep`, `Bash` (for `git` commands and reading config files outside the worktree via `cat`), `Edit` (for conflict resolution), and `AskUserQuestion`. Do not use `Write`. Do not use `Read` for files outside the worktree (e.g., project root config) — use `Bash` with `cat` instead to avoid permission prompts. Always run commands from the worktree directory — no chained commands (`&&`, `||`, `|`, `;`).
+Use `Read`, `Glob`, `Grep`, `Bash` (for `git` commands and reading config files outside the worktree via `cat`), `Edit` (for conflict resolution), and `AskUserQuestion`. Do not use `Write`. Do not use `Read` for files outside the worktree (e.g., project root config) — use `Bash` with `cat` instead to avoid permission prompts.
+
+**CRITICAL: No chained commands.** Every Bash call must contain exactly ONE command. Never use `&&`, `||`, `|`, or `;`. For git commands in the worktree, use `git -C <worktreePath>` — never `cd <path> && git ...`.
