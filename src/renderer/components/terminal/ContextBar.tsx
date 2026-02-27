@@ -2,6 +2,7 @@ import React from 'react';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { getProgressColor } from '../../utils/color-lerp';
+import { formatTokenCount } from '../../utils/format-tokens';
 
 interface ContextBarProps {
   sessionId: string;
@@ -41,6 +42,11 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
       )}
       <span className={`${pill} text-zinc-400`}>{modelName}</span>
       <span className={`${pill} text-zinc-400 tabular-nums`}>${usage.cost.totalCostUsd.toFixed(2)}</span>
+      {!compact && (
+        <span className={`${pill} text-zinc-400 tabular-nums`}>
+          {formatTokenCount(usage.contextWindow.totalInputTokens)} ↑ / {formatTokenCount(usage.contextWindow.totalOutputTokens)} ↓
+        </span>
+      )}
 
       <div className="w-px h-3.5 bg-zinc-700 flex-shrink-0" />
 

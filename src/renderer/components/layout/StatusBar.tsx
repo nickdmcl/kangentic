@@ -4,9 +4,11 @@ import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useProjectStore } from '../../stores/project-store';
+import { formatTokenCount } from '../../utils/format-tokens';
 
 export function StatusBar() {
   const sessions = useSessionStore((s) => s.sessions);
+  const sessionUsage = useSessionStore((s) => s.sessionUsage);
   const claudeInfo = useConfigStore((s) => s.claudeInfo);
   const claudeVersionLabel = useConfigStore((s) => s.claudeVersionLabel);
   const tasks = useBoardStore((s) => s.tasks);
@@ -24,6 +26,13 @@ export function StatusBar() {
   );
   const activeTasks = tasks.filter((t) => !doneSwimlaneIds.has(t.swimlane_id)).length;
 
+  // Aggregate token usage across all sessions
+  const usageValues = Object.values(sessionUsage);
+  const hasUsage = usageValues.length > 0;
+  const totalInput = usageValues.reduce((sum, u) => sum + u.contextWindow.totalInputTokens, 0);
+  const totalOutput = usageValues.reduce((sum, u) => sum + u.contextWindow.totalOutputTokens, 0);
+  const totalCost = usageValues.reduce((sum, u) => sum + u.cost.totalCostUsd, 0);
+
   return (
     <div className="h-9 bg-zinc-900 border-t border-zinc-700 flex items-center px-3 text-xs text-zinc-500 select-none flex-shrink-0">
       {currentProject && (
@@ -39,6 +48,14 @@ export function StatusBar() {
             <ClipboardCheck size={14} />
             {activeTasks} tasks
           </span>
+          {hasUsage && (
+            <>
+              <div className="w-px h-3.5 bg-zinc-700 flex-shrink-0" />
+              <span className="tabular-nums" data-testid="aggregate-usage">
+                {formatTokenCount(totalInput)} ↑ / {formatTokenCount(totalOutput)} ↓&nbsp;&nbsp;${totalCost.toFixed(2)}
+              </span>
+            </>
+          )}
         </div>
       )}
 
