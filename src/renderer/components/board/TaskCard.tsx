@@ -72,11 +72,15 @@ export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardPro
     data: { type: 'task' },
   });
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.3 : 1,
-  };
+  const isDragOverDone = useBoardStore((s) => s.isDragOverDone);
+
+  const style: React.CSSProperties = isDragging && isDragOverDone
+    ? { display: 'none' }
+    : {
+        transform: CSS.Transform.toString(transform) ?? 'translate3d(0, 0, 0)',
+        transition: transition ?? 'transform 200ms ease',
+        opacity: isDragging ? 0.4 : 1,
+      };
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDragOverlay) return;
@@ -93,6 +97,7 @@ export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardPro
           {...attributes}
           {...listeners}
           onClick={handleClick}
+          data-task-id={task.id}
           className={`bg-zinc-800/60 border border-zinc-700/50 rounded-md px-2.5 py-1.5 cursor-grab active:cursor-grabbing hover:border-zinc-600 transition-colors group/card ${
             isDragOverlay ? 'shadow-xl' : ''
           }`}
@@ -131,6 +136,7 @@ export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardPro
         {...attributes}
         {...listeners}
         onClick={handleClick}
+        data-task-id={task.id}
         className={`border rounded-md p-2.5 cursor-grab active:cursor-grabbing transition-colors bg-zinc-800 ${
           isHighlighted ? 'border-[2px] border-zinc-500/60' : isIdle ? 'border-zinc-700/40' : 'border-zinc-700 hover:border-zinc-600'
         } ${isIdle ? 'animate-pulse-subtle' : ''

@@ -10,9 +10,7 @@ import { chromium, type Browser, type Page } from '@playwright/test';
 import path from 'node:path';
 
 const MOCK_SCRIPT = path.join(__dirname, 'mock-electron-api.js');
-const isWorktree = __dirname.replace(/\\/g, '/').includes('.kangentic/worktrees/');
-const VITE_PORT = process.env.VITE_PORT || (isWorktree ? '5174' : '5173');
-const VITE_URL = `http://localhost:${VITE_PORT}`;
+const VITE_URL = `http://localhost:${process.env.PLAYWRIGHT_VITE_PORT || '5173'}`;
 
 /**
  * Launch a page with pre-configured mock state.
@@ -109,8 +107,9 @@ function makePreConfig(opts: { sessionStatus: string; activity: string; withUsag
     window.electronAPI.sessions.getUsage = async function () {
       var result = {};
       result['${SESSION_ID}'] = {
-        model: { displayName: 'Claude Sonnet' },
-        contextWindow: { usedPercentage: 25 },
+        model: { id: 'claude-sonnet', displayName: 'Claude Sonnet' },
+        contextWindow: { usedPercentage: 25, totalInputTokens: 1000, totalOutputTokens: 500, contextWindowSize: 200000 },
+        cost: { totalCostUsd: 0.01, totalDurationMs: 5000 },
       };
       return result;
     };

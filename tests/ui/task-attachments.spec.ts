@@ -216,8 +216,8 @@ test.describe('Image Attachments', () => {
       container.dispatchEvent(dragEvent);
     });
 
-    // The drop overlay should appear
-    const dropOverlay = page.locator('text=Drop images here');
+    // The drop overlay should appear (exact match to avoid hitting the placeholder)
+    const dropOverlay = page.locator('text="Drop images here"');
     await expect(dropOverlay).toBeVisible();
 
     // Simulate dragleave

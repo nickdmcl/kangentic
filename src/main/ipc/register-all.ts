@@ -420,6 +420,9 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // Move the task in the database
     tasks.move(input);
 
+    // Within-column reorder — no side effects needed
+    if (fromSwimlaneId === input.targetSwimlaneId) return;
+
     const db = getProjectDb(currentProjectId!);
     const sessionRepo = new SessionRepository(db);
 

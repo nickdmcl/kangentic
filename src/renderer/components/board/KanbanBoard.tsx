@@ -4,7 +4,6 @@ import {
   DragOverlay,
   closestCorners,
   pointerWithin,
-  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -141,6 +140,7 @@ export function KanbanBoard() {
   const moveTask = useBoardStore((s) => s.moveTask);
   const setCompletingTask = useBoardStore((s) => s.setCompletingTask);
   const reorderSwimlanes = useBoardStore((s) => s.reorderSwimlanes);
+  const reorderTaskInColumn = useBoardStore((s) => s.reorderTaskInColumn);
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
 
   // Track the original swimlane when drag starts (for proper transitions)
@@ -184,31 +184,33 @@ export function KanbanBoard() {
     return task?.swimlane_id;
   }, [swimlaneIds]);
 
-  /**
-   * Custom collision detection: use pointerWithin first (checks if cursor
-   * is inside a droppable rect), fall back to rectIntersection.
-   * For column drags, use closestCorners.
-   * When multiple collisions are found, prioritize swimlane droppables
-   * over sortable task items so the column drop zone always highlights.
-   */
   const collisionDetection = useCallback<CollisionDetection>((args) => {
+    // Column drags: closestCorners
     if (String(args.active.id).startsWith('column:')) {
       return closestCorners(args);
     }
-    const pointer = pointerWithin(args);
-    if (pointer.length > 0) {
-      const containerMap = new Map<string, any>();
-      for (const c of args.droppableContainers) {
-        containerMap.set(String(c.id), c);
-      }
-      const swimlaneHits = pointer.filter((c) => {
-        const container = containerMap.get(String(c.id));
-        return container?.data?.current?.type === 'swimlane';
+
+    // Done column: check with pointerWithin first (docs' "trash bin" pattern).
+    // pointerWithin checks pointer coordinates, not the draggable's full rect,
+    // so dragging to adjacent Review doesn't falsely match Done.
+    const doneLane = useBoardStore.getState().swimlanes.find((s) => s.role === 'done');
+    if (doneLane) {
+      const doneCollisions = pointerWithin({
+        ...args,
+        droppableContainers: args.droppableContainers.filter(
+          (c) => String(c.id) === doneLane.id,
+        ),
       });
-      if (swimlaneHits.length > 0) return swimlaneHits;
-      return pointer;
+      if (doneCollisions.length > 0) return doneCollisions;
     }
-    return rectIntersection(args);
+
+    // Everything else: closestCorners (docs-recommended for Kanban)
+    return closestCorners({
+      ...args,
+      droppableContainers: args.droppableContainers.filter(
+        (c) => !String(c.id).startsWith('column:'),
+      ),
+    });
   }, []);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -250,7 +252,11 @@ export function KanbanBoard() {
     // Don't visually transfer to Done — the card stays in its current column
     // and shrinks in place when dropped
     const doneLane = useBoardStore.getState().swimlanes.find((s) => s.role === 'done');
-    if (doneLane && overContainer === doneLane.id) return;
+    if (doneLane && overContainer === doneLane.id) {
+      useBoardStore.setState({ isDragOverDone: true });
+      return;
+    }
+    useBoardStore.setState({ isDragOverDone: false });
 
     // Move the task to the new container visually
     useBoardStore.setState((s) => ({
@@ -269,6 +275,7 @@ export function KanbanBoard() {
     const originalSwimlane = dragOriginRef.current;
     dragOriginRef.current = null;
     setActiveTask(null);
+    useBoardStore.setState({ isDragOverDone: false });
 
     if (!over) {
       // Cancelled — reload from DB to restore original positions
@@ -330,6 +337,16 @@ export function KanbanBoard() {
       return;
     }
 
+    // --- Same-column reorder ---
+    if (originalSwimlane === targetSwimlaneId) {
+      if (over.data.current?.type !== 'task') {
+        useBoardStore.getState().loadBoard();
+        return;
+      }
+      await reorderTaskInColumn(taskId, targetSwimlaneId, active.id as string, over.id as string);
+      return;
+    }
+
     // Determine position within the target container
     const currentTasks = state.tasks;
     const laneTasks = currentTasks.filter(
@@ -378,11 +395,12 @@ export function KanbanBoard() {
 
     // Persist the move (moveTask handles optimistic update, IPC, and reload)
     await moveTask({ taskId, targetSwimlaneId, targetPosition });
-  }, [moveTask, setCompletingTask, findSwimlane, swimlanes, reorderSwimlanes]);
+  }, [moveTask, setCompletingTask, findSwimlane, swimlanes, reorderSwimlanes, reorderTaskInColumn]);
 
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);
     dragOriginRef.current = null;
+    useBoardStore.setState({ isDragOverDone: false });
     useBoardStore.getState().loadBoard();
   }, []);
 
@@ -411,7 +429,7 @@ export function KanbanBoard() {
 
         <DragOverlay style={{ pointerEvents: 'none' }}>
           {activeTask ? (
-            <div className="drag-overlay">
+            <div className="drag-overlay" style={{ opacity: 0.9 }}>
               <TaskCard task={activeTask} isDragOverlay />
             </div>
           ) : null}

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { arrayMove } from '@dnd-kit/sortable';
 import type { Task, Swimlane, TaskCreateInput, TaskUpdateInput, TaskMoveInput, TaskUnarchiveInput, SwimlaneCreateInput, SwimlaneUpdateInput } from '../../shared/types';
 import { useSessionStore } from './session-store';
 import { useToastStore } from './toast-store';
@@ -22,6 +23,9 @@ interface BoardStore {
   completingTask: CompletingTask | null;
   recentlyArchivedId: string | null;
 
+  // Transient drag state
+  isDragOverDone: boolean;
+
   loadBoard: () => Promise<void>;
 
   // Tasks
@@ -42,6 +46,9 @@ interface BoardStore {
   finalizeCompletion: () => Promise<void>;
   clearRecentlyArchived: () => void;
 
+  // Within-column reorder
+  reorderTaskInColumn: (taskId: string, swimlaneId: string, activeId: string, overId: string) => Promise<void>;
+
   // Swimlanes
   createSwimlane: (input: SwimlaneCreateInput) => Promise<Swimlane>;
   updateSwimlane: (input: SwimlaneUpdateInput) => Promise<Swimlane>;
@@ -56,6 +63,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   loading: false,
   completingTask: null,
   recentlyArchivedId: null,
+  isDragOverDone: false,
 
   loadBoard: async () => {
     set({ loading: true });
@@ -261,6 +269,46 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
 
   clearRecentlyArchived: () => {
     set({ recentlyArchivedId: null });
+  },
+
+  reorderTaskInColumn: async (taskId, swimlaneId, activeId, overId) => {
+    if (activeId === overId) return;
+
+    // Compute indices from IDs
+    const laneTasks = get().tasks
+      .filter((t) => t.swimlane_id === swimlaneId)
+      .sort((a, b) => a.position - b.position);
+
+    const oldIndex = laneTasks.findIndex((t) => t.id === activeId);
+    const newIndex = laneTasks.findIndex((t) => t.id === overId);
+    if (oldIndex === -1 || newIndex === -1) {
+      await get().loadBoard();
+      return;
+    }
+
+    // Optimistic update: reorder tasks in store immediately so dnd-kit's
+    // transform release sees the correct DOM order (no snap-back).
+    const reordered = arrayMove([...laneTasks], oldIndex, newIndex);
+
+    const positionMap = new Map<string, number>();
+    reordered.forEach((t, i) => positionMap.set(t.id, i));
+
+    set((s) => ({
+      tasks: s.tasks.map((t) => {
+        const pos = positionMap.get(t.id);
+        return pos !== undefined ? { ...t, position: pos } : t;
+      }),
+    }));
+
+    await window.electronAPI.tasks.move({
+      taskId,
+      targetSwimlaneId: swimlaneId,
+      targetPosition: newIndex,
+    });
+
+    // Lightweight reload — only tasks (no session changes for same-column reorder)
+    const tasks = await window.electronAPI.tasks.list();
+    set({ tasks });
   },
 
   createSwimlane: async (input) => {

@@ -94,12 +94,12 @@ function isJunction(p) {
 
 function isPortFree(port) {
   return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', () => resolve(false));
-    server.once('listening', () => {
-      server.close(() => resolve(true));
+    // Connect as a client to catch listeners on both IPv4 and IPv6
+    const socket = net.createConnection({ port, host: 'localhost' }, () => {
+      socket.end();
+      resolve(false); // something is listening
     });
-    server.listen(port, '127.0.0.1');
+    socket.once('error', () => resolve(true)); // nothing listening
   });
 }
 

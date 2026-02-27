@@ -90,9 +90,7 @@ test.describe('Task CRUD', () => {
     await backlog.locator('text=+ Add task').click();
 
     await page.locator('input[placeholder="Task title"]').fill('Test Task Alpha');
-    await page
-      .locator('textarea[placeholder="Description (optional)"]')
-      .fill('Description for alpha task');
+    await page.locator('.fixed textarea').fill('Description for alpha task');
     await page.locator('button:has-text("Create")').click();
     await page.waitForTimeout(500);
 

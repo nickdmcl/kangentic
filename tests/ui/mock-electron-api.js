@@ -251,13 +251,50 @@
         var idx = tasks.findIndex(function (t) {
           return t.id === input.taskId;
         });
-        if (idx >= 0) {
-          tasks[idx] = Object.assign({}, tasks[idx], {
-            swimlane_id: input.targetSwimlaneId,
-            position: input.targetPosition,
-            updated_at: now(),
+        if (idx < 0) return;
+
+        var task = tasks[idx];
+        var oldSwimlaneId = task.swimlane_id;
+        var oldPosition = task.position;
+        var newSwimlaneId = input.targetSwimlaneId;
+        var newPosition = input.targetPosition;
+
+        if (oldSwimlaneId === newSwimlaneId) {
+          // Same-column reorder: shift positions between old and new
+          var laneTasks = tasks.filter(function (t) {
+            return t.swimlane_id === oldSwimlaneId;
+          });
+          // Remove from old position
+          laneTasks.forEach(function (t) {
+            if (t.id !== input.taskId && t.position > oldPosition) {
+              t.position = t.position - 1;
+            }
+          });
+          // Insert at new position
+          laneTasks.forEach(function (t) {
+            if (t.id !== input.taskId && t.position >= newPosition) {
+              t.position = t.position + 1;
+            }
+          });
+        } else {
+          // Cross-column: close gap in source, make room in target
+          tasks.forEach(function (t) {
+            if (t.id !== input.taskId && t.swimlane_id === oldSwimlaneId && t.position > oldPosition) {
+              t.position = t.position - 1;
+            }
+          });
+          tasks.forEach(function (t) {
+            if (t.swimlane_id === newSwimlaneId && t.position >= newPosition) {
+              t.position = t.position + 1;
+            }
           });
         }
+
+        tasks[idx] = Object.assign({}, task, {
+          swimlane_id: newSwimlaneId,
+          position: newPosition,
+          updated_at: now(),
+        });
       },
       listArchived: async function () {
         return archivedTasks;
