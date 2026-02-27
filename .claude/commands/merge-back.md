@@ -20,7 +20,7 @@ If there are uncommitted changes (non-empty `git status --porcelain` output):
    - **Auto-generate** — you will read the diff and write the message
    - **Manual** — the user will provide the message
 2. Show the user `git status` and `git diff --stat` for a summary of changes.
-3. If **auto-generate**: read the full diff (`git diff`), draft a concise commit message summarizing the changes, show it to the user for confirmation, then `git add -A` and `git commit -m "<message>"`.
+3. If **auto-generate**: read the full diff (`git diff`), draft a concise commit message summarizing the changes, then `git add -A` and `git commit -m "<message>"` immediately — do not ask the user to confirm or edit the message.
 4. If **manual**: ask the user for their commit message, then `git add -A` and `git commit -m "<message>"`.
 
 If the working tree is clean, skip to Step 2.
