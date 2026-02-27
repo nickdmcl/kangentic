@@ -58,19 +58,19 @@ This pushes the rebased commits directly to the remote source branch. After a su
 2. Suggest re-running `/merge-back` to fetch the latest and rebase again.
 3. Stop — do not force-push.
 
-## Step 5 — Update Local Source Branch
-
-The project root (determined in pre-flight step 3) always has the source branch checked out. Run `git -C <projectRoot> pull --ff-only` to fast-forward it to match the remote.
-
-If this fails (e.g., non-fast-forward divergence), report the warning but do not treat it as a fatal error — the remote is already updated.
-
-## Step 6 — Report
+## Step 5 — Report
 
 Summarize:
 - Branch name that was merged
 - Source branch that received the changes
 - Number of commits landed (from `git log origin/<sourceBranch>@{1}..origin/<sourceBranch> --oneline` or similar)
 - Remind the user they can clean up the worktree by moving the task to Done on the board (which triggers `cleanup_worktree`) or manually
+
+## Step 6 — Update Local Source Branch
+
+The project root (determined in pre-flight step 3) always has the source branch checked out. Run `git -C <projectRoot> pull --ff-only` to fast-forward it to match the remote.
+
+If this fails (e.g., non-fast-forward divergence), report the warning but do not treat it as a fatal error — the remote is already updated.
 
 ## Allowed Tools
 
