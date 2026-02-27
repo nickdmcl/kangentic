@@ -244,3 +244,13 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     });
   });
 }
+
+// Handle graceful restart signal from dev.js (esbuild watch triggered rebuild)
+process.on('message', (msg: unknown) => {
+  if (msg && typeof msg === 'object' && (msg as Record<string, unknown>).type === 'graceful-restart' && !isShuttingDown) {
+    isShuttingDown = true;
+    shutdownSessions().finally(() => {
+      app.exit(75); // signal dev.js to respawn
+    });
+  }
+});
