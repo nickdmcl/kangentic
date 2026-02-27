@@ -42,7 +42,9 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps) {
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <button
           onClick={() => setSettingsOpen(!settingsOpen)}
-          className="p-1.5 hover:bg-zinc-700 rounded text-zinc-400 hover:text-zinc-100 transition-colors"
+          className={`p-1.5 hover:bg-zinc-700 rounded transition-colors ${
+            settingsOpen ? 'text-zinc-100 bg-zinc-700' : 'text-zinc-400 hover:text-zinc-100'
+          }`}
           title="Settings"
         >
           <Settings size={20} />

@@ -4,7 +4,7 @@ import { StatusBar } from './StatusBar';
 import { ProjectSidebar } from '../sidebar/ProjectSidebar';
 import { KanbanBoard } from '../board/KanbanBoard';
 import { TerminalPanel } from '../terminal/TerminalPanel';
-import { SettingsPage } from '../settings/SettingsPage';
+import { SettingsPanel } from '../settings/SettingsPanel';
 import { useConfigStore } from '../../stores/config-store';
 import { useProjectStore } from '../../stores/project-store';
 import { ToastContainer } from './ToastContainer';
@@ -18,16 +18,6 @@ export function AppLayout() {
 
   const sidebar = useSidebarResize(config);
   const terminal = useTerminalResize(config);
-
-  if (settingsOpen) {
-    return (
-      <div className="h-screen flex flex-col bg-zinc-900">
-        <TitleBar sidebarOpen={sidebar.open} onToggleSidebar={sidebar.toggle} />
-        <SettingsPage />
-        <ToastContainer />
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-zinc-900">
@@ -94,6 +84,7 @@ export function AppLayout() {
       </div>
 
       <StatusBar />
+      {settingsOpen && <SettingsPanel />}
       <ToastContainer />
     </div>
   );

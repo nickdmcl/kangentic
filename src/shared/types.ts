@@ -171,7 +171,7 @@ export interface SessionUsage {
 
 // === Configuration ===
 
-export type PermissionMode = 'dangerously-skip' | 'project-settings' | 'plan-mode' | 'manual';
+export type PermissionMode = 'dangerously-skip' | 'project-settings' | 'manual';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 
@@ -226,7 +226,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   claude: {
     permissionMode: 'project-settings',
     cliPath: null,
-    maxConcurrentSessions: 5,
+    maxConcurrentSessions: 8,
     queueOverflow: 'queue',
   },
   sidebar: {
@@ -236,7 +236,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     worktreesEnabled: true,
     autoCleanup: true,
     defaultBaseBranch: 'main',
-    copyFiles: ['.claude/settings.json', '.claude/settings.local.json'],
+    copyFiles: ['.claude/settings.local.json'],
     initScript: null,
   },
   skipDeleteConfirm: false,

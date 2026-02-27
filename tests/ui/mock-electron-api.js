@@ -33,14 +33,14 @@
     claude: {
       permissionMode: 'project-settings',
       cliPath: null,
-      maxConcurrentSessions: 5,
+      maxConcurrentSessions: 8,
       queueOverflow: 'queue',
     },
     git: {
       worktreesEnabled: true,
       autoCleanup: true,
       defaultBaseBranch: 'main',
-      copyFiles: ['.claude/settings.json', '.claude/settings.local.json'],
+      copyFiles: ['.claude/settings.local.json'],
       initScript: null,
     },
     skipDeleteConfirm: false,

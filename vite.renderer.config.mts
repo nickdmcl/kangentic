@@ -9,4 +9,9 @@ export default defineConfig({
       '@shared': '/src/shared',
     },
   },
+  server: {
+    watch: {
+      ignored: ['**/.kangentic/**'],
+    },
+  },
 });

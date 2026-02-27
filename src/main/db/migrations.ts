@@ -279,7 +279,7 @@ function seedActionsAndTransitions(db: Database.Database, now: string): void {
     JSON.stringify({
       agent: 'claude',
       promptTemplate: 'Task: {{title}}\n\n{{description}}{{attachments}}',
-      permissionMode: 'plan-mode',
+      permissionMode: 'project-settings',
     }),
     now,
   );

@@ -39,15 +39,6 @@ export class CommandBuilder {
           parts.push('--settings', quoteArg(toForwardSlash(mergedSettingsPath)));
         }
         break;
-      case 'plan-mode':
-        parts.push('--permission-mode', 'plan');
-        if (mergedSettingsPath) {
-          parts.push('--settings', quoteArg(toForwardSlash(mergedSettingsPath)));
-        } else {
-          const settingsArg = this.getProjectSettingsArg(options);
-          if (settingsArg) parts.push('--settings', quoteArg(settingsArg));
-        }
-        break;
       case 'project-settings':
         // When running from a worktree, Claude resolves settings from CWD,
         // not the git root. Explicitly pass --settings for the main project.

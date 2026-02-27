@@ -27,10 +27,6 @@ function buildClaudeCommand(options: {
 }): string {
   const parts = [quoteArg(options.claudePath)];
 
-  if (options.permissionMode === 'plan-mode') {
-    parts.push('--permission-mode', 'plan');
-  }
-
   if (options.sessionId) {
     const flag = options.resume ? '--resume' : '--session-id';
     parts.push(flag, quoteArg(options.sessionId));
@@ -256,25 +252,11 @@ describe('Prompt Delivery (Claude Agent)', () => {
     expect(lastPart).toContain('abc-123-def');
   });
 
-  it('fresh session to Planning includes plan mode flag and prompt', () => {
-    const cmd = buildClaudeCommand({
-      claudePath: '/usr/bin/claude',
-      prompt: 'Task: Design auth\n\nArchitect the system',
-      permissionMode: 'plan-mode',
-    });
-
-    expect(cmd).toContain('--permission-mode');
-    expect(cmd).toContain('plan');
-    expect(cmd).toContain('Design auth');
-    expect(cmd).toContain('Architect the system');
-  });
-
   it('resumed session with --resume has no prompt text', () => {
     const cmd = buildClaudeCommand({
       claudePath: '/usr/bin/claude',
       sessionId: 'session-xyz',
       resume: true,
-      permissionMode: 'plan-mode',
     });
 
     expect(cmd).toContain('--resume');
