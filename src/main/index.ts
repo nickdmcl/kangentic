@@ -22,6 +22,14 @@ if (app.isPackaged) {
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+// Separate user data directory for preview instances to avoid disk cache conflicts
+for (const arg of process.argv) {
+  if (arg.startsWith('--user-data-dir=')) {
+    app.setPath('userData', arg.slice('--user-data-dir='.length));
+    break;
+  }
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 // Parse --cwd=<path> from command line args

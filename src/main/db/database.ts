@@ -10,6 +10,7 @@ export function getGlobalDb(): Database.Database {
     ensureDirs();
     globalDb = new Database(PATHS.globalDb);
     globalDb.pragma('journal_mode = WAL');
+    globalDb.pragma('busy_timeout = 5000');
     globalDb.pragma('foreign_keys = ON');
     runGlobalMigrations(globalDb);
   }
@@ -22,6 +23,7 @@ export function getProjectDb(projectId: string): Database.Database {
     ensureDirs();
     db = new Database(PATHS.projectDb(projectId));
     db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
     runProjectMigrations(db);
     projectDbs.set(projectId, db);
