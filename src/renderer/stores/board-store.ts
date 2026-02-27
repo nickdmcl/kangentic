@@ -23,9 +23,6 @@ interface BoardStore {
   completingTask: CompletingTask | null;
   recentlyArchivedId: string | null;
 
-  // Transient drag state
-  isDragOverDone: boolean;
-
   loadBoard: () => Promise<void>;
 
   // Tasks
@@ -63,8 +60,6 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   loading: false,
   completingTask: null,
   recentlyArchivedId: null,
-  isDragOverDone: false,
-
   loadBoard: async () => {
     set({ loading: true });
     const [tasks, swimlanes, archivedTasks] = await Promise.all([

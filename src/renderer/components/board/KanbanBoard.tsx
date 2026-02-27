@@ -22,7 +22,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
-import { DoneSwimlane, type DoneSwimlaneProps } from './DoneSwimlane';
+import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
 import { AddColumnButton } from './AddColumnButton';
 import { useBoardStore } from '../../stores/board-store';
@@ -32,7 +32,7 @@ import { useToastStore } from '../../stores/toast-store';
 /** Wrapper that registers a column with @dnd-kit/sortable.
  *  All columns participate so dnd-kit knows their positions,
  *  but only custom columns (role === null) get a drag handle. */
-function SortableSwimlane({ swimlane, tasks }: SwimlaneProps) {
+const SortableSwimlane = React.memo(function SortableSwimlane({ swimlane, tasks }: SwimlaneProps) {
   const {
     attributes,
     listeners,
@@ -75,7 +75,7 @@ function SortableSwimlane({ swimlane, tasks }: SwimlaneProps) {
       />
     </div>
   );
-}
+});
 
 /** Fixed-position card that flies from the drop position into the Done drop zone. */
 function FlyingCard() {
@@ -168,13 +168,21 @@ export function KanbanBoard() {
     [swimlanes],
   );
 
-  const tasksForLane = useCallback(
-    (swimlane: SwimlaneType) =>
-      tasks
-        .filter((t) => t.swimlane_id === swimlane.id)
-        .sort((a, b) => a.position - b.position),
-    [tasks],
+  const doneLaneId = useMemo(
+    () => swimlanes.find((s) => s.role === 'done')?.id ?? null,
+    [swimlanes],
   );
+
+  const tasksPerLane = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const lane of swimlanes) map.set(lane.id, []);
+    for (const task of tasks) {
+      const arr = map.get(task.swimlane_id);
+      if (arr) arr.push(task);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.position - b.position);
+    return map;
+  }, [swimlanes, tasks]);
 
   /** Resolve which swimlane a draggable/droppable ID belongs to. */
   const findSwimlane = useCallback((id: string): string | undefined => {
@@ -194,12 +202,11 @@ export function KanbanBoard() {
     // Done column: check with pointerWithin first (docs' "trash bin" pattern).
     // pointerWithin checks pointer coordinates, not the draggable's full rect,
     // so dragging to adjacent Review doesn't falsely match Done.
-    const doneLane = useBoardStore.getState().swimlanes.find((s) => s.role === 'done');
-    if (doneLane) {
+    if (doneLaneId) {
       const doneCollisions = pointerWithin({
         ...args,
         droppableContainers: args.droppableContainers.filter(
-          (c) => String(c.id) === doneLane.id,
+          (c) => String(c.id) === doneLaneId,
         ),
       });
       if (doneCollisions.length > 0) return doneCollisions;
@@ -219,7 +226,7 @@ export function KanbanBoard() {
         return true;
       }),
     });
-  }, [findSwimlane]);
+  }, [findSwimlane, doneLaneId]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
@@ -234,56 +241,16 @@ export function KanbanBoard() {
     }
   }, []);
 
-  /**
-   * Fires continuously as the dragged item moves over different containers.
-   * We transfer the task between SortableContext containers by updating
-   * swimlane_id in the store (visual only, no IPC).
-   */
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = String(active.id);
-    if (activeId.startsWith('column:')) return;
-
-    // Skip visual cross-container transfer for archived tasks — they aren't
-    // in the `tasks` array. The DragOverlay shows the floating card and
-    // handleDragEnd will call unarchiveTask on drop.
-    const state = useBoardStore.getState();
-    if (state.archivedTasks.some((t) => t.id === activeId)) return;
-
-    const activeContainer = findSwimlane(activeId);
-    const overContainer = findSwimlane(String(over.id));
-
-    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
-
-    // Don't visually transfer to Done — the card stays in its current column
-    // and shrinks in place when dropped
-    const doneLane = useBoardStore.getState().swimlanes.find((s) => s.role === 'done');
-    if (doneLane && overContainer === doneLane.id) {
-      useBoardStore.setState({ isDragOverDone: true });
-      return;
-    }
-    useBoardStore.setState({ isDragOverDone: false });
-
-    // Move the task to the new container visually
-    useBoardStore.setState((s) => ({
-      tasks: s.tasks.map((t) => {
-        if (t.id !== activeId) return t;
-        const targetTasks = s.tasks.filter(
-          (ot) => ot.swimlane_id === overContainer && ot.id !== activeId,
-        );
-        return { ...t, swimlane_id: overContainer, position: targetTasks.length };
-      }),
-    }));
-  }, [findSwimlane]);
+  // No visual cross-container transfer during drag — the DragOverlay provides
+  // the floating card feedback. Mutating tasks mid-drag caused rect shifts that
+  // made closestCenter oscillate at column boundaries.
+  const handleDragOver = useCallback((_event: DragOverEvent) => {}, []);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     const originalSwimlane = dragOriginRef.current;
     dragOriginRef.current = null;
     setActiveTask(null);
-    useBoardStore.setState({ isDragOverDone: false });
 
     if (!over) {
       // Cancelled — reload from DB to restore original positions
@@ -423,7 +390,6 @@ export function KanbanBoard() {
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);
     dragOriginRef.current = null;
-    useBoardStore.setState({ isDragOverDone: false });
     useBoardStore.getState().loadBoard();
   }, []);
 
@@ -443,7 +409,7 @@ export function KanbanBoard() {
               <SortableSwimlane
                 key={swimlane.id}
                 swimlane={swimlane}
-                tasks={tasksForLane(swimlane)}
+                tasks={tasksPerLane.get(swimlane.id) ?? []}
               />
             ))}
             <AddColumnButton />

@@ -9,7 +9,14 @@ import { useBoardStore } from '../../stores/board-store';
 import { getProgressColor } from '../../utils/color-lerp';
 import type { Task } from '../../../shared/types';
 
-export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardProps) {
+interface TaskCardProps {
+  task: Task;
+  isDragOverlay?: boolean;
+  compact?: boolean;
+  onDelete?: (taskId: string) => void;
+}
+
+const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardProps) {
   const [showDetail, setShowDetail] = useState(false);
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -72,15 +79,11 @@ export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardPro
     data: { type: 'task' },
   });
 
-  const isDragOverDone = useBoardStore((s) => s.isDragOverDone);
-
-  const style: React.CSSProperties = isDragging && isDragOverDone
-    ? { display: 'none' }
-    : {
-        transform: CSS.Transform.toString(transform) ?? 'translate3d(0, 0, 0)',
-        transition: transition ?? 'transform 200ms ease',
-        opacity: isDragging ? 0.4 : 1,
-      };
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform) ?? 'translate3d(0, 0, 0)',
+    transition: transition ?? 'transform 200ms ease',
+    opacity: isDragging ? 0.4 : 1,
+  };
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDragOverlay) return;
@@ -207,4 +210,6 @@ export function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardPro
       )}
     </>
   );
-}
+};
+
+export const TaskCard = React.memo(TaskCardInner);

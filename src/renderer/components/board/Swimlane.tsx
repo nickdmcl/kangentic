@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Lock, Pencil, GripVertical } from 'lucide-react';
@@ -22,6 +22,8 @@ export function Swimlane({ swimlane, tasks, dragHandleProps }: SwimlaneProps) {
     id: swimlane.id,
     data: { type: 'swimlane' },
   });
+
+  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   const role = swimlane.role;
   const isSystemColumn = role !== null;
@@ -107,7 +109,7 @@ export function Swimlane({ swimlane, tasks, dragHandleProps }: SwimlaneProps) {
           isOver ? 'bg-zinc-700/30' : ''
         }`}
       >
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <TaskCard key={task.id} task={task} />
           ))}

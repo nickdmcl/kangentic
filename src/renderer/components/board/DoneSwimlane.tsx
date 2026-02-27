@@ -54,6 +54,8 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
     setPendingDeleteId(null);
   }, [pendingDeleteId, dontAskAgain, deleteArchivedTask, updateConfig]);
 
+  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+
   const { setNodeRef, isOver } = useDroppable({
     id: swimlane.id,
     data: { type: 'swimlane' },
@@ -125,7 +127,7 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
           style={isOver ? { '--drop-color': swimlane.color, color: swimlane.color } as React.CSSProperties : undefined}
         >
           <div className="relative z-10 w-full">
-            <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
               {tasks.length > 0 ? (
                 <div className="space-y-2 w-full">
                   {tasks.map((task) => (
