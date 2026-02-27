@@ -14,8 +14,6 @@ interface UseTerminalOptions {
   sessionId: string | null;
   fontFamily?: string;
   fontSize?: number;
-  isClaudeSession?: boolean;
-  shell?: string;
 }
 
 export function useTerminal(options: UseTerminalOptions) {
@@ -80,28 +78,6 @@ export function useTerminal(options: UseTerminalOptions) {
 
     // Send user input to PTY
     if (options.sessionId) {
-      // Shell-appropriate newline: send CSI u for modified Enter in Claude sessions.
-      // xterm.js 6.0.0 sends plain \r for all Enter variants. Claude Code CLI
-      // expects \x1b[13;<mod>u to distinguish newline from submit.
-      // Only the platform-native key is intercepted per shell type.
-      if (options.isClaudeSession && options.shell) {
-        const s = options.shell.toLowerCase();
-        const isWindowsShell = s.includes('powershell') || s.includes('pwsh') || /(?:^|[\\/])cmd(?:\.exe)?$/.test(s);
-        terminal.attachCustomKeyEventHandler((event) => {
-          if (event.type === 'keydown' && event.key === 'Enter' && !event.metaKey) {
-            if (!isWindowsShell && event.shiftKey && !event.ctrlKey && !event.altKey) {
-              window.electronAPI.sessions.write(options.sessionId!, '\x1b[13;2u');
-              return false;
-            }
-            if (isWindowsShell && event.ctrlKey && !event.shiftKey && !event.altKey) {
-              window.electronAPI.sessions.write(options.sessionId!, '\x1b[13;5u');
-              return false;
-            }
-          }
-          return true;
-        });
-      }
-
       terminal.onData((data) => {
         window.electronAPI.sessions.write(options.sessionId!, data);
       });
@@ -145,7 +121,7 @@ export function useTerminal(options: UseTerminalOptions) {
       // No session — just fit immediately
       fitAddon.fit();
     }
-  }, [options.sessionId, options.fontFamily, options.fontSize, options.isClaudeSession, options.shell]);
+  }, [options.sessionId, options.fontFamily, options.fontSize]);
 
   // Set up data listener
   useEffect(() => {

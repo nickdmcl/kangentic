@@ -652,8 +652,6 @@ export function TaskDetailDialog({ task, onClose }: TaskDetailDialogProps) {
                   key={session.id}
                   sessionId={session.id}
                   active={true}
-                  isClaudeSession={task.agent === 'claude'}
-                  shell={session.shell}
                 />
               </div>
             </div>
