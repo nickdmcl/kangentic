@@ -120,6 +120,11 @@ export function injectActivityHooks(
       ...filterActivityHooks(existingHooks.PermissionRequest),
       { matcher: '', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" idle` }] },
     ],
+    PostToolUse: [
+      ...filterActivityHooks(existingHooks.PostToolUse),
+      { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" thinking` }] },
+      { matcher: 'ExitPlanMode', hooks: [{ type: 'command', command: `node "${activityBridge}" "${activityPath}" thinking` }] },
+    ],
   };
 
   fs.writeFileSync(p, JSON.stringify(settings, null, 2));
@@ -162,6 +167,8 @@ export function injectEventHooks(
     PostToolUse: [
       ...filterEventHooks(existingHooks.PostToolUse),
       { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" tool_end` }] },
+      { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" prompt` }] },
+      { matcher: 'ExitPlanMode', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" prompt` }] },
     ],
     UserPromptSubmit: [
       ...filterEventHooks(existingHooks.UserPromptSubmit),

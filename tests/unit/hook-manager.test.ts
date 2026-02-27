@@ -40,6 +40,7 @@ describe('hook-manager', () => {
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(settings.hooks.Stop).toHaveLength(1);
     expect(settings.hooks.PermissionRequest).toHaveLength(1);
+    expect(settings.hooks.PostToolUse).toHaveLength(2);
     expect(settings.hooks.PreToolUse[0].matcher).toBe('AskUserQuestion');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('activity-bridge');
     expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('idle');
@@ -48,6 +49,13 @@ describe('hook-manager', () => {
     expect(settings.hooks.PermissionRequest[0].matcher).toBe('');
     expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('activity-bridge');
     expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('idle');
+    // PostToolUse: AskUserQuestion + ExitPlanMode → thinking
+    expect(settings.hooks.PostToolUse[0].matcher).toBe('AskUserQuestion');
+    expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('activity-bridge');
+    expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('thinking');
+    expect(settings.hooks.PostToolUse[1].matcher).toBe('ExitPlanMode');
+    expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('activity-bridge');
+    expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('thinking');
   });
 
   it('injectEventHooks creates settings file with correct hooks', () => {
@@ -55,7 +63,7 @@ describe('hook-manager', () => {
 
     const settings = readSettings();
     expect(settings.hooks.PreToolUse).toHaveLength(3);
-    expect(settings.hooks.PostToolUse).toHaveLength(1);
+    expect(settings.hooks.PostToolUse).toHaveLength(3);
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(settings.hooks.Stop).toHaveLength(1);
     expect(settings.hooks.PermissionRequest).toHaveLength(1);
@@ -71,6 +79,13 @@ describe('hook-manager', () => {
     expect(settings.hooks.PreToolUse[2].matcher).toBe('ExitPlanMode');
     expect(settings.hooks.PreToolUse[2].hooks[0].command).toContain('event-bridge');
     expect(settings.hooks.PreToolUse[2].hooks[0].command).toContain('idle');
+    // PostToolUse: catch-all tool_end + AskUserQuestion/ExitPlanMode → prompt
+    expect(settings.hooks.PostToolUse[0].matcher).toBe('');
+    expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('tool_end');
+    expect(settings.hooks.PostToolUse[1].matcher).toBe('AskUserQuestion');
+    expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('prompt');
+    expect(settings.hooks.PostToolUse[2].matcher).toBe('ExitPlanMode');
+    expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('prompt');
     // PermissionRequest → idle
     expect(settings.hooks.PermissionRequest[0].matcher).toBe('');
     expect(settings.hooks.PermissionRequest[0].hooks[0].command).toContain('event-bridge');
@@ -107,6 +122,14 @@ describe('hook-manager', () => {
     );
     expect(prCommands.some((c: string) => c.includes('event-bridge'))).toBe(true);
     expect(prCommands.some((c: string) => c.includes('activity-bridge'))).toBe(true);
+
+    // PostToolUse should have event-bridge entries (3) + activity-bridge entries (2)
+    expect(settings.hooks.PostToolUse).toHaveLength(5);
+    const ptuPostCommands = settings.hooks.PostToolUse.map(
+      (e: any) => e.hooks[0].command,
+    );
+    expect(ptuPostCommands.filter((c: string) => c.includes('event-bridge'))).toHaveLength(3);
+    expect(ptuPostCommands.filter((c: string) => c.includes('activity-bridge'))).toHaveLength(2);
   });
 
   it('injectEventHooks preserves activity-bridge hooks', () => {
@@ -137,6 +160,14 @@ describe('hook-manager', () => {
     );
     expect(prCommands.some((c: string) => c.includes('activity-bridge'))).toBe(true);
     expect(prCommands.some((c: string) => c.includes('event-bridge'))).toBe(true);
+
+    // PostToolUse should have activity-bridge entries (2) + event-bridge entries (3)
+    expect(settings.hooks.PostToolUse).toHaveLength(5);
+    const ptuPostCommands = settings.hooks.PostToolUse.map(
+      (e: any) => e.hooks[0].command,
+    );
+    expect(ptuPostCommands.filter((c: string) => c.includes('activity-bridge'))).toHaveLength(2);
+    expect(ptuPostCommands.filter((c: string) => c.includes('event-bridge'))).toHaveLength(3);
   });
 
   it('injectActivityHooks preserves user hooks', () => {
@@ -187,6 +218,11 @@ describe('hook-manager', () => {
           { matcher: '', hooks: [{ type: 'command', command: `node "${ACTIVITY_BRIDGE}" "${ACTIVITY_PATH}" idle` }] },
           { matcher: '', hooks: [{ type: 'command', command: `node "${EVENT_BRIDGE}" "${EVENTS_PATH}" idle` }] },
         ],
+        PostToolUse: [
+          { matcher: '', hooks: [{ type: 'command', command: `node "${EVENT_BRIDGE}" "${EVENTS_PATH}" tool_end` }] },
+          { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: `node "${ACTIVITY_BRIDGE}" "${ACTIVITY_PATH}" thinking` }] },
+          { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: `node "${EVENT_BRIDGE}" "${EVENTS_PATH}" prompt` }] },
+        ],
       },
     };
     fs.writeFileSync(
@@ -203,6 +239,8 @@ describe('hook-manager', () => {
     expect(result.hooks.PreToolUse[0].hooks[0].command).toBe('echo user-pretool');
     // PermissionRequest had only kangentic hooks — key should be removed entirely
     expect(result.hooks.PermissionRequest).toBeUndefined();
+    // PostToolUse had only kangentic hooks — key should be removed entirely
+    expect(result.hooks.PostToolUse).toBeUndefined();
   });
 
   it('stripActivityHooks cleans up empty settings file', () => {

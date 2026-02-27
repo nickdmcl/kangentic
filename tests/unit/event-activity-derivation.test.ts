@@ -237,6 +237,24 @@ describe('Event-derived activity state', () => {
     expect(states).toEqual(['thinking', 'idle', 'thinking']);
   });
 
+  it('AskUserQuestion answer: idle → tool_end (no change) → prompt → thinking', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. AskUserQuestion PreToolUse → idle
+    appendEvent(eventsPath, { ts: Date.now(), type: 'idle' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 2. User answers → PostToolUse fires tool_end (no change) + prompt (thinking)
+    appendEvent(eventsPath, { ts: Date.now(), type: 'tool_end', tool: 'AskUserQuestion' });
+    appendEvent(eventsPath, { ts: Date.now(), type: 'prompt' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('thinking');
+
+    expect(states).toEqual(['idle', 'thinking']);
+  });
+
   it('multiple events in single write batch', async () => {
     const { session, eventsPath } = await spawnWithEvents();
     const states = collectActivity(manager, session.id);
