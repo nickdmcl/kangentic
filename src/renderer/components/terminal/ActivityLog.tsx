@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { format } from 'date-fns';
 import { useSessionStore } from '../../stores/session-store';
 import type { SessionEvent } from '../../../shared/types';
 
@@ -92,6 +93,10 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   );
 }
 
+function formatTime(ts: number): string {
+  return format(ts, 'HH:mm:ss');
+}
+
 interface EventLineProps {
   sessionId: string;
   event: SessionEvent;
@@ -105,6 +110,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
     case 'tool_start':
       return (
         <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className="text-zinc-600 shrink-0">{formatTime(event.ts)}</span>
           {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
           <span className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0">
             {event.tool || 'Tool'}
@@ -123,6 +129,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
     case 'idle':
       return (
         <div className="flex items-baseline gap-1.5">
+          <span className="text-zinc-600 shrink-0">{formatTime(event.ts)}</span>
           {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
           <span className="text-zinc-500 italic">Idle — waiting for input</span>
         </div>
@@ -131,6 +138,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
     case 'prompt':
       return (
         <div className="flex items-baseline gap-1.5">
+          <span className="text-zinc-600 shrink-0">{formatTime(event.ts)}</span>
           {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
           <span className="text-zinc-400">Thinking...</span>
         </div>

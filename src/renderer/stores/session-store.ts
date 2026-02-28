@@ -13,7 +13,7 @@ interface SessionStore {
   sessionActivity: Record<string, ActivityState>;
   sessionEvents: Record<string, SessionEvent[]>;
 
-  loadSessions: () => Promise<void>;
+  syncSessions: () => Promise<void>;
   spawnSession: (input: SpawnSessionInput) => Promise<Session>;
   killSession: (id: string) => Promise<void>;
   suspendSession: (taskId: string) => Promise<void>;
@@ -40,7 +40,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessionActivity: {},
   sessionEvents: {},
 
-  loadSessions: async () => {
+  syncSessions: async () => {
     const sessions = await window.electronAPI.sessions.list();
     const currentActive = get().activeSessionId;
     const stillExists = currentActive && sessions.some((s) => s.id === currentActive);
