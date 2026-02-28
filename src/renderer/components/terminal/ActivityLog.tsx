@@ -114,7 +114,6 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
           taskLabelMap={taskLabelMap}
           filterSessionId={filterSessionId}
           onFilter={setFilterSessionId}
-          getColorIndex={getColorIndex}
         />
       )}
       {displayEvents.map((item, i) => (
@@ -155,7 +154,7 @@ function FilterPill({
           onChange={(e) => onFilter(e.target.value || null)}
           className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          <option value="">All Tasks</option>
+          <option value="">All</option>
           {sessionIds.map((sid) => (
             <option key={sid} value={sid}>
               {taskLabelMap.get(sid) || sid.slice(0, 8)}
