@@ -107,3 +107,4 @@ tests/.test-data/
 tests/reports/
 test-results/
 playwright-report/
+.claude/settings.local.json

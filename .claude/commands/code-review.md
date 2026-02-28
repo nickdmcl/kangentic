@@ -42,13 +42,35 @@ Review the current git changes (staged and unstaged) for quality, correctness, a
 
 ## Output Format
 
-For each file with findings, use this structure:
+### Findings Table
 
-### `<file-path>`
+Present all findings in a single table, sorted by severity (Critical first, then High, Medium, Low):
 
-- **[Category]** `file:line` — Description of the issue and suggested fix.
+| # | Severity | Category | Location | Finding | Recommendation |
+|---|----------|----------|----------|---------|----------------|
+| 1 | Critical | Correctness | `src/main/foo.ts:42` | Brief description of the issue | **Must fix** — what to change and why |
+| 2 | High | Best Practices | `src/renderer/Bar.tsx:15` | Brief description | **Should fix** — suggested change |
+| 3 | Medium | Performance | `src/main/baz.ts:88` | Brief description | **Consider** — tradeoff explanation |
+| 4 | Low | Maintainability | `src/shared/types.ts:10` | Brief description | **Optional** — nice-to-have improvement |
 
-If there are no findings for a file, skip it. End with a summary: total files reviewed, total findings, and an overall assessment (looks good / minor issues / needs revision).
+#### Severity levels
+
+| Severity | Meaning | Action |
+|----------|---------|--------|
+| **Critical** | Type errors, runtime crashes, data loss, security vulnerabilities | **Must fix** before merging |
+| **High** | Logic bugs, missing error handling, `any` types, race conditions | **Should fix** — real risk of breakage |
+| **Medium** | Performance issues, convention violations, unclear code | **Consider** — improves quality but not blocking |
+| **Low** | Style nits, minor duplication, optional improvements | **Optional** — fix if touching the area anyway |
+
+### Summary
+
+End with:
+- **Files reviewed:** N
+- **Findings:** N critical, N high, N medium, N low
+- **Verdict:** one of:
+  - **Ship it** — no findings, or only low-severity items
+  - **Minor issues** — medium findings worth addressing, no blockers
+  - **Needs revision** — critical or high-severity findings that should be resolved
 
 ## Allowed Tools
 
