@@ -195,10 +195,10 @@ test.describe('Task Activity Indicators', () => {
         }))
       );
 
-      // Find cost pill (contains "$"), separator, and tokens pill (contains "↑")
+      // Find cost pill (contains "$"), separator, and tokens pill (contains formatted numbers)
       const costIdx = texts.findIndex((t) => t.text.includes('$'));
       const separatorIdx = texts.findIndex((t, i) => i > costIdx && t.isSeparator);
-      const tokensIdx = texts.findIndex((t) => t.text.includes('↑'));
+      const tokensIdx = texts.findIndex((t) => t.text.includes('1.0k'));
 
       expect(costIdx).toBeGreaterThanOrEqual(0);
       expect(separatorIdx).toBeGreaterThan(costIdx);
@@ -222,8 +222,8 @@ test.describe('Task Activity Indicators', () => {
       await expect(tokens).toBeVisible();
       await expect(cost).toBeVisible();
 
-      // Verify content
-      await expect(tokens).toContainText('↑');
+      // Verify content — icons are SVGs, so check for numeric token text
+      await expect(tokens).toContainText('1.0k');
       await expect(cost).toContainText('$');
     } finally {
       await browser.close();

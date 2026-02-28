@@ -1,5 +1,5 @@
 import React from 'react';
-import { SquareTerminal, ClipboardCheck } from 'lucide-react';
+import { SquareTerminal, ClipboardCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useBoardStore } from '../../stores/board-store';
@@ -57,8 +57,15 @@ export function StatusBar() {
           {hasUsage && (
             <>
               <div className="w-px h-3.5 bg-edge flex-shrink-0" />
-              <span ref={tokenPulseRef} className="tabular-nums" data-testid="aggregate-tokens" title="Total input tokens ↑ / output tokens ↓ across all sessions">
-                {formatTokenCount(totalInput)} ↑ / {formatTokenCount(totalOutput)} ↓
+              <span ref={tokenPulseRef} className="tabular-nums flex items-center gap-3" data-testid="aggregate-tokens" title="Total input / output tokens across all sessions">
+                <span className="flex items-center gap-1">
+                  <ArrowUp size={11} className="text-fg-faint" />
+                  {formatTokenCount(totalInput)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <ArrowDown size={11} className="text-fg-faint" />
+                  {formatTokenCount(totalOutput)}
+                </span>
               </span>
               <div className="w-px h-3.5 bg-edge flex-shrink-0" />
               <span ref={costPulseRef} className="tabular-nums" data-testid="aggregate-cost" title="Total API cost across all sessions">

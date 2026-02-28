@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { getProgressColor } from '../../utils/color-lerp';
@@ -55,8 +56,15 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
       <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />
 
       {!compact && (
-        <span ref={tokenRef} className={`${pill} text-fg-muted tabular-nums`} title="Input tokens ↑ / output tokens ↓">
-          {formatTokenCount(usage.contextWindow.totalInputTokens)} ↑ / {formatTokenCount(usage.contextWindow.totalOutputTokens)} ↓
+        <span ref={tokenRef} className={`${pill} text-fg-muted tabular-nums flex items-center gap-3`} title="Input / output tokens">
+          <span className="flex items-center gap-1">
+            <ArrowUp size={11} className="text-fg-faint" />
+            {formatTokenCount(usage.contextWindow.totalInputTokens)}
+          </span>
+          <span className="flex items-center gap-1">
+            <ArrowDown size={11} className="text-fg-faint" />
+            {formatTokenCount(usage.contextWindow.totalOutputTokens)}
+          </span>
         </span>
       )}
 
