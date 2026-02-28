@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pencil, Lock, Trash2, Palette, ChevronRight } from 'lucide-react';
+import { Pencil, Lock, Trash2, Palette, ChevronRight, Info } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
@@ -44,6 +44,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const [hexInput, setHexInput] = useState(swimlane.color);
   const [permissionStrategy, setPermissionStrategy] = useState<PermissionMode | null>(swimlane.permission_strategy);
   const [autoSpawn, setAutoSpawn] = useState(swimlane.auto_spawn);
+  const [autoCommand, setAutoCommand] = useState(swimlane.auto_command || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +72,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
       icon,
       permission_strategy: permissionLocked ? undefined : permissionStrategy,
       auto_spawn: autoSpawnLocked ? undefined : autoSpawn,
+      auto_command: isBacklogOrDone ? undefined : (autoCommand.trim() || null),
     });
     onClose();
   };
@@ -330,6 +332,33 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                   : 'Start an agent when a task enters this column.'}
             </p>
           </div>
+
+          {/* Auto-command textarea (hidden for backlog/done — sessions don't run there) */}
+          {!isBacklogOrDone && (
+            <>
+              <div className="border-t border-edge-subtle" />
+              <div>
+                <label className="text-xs text-fg-muted mb-1.5 block">Auto-command</label>
+                <textarea
+                  value={autoCommand}
+                  onChange={(e) => setAutoCommand(e.target.value)}
+                  rows={2}
+                  placeholder="/test, /review, or a prompt..."
+                  className="w-full bg-surface border border-edge-input rounded px-3 py-2 text-sm text-fg font-mono placeholder-fg-faint focus:outline-none focus:border-accent resize-y"
+                  data-testid="auto-command-input"
+                />
+                <p className="text-[11px] text-fg-faint mt-1 flex items-center gap-1">
+                  Runs automatically when a task moves into this column
+                  <span
+                    title="Supports variables: {{title}}, {{description}}, {{branchName}}"
+                    className="inline-flex cursor-help text-fg-faint hover:text-fg-muted"
+                  >
+                    <Info size={12} />
+                  </span>
+                </p>
+              </div>
+            </>
+          )}
 
           {error && (
             <p className="text-xs text-red-400">{error}</p>

@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { registerAllIpc, getSessionManager, getCurrentProjectId, openProjectByPath, cleanupProject, deleteProjectFromIndex, pruneStaleWorktreeProjects } from './ipc/register-all';
+import { registerAllIpc, getSessionManager, getCommandInjector, getCurrentProjectId, openProjectByPath, cleanupProject, deleteProjectFromIndex, pruneStaleWorktreeProjects } from './ipc/register-all';
 import { closeAll, getProjectDb } from './db/database';
 import { SessionRepository } from './db/repositories/session-repository';
 import { ConfigManager } from './config/config-manager';
@@ -232,6 +232,7 @@ app.on('activate', () => {
 
 async function shutdownSessions(): Promise<void> {
   const sessionManager = getSessionManager();
+  getCommandInjector().cancelAll();
   const projectId = getCurrentProjectId();
 
   // Mark running DB records as 'suspended' BEFORE calling suspendAll().
@@ -265,6 +266,7 @@ async function shutdownSessions(): Promise<void> {
 
 async function shutdownEphemeral(): Promise<void> {
   const sessionManager = getSessionManager();
+  getCommandInjector().cancelAll();
   sessionManager.killAll();
 
   const projectId = getCurrentProjectId();

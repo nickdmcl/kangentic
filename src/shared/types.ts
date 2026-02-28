@@ -50,6 +50,7 @@ export interface Swimlane {
   is_terminal: boolean;
   permission_strategy: PermissionMode | null;
   auto_spawn: boolean;
+  auto_command: string | null;
   created_at: string;
 }
 
@@ -320,6 +321,7 @@ export interface SwimlaneCreateInput {
   is_terminal?: boolean;
   permission_strategy?: PermissionMode | null;
   auto_spawn?: boolean;
+  auto_command?: string | null;
 }
 
 export interface SwimlaneUpdateInput {
@@ -331,6 +333,7 @@ export interface SwimlaneUpdateInput {
   is_terminal?: boolean;
   permission_strategy?: PermissionMode | null;
   auto_spawn?: boolean;
+  auto_command?: string | null;
 }
 
 export interface ActionCreateInput {

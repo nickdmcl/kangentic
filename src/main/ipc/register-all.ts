@@ -17,11 +17,12 @@ import { CommandBuilder } from '../agent/command-builder';
 import { SessionRepository } from '../db/repositories/session-repository';
 import { AttachmentRepository } from '../db/repositories/attachment-repository';
 import { recoverSessions, reconcileSessions, pruneOrphanedWorktrees } from '../engine/session-recovery';
+import { CommandInjector } from '../engine/command-injector';
 import { WorktreeManager } from '../git/worktree-manager';
 import { stripActivityHooks } from '../agent/hook-manager';
 import { getProjectDb, closeProjectDb } from '../db/database';
 import { PATHS } from '../config/paths';
-import type { AppConfig } from '../../shared/types';
+import type { AppConfig, Task } from '../../shared/types';
 
 /**
  * Resolve the base branch for worktree creation: task override > config default > 'main'.
@@ -95,6 +96,18 @@ const configManager = new ConfigManager();
 const claudeDetector = new ClaudeDetector();
 const shellResolver = new ShellResolver();
 const commandBuilder = new CommandBuilder();
+const commandInjector = new CommandInjector(sessionManager);
+
+/** Build template variables for auto-command interpolation. */
+function buildAutoCommandVars(task: Task): Record<string, string> {
+  return {
+    title: task.title,
+    description: task.description,
+    taskId: task.id,
+    worktreePath: task.worktree_path || '',
+    branchName: task.branch_name || '',
+  };
+}
 
 function getProjectRepos(): { tasks: TaskRepository; swimlanes: SwimlaneRepository; actions: ActionRepository; attachments: AttachmentRepository } {
   if (!currentProjectId) throw new Error('No project is currently open');
@@ -476,6 +489,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
 
     // --- Priority 1: TARGET IS BACKLOG → kill session, preserve worktree ---
     if (toLane?.role === 'backlog') {
+      commandInjector.cancel(task.id);
       await cleanupTaskSession(task, tasks);
       console.log(`[TASK_MOVE] Killed session for task ${task.id.slice(0, 8)} (moved to Backlog, worktree preserved)`);
       return;
@@ -483,6 +497,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
 
     // --- Priority 2: TARGET IS DONE → suspend + archive (resumable on unarchive) ---
     if (toLane?.role === 'done') {
+      commandInjector.cancel(task.id);
       if (task.session_id) {
         const record = sessionRepo.getLatestForTask(task.id);
         // Accept 'running' AND 'exited' — exited covers Claude natural exit
@@ -511,6 +526,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // --- Priority 2.5: TARGET HAS auto_spawn=false (and not backlog/done which are handled above) ---
     // → Suspend session if one exists, do NOT spawn new agent
     if (toLane && !toLane.auto_spawn) {
+      commandInjector.cancel(task.id);
       if (task.session_id) {
         const record = sessionRepo.getLatestForTask(task.id);
         if (record && record.claude_session_id
@@ -528,6 +544,12 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     // If the agent is already running, moving between non-terminal columns
     // (e.g. Review → Running) should NOT kill and respawn — just let it continue.
     if (task.session_id) {
+      commandInjector.cancel(task.id);
+      if (toLane?.auto_command) {
+        const vars = buildAutoCommandVars(task);
+        const interpolated = commandBuilder.interpolateTemplate(toLane.auto_command, vars);
+        commandInjector.schedule(task.id, task.session_id, interpolated, { freshlySpawned: false });
+      }
       console.log(`[TASK_MOVE] Task ${task.id.slice(0, 8)} already has active session — skipping transitions`);
       return;
     }
@@ -576,17 +598,25 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     }
 
     // Re-read task from DB — transition engine may have spawned a session
-    const updatedTask = tasks.getById(task.id);
+    let finalTask = tasks.getById(task.id);
 
     // If task STILL has no session, resume a suspended session or spawn fresh.
     // resumeSuspendedSession handles both cases internally via executeSpawnAgent.
-    if (updatedTask && !updatedTask.session_id && toLane?.auto_spawn) {
+    if (finalTask && !finalTask.session_id && toLane?.auto_spawn) {
       console.log(`[TASK_MOVE] Ensuring agent for task ${task.id.slice(0, 8)}`);
       try {
-        await engine.resumeSuspendedSession(updatedTask, toLane.permission_strategy);
+        await engine.resumeSuspendedSession(finalTask, toLane.permission_strategy);
+        finalTask = tasks.getById(task.id);
       } catch (err) {
         console.error('Failed to start session:', err);
       }
+    }
+
+    // Schedule auto-command for freshly spawned session
+    if (finalTask?.session_id && toLane?.auto_command) {
+      const vars = buildAutoCommandVars(finalTask);
+      const interpolated = commandBuilder.interpolateTemplate(toLane.auto_command, vars);
+      commandInjector.schedule(finalTask.id, finalTask.session_id, interpolated, { freshlySpawned: true });
     }
   });
 
@@ -657,14 +687,22 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
 
         // Re-read task; if still no session, resume suspended or spawn fresh.
         // resumeSuspendedSession handles both cases internally via executeSpawnAgent.
-        const updatedTask = tasks.getById(task.id);
-        if (updatedTask && !updatedTask.session_id && toLane?.auto_spawn) {
+        let finalTask = tasks.getById(task.id);
+        if (finalTask && !finalTask.session_id && toLane?.auto_spawn) {
           console.log(`[TASK_UNARCHIVE] Ensuring agent for task ${task.id.slice(0, 8)}`);
           try {
-            await engine.resumeSuspendedSession(updatedTask, toLane.permission_strategy);
+            await engine.resumeSuspendedSession(finalTask, toLane.permission_strategy);
+            finalTask = tasks.getById(task.id);
           } catch (err) {
             console.error('Failed to start session during unarchive:', err);
           }
+        }
+
+        // Schedule auto-command for freshly spawned session
+        if (finalTask?.session_id && toLane?.auto_command) {
+          const vars = buildAutoCommandVars(finalTask);
+          const interpolated = commandBuilder.interpolateTemplate(toLane.auto_command, vars);
+          commandInjector.schedule(finalTask.id, finalTask.session_id, interpolated, { freshlySpawned: true });
         }
       }
     }
@@ -978,6 +1016,10 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
 
 export function getSessionManager(): SessionManager {
   return sessionManager;
+}
+
+export function getCommandInjector(): CommandInjector {
+  return commandInjector;
 }
 
 export function getCurrentProjectId(): string | null {
