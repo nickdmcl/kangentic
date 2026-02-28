@@ -42,6 +42,12 @@ async function start() {
     // arrays instead of replacing them, so we can't override it.
     const tailwindcss = (await import('@tailwindcss/vite')).default;
     const react = (await import('@vitejs/plugin-react')).default;
+    // Ignore runtime dirs that Electron/Claude write into during the session.
+    // We can't reuse vite.config.mts because its **/.kangentic/** pattern
+    // matches every file in the worktree. Use absolute paths instead.
+    const ignoreDirs = ['.kangentic', '.claude', '.vite'].map(
+      d => path.join(projectDir, d).replace(/\\/g, '/') + '/**'
+    );
     viteServer = await createServer({
       configFile: false,
       root: projectDir,
@@ -50,7 +56,7 @@ async function start() {
         alias: { '@shared': '/src/shared' },
         preserveSymlinks: true,
       },
-      server: { port, strictPort: true },
+      server: { port, strictPort: true, watch: { ignored: ignoreDirs } },
     });
   } else {
     viteServer = await createServer({
