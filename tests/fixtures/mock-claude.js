@@ -49,6 +49,12 @@ for (let i = 0; i < args.length; i++) {
     i++; // skip value
   } else if (args[i] === '--dangerously-skip-permissions' || args[i] === '--print') {
     // flag without value, skip
+  } else if (args[i] === '--') {
+    // End-of-options: everything after -- is the prompt
+    if (i + 1 < args.length) {
+      prompt = args[i + 1];
+    }
+    break;
   } else if (!args[i].startsWith('-')) {
     prompt = args[i];
   }

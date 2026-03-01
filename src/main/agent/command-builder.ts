@@ -131,7 +131,14 @@ export class CommandBuilder {
 
     // The prompt as positional argument (omitted for resumed sessions)
     if (options.prompt) {
-      parts.push(quoteArg(options.prompt));
+      // Replace double quotes to prevent PowerShell quoting breakage:
+      // quoteArg wraps in "..." on Windows and escapes " as \" which
+      // PowerShell misinterprets (it uses "" or `" not \").
+      // Single quotes are safe inside double-quoted strings on all shells.
+      const safePrompt = options.prompt.replace(/"/g, "'");
+      // -- (end-of-options) prevents content like -> or --flag from being
+      // parsed as CLI options regardless of shell quoting behavior.
+      parts.push('--', quoteArg(safePrompt));
     }
 
     return parts.join(' ');

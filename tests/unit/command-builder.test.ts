@@ -41,7 +41,8 @@ function buildClaudeCommand(options: {
   }
 
   if (options.prompt) {
-    parts.push(quoteArg(options.prompt));
+    const safePrompt = options.prompt.replace(/"/g, "'");
+    parts.push('--', quoteArg(safePrompt));
   }
 
   return parts.join(' ');
@@ -329,6 +330,84 @@ describe('Prompt Delivery (Claude Agent)', () => {
     expect(cmd).toContain('--permission-mode');
     expect(cmd).toContain('acceptEdits');
     expect(cmd).toContain('Refactor module');
+  });
+
+  it('adds -- separator before prompt to prevent option parsing', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'Simple task description',
+    });
+    expect(cmd).toMatch(/sess-123 -- /);
+  });
+
+  it('prompt with -> arrow does not cause unknown option error', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'Fix the Backlog -> Planning transition',
+    });
+    expect(cmd).toContain(' -- ');
+    expect(cmd).toContain('Backlog -> Planning');
+  });
+
+  it('prompt with -- double-dash does not cause option parsing', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'Check the --verbose flag behavior',
+    });
+    expect(cmd).toContain(' -- ');
+    expect(cmd).toContain('--verbose flag');
+  });
+
+  it('prompt with double quotes are replaced with single quotes', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'While it becomes "active" update the view',
+    });
+    expect(cmd).not.toContain('"active"');
+    expect(cmd).toContain("'active'");
+  });
+
+  it('prompt starting with - is not treated as option', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: '- Fix this bug immediately',
+    });
+    expect(cmd).toContain(' -- ');
+  });
+
+  it('prompt with mixed special characters is safely quoted', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'Fix "error" in path C:\\Users\\dev -> deploy & test (urgent)',
+    });
+    expect(cmd).toContain(' -- ');
+    expect(cmd).not.toContain('"error"');
+    expect(cmd).toContain("'error'");
+  });
+
+  it('resumed session has no -- separator (no prompt)', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      resume: true,
+    });
+    expect(cmd).not.toContain(' -- ');
+  });
+
+  it('prompt with [Review images: ...] attachment paths is handled', () => {
+    const cmd = buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      sessionId: 'sess-123',
+      prompt: 'Fix bug [Review images: C:\\Users\\dev\\image-1.png, C:\\Users\\dev\\image-2.png]',
+    });
+    expect(cmd).toContain(' -- ');
+    expect(cmd).toContain('image-1.png');
   });
 });
 
