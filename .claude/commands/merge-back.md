@@ -35,7 +35,13 @@ If there are uncommitted changes (non-empty `git status --porcelain` output):
 1. Show the user `git status` and `git diff --stat` for a summary of changes.
 2. If the user provided a commit message with the command (e.g., `/merge-back added new e2e tests`), use that text as the commit message.
 3. Otherwise, read the full diff (`git diff`), draft a concise commit message summarizing the changes.
-4. Run `git add -A`, then commit using the **Write tool** to write the message to a temp file and `git commit -F <tempfile>`. **Never use `$(...)` or backtick command substitution in the commit command** — this triggers an unnecessary safety prompt. Always use `-F` with a file written by the Write tool.
+4. Stage changes: `git add -A`
+5. Write the commit message to `COMMIT_MSG.tmp` in CWD using the **Write tool**.
+   **Important:** Write the file AFTER `git add -A` so it is not staged.
+   Then commit: `git commit -F COMMIT_MSG.tmp`
+   Then clean up: `rm COMMIT_MSG.tmp`
+   **Never write to `.git/`** — in worktrees `.git` is a file, not a directory.
+   **Never use `$(...)` or backtick command substitution** — triggers a safety prompt.
 
 If the working tree is clean, skip to Step 2.
 
@@ -59,12 +65,6 @@ Run: `git rebase origin/<sourceBranch>`
    - **Abort and merge instead** — `git rebase --abort` then `git merge origin/<sourceBranch>` (creates a merge commit)
    - **Abort entirely** — `git rebase --abort` and stop the merge-back process
 3. If resolving conflicts: read each conflicting file, use `Edit` to resolve the conflict markers, stage the file, and continue the rebase. Repeat until all conflicts are resolved.
-
-**After rebase (or merge) completes — worktree mode only:** Rebase can restore `.claude/commands/` and `.claude/skills/` directories that sparse-checkout excludes. Delete them to prevent duplicate command/skill discovery:
-- `rm -rf <worktreePath>/.claude/commands`
-- `rm -rf <worktreePath>/.claude/skills`
-
-Skip this cleanup in main repo mode.
 
 ## Step 4 — Push to Source Branch
 
