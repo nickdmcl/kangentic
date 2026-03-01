@@ -442,8 +442,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           >
             {isQueued ? (
               <Clock size={18} />
-            ) : isSessionActive && isThinking ? (
-              <Loader2 size={18} className="animate-spin" />
             ) : isSessionActive ? (
               <CirclePause size={18} />
             ) : (
