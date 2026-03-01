@@ -114,6 +114,55 @@ async function dragTaskWithinColumn(sourceTitle: string, targetTitle: string) {
   await page.waitForTimeout(500);
 }
 
+/**
+ * Drag a task card to a position below a specific target task in another column.
+ * Drops the card below the target task's midpoint so it inserts after it.
+ */
+async function dragTaskBelowTaskInColumn(taskTitle: string, targetTaskTitle: string, targetColumn: string) {
+  const card = page
+    .locator('[data-testid="swimlane"]')
+    .locator(`text=${taskTitle}`)
+    .first();
+  await card.waitFor({ state: 'visible', timeout: 5000 });
+
+  const targetCard = page
+    .locator(`[data-swimlane-name="${targetColumn}"]`)
+    .locator(`text=${targetTaskTitle}`)
+    .first();
+  await targetCard.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Scroll so both elements are in view
+  await page.evaluate((targetCol) => {
+    const targetEl = document.querySelector(`[data-swimlane-name="${targetCol}"]`);
+    if (targetEl) targetEl.scrollIntoView({ inline: 'nearest', behavior: 'instant' });
+  }, targetColumn);
+  await page.waitForTimeout(100);
+
+  const cardBox = await card.boundingBox();
+  const targetBox = await targetCard.boundingBox();
+  if (!cardBox || !targetBox) throw new Error('Could not get bounding boxes for drag');
+
+  const startX = cardBox.x + cardBox.width / 2;
+  const startY = cardBox.y + cardBox.height / 2;
+  // Drop below the target task's midpoint (bottom quarter)
+  const endX = targetBox.x + targetBox.width / 2;
+  const endY = targetBox.y + targetBox.height * 0.75;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+
+  // Move enough to activate @dnd-kit's PointerSensor (distance >= 5)
+  await page.mouse.move(startX + 10, startY, { steps: 3 });
+  await page.waitForTimeout(100);
+
+  // Move to target in steps
+  await page.mouse.move(endX, endY, { steps: 15 });
+  await page.waitForTimeout(200);
+
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+}
+
 test.describe('Drag and Drop', () => {
   test.beforeEach(async () => {
     await ensureBoard();
@@ -239,5 +288,37 @@ test.describe('Drag and Drop', () => {
     expect(box3).toBeTruthy();
     expect(box2).toBeTruthy();
     expect(box3!.y).toBeLessThan(box2!.y);
+  });
+
+  test('cross-column drag respects drop position (not always top)', async () => {
+    // Create two tasks in Code Review so there's an existing order
+    const existing1 = `DnD Pos1 ${runId}`;
+    const existing2 = `DnD Pos2 ${runId}`;
+    const movingTask = `DnD PosMove ${runId}`;
+    await createTask(page, existing1, 'Already in CR', 'Code Review');
+    await createTask(page, existing2, 'Also in CR', 'Code Review');
+    await createTask(page, movingTask, 'Will be moved');
+
+    const review = page.locator('[data-swimlane-name="Code Review"]');
+    const backlog = page.locator('[data-swimlane-name="Backlog"]');
+    await expect(review.locator(`text=${existing1}`).first()).toBeVisible();
+    await expect(review.locator(`text=${existing2}`).first()).toBeVisible();
+    await expect(backlog.locator(`text=${movingTask}`).first()).toBeVisible();
+
+    // Drag the Backlog task to below existing1 in Code Review
+    await dragTaskBelowTaskInColumn(movingTask, existing1, 'Code Review');
+
+    // Task should appear in Code Review
+    await expect(
+      review.locator(`text=${movingTask}`).first(),
+    ).toBeVisible({ timeout: 5000 });
+    await expect(backlog.locator(`text=${movingTask}`)).not.toBeVisible({ timeout: 3000 });
+
+    // Verify positional ordering: existing1 should be above movingTask
+    const boxExisting1 = await review.locator(`text=${existing1}`).first().boundingBox();
+    const boxMoving = await review.locator(`text=${movingTask}`).first().boundingBox();
+    expect(boxExisting1).toBeTruthy();
+    expect(boxMoving).toBeTruthy();
+    expect(boxExisting1!.y).toBeLessThan(boxMoving!.y);
   });
 });

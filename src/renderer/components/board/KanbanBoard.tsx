@@ -137,6 +137,44 @@ function FlyingCard() {
   );
 }
 
+/**
+ * Determine the insertion index for a cross-column drop by comparing
+ * the pointer position to the over-element's midpoint.
+ */
+function getInsertionIndex(
+  event: DragOverEvent | DragEndEvent,
+  laneTasks: Task[],
+  swimlaneIds: Set<string>,
+): number {
+  const { over } = event;
+  if (!over) return 0;
+  const overId = String(over.id);
+
+  // Over a swimlane container (empty column) → append
+  if (swimlaneIds.has(overId)) return laneTasks.length;
+
+  // Over a task → check above/below midpoint
+  const overIndex = laneTasks.findIndex((t) => t.id === overId);
+  if (overIndex === -1) return laneTasks.length;
+
+  const overRect = over.rect;
+  const midY = overRect.top + overRect.height / 2;
+
+  // Use the actual pointer position — directly reflects user intent
+  let pointerY: number;
+  if (event.activatorEvent instanceof PointerEvent) {
+    pointerY = event.activatorEvent.clientY + event.delta.y;
+  } else {
+    // Keyboard drag fallback: use translated rect center
+    const translated = event.active.rect.current.translated;
+    pointerY = translated
+      ? translated.top + translated.height / 2
+      : overRect.top;
+  }
+
+  return pointerY < midY ? overIndex : overIndex + 1;
+}
+
 export function KanbanBoard() {
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const tasks = useBoardStore((s) => s.tasks);
@@ -278,7 +316,14 @@ export function KanbanBoard() {
   // Done is excluded — it has its own drop-zone animation (green spinning border)
   // via useDroppable's isOver, so the generic blue ring would conflict.
   const handleDragOver = useCallback((event: DragOverEvent) => {
-    if (!event.over) { setHoveringSwimlaneId(null); return; }
+    if (!event.over) {
+      setHoveringSwimlaneId(null);
+      return;
+    }
+
+    const activeId = String(event.active.id);
+    if (activeId.startsWith('column:')) return;
+
     const targetLane = findSwimlane(String(event.over.id)) ?? null;
     setHoveringSwimlaneId(targetLane === doneLaneId ? null : targetLane);
   }, [findSwimlane, doneLaneId]);
@@ -361,27 +406,11 @@ export function KanbanBoard() {
       return;
     }
 
-    // Determine position within the target container
     const currentTasks = state.tasks;
-    const laneTasks = currentTasks.filter(
-      (t) => t.swimlane_id === targetSwimlaneId && t.id !== taskId,
-    );
-    let targetPosition: number;
-
-    const overData = over.data.current;
-    if (overData?.type === 'task') {
-      const overTask = currentTasks.find((t) => t.id === over.id);
-      targetPosition = overTask ? overTask.position : laneTasks.length;
-    } else {
-      targetPosition = laneTasks.length;
-    }
-
-    // No-op check against the ORIGINAL swimlane (not the current one from onDragOver)
-    if (originalSwimlane === targetSwimlaneId && targetPosition === (currentTasks.find((t) => t.id === taskId)?.position ?? -1)) {
-      // Restore — nothing changed
-      useBoardStore.getState().loadBoard();
-      return;
-    }
+    const laneTasks = currentTasks
+      .filter((t) => t.swimlane_id === targetSwimlaneId && t.id !== taskId)
+      .sort((a, b) => a.position - b.position);
+    const targetPosition = getInsertionIndex(event, laneTasks, swimlaneIds);
 
     // Done target: defer moveTask and fly the card into the drop zone
     const doneLane = swimlanes.find((s) => s.role === 'done');
@@ -423,7 +452,7 @@ export function KanbanBoard() {
         variant: 'error',
       });
     }
-  }, [moveTask, setCompletingTask, findSwimlane, swimlanes, reorderSwimlanes, reorderTaskInColumn]);
+  }, [moveTask, setCompletingTask, findSwimlane, swimlanes, swimlaneIds, reorderSwimlanes, reorderTaskInColumn]);
 
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);

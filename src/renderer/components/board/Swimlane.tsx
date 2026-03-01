@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { GripVertical } from 'lucide-react';
@@ -12,7 +12,7 @@ export interface SwimlaneProps {
   swimlane: SwimlaneType;
   tasks: Task[];
   /** Event listeners for the drag handle (only for sortable/custom columns) */
-  dragHandleProps?: Record<string, any>;
+  dragHandleProps?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- dnd-kit listener spread
   /** Whether this column is the current drop target during a drag */
   isDropTarget?: boolean;
 }
