@@ -5,12 +5,24 @@ import type { Task, Session, SessionUsage, ActivityState, SessionEvent, SessionD
  * Pure derivation of display state from raw session data.
  * Centralizes the boolean logic that was previously scattered
  * across TaskCard, TaskDetailDialog, and TerminalPanel.
+ *
+ * Display lifecycle:
+ *
+ *   none → queued → initializing → running → exited
+ *                                           → suspended
+ *
+ * - none:         No session exists for this task
+ * - queued:       Waiting for a concurrency slot (no PTY yet)
+ * - initializing: PTY spawned, waiting for first usage report from Claude CLI
+ * - running:      Claude CLI active with usage data (progress bar visible)
+ * - suspended:    Session paused (PTY killed, files preserved for resume)
+ * - exited:       PTY process terminated
  */
 export function getSessionDisplayState(
   taskSession: Session | undefined,
   usage: SessionUsage | undefined,
   activity: ActivityState | undefined,
-  events: SessionEvent[] | undefined,
+  _events: SessionEvent[] | undefined,
 ): SessionDisplayState {
   if (!taskSession) return { kind: 'none' };
 
@@ -22,17 +34,17 @@ export function getSessionDisplayState(
     case 'queued':
       return { kind: 'queued' };
     case 'running': {
-      // "Initializing" = waiting for BOTH usage data AND the first hook event.
-      // Once any event arrives (tool_start, prompt, idle, permission_request)
-      // Claude Code is running — the card should reflect the real activity state.
-      const hasReceivedEvents = !!events && events.length > 0;
-      if (!usage && !hasReceivedEvents) {
+      // "Initializing" = PTY is running but Claude CLI hasn't reported usage
+      // yet (model name, context window %). Hook events may arrive earlier,
+      // but they don't carry enough info for the progress bar — keep showing
+      // the "Initializing..." spinner until the first usage report lands.
+      if (!usage) {
         return { kind: 'initializing' };
       }
       return {
         kind: 'running',
         activity: activity ?? 'thinking',
-        usage: usage ?? null,
+        usage,
       };
     }
   }

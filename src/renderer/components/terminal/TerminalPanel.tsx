@@ -23,10 +23,10 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
   const dialogSessionId = useSessionStore((s) => s.dialogSessionId);
   const sessionActivity = useSessionStore((s) => s.sessionActivity);
 
-  // Only show sessions that are actively running or queued.
-  // Exited/suspended sessions are removed from the panel.
+  // Only show sessions that are actively running.
+  // Queued/exited/suspended sessions are removed from the panel.
   const activeSessions = sessions.filter(
-    (s) => s.status === 'running' || s.status === 'queued',
+    (s) => s.status === 'running',
   );
 
   const showActivityTab = activeSessions.length >= 1;
@@ -111,9 +111,7 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
                 <Loader2 size={8} className="text-green-400 animate-spin" />
               ) : (
                 <div className={`w-1.5 h-1.5 rounded-full ${
-                  session.status === 'running' ? 'bg-green-400' :
-                  session.status === 'queued' ? 'bg-yellow-400' :
-                  'bg-fg-faint'
+                  session.status === 'running' ? 'bg-green-400' : 'bg-fg-faint'
                 }`} />
               )}
               {taskLabelMap.get(session.id) || session.taskId.slice(0, 8)}

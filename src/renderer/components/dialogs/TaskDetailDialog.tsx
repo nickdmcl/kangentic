@@ -32,23 +32,47 @@ interface TaskDetailDialogProps {
 }
 
 function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
-  const queuePos = useSessionStore((s) => sessionId ? s.getQueuePosition(sessionId) : null);
-  const runningCount = useSessionStore((s) => s.getRunningCount());
+  const sessions = useSessionStore((s) => s.sessions);
   const maxConcurrent = useConfigStore((s) => s.config.claude.maxConcurrentSessions);
 
+  const { queuePos, runningCount } = React.useMemo(() => {
+    const running = sessions.filter((s) => s.status === 'running').length;
+    const queued = sessions
+      .filter((s) => s.status === 'queued')
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    const idx = sessionId ? queued.findIndex((s) => s.id === sessionId) : -1;
+    return {
+      queuePos: idx >= 0 ? { position: idx + 1, total: queued.length } : null,
+      runningCount: running,
+    };
+  }, [sessions, sessionId]);
+
+  const openSettingsTab = useConfigStore((s) => s.openSettingsTab);
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-surface/50">
-      <Clock size={36} className="text-fg-disabled" />
-      <div className="flex flex-col items-center gap-1.5">
-        <span className="text-base text-fg-muted font-medium">Waiting in queue</span>
-        {queuePos && (
-          <span className="text-sm text-fg-faint">
-            Position {queuePos.position} of {queuePos.total}
+    <div className="flex-1 flex flex-col bg-surface/50">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4">
+        <Clock size={32} className="text-fg-faint animate-pulse" />
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-base text-fg-muted font-medium">Waiting in queue</span>
+          {queuePos && (
+            <span className="text-sm text-fg-faint">
+              Position {queuePos.position} of {queuePos.total}
+            </span>
+          )}
+          <span className="text-xs text-fg-disabled mt-1">
+            Starts automatically when a slot opens up
           </span>
-        )}
-        <span className="text-xs text-fg-disabled">
+        </div>
+      </div>
+      <div className="px-4 py-2.5 border-t border-edge">
+        <button
+          onClick={() => openSettingsTab('agent')}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs text-fg-faint bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-tertiary transition-colors"
+        >
           {runningCount} / {maxConcurrent} agent slots in use
-        </span>
+          <ChevronRight size={12} />
+        </button>
       </div>
     </div>
   );
@@ -253,6 +277,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     || displayState.kind === 'initializing' || displayState.kind === 'suspended';
   const isSessionActive = displayState.kind === 'running' || displayState.kind === 'queued'
     || displayState.kind === 'initializing';
+  const isQueued = displayState.kind === 'queued';
   const isSuspended = displayState.kind === 'suspended';
 
   // Use large dialog when there's an active session OR a suspended one
@@ -413,13 +438,17 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           <button
             onClick={handleToggle}
             className={`p-1 rounded-full transition-colors flex-shrink-0 ${
-              isSessionActive
-                ? 'text-green-400 hover:bg-green-400/10'
-                : 'text-fg-faint hover:bg-surface-hover hover:text-fg-tertiary'
+              isQueued
+                ? 'text-fg-muted hover:bg-surface-hover'
+                : isSessionActive
+                  ? 'text-green-400 hover:bg-green-400/10'
+                  : 'text-fg-faint hover:bg-surface-hover hover:text-fg-tertiary'
             }`}
-            title={isSessionActive ? 'Pause session' : 'Resume session'}
+            title={isQueued ? 'Queued — click to pause' : isSessionActive ? 'Pause session' : 'Resume session'}
           >
-            {isSessionActive && isThinking ? (
+            {isQueued ? (
+              <Clock size={18} />
+            ) : isSessionActive && isThinking ? (
               <Loader2 size={18} className="animate-spin" />
             ) : isSessionActive ? (
               <CirclePause size={18} />
@@ -618,7 +647,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         onClose={onClose}
         header={customHeader}
         rawBody
-        className={hasSessionContext ? 'w-[90vw] h-[85vh]' : 'w-[640px] max-h-[80vh]'}
+        className={hasSessionContext && !isQueued ? 'w-[90vw] h-[85vh]' : isQueued ? 'w-[520px] h-[320px]' : 'w-[640px] max-h-[80vh]'}
         backdropClassName="p-6"
         testId="task-detail-dialog"
       >

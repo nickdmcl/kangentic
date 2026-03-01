@@ -16,10 +16,12 @@ interface ConfigStore {
   claudeVersionNumber: string | null;
   loading: boolean;
   settingsOpen: boolean;
+  settingsInitialTab: string | null;
   loadConfig: () => Promise<void>;
   updateConfig: (partial: Partial<AppConfig>) => Promise<void>;
   detectClaude: () => Promise<void>;
   setSettingsOpen: (open: boolean) => void;
+  openSettingsTab: (tab: string) => void;
 }
 
 export const useConfigStore = create<ConfigStore>((set) => ({
@@ -29,6 +31,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   claudeVersionNumber: null,
   loading: false,
   settingsOpen: false,
+  settingsInitialTab: null,
 
   loadConfig: async () => {
     set({ loading: true });
@@ -52,7 +55,8 @@ export const useConfigStore = create<ConfigStore>((set) => ({
     });
   },
 
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setSettingsOpen: (open) => set({ settingsOpen: open, ...(!open && { settingsInitialTab: null }) }),
+  openSettingsTab: (tab) => set({ settingsOpen: true, settingsInitialTab: tab }),
 }));
 
 // Sync resolved theme → localStorage + <html> class whenever it changes.

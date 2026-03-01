@@ -45,6 +45,14 @@ export function App() {
     }
   }, [currentProject]);
 
+  // Listen for session status transitions (queued → running)
+  useEffect(() => {
+    const cleanup = window.electronAPI.sessions.onStatus((sessionId, status) => {
+      updateSessionStatus(sessionId, { status });
+    });
+    return cleanup;
+  }, []);
+
   // Listen for session exit events
   useEffect(() => {
     const cleanup = window.electronAPI.sessions.onExit((sessionId, exitCode) => {

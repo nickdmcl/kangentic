@@ -21,9 +21,12 @@ export function SettingsPanel() {
   const claudeInfo = useConfigStore((s) => s.claudeInfo);
   const detectClaude = useConfigStore((s) => s.detectClaude);
   const setSettingsOpen = useConfigStore((s) => s.setSettingsOpen);
+  const settingsInitialTab = useConfigStore((s) => s.settingsInitialTab);
   const [shells, setShells] = useState<Array<{ name: string; path: string }>>([]);
   const [phase, setPhase] = useState<Phase>('entering');
-  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    (settingsInitialTab as SettingsTab) || 'appearance',
+  );
   const backdropMouseDown = useRef(false);
 
   useEffect(() => {

@@ -486,6 +486,9 @@
       onExit: function () {
         return noop;
       },
+      onStatus: function () {
+        return noop;
+      },
       onUsage: function () {
         return noop;
       },

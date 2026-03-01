@@ -916,6 +916,12 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     }
   });
 
+  sessionManager.on('status', (sessionId: string, status: string) => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC.SESSION_STATUS, sessionId, status);
+    }
+  });
+
   sessionManager.on('exit', (sessionId: string, exitCode: number) => {
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IPC.SESSION_EXIT, sessionId, exitCode);

@@ -16,9 +16,7 @@ export function StatusBar() {
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const currentProject = useProjectStore((s) => s.currentProject);
 
-  const activeSessions = sessions.filter(
-    (s) => s.status === 'running' || s.status === 'queued',
-  ).length;
+  const activeSessions = sessions.filter((s) => s.status === 'running').length;
   const queued = sessions.filter((s) => s.status === 'queued').length;
 
   // Count tasks not in "done" role swimlanes
@@ -48,7 +46,7 @@ export function StatusBar() {
             <span className={activeSessions > 0 ? 'text-green-400' : ''}>
               {activeSessions} agents
             </span>
-            {queued > 0 && <span className="text-yellow-400">({queued} queued)</span>}
+            {queued > 0 && <span className="text-fg-faint">{queued} queued</span>}
           </span>
           <span className="flex items-center gap-1.5" data-testid="task-count">
             <ClipboardCheck size={14} />

@@ -435,6 +435,7 @@ export interface ElectronAPI {
     getUsage: () => Promise<Record<string, SessionUsage>>;
     onData: (callback: (sessionId: string, data: string) => void) => () => void;
     onExit: (callback: (sessionId: string, exitCode: number) => void) => () => void;
+    onStatus: (callback: (sessionId: string, status: SessionStatus) => void) => () => void;
     onUsage: (callback: (sessionId: string, data: SessionUsage) => void) => () => void;
     getActivity: () => Promise<Record<string, ActivityState>>;
     onActivity: (callback: (sessionId: string, state: ActivityState) => void) => () => void;

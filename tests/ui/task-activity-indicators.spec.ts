@@ -275,7 +275,7 @@ test.describe('Task Activity Indicators', () => {
     }
   });
 
-  test('task with events but no usage shows idle state, not initializing', async () => {
+  test('task with events but no usage still shows initializing (usage required)', async () => {
     const { browser, page } = await launchWithState(
       makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, withEvents: true })
     );
@@ -285,19 +285,21 @@ test.describe('Task Activity Indicators', () => {
       const card = page.locator('text=Test Initializing Task').first();
       await expect(card).toBeVisible();
 
-      // Events have fired, so card should show real idle state (Mail icon), not initializing
+      // Events may arrive before usage, but "Initializing..." persists until
+      // usage data lands — no title icon (idle/thinking) without usage.
       const titleRow = card.locator('..');
-      await expect(titleRow.locator('.lucide-mail')).toBeVisible();
+      await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
       await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
 
-      // Initializing bar should NOT be visible (events prove agent is active)
-      await expect(page.locator('[data-testid="status-bar"]')).not.toBeVisible();
+      // Initializing bar still visible — usage is the gate, not events
+      await expect(page.locator('[data-testid="status-bar"]')).toBeVisible();
+      await expect(page.locator('text=Initializing...')).toBeVisible();
     } finally {
       await browser.close();
     }
   });
 
-  test('task with events and thinking activity shows thinking spinner, not initializing', async () => {
+  test('task with events and thinking activity still shows initializing without usage', async () => {
     const { browser, page } = await launchWithState(
       makePreConfig({ sessionStatus: 'running', activity: 'thinking', withUsage: false, withEvents: true })
     );
@@ -307,13 +309,15 @@ test.describe('Task Activity Indicators', () => {
       const card = page.locator('text=Test Initializing Task').first();
       await expect(card).toBeVisible();
 
-      // Events have fired + thinking activity → green spinner, no initializing bar
+      // Even with thinking activity + events, no usage = still initializing.
+      // The progress bar needs usage data (model name, context %) to render.
       const titleRow = card.locator('..');
-      await expect(titleRow.locator('.lucide-loader-circle')).toBeVisible();
+      await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
       await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
 
-      // No initializing bar (events prove agent is active, no usage yet is fine)
-      await expect(page.locator('[data-testid="status-bar"]')).not.toBeVisible();
+      // Initializing bar persists until usage arrives
+      await expect(page.locator('[data-testid="status-bar"]')).toBeVisible();
+      await expect(page.locator('text=Initializing...')).toBeVisible();
     } finally {
       await browser.close();
     }

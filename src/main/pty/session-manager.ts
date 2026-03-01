@@ -3,6 +3,7 @@ import * as pty from 'node-pty';
 import { EventEmitter } from 'node:events';
 import { v4 as uuidv4 } from 'uuid';
 import { ShellResolver } from './shell-resolver';
+import { SessionQueue } from './session-queue';
 import { adaptCommandForShell } from '../../shared/paths';
 import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent, SpawnSessionInput } from '../../shared/types';
 
@@ -33,17 +34,24 @@ interface ManagedSession {
 
 export class SessionManager extends EventEmitter {
   private sessions = new Map<string, ManagedSession>();
-  private queue: Array<{ input: SpawnSessionInput; sessionId: string }> = [];
-  private maxConcurrent = 5;
+  private sessionQueue: SessionQueue;
   private shellResolver = new ShellResolver();
   private configuredShell: string | null = null;
   private usageCache = new Map<string, SessionUsage>();
   private activityCache = new Map<string, ActivityState>();
   private eventCache = new Map<string, SessionEvent[]>();
 
+  constructor() {
+    super();
+    this.sessionQueue = new SessionQueue({
+      spawner: (input) => this.doSpawn(input).then(() => {}),
+      getActiveCount: () => this.activeCount,
+      maxConcurrent: 5,
+    });
+  }
+
   setMaxConcurrent(max: number): void {
-    this.maxConcurrent = max;
-    this.processQueue();
+    this.sessionQueue.setMaxConcurrent(max);
   }
 
   setShell(shell: string | null): void {
@@ -59,13 +67,13 @@ export class SessionManager extends EventEmitter {
   }
 
   get queuedCount(): number {
-    return this.queue.length;
+    return this.sessionQueue.length;
   }
 
   async spawn(input: SpawnSessionInput): Promise<Session> {
-    if (this.activeCount >= this.maxConcurrent) {
+    if (this.sessionQueue.shouldQueue()) {
       // Return a queued placeholder immediately (don't block the caller).
-      // processQueue() will upgrade it to a running PTY when a slot opens.
+      // SessionQueue will promote it to a running PTY when a slot opens.
       const id = uuidv4();
       const session: ManagedSession = {
         id,
@@ -89,7 +97,7 @@ export class SessionManager extends EventEmitter {
         mergedSettingsPath: null,
       };
       this.sessions.set(id, session);
-      this.queue.push({ input, sessionId: id });
+      this.sessionQueue.enqueue(input, id);
       this.emit('status', id, 'queued');
       return this.toSession(session);
     }
@@ -293,7 +301,7 @@ export class SessionManager extends EventEmitter {
       this.cleanupSessionFiles(session);
 
       this.emit('exit', id, exitCode);
-      this.processQueue();
+      this.sessionQueue.notifySlotFreed();
     });
 
     this.emit('status', id, 'running');
@@ -347,18 +355,15 @@ export class SessionManager extends EventEmitter {
       session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
       ptyRef.kill();
     }
-    // Also remove from queue
-    const queueIdx = this.queue.findIndex(q => {
-      const s = this.findByTaskId(q.input.taskId);
-      return s?.id === sessionId;
-    });
-    if (queueIdx >= 0) {
-      this.queue.splice(queueIdx, 1);
-      if (session) {
-        session.status = 'exited';
-        session.exitCode = -1;
-      }
+    // Remove from queue if queued, and mark as exited
+    const wasQueued = this.sessionQueue.length;
+    this.sessionQueue.remove(sessionId);
+    if (this.sessionQueue.length < wasQueued && session) {
+      session.status = 'exited';
+      session.exitCode = -1;
     }
+    // A slot may have opened — let the queue promote
+    this.sessionQueue.notifySlotFreed();
   }
 
   /**
@@ -404,14 +409,9 @@ export class SessionManager extends EventEmitter {
 
     this.emit('status', sessionId, 'suspended');
 
-    // Also remove from queue (queued sessions have no PTY yet)
-    const queueIdx = this.queue.findIndex(q => {
-      const s = this.findByTaskId(q.input.taskId);
-      return s?.id === sessionId;
-    });
-    if (queueIdx >= 0) {
-      this.queue.splice(queueIdx, 1);
-    }
+    // Remove from queue (queued sessions have no PTY yet) and promote
+    this.sessionQueue.remove(sessionId);
+    this.sessionQueue.notifySlotFreed();
   }
 
   getScrollback(sessionId: string): string {
@@ -465,16 +465,6 @@ export class SessionManager extends EventEmitter {
       if (s.taskId === taskId) return s;
     }
     return undefined;
-  }
-
-  private async processQueue(): Promise<void> {
-    while (this.queue.length > 0 && this.activeCount < this.maxConcurrent) {
-      const next = this.queue.shift();
-      if (next) {
-        // doSpawn will find the placeholder by taskId and upgrade it in-place
-        await this.doSpawn(next.input);
-      }
-    }
   }
 
   private toSession(s: ManagedSession): Session {
@@ -799,7 +789,7 @@ export class SessionManager extends EventEmitter {
         session.status = 'exited';
       }
     }
-    this.queue.length = 0;
+    this.sessionQueue.clear();
 
     // Wait for graceful exit, then force-kill any remaining
     if (ptysToKill.length > 0) {
@@ -847,6 +837,6 @@ export class SessionManager extends EventEmitter {
       this.cleanupSessionFiles(session);
     }
     this.sessions.clear();
-    this.queue.length = 0;
+    this.sessionQueue.clear();
   }
 }
