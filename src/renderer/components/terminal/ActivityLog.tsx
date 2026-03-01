@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSessionStore } from '../../stores/session-store';
@@ -47,20 +47,29 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   };
 
   // Filter to selected session or show all
-  const effectiveSessionIds = filterSessionId ? [filterSessionId] : sessionIds;
+  const effectiveSessionIds = useMemo(
+    () => filterSessionId ? [filterSessionId] : sessionIds,
+    [filterSessionId, sessionIds],
+  );
 
   // Merge events from active sessions, sorted by timestamp
-  const allEvents: Array<{ sessionId: string; event: SessionEvent }> = [];
-  for (const sid of effectiveSessionIds) {
-    const events = sessionEvents[sid] || [];
-    for (const event of events) {
-      allEvents.push({ sessionId: sid, event });
+  const allEvents = useMemo(() => {
+    const events: Array<{ sessionId: string; event: SessionEvent }> = [];
+    for (const sid of effectiveSessionIds) {
+      const evts = sessionEvents[sid] || [];
+      for (const event of evts) {
+        events.push({ sessionId: sid, event });
+      }
     }
-  }
-  allEvents.sort((a, b) => a.event.ts - b.event.ts);
+    events.sort((a, b) => a.event.ts - b.event.ts);
+    return events;
+  }, [effectiveSessionIds, sessionEvents]);
 
   // Cap display at last 500 events
-  const displayEvents = allEvents.length > 500 ? allEvents.slice(-500) : allEvents;
+  const displayEvents = useMemo(
+    () => allEvents.length > 500 ? allEvents.slice(-500) : allEvents,
+    [allEvents],
+  );
 
   // Track scroll position — auto-scroll when at bottom
   const handleScroll = () => {

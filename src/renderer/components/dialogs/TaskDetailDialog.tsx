@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useLayoutEffect, useRef, useEffect, useCallback, useMemo } from 'react';
 import { X, Trash2, Pencil, Loader2, ExternalLink, ArrowRightLeft, ChevronRight, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock } from 'lucide-react';
 import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
@@ -35,7 +35,17 @@ interface TaskDetailDialogProps {
 function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
   const maxConcurrent = useConfigStore((s) => s.config.claude.maxConcurrentSessions);
   const runningCount = useSessionStore((s) => s.getRunningCount());
-  const queuePos = useSessionStore((s) => sessionId ? s.getQueuePosition(sessionId) : null);
+  // Split into primitive selectors — avoids new object refs triggering re-renders
+  const queuePosition = useSessionStore((s) => {
+    if (!sessionId) return 0;
+    const pos = s.getQueuePosition(sessionId);
+    return pos ? pos.position : 0;
+  });
+  const queueTotal = useSessionStore((s) => {
+    if (!sessionId) return 0;
+    const pos = s.getQueuePosition(sessionId);
+    return pos ? pos.total : 0;
+  });
 
   const openSettingsTab = useConfigStore((s) => s.openSettingsTab);
 
@@ -45,9 +55,9 @@ function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
         <Clock size={32} className="text-fg-faint animate-pulse" />
         <div className="flex flex-col items-center gap-1.5">
           <span className="text-base text-fg-muted font-medium">Waiting in queue</span>
-          {queuePos && (
+          {queuePosition > 0 && (
             <span className="text-sm text-fg-faint">
-              Position {queuePos.position} of {queuePos.total}
+              Position {queuePosition} of {queueTotal}
             </span>
           )}
           <span className="text-xs text-fg-disabled mt-1">
@@ -77,7 +87,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const killSession = useSessionStore((s) => s.killSession);
   const suspendSession = useSessionStore((s) => s.suspendSession);
   const resumeSession = useSessionStore((s) => s.resumeSession);
-  const sessions = useSessionStore((s) => s.sessions);
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [isEditing, setIsEditing] = useState(!!initialEdit);
@@ -232,11 +241,14 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   }, [showKebabMenu]);
 
   // Columns available as move targets: exclude current column and Done column (for archived tasks)
-  const moveTargets = swimlanes.filter((s) => {
-    if (s.id === task.swimlane_id) return false;
-    if (isArchived && s.role === 'done') return false;
-    return true;
-  });
+  const moveTargets = useMemo(() =>
+    swimlanes.filter((s) => {
+      if (s.id === task.swimlane_id) return false;
+      if (isArchived && s.role === 'done') return false;
+      return true;
+    }),
+    [swimlanes, task.swimlane_id, isArchived],
+  );
 
   const handleMoveTo = async (targetSwimlaneId: string) => {
     const targetName = swimlanes.find((s) => s.id === targetSwimlaneId)?.name ?? 'column';
@@ -257,7 +269,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
 
   const setDialogSessionId = useSessionStore((s) => s.setDialogSessionId);
   const loadBoard = useBoardStore((s) => s.loadBoard);
-  const session = task.session_id ? sessions.find((s) => s.id === task.session_id) : null;
+  // Targeted selector — only re-renders when THIS session changes, not all sessions
+  const session = useSessionStore((s) =>
+    task.session_id ? s.sessions.find((sess) => sess.id === task.session_id) ?? null : null
+  );
 
   // Centralized display state derivation
   const displayState = useSessionDisplayState(task);
@@ -332,7 +347,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   // terminal is torn down before the dialog's terminal initializes.
   useLayoutEffect(() => {
     if (session?.id) {
-      setDialogSessionId(session.id);
+      // Guard against redundant store updates — prevents re-render cascades
+      if (useSessionStore.getState().dialogSessionId !== session.id) {
+        setDialogSessionId(session.id);
+      }
       return () => setDialogSessionId(null);
     }
   }, [session?.id, setDialogSessionId]);

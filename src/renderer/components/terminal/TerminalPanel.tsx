@@ -25,8 +25,11 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
 
   // Only show sessions that are actively running.
   // Queued/exited/suspended sessions are removed from the panel.
-  const activeSessions = sessions.filter(
-    (s) => s.status === 'running',
+  // Memoized to prevent downstream useMemo hooks (taskLabelMap, activeSessionIds)
+  // from being defeated by a new array reference on every render.
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => s.status === 'running'),
+    [sessions],
   );
 
   const showActivityTab = activeSessions.length >= 1;

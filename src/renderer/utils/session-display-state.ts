@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useSessionStore } from '../stores/session-store';
 import type { Task, Session, SessionUsage, ActivityState, SessionDisplayState } from '../../shared/types';
 
@@ -54,13 +55,15 @@ export function getSessionDisplayState(
  * Subscribes to the minimal store slices needed to avoid unnecessary re-renders.
  */
 export function useSessionDisplayState(task: Task): SessionDisplayState {
-  const sessions = useSessionStore((s) => s.sessions);
+  // Select only this task's session — avoids re-rendering when unrelated sessions change.
+  // Zustand's Object.is check on the returned Session object is stable because the store
+  // replaces session objects only when their data actually changes.
+  const taskSession = useSessionStore((s) => s.sessions.find((sess) => sess.taskId === task.id));
   const usage = useSessionStore((s) => task.session_id ? s.sessionUsage[task.session_id] : undefined);
   const activity = useSessionStore((s) => task.session_id ? s.sessionActivity[task.session_id] : undefined);
 
-  // Find session by taskId (more robust than by session_id — catches
-  // sessions not yet linked back to the task record, e.g. during resume)
-  const taskSession = sessions.find((s) => s.taskId === task.id);
-
-  return getSessionDisplayState(taskSession, usage, activity);
+  return useMemo(
+    () => getSessionDisplayState(taskSession, usage, activity),
+    [taskSession, usage, activity],
+  );
 }
