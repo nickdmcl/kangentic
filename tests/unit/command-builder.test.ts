@@ -606,8 +606,49 @@ describe('Merged Settings — Local Settings Merge', () => {
       .flatMap((e: { hooks: Array<{ command: string }> }) => e.hooks.map((h: { command: string }) => h.command));
     expect(stopCommands).toContain('echo local-stop');
 
-    // Project permissions should be preserved
-    expect(merged.permissions).toEqual({ allow: ['Read'] });
+    // Project permissions should be preserved (local had no permissions key)
+    expect(merged.permissions).toEqual({ allow: ['Read'], deny: [] });
+  });
+
+  it('deep-merges permissions.allow from project and local settings', () => {
+    const claudeDir = path.join(tmpDir, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+
+    // Project settings with core permissions
+    fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify({
+      permissions: { allow: ['Read', 'Edit', 'Write', 'Glob', 'Grep'], deny: [] },
+    }));
+
+    // Local settings with extra permissions
+    fs.writeFileSync(path.join(claudeDir, 'settings.local.json'), JSON.stringify({
+      permissions: { allow: ['WebFetch(domain:deepwiki.com)', 'Bash(test:*)'] },
+    }));
+
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'perms-test', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'perms-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'perms-test',
+      statusOutputPath: statusOutput,
+    });
+
+    const mergedPath = path.join(tmpDir, '.kangentic', 'sessions', 'perms-test', 'settings.json');
+    const merged = JSON.parse(fs.readFileSync(mergedPath, 'utf-8'));
+
+    // Both project and local permissions should be present
+    expect(merged.permissions.allow).toContain('Read');
+    expect(merged.permissions.allow).toContain('Edit');
+    expect(merged.permissions.allow).toContain('Write');
+    expect(merged.permissions.allow).toContain('Glob');
+    expect(merged.permissions.allow).toContain('Grep');
+    expect(merged.permissions.allow).toContain('WebFetch(domain:deepwiki.com)');
+    expect(merged.permissions.allow).toContain('Bash(test:*)');
+    expect(merged.permissions.allow).toHaveLength(7); // no duplicates
   });
 
   it('does not write to .claude/settings.local.json in cwd', () => {

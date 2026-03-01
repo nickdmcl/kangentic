@@ -61,6 +61,17 @@ function mergeHookArrays(
   return merged;
 }
 
+/** Deep-merge permissions: deduplicate allow/deny arrays. */
+function mergePermissions(
+  base: { allow?: string[]; deny?: string[] } | undefined,
+  overlay: { allow?: string[]; deny?: string[] } | undefined,
+): { allow: string[]; deny: string[] } | undefined {
+  if (!base && !overlay) return undefined;
+  const allow = [...new Set([...(base?.allow || []), ...(overlay?.allow || [])])];
+  const deny = [...new Set([...(base?.deny || []), ...(overlay?.deny || [])])];
+  return { allow, deny };
+}
+
 export class CommandBuilder {
   buildClaudeCommand(options: CommandOptions): string {
     const parts = [quoteArg(options.claudePath)];
@@ -166,15 +177,21 @@ export class CommandBuilder {
 
     // Also read local settings (gitignored, personal).
     // Local overrides project, matching Claude's own precedence.
+    // Hooks and permissions are deep-merged (concat arrays); other keys shallow-override.
     const localSettingsPath = path.join(projectRoot, '.claude', 'settings.local.json');
     try {
       const raw = fs.readFileSync(localSettingsPath, 'utf-8');
       const localSettings: ClaudeSettings = JSON.parse(raw);
-      const { hooks: localHooks, ...localRest } = localSettings;
+      const { hooks: localHooks, permissions: localPerms, ...localRest } = localSettings;
+      const mergedPerms = mergePermissions(
+        existingSettings.permissions as { allow?: string[]; deny?: string[] } | undefined,
+        localPerms as { allow?: string[]; deny?: string[] } | undefined,
+      );
       existingSettings = {
         ...existingSettings,
         ...localRest,
         hooks: mergeHookArrays(existingSettings.hooks, localHooks),
+        ...(mergedPerms ? { permissions: mergedPerms } : {}),
       };
     } catch {
       // No local settings
