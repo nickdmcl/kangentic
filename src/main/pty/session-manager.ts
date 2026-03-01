@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { v4 as uuidv4 } from 'uuid';
 import { ShellResolver } from './shell-resolver';
 import { SessionQueue } from './session-queue';
+import { ClaudeStatusParser } from '../agent/claude-status-parser';
 import { adaptCommandForShell } from '../../shared/paths';
 import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent, SpawnSessionInput } from '../../shared/types';
 
@@ -496,27 +497,13 @@ export class SessionManager extends EventEmitter {
     const readAndEmit = () => {
       try {
         const raw = fs.readFileSync(session.statusOutputPath!, 'utf-8');
-        const data = JSON.parse(raw);
-        const usage: SessionUsage = {
-          contextWindow: {
-            usedPercentage: data.context_window?.used_percentage ?? 0,
-            totalInputTokens: data.context_window?.total_input_tokens ?? 0,
-            totalOutputTokens: data.context_window?.total_output_tokens ?? 0,
-            contextWindowSize: data.context_window?.context_window_size ?? 0,
-          },
-          cost: {
-            totalCostUsd: data.cost?.total_cost_usd ?? 0,
-            totalDurationMs: data.cost?.total_duration_ms ?? 0,
-          },
-          model: {
-            id: data.model?.id ?? '',
-            displayName: data.model?.display_name ?? '',
-          },
-        };
-        this.usageCache.set(session.id, usage);
-        this.emit('usage', session.id, usage);
+        const usage = ClaudeStatusParser.parseStatus(raw);
+        if (usage) {
+          this.usageCache.set(session.id, usage);
+          this.emit('usage', session.id, usage);
+        }
       } catch {
-        // File may not exist yet, or be partially written — ignore
+        // File may not exist yet — ignore
       }
     };
 
@@ -567,14 +554,13 @@ export class SessionManager extends EventEmitter {
     const readAndEmit = () => {
       try {
         const raw = fs.readFileSync(session.activityOutputPath!, 'utf-8');
-        const data = JSON.parse(raw);
-        const state = data.state as ActivityState;
-        if (state === 'thinking' || state === 'idle') {
+        const state = ClaudeStatusParser.parseActivity(raw);
+        if (state) {
           this.activityCache.set(session.id, state);
           this.emit('activity', session.id, state);
         }
       } catch {
-        // File may not exist yet, or be partially written — ignore
+        // File may not exist yet — ignore
       }
     };
 
@@ -647,8 +633,8 @@ export class SessionManager extends EventEmitter {
         }
 
         for (const line of lines) {
-          try {
-            const event = JSON.parse(line) as SessionEvent;
+          const event = ClaudeStatusParser.parseEvent(line);
+          if (event) {
             events.push(event);
             this.emit('event', session.id, event);
 
@@ -662,8 +648,6 @@ export class SessionManager extends EventEmitter {
               this.activityCache.set(session.id, 'idle');
               this.emit('activity', session.id, 'idle');
             }
-          } catch {
-            // Malformed line — skip
           }
         }
 

@@ -17,6 +17,9 @@ const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap';
  * Visual context window usage bar displayed below terminal areas.
  * Full mode (task detail): version, model, progress bar, percentage, cost.
  * Compact mode (bottom panel): model, progress bar, percentage, cost.
+ *
+ * A fraction pill (e.g. "28k / 200k") shows absolute context usage.
+ * Tooltip on the bar shows cache vs conversation breakdown.
  */
 export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const usage = useSessionStore((s) => s.sessionUsage[sessionId]);
@@ -29,6 +32,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const tokenKey = `${inputTokens}-${outputTokens}`;
   const tokenRef = useValuePulse(tokenKey);
   const pctRef = useValuePulse(usage ? Math.round(usage.contextWindow.usedPercentage) : 0);
+  const fractionRef = useValuePulse(usage?.contextWindow.usedTokens);
 
   if (!usage) return null;
 
@@ -36,6 +40,13 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const progressColor = getProgressColor(pct);
 
   const modelName = usage.model.displayName || 'Claude';
+
+  // Fallback to 0 for fields that may be absent from older main-process sessions
+  const usedTokens = usage.contextWindow.usedTokens ?? 0;
+  const cacheTokens = usage.contextWindow.cacheTokens ?? 0;
+  const { contextWindowSize } = usage.contextWindow;
+
+  const barTooltip = `${formatTokenCount(cacheTokens)} cached (system) \u00b7 ${formatTokenCount(Math.max(0, usedTokens - cacheTokens))} conversation`;
 
   return (
     <div
@@ -68,8 +79,14 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
         </span>
       )}
 
+      {!compact && (
+        <span ref={fractionRef} className={`${pill} text-fg-muted tabular-nums`} title="Current context usage / window size">
+          {formatTokenCount(usedTokens)} / {formatTokenCount(contextWindowSize)}
+        </span>
+      )}
+
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden">
+        <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden" title={barTooltip}>
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: progressColor }}

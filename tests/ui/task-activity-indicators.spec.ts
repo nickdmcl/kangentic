@@ -115,7 +115,7 @@ function makePreConfig(opts: { sessionStatus: string; activity: string; withUsag
       var result = {};
       result['${SESSION_ID}'] = {
         model: { id: 'claude-sonnet', displayName: 'Claude Sonnet' },
-        contextWindow: { usedPercentage: 25, totalInputTokens: 1000, totalOutputTokens: 500, contextWindowSize: 200000 },
+        contextWindow: { usedPercentage: 25, usedTokens: 1500, cacheTokens: 0, totalInputTokens: 1000, totalOutputTokens: 500, contextWindowSize: 200000 },
         cost: { totalCostUsd: 0.01, totalDurationMs: 5000 },
       };
       return result;
@@ -201,7 +201,7 @@ test.describe('Task Activity Indicators', () => {
       // Find cost pill (contains "$"), separator, and tokens pill (contains formatted numbers)
       const costIdx = texts.findIndex((t) => t.text.includes('$'));
       const separatorIdx = texts.findIndex((t, i) => i > costIdx && t.isSeparator);
-      const tokensIdx = texts.findIndex((t) => t.text.includes('1.0k'));
+      const tokensIdx = texts.findIndex((t) => t.text.includes('1k'));
 
       expect(costIdx).toBeGreaterThanOrEqual(0);
       expect(separatorIdx).toBeGreaterThan(costIdx);
@@ -226,7 +226,7 @@ test.describe('Task Activity Indicators', () => {
       await expect(cost).toBeVisible();
 
       // Verify content — icons are SVGs, so check for numeric token text
-      await expect(tokens).toContainText('1.0k');
+      await expect(tokens).toContainText('1k');
       await expect(cost).toContainText('$');
     } finally {
       await browser.close();
