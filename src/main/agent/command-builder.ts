@@ -240,7 +240,6 @@ export class CommandBuilder {
     if (eventsPath) {
       const eventBridge = toForwardSlash(resolveBridgeScript('event-bridge'));
       merged.hooks = buildEventHooks(eventBridge, eventsPath, baseSettings.hooks || {});
-
     }
 
     // Write to .kangentic/sessions/<sessionId>/settings.json (for session recovery reference)

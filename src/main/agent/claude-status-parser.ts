@@ -6,6 +6,19 @@ import type { SessionUsage, SessionEvent } from '../../shared/types';
  * Encapsulates all Claude-specific data parsing so it can be swapped
  * for other agent solutions without touching session-manager.ts.
  */
+
+/** Shape of the `context_window` object from Claude Code's status line JSON. */
+export interface StatusContextWindow {
+  current_usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  } | null;
+  used_percentage?: number;
+  context_window_size?: number;
+}
+
 export class ClaudeStatusParser {
   /**
    * Auto-compaction triggers at approximately 95% of the context window.
@@ -26,19 +39,15 @@ export class ClaudeStatusParser {
    * representation of context fullness. Falls back to `used_percentage`
    * when `current_usage` is unavailable.
    *
+   * Note: Claude Code's status line reports these four fields as separate
+   * non-overlapping buckets (unlike the Anthropic API billing response
+   * where `input_tokens` includes cache reads). Verified against real
+   * session data — additive summation is correct here.
+   *
    * The result is scaled by the compaction threshold (95%) so the bar
    * reaches 100% when compaction is imminent.
    */
-  static computeContextPercentage(contextWindow: {
-    current_usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    } | null;
-    used_percentage?: number;
-    context_window_size?: number;
-  } | null | undefined): number {
+  static computeContextPercentage(contextWindow: StatusContextWindow | null | undefined): number {
     if (!contextWindow) return 0;
 
     const usage = contextWindow.current_usage;
@@ -112,7 +121,7 @@ export class ClaudeStatusParser {
         usage: {
           contextWindow: {
             usedPercentage: ClaudeStatusParser.computeContextPercentage(
-              cw as Parameters<typeof ClaudeStatusParser.computeContextPercentage>[0],
+              cw as StatusContextWindow | undefined,
             ),
             usedTokens,
             cacheTokens,

@@ -69,7 +69,7 @@ describe('SessionManager suspend logic', () => {
 
   async function spawnSession(taskId = 'task-1') {
     const mock = createMockPty();
-    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as any);
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
 
     const session = await manager.spawn({
       taskId,
@@ -114,7 +114,7 @@ describe('SessionManager suspend logic', () => {
 
   it('suspend nulls file paths before kill', async () => {
     const mock = createMockPty();
-    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as any);
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
 
     const session = await manager.spawn({
       taskId: 'task-paths',

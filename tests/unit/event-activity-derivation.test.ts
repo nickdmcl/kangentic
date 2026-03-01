@@ -105,7 +105,7 @@ describe('Event-derived activity state', () => {
   async function spawnWithEvents(taskId = 'task-1') {
     const eventsPath = path.join(tmpDir, `${taskId}-events.jsonl`);
     const mock = createMockPty();
-    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as any);
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
 
     const session = await manager.spawn({
       taskId,
