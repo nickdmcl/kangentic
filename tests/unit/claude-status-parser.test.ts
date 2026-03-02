@@ -7,7 +7,7 @@ describe('ClaudeStatusParser', () => {
   // computeContextPercentage
   // -------------------------------------------------------------------------
   describe('computeContextPercentage', () => {
-    it('includes all four token fields in the result', () => {
+    it('uses hybrid approach when both used_percentage and current_usage are available', () => {
       const pct = ClaudeStatusParser.computeContextPercentage({
         current_usage: {
           input_tokens: 5000,
@@ -16,11 +16,11 @@ describe('ClaudeStatusParser', () => {
           cache_read_input_tokens: 1000,
         },
         context_window_size: 100_000,
-        used_percentage: 50, // should be ignored when current_usage is available
+        used_percentage: 50, // primary signal: covers all input including cached system prompt
       });
-      // Raw: (5000 + 3000 + 1000 + 1000) / 100000 * 100 = 10
-      // Scaled: 10 / 95 * 100 ≈ 10.53
-      expect(pct).toBeCloseTo(10.53, 1);
+      // Hybrid: used_percentage + output/window*100 = 50 + 3000/100000*100 = 53
+      // Scaled: 53 / 95 * 100 ≈ 55.79
+      expect(pct).toBeCloseTo(55.79, 1);
     });
 
     it('caps at 100 when tokens exceed 95% of window', () => {
@@ -101,9 +101,49 @@ describe('ClaudeStatusParser', () => {
         used_percentage: 75, // Claude Code's input-only number
         context_window_size: 80_000,
       });
-      // Raw: (60000 + 15000) / 80000 * 100 = 93.75
+      // Hybrid: 75 + 15000/80000*100 = 75 + 18.75 = 93.75
       // Scaled: 93.75 / 95 * 100 ≈ 98.68
       expect(pct).toBeCloseTo(98.68, 1);
+    });
+
+    it('hybrid path produces higher result than pure token sum when cache gap exists', () => {
+      // Simulates scenario where used_percentage=40 (includes cached system prompt)
+      // but token fields only sum to 20% (system prompt tokens missing from buckets)
+      const contextWindow = {
+        current_usage: {
+          input_tokens: 15_000,
+          output_tokens: 5_000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+        used_percentage: 40, // 40% input-side (includes ~20% cached system prompt)
+        context_window_size: 100_000,
+      };
+      const pct = ClaudeStatusParser.computeContextPercentage(contextWindow);
+      // Hybrid: 40 + 5000/100000*100 = 45
+      // Scaled: 45 / 95 * 100 ≈ 47.37
+      expect(pct).toBeCloseTo(47.37, 1);
+      // Pure token sum would give: (15000+5000)/100000*100 = 20, scaled ≈ 21.05
+      // Hybrid is significantly higher, correctly accounting for cached system prompt
+      expect(pct).toBeGreaterThan(30);
+    });
+
+    it('near-compaction scenario reaches ~100% with hybrid approach', () => {
+      // Real-world: used_percentage=82 (input-side) + significant output tokens
+      const pct = ClaudeStatusParser.computeContextPercentage({
+        current_usage: {
+          input_tokens: 120_000,
+          output_tokens: 25_000,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+        used_percentage: 82,
+        context_window_size: 200_000,
+      });
+      // Hybrid: 82 + 25000/200000*100 = 82 + 12.5 = 94.5
+      // Scaled: 94.5 / 95 * 100 ≈ 99.47
+      expect(pct).toBeCloseTo(99.47, 0);
+      expect(pct).toBeGreaterThan(99);
     });
 
     // --- 95% compaction threshold tests ---
@@ -178,11 +218,13 @@ describe('ClaudeStatusParser', () => {
       });
       const usage = ClaudeStatusParser.parseStatus(raw);
       expect(usage).not.toBeNull();
-      // Raw: (20000 + 5000 + 1000 + 4000) / 200000 * 100 = 15
-      // Scaled: 15 / 95 * 100 ≈ 15.79
-      expect(usage!.contextWindow.usedPercentage).toBeCloseTo(15.79, 1);
-      expect(usage!.contextWindow.usedTokens).toBe(30_000); // 20000+5000+1000+4000
-      expect(usage!.contextWindow.cacheTokens).toBe(5_000);  // 1000+4000
+      // Hybrid: used_percentage(20) + output(5000)/window(200000)*100 = 22.5
+      // Scaled: 22.5 / 95 * 100 ≈ 23.68
+      expect(usage!.contextWindow.usedPercentage).toBeCloseTo(23.68, 1);
+      // usedTokens: inputFromPct(20%*200k=40000) + output(5000) = 45000
+      expect(usage!.contextWindow.usedTokens).toBe(45_000);
+      // cacheTokens: inputFromPct(40000) - input_tokens(20000) = 20000
+      expect(usage!.contextWindow.cacheTokens).toBe(20_000);
       expect(usage!.contextWindow.totalInputTokens).toBe(20_000);
       expect(usage!.contextWindow.totalOutputTokens).toBe(5_000);
       expect(usage!.contextWindow.contextWindowSize).toBe(200_000);

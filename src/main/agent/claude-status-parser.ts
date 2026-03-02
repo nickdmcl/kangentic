@@ -27,22 +27,25 @@ export class ClaudeStatusParser {
   private static COMPACTION_THRESHOLD = 95;
 
   /**
-   * Compute context window usage including output tokens.
+   * Compute context window usage as a percentage, scaled to the compaction
+   * threshold (95% raw = 100% displayed).
    *
-   * Claude Code's `used_percentage` only counts input tokens — it excludes
-   * `output_tokens` from the latest response. After each response, output
-   * tokens become part of the next call's input, so the gap grows over a
-   * session (can be 10-20%).
+   * Uses a three-tier approach to handle the gap between what Claude Code
+   * reports and what's actually consumed:
    *
-   * This method sums all token buckets (input, output, cache_creation,
-   * cache_read) and divides by the context window size for a more accurate
-   * representation of context fullness. Falls back to `used_percentage`
-   * when `current_usage` is unavailable.
+   * 1. **Primary** (both `used_percentage` > 0 AND `current_usage` available):
+   *    `used_percentage + (output_tokens / window_size * 100)`.
+   *    `used_percentage` accurately accounts for all input-side tokens
+   *    (including initial cached system prompt tokens that aren't broken out
+   *    in `current_usage`), and we add the output token contribution on top.
    *
-   * Note: Claude Code's status line reports these four fields as separate
-   * non-overlapping buckets (unlike the Anthropic API billing response
-   * where `input_tokens` includes cache reads). Verified against real
-   * session data — additive summation is correct here.
+   * 2. **Fallback** (`current_usage` only, `used_percentage` absent or 0):
+   *    Sums all four token buckets (input, output, cache_creation, cache_read)
+   *    and divides by window size. May under-report if cached system prompt
+   *    tokens are missing from the buckets.
+   *
+   * 3. **Last resort** (no `current_usage`):
+   *    `used_percentage` alone (input-only, excludes output tokens).
    *
    * The result is scaled by the compaction threshold (95%) so the bar
    * reaches 100% when compaction is imminent.
@@ -52,24 +55,30 @@ export class ClaudeStatusParser {
 
     const usage = contextWindow.current_usage;
     const windowSize = contextWindow.context_window_size ?? 0;
+    const usedPercentage = contextWindow.used_percentage ?? 0;
 
-    let rawPct: number;
+    let rawPercentage: number;
 
-    // If we have current_usage and a valid window size, compute accurately
-    if (usage && windowSize > 0) {
+    if (usage && windowSize > 0 && usedPercentage > 0) {
+      // Primary: used_percentage covers all input tokens (including cached
+      // system prompt); add output token contribution on top.
+      const output = usage.output_tokens ?? 0;
+      rawPercentage = Math.min(100, usedPercentage + (output / windowSize) * 100);
+    } else if (usage && windowSize > 0) {
+      // Fallback: sum all four token buckets when used_percentage is unavailable
       const input = usage.input_tokens ?? 0;
       const output = usage.output_tokens ?? 0;
       const cacheCreation = usage.cache_creation_input_tokens ?? 0;
       const cacheRead = usage.cache_read_input_tokens ?? 0;
       const total = input + output + cacheCreation + cacheRead;
-      rawPct = Math.min(100, (total / windowSize) * 100);
+      rawPercentage = Math.min(100, (total / windowSize) * 100);
     } else {
-      // Fall back to Claude Code's used_percentage (input-only)
-      rawPct = contextWindow.used_percentage ?? 0;
+      // Last resort: used_percentage alone (input-only, no output tokens)
+      rawPercentage = usedPercentage;
     }
 
     // Scale so compaction threshold (95%) shows as 100%
-    return Math.min(100, (rawPct / ClaudeStatusParser.COMPACTION_THRESHOLD) * 100);
+    return Math.min(100, (rawPercentage / ClaudeStatusParser.COMPACTION_THRESHOLD) * 100);
   }
 
   /**
@@ -101,21 +110,27 @@ export class ClaudeStatusParser {
       const outputTokens = (cu?.output_tokens as number) ?? 0;
       const windowSize = (cw?.context_window_size as number) ?? 0;
 
-      // When current_usage is available, sum all buckets for precise counts.
-      // When missing (early status updates), estimate from used_percentage.
+      // Three-tier token computation, matching computeContextPercentage:
+      const rawUsedPercentage = (cw?.used_percentage as number) ?? 0;
       let usedTokens: number;
       let cacheTokens: number;
-      if (cu) {
+      if (cu && windowSize > 0 && rawUsedPercentage > 0) {
+        // Primary: used_percentage covers all input tokens (including cached
+        // system prompt not broken out in current_usage). Add output on top.
+        const inputFromPct = Math.round((rawUsedPercentage / 100) * windowSize);
+        usedTokens = inputFromPct + outputTokens;
+        cacheTokens = Math.max(0, inputFromPct - inputTokens);
+      } else if (cu) {
+        // Fallback: sum all four token buckets
         usedTokens = inputTokens + outputTokens + cacheCreation + cacheRead;
         cacheTokens = cacheCreation + cacheRead;
       } else {
-        const pct = (cw?.used_percentage as number) ?? 0;
-        usedTokens = Math.round((pct / 100) * windowSize);
+        // Last resort: estimate from used_percentage alone
+        usedTokens = Math.round((rawUsedPercentage / 100) * windowSize);
         cacheTokens = usedTokens; // without current_usage, all context is system/cache
       }
 
       const modelId = (model?.id as string) ?? '';
-      const rawUsedPercentage = (cw?.used_percentage as number) ?? 0;
 
       return {
         usage: {
