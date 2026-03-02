@@ -51,11 +51,14 @@ export class WorktreeManager {
    * (already has worktree, worktrees disabled, not a git repo, is a worktree).
    */
   async ensureWorktree(
-    task: { id: string; title: string; worktree_path: string | null; base_branch?: string | null },
+    task: { id: string; title: string; worktree_path: string | null; base_branch?: string | null; use_worktree?: number | null },
     gitConfig: { worktreesEnabled: boolean; defaultBaseBranch: string; copyFiles: string[] },
   ): Promise<{ worktreePath: string; branchName: string } | null> {
     if (task.worktree_path) return null;
-    if (!gitConfig.worktreesEnabled) return null;
+    const shouldUseWorktree = task.use_worktree != null
+      ? Boolean(task.use_worktree)
+      : gitConfig.worktreesEnabled;
+    if (!shouldUseWorktree) return null;
     if (!isGitRepo(this.projectPath)) return null;
     if (isInsideWorktree(this.projectPath)) return null;
 

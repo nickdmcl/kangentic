@@ -23,6 +23,7 @@ export interface Task {
   pr_number: number | null;
   pr_url: string | null;
   base_branch: string | null;
+  use_worktree: number | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -283,6 +284,7 @@ export interface TaskCreateInput {
   description: string;
   swimlane_id: string;
   baseBranch?: string;
+  useWorktree?: boolean | null;
   pendingAttachments?: Array<{
     filename: string;
     data: string; // base64
@@ -303,6 +305,7 @@ export interface TaskUpdateInput {
   pr_number?: number | null;
   pr_url?: string | null;
   base_branch?: string | null;
+  use_worktree?: number | null;
 }
 
 export interface TaskMoveInput {

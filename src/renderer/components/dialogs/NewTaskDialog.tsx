@@ -5,6 +5,7 @@ import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { BaseDialog } from './BaseDialog';
 import { BranchPicker } from './BranchPicker';
+import { WorktreeChip } from './WorktreeChip';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -31,9 +32,12 @@ interface NewTaskDialogProps {
 export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
   const createTask = useBoardStore((s) => s.createTask);
   const defaultBaseBranch = useConfigStore((s) => s.config.git.defaultBaseBranch);
+  const worktreesEnabled = useConfigStore((s) => s.config.git.worktreesEnabled);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [baseBranch, setBaseBranch] = useState('');
+  const [useWorktree, setUseWorktree] = useState<boolean | null>(null);
+  const effectiveWorktree = useWorktree ?? worktreesEnabled;
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<PendingAttachment | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -156,6 +160,7 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
       description: description.trim(),
       swimlane_id: swimlaneId,
       ...(baseBranch.trim() ? { baseBranch: baseBranch.trim() } : {}),
+      ...(useWorktree !== null ? { useWorktree } : {}),
       ...(attachments.length > 0 ? {
         pendingAttachments: attachments.map((a) => ({
           filename: a.filename,
@@ -273,7 +278,11 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
               </div>
             )}
 
-            <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
+            <div className="flex items-center gap-2">
+              <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
+              <div className="w-px h-5 bg-edge-input" />
+              <WorktreeChip enabled={effectiveWorktree} onToggle={() => setUseWorktree(effectiveWorktree ? false : true)} />
+            </div>
 
             {/* Drag overlay */}
             {isDragOver && (

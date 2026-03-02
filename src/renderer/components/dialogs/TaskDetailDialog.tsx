@@ -11,6 +11,7 @@ import { useToastStore } from '../../stores/toast-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { BranchPicker } from './BranchPicker';
+import { WorktreeChip } from './WorktreeChip';
 import type { Task, TaskAttachment } from '../../../shared/types';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -93,6 +94,11 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const [showKebabMenu, setShowKebabMenu] = useState(false);
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
   const [baseBranch, setBaseBranch] = useState(task.base_branch || '');
+  const worktreesEnabled = useConfigStore((s) => s.config.git.worktreesEnabled);
+  const [useWorktree, setUseWorktree] = useState<boolean | null>(
+    task.use_worktree != null ? Boolean(task.use_worktree) : null,
+  );
+  const effectiveWorktree = useWorktree ?? worktreesEnabled;
   const [textareaFocused, setTextareaFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [toggling, setToggling] = useState(false);
@@ -355,6 +361,14 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     }
   }, [session?.id, setDialogSessionId]);
 
+  const handleCancel = () => {
+    setTitle(task.title);
+    setDescription(task.description);
+    setBaseBranch(task.base_branch || '');
+    setUseWorktree(task.use_worktree != null ? Boolean(task.use_worktree) : null);
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
     const payload: Parameters<typeof updateTask>[0] = { id: task.id, title, description };
     if (!hasSessionContext) {
@@ -362,6 +376,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       const original = task.base_branch || '';
       if (trimmed !== original) {
         payload.base_branch = trimmed || null;
+      }
+      const originalWorktree = task.use_worktree != null ? Boolean(task.use_worktree) : null;
+      if (useWorktree !== originalWorktree) {
+        payload.use_worktree = useWorktree != null ? (useWorktree ? 1 : 0) : null;
       }
     }
     await updateTask(payload);
@@ -486,7 +504,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       {isEditing ? (
         <>
           <button
-            onClick={() => { setTitle(task.title); setDescription(task.description); setBaseBranch(task.base_branch || ''); setIsEditing(false); }}
+            onClick={handleCancel}
             className="px-3 py-1.5 text-xs text-fg-muted hover:text-fg-secondary border border-edge-input hover:border-fg-faint rounded transition-colors flex-shrink-0"
           >
             Cancel
@@ -717,9 +735,17 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             </div>
             {thumbnailStrip}
 
-            {/* Base branch picker (no-session edit only) */}
+            {/* Base branch picker + worktree toggle (no-session edit only) */}
             {!hasSessionContext && (
-              <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
+              <div className="flex items-center gap-2">
+                <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
+                {!task.worktree_path && (
+                  <>
+                    <div className="w-px h-5 bg-edge-input" />
+                    <WorktreeChip enabled={effectiveWorktree} onToggle={() => setUseWorktree(effectiveWorktree ? false : true)} />
+                  </>
+                )}
+              </div>
             )}
 
             {isDragOver && (

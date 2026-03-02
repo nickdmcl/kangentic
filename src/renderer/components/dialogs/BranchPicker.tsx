@@ -98,7 +98,7 @@ export function BranchPicker({ value, defaultBranch, onChange, variant = 'chip',
       }`}
       data-testid="branch-picker-chip"
     >
-      <GitBranch size={12} />
+      <GitBranch size={16} />
       {displayBranch}
     </button>
   );

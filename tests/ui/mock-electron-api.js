@@ -198,6 +198,7 @@
           pr_number: null,
           pr_url: null,
           base_branch: input.baseBranch || null,
+          use_worktree: input.useWorktree != null ? (input.useWorktree ? 1 : 0) : null,
           archived_at: null,
           created_at: now(),
           updated_at: now(),
