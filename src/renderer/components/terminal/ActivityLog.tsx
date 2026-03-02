@@ -29,6 +29,8 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   const autoScrollRef = useRef(true);
   const colorMapRef = useRef(new Map<string, number>());
   const colorIndexRef = useRef(0);
+  const returnTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const isSmoothScrollingRef = useRef(false);
   const [filterSessionId, setFilterSessionId] = useState<string | null>(null);
 
   // Auto-clear filter when the filtered session exits
@@ -72,12 +74,44 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     [allEvents],
   );
 
-  // Track scroll position — auto-scroll when at bottom
-  const handleScroll = () => {
+  // Smooth-scroll back to bottom and re-enable auto-scroll
+  const smoothScrollToBottom = () => {
     const el = containerRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    // Already at bottom — just re-enable
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) {
+      autoScrollRef.current = true;
+      return;
+    }
+    isSmoothScrollingRef.current = true;
+    autoScrollRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
+
+  // Track scroll position — auto-scroll when at bottom
+  const handleScroll = () => {
+    if (isSmoothScrollingRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 1;
     autoScrollRef.current = atBottom;
+  };
+
+  const handleMouseEnter = () => {
+    if (returnTimerRef.current) {
+      clearTimeout(returnTimerRef.current);
+      returnTimerRef.current = undefined;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!autoScrollRef.current) {
+      if (returnTimerRef.current) clearTimeout(returnTimerRef.current);
+      returnTimerRef.current = setTimeout(() => {
+        returnTimerRef.current = undefined;
+        smoothScrollToBottom();
+      }, 3000);
+    }
   };
 
   // Auto-scroll to bottom when new events arrive
@@ -86,6 +120,32 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [displayEvents.length]);
+
+  // Clear isSmoothScrollingRef when scroll animation finishes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onEnd = () => { isSmoothScrollingRef.current = false; };
+    el.addEventListener('scrollend', onEnd);
+    return () => el.removeEventListener('scrollend', onEnd);
+  }, []);
+
+  // Smooth-scroll back when switching to the Activity tab
+  // Also resets the smooth-scrolling guard — if a scroll was in progress
+  // when the tab was hidden (display:none), scrollend won't fire.
+  useEffect(() => {
+    isSmoothScrollingRef.current = false;
+    if (active && !autoScrollRef.current) {
+      requestAnimationFrame(() => smoothScrollToBottom());
+    }
+  }, [active]);
+
+  // Cleanup return timer on unmount
+  useEffect(() => {
+    return () => {
+      if (returnTimerRef.current) clearTimeout(returnTimerRef.current);
+    };
+  }, []);
 
   const showFilter = sessionIds.length >= 2;
   const filteredLabel = filterSessionId
@@ -116,6 +176,8 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`h-full w-full bg-surface overflow-y-auto font-mono text-xs leading-5 px-2 pb-2 ${showFilter ? 'pt-0' : 'pt-2'}`}
     >
       {showFilter && (
