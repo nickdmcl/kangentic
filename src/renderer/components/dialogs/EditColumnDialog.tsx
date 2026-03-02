@@ -19,8 +19,9 @@ const PERMISSION_LABELS: Record<PermissionMode, string> = {
 };
 
 const PRESET_COLORS = [
-  '#6b7280', '#ef4444', '#f59e0b', '#10b981',
-  '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6',
+  '#6b7280', '#ef4444', '#f43f5e', '#f97316',
+  '#f59e0b', '#10b981', '#06b6d4', '#3b82f6',
+  '#8b5cf6', '#ec4899',
 ];
 
 interface EditColumnDialogProps {
@@ -37,11 +38,11 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const swimlanes = useBoardStore((s) => s.swimlanes);
 
   const [name, setName] = useState(swimlane.name);
-  const [color, setColor] = useState(swimlane.color);
+  const [color, setColor] = useState(swimlane.color.toLowerCase());
   const [icon, setIcon] = useState<string | null>(swimlane.icon);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
-  const [hexInput, setHexInput] = useState(swimlane.color);
+  const [hexInput, setHexInput] = useState(swimlane.color.toLowerCase());
   const [permissionStrategy, setPermissionStrategy] = useState<PermissionMode | null>(swimlane.permission_strategy);
   const [autoSpawn, setAutoSpawn] = useState(swimlane.auto_spawn);
   const [autoCommand, setAutoCommand] = useState(swimlane.auto_command || '');
@@ -57,6 +58,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const permissionLocked = isPlanning || isBacklogOrDone;
   const autoSpawnLocked = isLocked; // backlog, planning, done all have locked auto_spawn
 
+  const isCustomColor = !PRESET_COLORS.includes(color);
   const usedIcons = getUsedIcons(swimlanes, swimlane.id);
 
   useEffect(() => {
@@ -179,6 +181,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
             <button
               type="button"
               onClick={() => setShowIconPicker(true)}
+              aria-label={`Choose icon${icon ? `: ${icon}` : ''}`}
               className="w-full flex items-center gap-2.5 bg-surface border border-edge-input hover:border-fg-faint rounded px-3 py-2 transition-colors group"
             >
               <div className="flex-shrink-0">
@@ -229,8 +232,9 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                     setHexInput(c);
                     setShowCustomPicker(false);
                   }}
+                  aria-label={`Color ${c}${color === c ? ' (selected)' : ''}`}
                   className={`w-6 h-6 rounded-full border-2 transition-all ${
-                    color === c ? 'border-white scale-110' : 'border-transparent hover:border-fg-faint'
+                    color === c ? 'border-white/60 scale-110' : 'border-transparent hover:border-fg-faint'
                   }`}
                   style={{ backgroundColor: c }}
                 />
@@ -238,12 +242,18 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
               <button
                 type="button"
                 onClick={() => setShowCustomPicker(!showCustomPicker)}
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  showCustomPicker ? 'border-white bg-surface-hover' : 'border-edge-input hover:border-fg-muted bg-surface-raised'
+                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                  isCustomColor
+                    ? 'border-white/60 scale-110'
+                    : showCustomPicker
+                      ? 'border-white/60 bg-surface-hover'
+                      : 'border-edge-input hover:border-fg-muted bg-surface-raised'
                 }`}
-                title="Custom color"
+                style={isCustomColor ? { backgroundColor: color } : undefined}
+                title={isCustomColor ? `Custom color ${color}` : 'Custom color'}
+                aria-label={isCustomColor ? `Custom color ${color}` : 'Custom color'}
               >
-                <Palette size={12} className="text-fg-muted" />
+                <Palette size={12} className={isCustomColor ? 'text-white' : 'text-fg-muted'} />
               </button>
             </div>
 
@@ -260,11 +270,12 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                   onChange={(e) => {
                     const v = e.target.value;
                     setHexInput(v);
-                    if (/^#[0-9a-fA-F]{6}$/.test(v)) setColor(v);
+                    if (/^#[0-9a-fA-F]{6}$/.test(v)) setColor(v.toLowerCase());
                   }}
                   onBlur={() => {
                     if (!/^#[0-9a-fA-F]{6}$/.test(hexInput)) setHexInput(color);
                   }}
+                  aria-label="Hex color value"
                   className="w-full bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg font-mono focus:outline-none focus:border-accent"
                   placeholder="#000000"
                   maxLength={7}
@@ -311,6 +322,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                 type="button"
                 role="switch"
                 aria-checked={autoSpawn}
+                aria-label="Auto-spawn"
                 onClick={() => { if (!autoSpawnLocked) setAutoSpawn(!autoSpawn); }}
                 disabled={autoSpawnLocked}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
