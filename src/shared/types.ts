@@ -47,7 +47,7 @@ export interface Swimlane {
   position: number;
   color: string;
   icon: string | null;
-  is_terminal: boolean;
+  is_archived: boolean;
   permission_strategy: PermissionMode | null;
   auto_spawn: boolean;
   auto_command: string | null;
@@ -320,7 +320,7 @@ export interface SwimlaneCreateInput {
   name: string;
   color?: string;
   icon?: string | null;
-  is_terminal?: boolean;
+  is_archived?: boolean;
   permission_strategy?: PermissionMode | null;
   auto_spawn?: boolean;
   auto_command?: string | null;
@@ -332,7 +332,7 @@ export interface SwimlaneUpdateInput {
   color?: string;
   icon?: string | null;
   position?: number;
-  is_terminal?: boolean;
+  is_archived?: boolean;
   permission_strategy?: PermissionMode | null;
   auto_spawn?: boolean;
   auto_command?: string | null;

@@ -99,8 +99,10 @@ test.describe('Project Management', () => {
     await ensureBoardVisible();
     await expect(page.locator('[data-swimlane-name="Backlog"]')).toBeVisible();
     await expect(page.locator('[data-swimlane-name="Planning"]')).toBeVisible();
+    await expect(page.locator('[data-swimlane-name="Executing"]')).toBeVisible();
     await expect(page.locator('[data-swimlane-name="Code Review"]')).toBeVisible();
     await expect(page.locator('[data-swimlane-name="Tests"]')).toBeVisible();
+    await expect(page.locator('[data-swimlane-name="Ship It"]')).toBeVisible();
     await expect(page.locator('[data-swimlane-name="Done"]')).toBeVisible();
   });
 

@@ -10,7 +10,7 @@ interface SwimlaneRow {
   position: number;
   color: string;
   icon: string | null;
-  is_terminal: number;
+  is_archived: number;
   permission_strategy: string | null;
   auto_spawn: number;
   auto_command: string | null;
@@ -56,7 +56,7 @@ export class SwimlaneRepository {
       position: insertPos,
       color: input.color || '#3b82f6',
       icon: input.icon || null,
-      is_terminal: input.is_terminal || false,
+      is_archived: input.is_archived || false,
       permission_strategy: input.permission_strategy ?? null,
       auto_spawn: input.auto_spawn ?? true,
       auto_command: input.auto_command ?? null,
@@ -64,8 +64,8 @@ export class SwimlaneRepository {
     };
 
     this.db.prepare(
-      'INSERT INTO swimlanes (id, name, role, position, color, icon, is_terminal, permission_strategy, auto_spawn, auto_command, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(swimlane.id, swimlane.name, swimlane.role, swimlane.position, swimlane.color, swimlane.icon, swimlane.is_terminal ? 1 : 0, swimlane.permission_strategy, swimlane.auto_spawn ? 1 : 0, swimlane.auto_command, swimlane.created_at);
+      'INSERT INTO swimlanes (id, name, role, position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(swimlane.id, swimlane.name, swimlane.role, swimlane.position, swimlane.color, swimlane.icon, swimlane.is_archived ? 1 : 0, swimlane.permission_strategy, swimlane.auto_spawn ? 1 : 0, swimlane.auto_command, swimlane.created_at);
 
     return swimlane;
   }
@@ -79,14 +79,14 @@ export class SwimlaneRepository {
     if (input.color !== undefined) updated.color = input.color;
     if (input.icon !== undefined) updated.icon = input.icon;
     if (input.position !== undefined) updated.position = input.position;
-    if (input.is_terminal !== undefined) updated.is_terminal = input.is_terminal;
+    if (input.is_archived !== undefined) updated.is_archived = input.is_archived;
     if (input.permission_strategy !== undefined) updated.permission_strategy = input.permission_strategy;
     if (input.auto_spawn !== undefined) updated.auto_spawn = input.auto_spawn;
     if (input.auto_command !== undefined) updated.auto_command = input.auto_command;
 
     this.db.prepare(
-      'UPDATE swimlanes SET name = ?, color = ?, icon = ?, position = ?, is_terminal = ?, permission_strategy = ?, auto_spawn = ?, auto_command = ? WHERE id = ?'
-    ).run(updated.name, updated.color, updated.icon, updated.position, updated.is_terminal ? 1 : 0, updated.permission_strategy, updated.auto_spawn ? 1 : 0, updated.auto_command, updated.id);
+      'UPDATE swimlanes SET name = ?, color = ?, icon = ?, position = ?, is_archived = ?, permission_strategy = ?, auto_spawn = ?, auto_command = ? WHERE id = ?'
+    ).run(updated.name, updated.color, updated.icon, updated.position, updated.is_archived ? 1 : 0, updated.permission_strategy, updated.auto_spawn ? 1 : 0, updated.auto_command, updated.id);
 
     return updated;
   }
@@ -140,7 +140,7 @@ export class SwimlaneRepository {
       position: row.position,
       color: row.color,
       icon: row.icon || null,
-      is_terminal: Boolean(row.is_terminal),
+      is_archived: Boolean(row.is_archived),
       permission_strategy: (row.permission_strategy as PermissionMode) ?? null,
       auto_spawn: Boolean(row.auto_spawn),
       auto_command: row.auto_command || null,

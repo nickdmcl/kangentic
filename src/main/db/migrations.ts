@@ -30,7 +30,7 @@ export function runProjectMigrations(db: Database.Database): void {
       position INTEGER NOT NULL,
       color TEXT NOT NULL DEFAULT '#3b82f6',
       icon TEXT DEFAULT NULL,
-      is_terminal INTEGER NOT NULL DEFAULT 0,
+      is_archived INTEGER NOT NULL DEFAULT 0,
       permission_strategy TEXT DEFAULT NULL,
       auto_spawn INTEGER NOT NULL DEFAULT 1,
       auto_command TEXT DEFAULT NULL,
@@ -95,10 +95,10 @@ export function runProjectMigrations(db: Database.Database): void {
   if (!hasRoleColumn) {
     db.exec('ALTER TABLE swimlanes ADD COLUMN role TEXT');
     // Backfill roles for the default seed columns by position
-    const lanes = db.prepare('SELECT id, position, is_terminal FROM swimlanes ORDER BY position ASC').all() as Array<{ id: string; position: number; is_terminal: number }>;
+    const lanes = db.prepare('SELECT id, position, is_archived FROM swimlanes ORDER BY position ASC').all() as Array<{ id: string; position: number; is_archived: number }>;
     const roleMap: Record<number, string> = { 0: 'backlog', 1: 'planning', 2: 'running' };
     for (const lane of lanes) {
-      const role = lane.is_terminal ? 'done' : roleMap[lane.position] || null;
+      const role = lane.is_archived ? 'done' : roleMap[lane.position] || null;
       if (role) {
         db.prepare('UPDATE swimlanes SET role = ? WHERE id = ?').run(role, lane.id);
       }
@@ -248,6 +248,13 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec('ALTER TABLE swimlanes ADD COLUMN auto_command TEXT DEFAULT NULL');
   }
 
+  // Migration: rename is_terminal → is_archived
+  const hasIsTerminal = (db.pragma('table_info(swimlanes)') as Array<{ name: string }>)
+    .some((col) => col.name === 'is_terminal');
+  if (hasIsTerminal) {
+    db.exec('ALTER TABLE swimlanes RENAME COLUMN is_terminal TO is_archived');
+  }
+
   // Data migration: rename legacy permission_strategy values in swimlanes
   db.prepare("UPDATE swimlanes SET permission_strategy = 'default' WHERE permission_strategy = 'project-settings'").run();
   db.prepare("UPDATE swimlanes SET permission_strategy = 'bypass-permissions' WHERE permission_strategy = 'dangerously-skip'").run();
@@ -257,20 +264,22 @@ export function runProjectMigrations(db: Database.Database): void {
   if (laneCount.c === 0) {
     const now = new Date().toISOString();
     const insertLane = db.prepare(
-      'INSERT INTO swimlanes (id, name, role, position, color, icon, is_terminal, permission_strategy, auto_spawn, auto_command, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO swimlanes (id, name, role, position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     const defaults = [
-      { name: 'Backlog', role: 'backlog', color: '#6b7280', icon: null, terminal: 0, permission_strategy: null, auto_spawn: 0, auto_command: null },
-      { name: 'Planning', role: 'planning', color: '#8b5cf6', icon: null, terminal: 0, permission_strategy: 'plan', auto_spawn: 1, auto_command: null },
-      { name: 'Code Review', role: null, color: '#f59e0b', icon: 'code', terminal: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
-      { name: 'Tests', role: null, color: '#06b6d4', icon: 'flask-conical', terminal: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
-      { name: 'Done', role: 'done', color: '#10b981', icon: null, terminal: 1, permission_strategy: null, auto_spawn: 0, auto_command: null },
+      { name: 'Backlog', role: 'backlog', color: '#6b7280', icon: 'layers', archived: 0, permission_strategy: null, auto_spawn: 0, auto_command: null },
+      { name: 'Planning', role: 'planning', color: '#8b5cf6', icon: 'map', archived: 0, permission_strategy: 'plan', auto_spawn: 1, auto_command: null },
+      { name: 'Executing', role: null, color: '#3b82f6', icon: 'square-terminal', archived: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
+      { name: 'Code Review', role: null, color: '#f59e0b', icon: 'code', archived: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
+      { name: 'Tests', role: null, color: '#06b6d4', icon: 'flask-conical', archived: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
+      { name: 'Ship It', role: null, color: '#F97316', icon: 'sailboat', archived: 0, permission_strategy: null, auto_spawn: 1, auto_command: null },
+      { name: 'Done', role: 'done', color: '#10b981', icon: 'circle-check-big', archived: 1, permission_strategy: null, auto_spawn: 0, auto_command: null },
     ];
 
     const tx = db.transaction(() => {
       defaults.forEach((lane, i) => {
         const id = uuidv4();
-        insertLane.run(id, lane.name, lane.role, i, lane.color, lane.icon, lane.terminal, lane.permission_strategy, lane.auto_spawn, lane.auto_command, now);
+        insertLane.run(id, lane.name, lane.role, i, lane.color, lane.icon, lane.archived, lane.permission_strategy, lane.auto_spawn, lane.auto_command, now);
       });
 
       // Seed default actions and transitions

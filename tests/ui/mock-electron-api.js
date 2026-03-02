@@ -80,11 +80,13 @@
   }
 
   var DEFAULT_SWIMLANES = [
-    { name: 'Backlog', role: 'backlog', color: '#71717a', icon: null, is_terminal: false, permission_strategy: null, auto_spawn: false, auto_command: null },
-    { name: 'Planning', role: 'planning', color: '#f59e0b', icon: 'map', is_terminal: false, permission_strategy: 'plan', auto_spawn: true, auto_command: null },
-    { name: 'Code Review', role: null, color: '#8b5cf6', icon: 'code', is_terminal: false, permission_strategy: null, auto_spawn: true, auto_command: null },
-    { name: 'Tests', role: null, color: '#06b6d4', icon: 'flask-conical', is_terminal: false, permission_strategy: null, auto_spawn: true, auto_command: null },
-    { name: 'Done', role: 'done', color: '#22c55e', icon: 'check', is_terminal: true, permission_strategy: null, auto_spawn: false, auto_command: null },
+    { name: 'Backlog', role: 'backlog', color: '#6b7280', icon: 'layers', is_archived: false, permission_strategy: null, auto_spawn: false, auto_command: null },
+    { name: 'Planning', role: 'planning', color: '#8b5cf6', icon: 'map', is_archived: false, permission_strategy: 'plan', auto_spawn: true, auto_command: null },
+    { name: 'Executing', role: null, color: '#3b82f6', icon: 'square-terminal', is_archived: false, permission_strategy: null, auto_spawn: true, auto_command: null },
+    { name: 'Code Review', role: null, color: '#f59e0b', icon: 'code', is_archived: false, permission_strategy: null, auto_spawn: true, auto_command: null },
+    { name: 'Tests', role: null, color: '#06b6d4', icon: 'flask-conical', is_archived: false, permission_strategy: null, auto_spawn: true, auto_command: null },
+    { name: 'Ship It', role: null, color: '#F97316', icon: 'sailboat', is_archived: false, permission_strategy: null, auto_spawn: true, auto_command: null },
+    { name: 'Done', role: 'done', color: '#10b981', icon: 'circle-check-big', is_archived: true, permission_strategy: null, auto_spawn: false, auto_command: null },
   ];
 
   function noop() {}
@@ -361,7 +363,7 @@
           role: null,
           color: input.color || '#71717a',
           icon: input.icon || null,
-          is_terminal: input.is_terminal || false,
+          is_archived: input.is_archived || false,
           permission_strategy: input.permission_strategy || null,
           auto_spawn: (input.auto_spawn !== undefined && input.auto_spawn !== null) ? input.auto_spawn : true,
           auto_command: input.auto_command || null,

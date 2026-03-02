@@ -146,7 +146,7 @@ Stores the project list. Tables:
 
 Created on project open. Stored in the global config directory (not inside the project). Tables:
 
-- **swimlanes** — Kanban columns. Fields: id, name, role (`backlog`/`planning`/`done`/null), position, color, icon, is_terminal, permission_strategy, auto_spawn, auto_command, created_at
+- **swimlanes** — Kanban columns. Fields: id, name, role (`backlog`/`planning`/`done`/null), position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at
 - **tasks** — Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, archived_at, created_at, updated_at
 - **actions** — Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `webhook`. Config stored as JSON.
 - **swimlane_transitions** — Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
