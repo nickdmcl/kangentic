@@ -285,6 +285,12 @@ export function SettingsPanel() {
                     onChange={(v) => updateConfig({ skipDeleteConfirm: v })}
                   />
                 </SettingRow>
+                <SettingRow label="Auto-Focus Idle Sessions" description="Automatically switch the bottom panel to the most recently idle session">
+                  <ToggleSwitch
+                    checked={config.autoFocusIdleSession}
+                    onChange={(v) => updateConfig({ autoFocusIdleSession: v })}
+                  />
+                </SettingRow>
               </>
             )}
           </div>

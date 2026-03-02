@@ -6,8 +6,7 @@ import { TerminalTab } from './TerminalTab';
 import { ActivityLog } from './ActivityLog';
 import { ContextBar } from './ContextBar';
 import { slugify } from '../../utils/slugify';
-
-const ACTIVITY_TAB = '__all__';
+import { ACTIVITY_TAB } from '../../../shared/types';
 
 interface TerminalPanelProps {
   collapsed?: boolean;

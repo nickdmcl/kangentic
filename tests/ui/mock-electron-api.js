@@ -44,6 +44,7 @@
       initScript: null,
     },
     skipDeleteConfirm: false,
+    autoFocusIdleSession: true,
   };
 
   function uuid() {

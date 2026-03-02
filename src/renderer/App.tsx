@@ -5,6 +5,7 @@ import { useBoardStore } from './stores/board-store';
 import { useConfigStore } from './stores/config-store';
 import { useSessionStore } from './stores/session-store';
 import { useToastStore } from './stores/toast-store';
+import { resolveAutoFocusTarget } from './utils/auto-focus';
 
 export function App() {
   const loadProjects = useProjectStore((s) => s.loadProjects);
@@ -87,6 +88,22 @@ export function App() {
     if (sessions.onActivity) {
       cleanups.push(sessions.onActivity((sessionId, state) => {
         updateActivity(sessionId, state);
+
+        // Auto-focus: switch the bottom panel to the most recently idle session
+        const config = useConfigStore.getState().config;
+        if (config.autoFocusIdleSession) {
+          const store = useSessionStore.getState();
+          const target = resolveAutoFocusTarget({
+            sessionId,
+            newState: state,
+            currentActiveSessionId: store.activeSessionId,
+            sessionActivity: store.sessionActivity,
+            sessions: store.sessions,
+          });
+          if (target !== null) {
+            store.setActiveSession(target);
+          }
+        }
       }));
     }
 

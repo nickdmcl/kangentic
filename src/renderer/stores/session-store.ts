@@ -5,7 +5,7 @@ const MAX_EVENTS_PER_SESSION = 500;
 
 interface SessionStore {
   sessions: Session[];
-  // '__all__' = activity log tab; session UUID = individual tab; null = none
+  // ACTIVITY_TAB = activity log tab; session UUID = individual tab; null = none
   activeSessionId: string | null;
   openTaskId: string | null;
   dialogSessionId: string | null;

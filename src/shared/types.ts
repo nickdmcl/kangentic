@@ -273,6 +273,11 @@ export type SessionDisplayState =
   | { kind: 'suspended' }
   | { kind: 'exited'; exitCode: number };
 
+// === Bottom Panel Constants ===
+
+/** Sentinel value for the Activity tab in the bottom panel. */
+export const ACTIVITY_TAB = '__all__';
+
 // === Configuration ===
 
 export type PermissionMode = 'bypass-permissions' | 'default' | 'manual' | 'plan' | 'acceptEdits';
@@ -333,6 +338,7 @@ export interface AppConfig {
   };
 
   skipDeleteConfirm: boolean;
+  autoFocusIdleSession: boolean;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -363,6 +369,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     initScript: null,
   },
   skipDeleteConfirm: false,
+  autoFocusIdleSession: true,
 };
 
 // === IPC API Types ===
