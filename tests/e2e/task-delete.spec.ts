@@ -242,13 +242,13 @@ test.describe('Task Delete', () => {
     await createTask(page, titleA, 'Occupies the only slot');
     await createTask(page, titleB, 'Should be queued');
 
-    // Get swimlane IDs for Planning (role='planning')
+    // Get swimlane IDs for Planning
     const { planningId, taskAId, taskBId } = await page.evaluate(async (titles) => {
       const lanes = await window.electronAPI.swimlanes.list();
-      const planning = lanes.find((l: any) => l.role === 'planning');
+      const planning = lanes.find((l: { name: string }) => l.name === 'Planning');
       const tasks = await window.electronAPI.tasks.list();
-      const a = tasks.find((t: any) => t.title === titles.a);
-      const b = tasks.find((t: any) => t.title === titles.b);
+      const a = tasks.find((t: { title: string }) => t.title === titles.a);
+      const b = tasks.find((t: { title: string }) => t.title === titles.b);
       return { planningId: planning.id, taskAId: a.id, taskBId: b.id };
     }, { a: titleA, b: titleB });
 

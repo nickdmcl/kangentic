@@ -77,6 +77,7 @@ export const IPC = {
 
   // Shell utilities
   SHELL_OPEN_PATH: 'shell:openPath',
+  SHELL_OPEN_EXTERNAL: 'shell:openExternal',
 
   // Git
   GIT_LIST_BRANCHES: 'git:listBranches',

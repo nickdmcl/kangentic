@@ -558,6 +558,9 @@
       openPath: async function () {
         return '';
       },
+      openExternal: async function () {
+        return;
+      },
     },
 
     git: {

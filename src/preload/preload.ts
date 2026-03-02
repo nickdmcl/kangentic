@@ -121,6 +121,7 @@ const api: ElectronAPI = {
     getAvailable: () => ipcRenderer.invoke(IPC.SHELL_GET_AVAILABLE),
     getDefault: () => ipcRenderer.invoke(IPC.SHELL_GET_DEFAULT),
     openPath: (dirPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, dirPath),
+    openExternal: (url: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_EXTERNAL, url),
   },
 
   git: {

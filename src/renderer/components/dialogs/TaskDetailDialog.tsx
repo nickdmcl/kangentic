@@ -1,5 +1,5 @@
 import React, { useState, useLayoutEffect, useRef, useEffect, useCallback, useMemo } from 'react';
-import { X, Trash2, Pencil, Loader2, ExternalLink, ArrowRightLeft, ChevronRight, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock } from 'lucide-react';
+import { X, Trash2, Pencil, Loader2, FolderGit2, GitPullRequest, ArrowRightLeft, ChevronRight, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock } from 'lucide-react';
 import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
@@ -9,6 +9,7 @@ import { BaseDialog } from './BaseDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useToastStore } from '../../stores/toast-store';
 import { useConfigStore } from '../../stores/config-store';
+import { useProjectStore } from '../../stores/project-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { BranchPicker } from './BranchPicker';
 import { WorktreeChip } from './WorktreeChip';
@@ -85,6 +86,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const moveTask = useBoardStore((s) => s.moveTask);
   const unarchiveTask = useBoardStore((s) => s.unarchiveTask);
   const swimlanes = useBoardStore((s) => s.swimlanes);
+  const projectPath = useProjectStore((s) => s.currentProject?.path ?? null);
   const killSession = useSessionStore((s) => s.killSession);
   const suspendSession = useSessionStore((s) => s.suspendSession);
   const resumeSession = useSessionStore((s) => s.resumeSession);
@@ -526,7 +528,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         )
       )}
 
-      {/* Title — fills remaining space */}
+      {/* Title */}
       {isEditing ? (
         <input
           type="text"
@@ -536,8 +538,24 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           autoFocus
         />
       ) : (
-        <h2 className="text-base font-semibold text-fg truncate flex-1 min-w-0">{task.title}</h2>
+        <h2 className="text-base font-semibold text-fg truncate min-w-0">{task.title}</h2>
       )}
+
+      {/* Open folder pill — left-aligned after title */}
+      {!isEditing && (task.worktree_path || projectPath) && (
+        <button
+          onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-hover/50 text-xs text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
+          title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
+          data-testid="branch-pill"
+        >
+          <FolderGit2 size={16} />
+          Open
+        </button>
+      )}
+
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Actions */}
       {isEditing && hasSessionContext ? (
@@ -574,6 +592,49 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                 <Pencil size={14} />
                 Edit
               </button>
+
+              {/* Open folder */}
+              {(task.worktree_path || projectPath) && (
+                <button
+                  onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!); }}
+                  className="w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 text-fg-tertiary hover:bg-surface-hover hover:text-fg"
+                >
+                  <FolderGit2 size={14} />
+                  Open folder
+                </button>
+              )}
+
+              {/* View PR */}
+              {task.pr_url && (
+                <button
+                  onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); window.electronAPI.shell.openExternal(task.pr_url!); }}
+                  className="w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-2 text-fg-tertiary hover:bg-surface-hover hover:text-fg"
+                >
+                  <GitPullRequest size={14} />
+                  View PR #{task.pr_number}
+                </button>
+              )}
+
+              {/* Pause / Resume */}
+              {canToggle && (
+                <button
+                  onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); handleToggle(); }}
+                  disabled={toggling}
+                  className="w-full text-left px-3 py-1.5 text-xs text-fg-tertiary hover:bg-surface-hover hover:text-fg transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSessionActive ? (
+                    <>
+                      <CirclePause size={14} />
+                      Pause session
+                    </>
+                  ) : (
+                    <>
+                      <CirclePlay size={14} />
+                      Resume session
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Move to — flyout submenu to the right */}
               {moveTargets.length > 0 && (
@@ -614,27 +675,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Pause / Resume */}
-              {canToggle && (
-                <button
-                  onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); handleToggle(); }}
-                  disabled={toggling}
-                  className="w-full text-left px-3 py-1.5 text-xs text-fg-tertiary hover:bg-surface-hover hover:text-fg transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSessionActive ? (
-                    <>
-                      <CirclePause size={14} />
-                      Pause session
-                    </>
-                  ) : (
-                    <>
-                      <CirclePlay size={14} />
-                      Resume session
-                    </>
-                  )}
-                </button>
               )}
 
               {/* Divider */}
@@ -843,32 +883,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
               <p className="text-sm text-fg-muted whitespace-pre-wrap">{task.description}</p>
             )}
             {thumbnailStrip}
-          </div>
-        )}
-
-        {/* Worktree / PR info */}
-        {!isEditing && (task.worktree_path || task.pr_url) && (
-          <div className="px-4 py-2 border-b border-edge flex-shrink-0 flex items-center gap-4 text-xs">
-            {task.branch_name && (
-              <span className="text-fg-muted flex items-center gap-1.5">
-                Branch:
-                {task.worktree_path ? (
-                  <button
-                    onClick={() => window.electronAPI.shell.openPath(task.worktree_path!)}
-                    className="inline-flex items-center gap-1.5 text-fg-secondary hover:text-accent-fg transition-colors"
-                    title="Open worktree directory"
-                  >
-                    {task.branch_name}
-                    <ExternalLink size={12} />
-                  </button>
-                ) : (
-                  <span className="text-fg-secondary">{task.branch_name}</span>
-                )}
-              </span>
-            )}
-            {task.pr_url && (
-              <span className="text-fg-muted">PR: <span className="text-accent-fg">#{task.pr_number}</span></span>
-            )}
           </div>
         )}
 

@@ -564,6 +564,7 @@ export interface ElectronAPI {
     getAvailable: () => Promise<Array<{ name: string; path: string }>>;
     getDefault: () => Promise<string>;
     openPath: (dirPath: string) => Promise<string>;
+    openExternal: (url: string) => Promise<void>;
   };
 
   // Git

@@ -252,11 +252,14 @@ test.describe('Branch Rename on Title Edit', () => {
     expect(updatedTask?.worktree_path).toBe(originalWorktreePath);
     expect(fs.existsSync(originalWorktreePath)).toBe(true);
 
-    // Open task detail to verify branch name shows in UI
+    // Open task detail to verify branch name shows in pill tooltip
     const card = page.locator('[data-testid="swimlane"]').locator(`text=${newTitle}`).first();
     await card.click();
     await page.waitForTimeout(500);
-    await expect(page.locator(`text=${updatedTask!.branch_name}`)).toBeVisible({ timeout: 3000 });
+    const branchPill = page.locator('[data-testid="branch-pill"]');
+    await expect(branchPill).toBeVisible({ timeout: 3000 });
+    const pillTitle = await branchPill.getAttribute('title');
+    expect(pillTitle).toContain(updatedTask!.branch_name!);
     await page.keyboard.press('Escape');
   });
 
