@@ -206,8 +206,8 @@ app.whenReady().then(async () => {
   }
 
   // Prune stale worktree projects from crashed/force-killed preview instances.
-  // Only runs in the main app — preview instances skip this.
-  if (!isEphemeral) {
+  // Only runs in the main app during development — preview is a dev-only feature.
+  if (!isEphemeral && !app.isPackaged) {
     try {
       await pruneStaleWorktreeProjects();
     } catch (err) {

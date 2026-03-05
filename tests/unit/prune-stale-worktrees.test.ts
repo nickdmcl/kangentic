@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted mock functions we need to control and assert on
-const { mockList, mockDelete, mockExistsSync, mockCloseProjectDb, mockIsInsideWorktree } = vi.hoisted(() => ({
+const { mockList, mockDelete, mockExistsSync, mockCloseProjectDb, mockIsKangenticWorktree } = vi.hoisted(() => ({
   mockList: vi.fn((): unknown[] => []),
   mockDelete: vi.fn(),
   mockExistsSync: vi.fn((): boolean => true),
   mockCloseProjectDb: vi.fn(),
-  mockIsInsideWorktree: vi.fn((): boolean => false),
+  mockIsKangenticWorktree: vi.fn((): boolean => false),
 }));
 
 // --- Mock leaf-level native modules ---
@@ -130,7 +130,8 @@ vi.mock('../../src/main/git/worktree-manager', () => {
   return {
     WorktreeManager: MockWorktreeManager,
     isGitRepo: vi.fn(() => false),
-    isInsideWorktree: mockIsInsideWorktree,
+    isInsideWorktree: vi.fn(() => false),
+    isKangenticWorktree: mockIsKangenticWorktree,
     isFileTracked: vi.fn(() => false),
   };
 });
@@ -155,11 +156,11 @@ describe('pruneStaleWorktreeProjects', () => {
     mockList.mockReturnValue([]);
   });
 
-  it('prunes worktree projects regardless of path existence', async () => {
+  it('prunes Kangentic worktree projects (preview instances)', async () => {
     mockList.mockReturnValue([
-      { id: 'proj-1', name: 'stale-preview', path: '/repo/my-worktree' },
+      { id: 'proj-1', name: 'stale-preview', path: '/home/dev/my-app/.kangentic/worktrees/fix-bug-abc123' },
     ]);
-    mockIsInsideWorktree.mockReturnValue(true);
+    mockIsKangenticWorktree.mockReturnValue(true);
 
     await pruneStaleWorktreeProjects();
 
@@ -171,7 +172,22 @@ describe('pruneStaleWorktreeProjects', () => {
     mockList.mockReturnValue([
       { id: 'proj-3', name: 'normal-project', path: '/home/dev/my-app' },
     ]);
-    mockIsInsideWorktree.mockReturnValue(false);
+    mockIsKangenticWorktree.mockReturnValue(false);
+
+    await pruneStaleWorktreeProjects();
+
+    expect(mockCloseProjectDb).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('does NOT prune external git worktrees or submodules', async () => {
+    // Regression: kangentic.com was incorrectly pruned because it was a git
+    // worktree/submodule — isInsideWorktree returned true. The new check uses
+    // isKangenticWorktree which only matches .kangentic/worktrees/ paths.
+    mockList.mockReturnValue([
+      { id: 'ext-wt', name: 'kangentic.com', path: '/home/dev/kangentic.com' },
+    ]);
+    mockIsKangenticWorktree.mockReturnValue(false);
 
     await pruneStaleWorktreeProjects();
 
@@ -188,14 +204,14 @@ describe('pruneStaleWorktreeProjects', () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('prunes all worktree projects but preserves normal projects', async () => {
+  it('prunes all Kangentic worktree projects but preserves normal projects', async () => {
     mockList.mockReturnValue([
-      { id: 'normal', name: 'normal', path: '/home/user/project' },
-      { id: 'stale', name: 'stale', path: '/repo/worktree-a' },
-      { id: 'alive', name: 'alive', path: '/repo/worktree-b' },
+      { id: 'normal', name: 'normal', path: '/home/dev/project' },
+      { id: 'stale', name: 'stale', path: '/home/dev/project/.kangentic/worktrees/task-a-abc123' },
+      { id: 'alive', name: 'alive', path: '/home/dev/project/.kangentic/worktrees/task-b-def456' },
     ]);
-    mockIsInsideWorktree.mockImplementation((p: string) =>
-      p === '/repo/worktree-a' || p === '/repo/worktree-b'
+    mockIsKangenticWorktree.mockImplementation((projectPath: string) =>
+      projectPath.includes('/.kangentic/worktrees/')
     );
 
     await pruneStaleWorktreeProjects();

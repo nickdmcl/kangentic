@@ -33,7 +33,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 import fs from 'node:fs';
-import { WorktreeManager, isGitRepo, isInsideWorktree } from '../../src/main/git/worktree-manager';
+import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree } from '../../src/main/git/worktree-manager';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -484,5 +484,36 @@ describe('WorktreeManager — ensureWorktree', () => {
     expect(result!.branchName).toContain('kanban/');
     // Should have used 'develop' (task override) not 'main' (config default)
     expect(mockProjectGit.raw).toHaveBeenCalledWith(['fetch', 'origin', 'develop']);
+  });
+});
+
+describe('isKangenticWorktree', () => {
+  it('returns true for paths inside .kangentic/worktrees/', () => {
+    expect(isKangenticWorktree('/home/dev/project/.kangentic/worktrees/fix-bug-abc123')).toBe(true);
+  });
+
+  it('returns true for Windows backslash paths', () => {
+    expect(isKangenticWorktree('C:\\Users\\dev\\project\\.kangentic\\worktrees\\fix-bug-abc123')).toBe(true);
+  });
+
+  it('returns false for normal project paths', () => {
+    expect(isKangenticWorktree('/home/dev/my-app')).toBe(false);
+  });
+
+  it('returns false for external git worktrees', () => {
+    expect(isKangenticWorktree('/home/dev/kangentic.com')).toBe(false);
+  });
+
+  it('returns false for path containing worktrees without .kangentic parent', () => {
+    expect(isKangenticWorktree('/home/dev/worktrees/some-branch')).toBe(false);
+  });
+
+  it('returns false for path ending at .kangentic/worktrees with no trailing slash', () => {
+    expect(isKangenticWorktree('/home/dev/project/.kangentic/worktrees')).toBe(false);
+  });
+
+  it('returns true for mixed-slash paths (cross-platform edge case)', () => {
+    expect(isKangenticWorktree('C:/Users/dev/project/.kangentic/worktrees/fix-bug')).toBe(true);
+    expect(isKangenticWorktree('/home/dev/project\\.kangentic\\worktrees\\fix-bug')).toBe(true);
   });
 });

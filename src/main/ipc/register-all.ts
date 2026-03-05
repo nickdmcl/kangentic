@@ -16,7 +16,7 @@ import { SessionRepository } from '../db/repositories/session-repository';
 import { AttachmentRepository } from '../db/repositories/attachment-repository';
 import { recoverSessions, reconcileSessions, pruneOrphanedWorktrees } from '../engine/session-recovery';
 import { CommandInjector } from '../engine/command-injector';
-import { WorktreeManager, isGitRepo, isInsideWorktree, isFileTracked } from '../git/worktree-manager';
+import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree, isFileTracked } from '../git/worktree-manager';
 import { stripKangenticHooks } from '../agent/hook-manager';
 import { getProjectDb, closeProjectDb } from '../db/database';
 import { PATHS } from '../config/paths';
@@ -363,7 +363,7 @@ export function deleteProjectFromIndex(id: string): void {
 export async function pruneStaleWorktreeProjects(): Promise<void> {
   const projects = projectRepo.list();
   for (const project of projects) {
-    if (!isInsideWorktree(project.path)) continue;
+    if (!isKangenticWorktree(project.path)) continue;
 
     console.log(`[PRUNE] Removing ephemeral preview project: ${project.name} (${project.path})`);
 

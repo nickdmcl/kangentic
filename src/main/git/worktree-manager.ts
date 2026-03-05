@@ -23,6 +23,12 @@ export function isInsideWorktree(projectPath: string): boolean {
   }
 }
 
+/** Check whether the project path lives inside a Kangentic-managed worktree directory. */
+export function isKangenticWorktree(projectPath: string): boolean {
+  const normalized = path.normalize(projectPath).replace(/\\/g, '/');
+  return normalized.includes('/.kangentic/worktrees/');
+}
+
 /** Check whether a file is tracked by git (committed or staged). */
 export function isFileTracked(projectPath: string, filePath: string): boolean {
   try {
