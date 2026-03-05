@@ -346,6 +346,7 @@ export interface AppConfig {
   skipDeleteConfirm: boolean;
   autoFocusIdleSession: boolean;
   notifyIdleOnInactiveProject: boolean;
+  activateAllProjectsOnStartup: boolean;
 }
 
 /** Setting paths that cannot be overridden per-project (global-only). */
@@ -358,6 +359,7 @@ export const GLOBAL_ONLY_PATHS = new Set([
   'sidebar.width',
   'terminal.panelHeight',
   'terminal.showPreview',
+  'activateAllProjectsOnStartup',
 ]);
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -390,6 +392,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   skipDeleteConfirm: false,
   autoFocusIdleSession: true,
   notifyIdleOnInactiveProject: true,
+  activateAllProjectsOnStartup: true,
 };
 
 // === IPC API Types ===

@@ -340,6 +340,12 @@ export function SettingsPanel() {
                     onChange={(v) => handleUpdate({ autoFocusIdleSession: v })}
                   />
                 </SettingRow>
+                <SettingRow label="Launch All Projects on Startup" description="Start agents across all projects on launch, not just the current open one" {...settingProps('activateAllProjectsOnStartup')}>
+                  <ToggleSwitch
+                    checked={displayConfig.activateAllProjectsOnStartup}
+                    onChange={(v) => handleUpdate({ activateAllProjectsOnStartup: v })}
+                  />
+                </SettingRow>
               </>
             )}
 

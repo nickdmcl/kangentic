@@ -2,7 +2,7 @@ import { app, BrowserWindow, Menu, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { registerAllIpc, getSessionManager, getCommandInjector, getCurrentProjectId, openProjectByPath, cleanupProject, deleteProjectFromIndex, pruneStaleWorktreeProjects } from './ipc/register-all';
+import { registerAllIpc, getSessionManager, getCommandInjector, getCurrentProjectId, openProjectByPath, cleanupProject, deleteProjectFromIndex, pruneStaleWorktreeProjects, activateAllProjects } from './ipc/register-all';
 import { closeAll, getProjectDb } from './db/database';
 import { SessionRepository } from './db/repositories/session-repository';
 import { ConfigManager } from './config/config-manager';
@@ -179,6 +179,9 @@ const createWindow = () => {
         console.error('Failed to auto-open project:', err);
       }
     }
+
+    // Activate all other projects' sessions in the background
+    activateAllProjects().catch((err) => console.error('Failed to activate all projects:', err));
   });
 };
 
@@ -233,22 +236,30 @@ app.on('activate', () => {
 async function shutdownSessions(): Promise<void> {
   const sessionManager = getSessionManager();
   getCommandInjector().cancelAll();
-  const projectId = getCurrentProjectId();
 
   // Mark running DB records as 'suspended' BEFORE calling suspendAll().
   // suspendAll() triggers PTY exits whose async onExit handler would
   // otherwise race and overwrite 'running' → 'exited', preventing resume.
-  if (projectId) {
+  // Group sessions by projectId so we suspend across ALL active projects.
+  const allSessions = sessionManager.listSessions();
+  const sessionsByProject = new Map<string, typeof allSessions>();
+  for (const session of allSessions) {
+    if (session.status === 'running' || session.status === 'queued') {
+      const existing = sessionsByProject.get(session.projectId) || [];
+      existing.push(session);
+      sessionsByProject.set(session.projectId, existing);
+    }
+  }
+
+  for (const [projectId, sessions] of sessionsByProject) {
     try {
       const db = getProjectDb(projectId);
       const sessionRepo = new SessionRepository(db);
       const now = new Date().toISOString();
-      for (const session of sessionManager.listSessions()) {
-        if (session.status === 'running' || session.status === 'queued') {
-          const record = sessionRepo.getLatestForTask(session.taskId);
-          if (record && record.status === 'running') {
-            sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: now });
-          }
+      for (const session of sessions) {
+        const record = sessionRepo.getLatestForTask(session.taskId);
+        if (record && record.status === 'running') {
+          sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: now });
         }
       }
     } catch {

@@ -1034,6 +1034,34 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   ipcMain.on(IPC.WINDOW_FLASH_FRAME, (_event, flash: boolean) => mainWindow.flashFrame(flash));
 }
 
+/**
+ * Activate all projects on startup: run session recovery/reconciliation
+ * for every project so agent sessions start immediately, not just when
+ * the user navigates to a project board.
+ */
+export async function activateAllProjects(): Promise<void> {
+  const config = configManager.load();
+  if (!config.activateAllProjectsOnStartup) return;
+
+  const projects = projectRepo.list();
+  for (const project of projects) {
+    // Skip the currently active project — it already ran recovery via PROJECT_OPEN
+    if (project.id === currentProjectId) continue;
+
+    try {
+      ensureGitignore(project.path);
+      const db = getProjectDb(project.id);
+      const taskRepo = new TaskRepository(db);
+      const sessionRepo = new SessionRepository(db);
+      pruneOrphanedWorktrees(project.path, taskRepo, sessionRepo, sessionManager);
+      await recoverSessions(project.id, project.path, sessionManager, claudeDetector, commandBuilder, configManager);
+      await reconcileSessions(project.id, project.path, sessionManager, claudeDetector, commandBuilder, configManager);
+    } catch (err) {
+      console.error(`Failed to activate project ${project.name}:`, err);
+    }
+  }
+}
+
 export function getSessionManager(): SessionManager {
   return sessionManager;
 }
