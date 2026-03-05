@@ -227,6 +227,57 @@ test.describe('Task CRUD', () => {
     // Verify the task is gone from the Completed section
     await expect(doneColumn.locator('text=Test Task Beta')).not.toBeVisible({ timeout: 3000 });
   });
+
+  test('kebab menu shows both Archive and Delete for non-archived task', async () => {
+    // Create a fresh task for this test
+    const backlog = page.locator('[data-swimlane-name="Backlog"]');
+    await backlog.locator('text=+ Add task').click();
+    await page.locator('input[placeholder="Task title"]').fill('Test Task Gamma');
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(500);
+
+    // Open the task detail dialog
+    await taskCard('Test Task Gamma').click();
+    await page.waitForTimeout(300);
+
+    // Backlog tasks open in edit mode — cancel to view mode first
+    await page.locator('button:has-text("Cancel")').click();
+    await page.waitForTimeout(200);
+
+    // Open kebab menu
+    await page.locator('button[title="Actions"]').click();
+    await page.waitForTimeout(200);
+
+    // Both Archive and Delete should be visible
+    const kebabMenu = page.locator('[data-testid="task-detail-dialog"]').locator('..');
+    await expect(kebabMenu.locator('button:has-text("Archive")')).toBeVisible();
+    await expect(kebabMenu.locator('button:has-text("Delete")')).toBeVisible();
+  });
+
+  test('can delete a non-archived task directly', async () => {
+    // "Test Task Gamma" was created above and is still in Backlog
+    await taskCard('Test Task Gamma').click();
+    await page.waitForTimeout(300);
+
+    // Backlog tasks open in edit mode — cancel to view mode first
+    await page.locator('button:has-text("Cancel")').click();
+    await page.waitForTimeout(200);
+
+    // Open kebab menu and click Delete
+    await page.locator('button[title="Actions"]').click();
+    await page.waitForTimeout(200);
+    await page.locator('button:has-text("Delete")').click();
+    await page.waitForTimeout(200);
+
+    // Confirm deletion in the ConfirmDialog
+    await page.locator('text=This action cannot be undone.').waitFor({ state: 'visible', timeout: 3000 });
+    await page.locator('button:has-text("Delete")').click();
+    await page.waitForTimeout(500);
+
+    // Verify the task is gone from the Backlog column
+    const backlog = page.locator('[data-swimlane-name="Backlog"]');
+    await expect(backlog.locator('text=Test Task Gamma')).not.toBeVisible({ timeout: 3000 });
+  });
 });
 
 test.describe('Column Management', () => {
