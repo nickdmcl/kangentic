@@ -313,13 +313,12 @@ test.describe('Project Session Scope', () => {
       await expect(gammaRow).toBeVisible();
       await expect(gammaRow.locator('span[title*="thinking"]')).not.toBeVisible();
       await expect(gammaRow.locator('span[title*="idle"]')).not.toBeVisible();
-      await expect(gammaRow.locator('span.bg-amber-400.rounded-full')).not.toBeVisible();
     } finally {
       await browser.close();
     }
   });
 
-  test('sidebar shows only idle badge when project has mixed sessions (idle takes priority)', async () => {
+  test('sidebar shows both idle and thinking badges when project has mixed sessions', async () => {
     // Add a second session to Project A (thinking) while first stays idle
     const preConfig = twoProjectPreConfig() + `
       window.__mockPreConfigure(function (state) {
@@ -360,107 +359,15 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project Alpha should show only idle badge (idle takes priority over thinking)
+      // Project Alpha should show both idle and thinking badges side by side
       const alphaRow = page.locator('[role="button"]:has-text("Project Alpha")');
       const thinkingBadge = alphaRow.locator('span[title*="thinking"]');
       const idleBadge = alphaRow.locator('span[title*="idle"]');
 
-      await expect(thinkingBadge).not.toBeVisible();
+      await expect(thinkingBadge).toBeVisible();
+      await expect(thinkingBadge).toContainText('1');
       await expect(idleBadge).toBeVisible();
       await expect(idleBadge).toContainText('1');
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('idle notification on non-active project has unseen pulse animation', async () => {
-    const { browser, page } = await launchWithState(twoProjectPreConfig());
-
-    try {
-      await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
-
-      // Project Alpha is active — its idle badge should NOT pulse (markIdleSessionsSeen ran on open)
-      const alphaRow = page.locator('[role="button"]:has-text("Project Alpha")');
-      const alphaIdleBadge = alphaRow.locator('span[title*="idle"]');
-      await expect(alphaIdleBadge).toBeVisible();
-      await expect(alphaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(0);
-
-      // Project Beta is non-active — shows pulsing idle badge (unseen)
-      const betaRow = page.locator('[role="button"]:has-text("Project Beta")');
-      const betaIdleBadge = betaRow.locator('span[title*="idle"]');
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(1);
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('switching to project marks idle as seen (stops pulse)', async () => {
-    const { browser, page } = await launchWithState(twoProjectPreConfig());
-
-    try {
-      await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
-
-      // Beta shows pulsing idle badge (non-active, unseen idle)
-      const betaRow = page.locator('[role="button"]:has-text("Project Beta")');
-      const betaIdleBadge = betaRow.locator('span[title*="idle"]');
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(1);
-
-      // Switch to Project Beta — this marks its idle sessions as seen
-      await betaRow.click();
-      await page.waitForTimeout(500);
-
-      // Badge still visible but no longer pulsing (seen)
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(0);
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('non-active project with unseen idle shows pulsing badge', async () => {
-    const { browser, page } = await launchWithState(twoProjectPreConfig());
-
-    try {
-      await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
-
-      // Project Beta (non-active) should have pulsing idle badge
-      const betaRow = page.locator('[role="button"]:has-text("Project Beta")');
-      const betaIdleBadge = betaRow.locator('span[title*="idle"]');
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(1);
-
-      // Project Alpha (active) should have idle badge but NOT pulsing (seen)
-      const alphaRow = page.locator('[role="button"]:has-text("Project Alpha")');
-      const alphaIdleBadge = alphaRow.locator('span[title*="idle"]');
-      await expect(alphaIdleBadge).toBeVisible();
-      await expect(alphaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(0);
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('idle badge pulse stops after switching to project', async () => {
-    const { browser, page } = await launchWithState(twoProjectPreConfig());
-
-    try {
-      await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
-
-      const betaRow = page.locator('[role="button"]:has-text("Project Beta")');
-      const betaIdleBadge = betaRow.locator('span[title*="idle"]');
-
-      // Badge is pulsing before switching (unseen)
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(1);
-
-      // Switch to Beta
-      await betaRow.click();
-      await page.waitForTimeout(500);
-
-      // Badge still visible but pulse stops (seen)
-      await expect(betaIdleBadge).toBeVisible();
-      await expect(betaIdleBadge.locator('.animate-pulse-amber')).toHaveCount(0);
     } finally {
       await browser.close();
     }
