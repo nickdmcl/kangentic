@@ -138,7 +138,7 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
                           className="flex items-center gap-1 text-xs tabular-nums flex-shrink-0 text-amber-400"
                           title={`${idleCount} idle — needs attention`}
                         >
-                          <span className="animate-breathe"><Mail size={10} /></span>
+                          <Mail size={10} />
                           {idleCount}
                         </span>
                       )}

@@ -357,15 +357,6 @@
   animation: pulse-subtle 4s ease-out infinite;
 }
 
-/* Gentle opacity breathing for idle icons */
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.animate-breathe {
-  animation: breathe 3s ease-in-out infinite;
-}
 
 /* Brief brightness + scale pulse for live-updating values */
 @keyframes value-update {
