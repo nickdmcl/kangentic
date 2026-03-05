@@ -24,7 +24,6 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const sessions = useSessionStore((s) => s.sessions);
   const sessionActivity = useSessionStore((s) => s.sessionActivity);
-  const seenIdleSessions = useSessionStore((s) => s.seenIdleSessions);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const handleNewProject = async () => {
@@ -110,11 +109,9 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
           const thinkingCount = runningSessions.filter(
             (s) => sessionActivity[s.id] !== 'idle',
           ).length;
-          const idleSessions = runningSessions.filter(
+          const idleCount = runningSessions.filter(
             (s) => sessionActivity[s.id] === 'idle',
-          );
-          const idleCount = idleSessions.length;
-          const hasUnseenIdle = idleSessions.some((s) => !seenIdleSessions[s.id]);
+          ).length;
           return (
             <div
               key={project.id}
@@ -138,17 +135,9 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
                       <span className="truncate font-medium">{project.name}</span>
                       {idleCount > 0 ? (
                         <span
-                          className={`flex items-center gap-1 text-xs tabular-nums flex-shrink-0 ${
-                            hasUnseenIdle ? 'text-amber-400' : 'text-amber-400/50'
-                          }`}
+                          className="flex items-center gap-1 text-xs tabular-nums flex-shrink-0 text-amber-400"
                           title={`${idleCount} idle — needs attention`}
                         >
-                          {hasUnseenIdle && (
-                            <span className="relative flex-shrink-0 w-1.5 h-1.5">
-                              <span className="absolute inset-0 rounded-full bg-amber-400 animate-pulse-amber" />
-                              <span className="absolute inset-0 rounded-full bg-amber-400" />
-                            </span>
-                          )}
                           <Mail size={10} />
                           {idleCount}
                         </span>
