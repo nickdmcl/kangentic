@@ -293,9 +293,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
 
   const setDialogSessionId = useSessionStore((s) => s.setDialogSessionId);
   const loadBoard = useBoardStore((s) => s.loadBoard);
-  // Targeted selector — only re-renders when THIS session changes, not all sessions
+  // Targeted selector — find by taskId (consistent with useSessionDisplayState).
+  // task.session_id can be stale after HMR or optimistic moves; taskId is always reliable.
   const session = useSessionStore((s) =>
-    task.session_id ? s.sessions.find((sess) => sess.id === task.session_id) ?? null : null
+    s.sessions.find((sess) => sess.taskId === task.id) ?? null
   );
 
   // Centralized display state derivation
@@ -457,8 +458,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     // Close dialog first to unmount the terminal (xterm) cleanly
     // before tearing down the session — prevents WebGL renderer crash
     onClose();
-    if (task.session_id) {
-      await killSession(task.session_id);
+    if (session) {
+      await killSession(session.id);
     }
     await deleteTask(task.id);
     useToastStore.getState().addToast({
@@ -889,7 +890,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         )}
 
         {/* Terminal, queued placeholder, suspended placeholder, or empty state */}
-        {session && displayState.kind !== 'queued' ? (
+        {session && displayState.kind !== 'queued' && displayState.kind !== 'suspended' ? (
           <>
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
@@ -903,7 +904,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             <ContextBar sessionId={session.id} />
           </>
         ) : displayState.kind === 'queued' ? (
-          <QueuedPlaceholder sessionId={task.session_id} />
+          <QueuedPlaceholder sessionId={session?.id ?? null} />
         ) : isSuspended || toggling ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-surface/50">
             <button

@@ -59,8 +59,14 @@ export function useSessionDisplayState(task: Task): SessionDisplayState {
   // Zustand's Object.is check on the returned Session object is stable because the store
   // replaces session objects only when their data actually changes.
   const taskSession = useSessionStore((s) => s.sessions.find((sess) => sess.taskId === task.id));
-  const usage = useSessionStore((s) => task.session_id ? s.sessionUsage[task.session_id] : undefined);
-  const activity = useSessionStore((s) => task.session_id ? s.sessionActivity[task.session_id] : undefined);
+  const usage = useSessionStore((s) => {
+    const id = s.sessions.find((sess) => sess.taskId === task.id)?.id;
+    return id ? s.sessionUsage[id] : undefined;
+  });
+  const activity = useSessionStore((s) => {
+    const id = s.sessions.find((sess) => sess.taskId === task.id)?.id;
+    return id ? s.sessionActivity[id] : undefined;
+  });
 
   return useMemo(
     () => getSessionDisplayState(taskSession, usage, activity),

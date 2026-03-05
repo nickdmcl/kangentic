@@ -74,7 +74,8 @@ export function App() {
         // Only show toast if exited session belongs to current project
         const activeProjectId = useProjectStore.getState().currentProject?.id;
         if (currentSession?.projectId === activeProjectId) {
-          const task = useBoardStore.getState().tasks.find((t) => t.session_id === sessionId);
+          const task = useBoardStore.getState().tasks.find((t) => t.session_id === sessionId)
+            ?? useBoardStore.getState().tasks.find((t) => t.id === currentSession?.taskId);
           const label = task ? `"${task.title}"` : sessionId.slice(0, 8);
           useToastStore.getState().addToast({
             message: `Session ended for ${label} (exit ${exitCode})`,

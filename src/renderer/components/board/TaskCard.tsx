@@ -18,11 +18,13 @@ interface TaskCardProps {
 
 const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardProps) {
   const [showDetail, setShowDetail] = useState(false);
-  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const isHighlighted = useSessionStore((s) => {
+    const matched = s.sessions.find((sess) => sess.taskId === task.id);
+    return !!matched && matched.id === s.activeSessionId;
+  });
   const openTaskId = useSessionStore((s) => s.openTaskId);
   const setOpenTaskId = useSessionStore((s) => s.setOpenTaskId);
   const displayState = useSessionDisplayState(task);
-  const isHighlighted = !!task.session_id && task.session_id === activeSessionId;
 
   useEffect(() => {
     if (openTaskId === task.id) {
