@@ -25,7 +25,7 @@ import { sanitizeForPty } from '../../shared/paths';
  *
  * Called on project open, before session recovery. Only prunes if the
  * `.kangentic/worktrees/` parent directory exists (if missing, the project
- * may be on an unmounted drive — don't prune anything).
+ * may be on an unmounted drive -- don't prune anything).
  *
  * Never prunes tasks without a worktree_path or tasks with an active PTY.
  */
@@ -36,7 +36,7 @@ export function pruneOrphanedWorktrees(
   sessionManager: SessionManager,
 ): number {
   const worktreesDir = path.join(projectPath, '.kangentic', 'worktrees');
-  if (!fs.existsSync(worktreesDir)) return 0; // Parent missing — don't prune
+  if (!fs.existsSync(worktreesDir)) return 0; // Parent missing -- don't prune
 
   const activeTaskIds = new Set(
     sessionManager.listSessions()
@@ -79,9 +79,9 @@ export function pruneOrphanedWorktrees(
  * Background cleanup of orphaned directories under `.kangentic/`.
  *
  * Scans three subdirectories and removes entries not referenced by any task:
- *  - `worktrees/<slug>/`  — matched against task.worktree_path
- *  - `sessions/<uuid>/`   — matched against task.session_id + active PTY sessions
- *  - `tasks/<uuid>/`      — matched against task.id
+ *  - `worktrees/<slug>/`  -- matched against task.worktree_path
+ *  - `sessions/<uuid>/`   -- matched against task.session_id + active PTY sessions
+ *  - `tasks/<uuid>/`      -- matched against task.id
  *
  * Uses async fs for non-blocking I/O so the UI stays responsive.
  * Retries EPERM failures (Windows file handle timing) with increasing delays.
@@ -126,7 +126,7 @@ async function pruneDirectory(
   try {
     entries = await fs.promises.readdir(parentDir, { withFileTypes: true });
   } catch {
-    return; // Directory doesn't exist — nothing to prune
+    return; // Directory doesn't exist -- nothing to prune
   }
 
   for (const entry of entries) {
@@ -145,7 +145,7 @@ async function pruneDirectory(
         removed = true;
         break;
       } catch {
-        // EPERM — retry after next delay
+        // EPERM -- retry after next delay
       }
     }
     if (!removed) {
@@ -187,7 +187,7 @@ export async function recoverSessions(
   const attachmentRepo = new AttachmentRepository(db);
 
   // 1. Mark leftover 'running' records as orphaned (crash case).
-  //    SKIP records whose task already has a live PTY session — this prevents
+  //    SKIP records whose task already has a live PTY session -- this prevents
   //    re-entrant calls (Vite hot-reload, duplicate PROJECT_OPEN) from
   //    orphaning sessions that were JUST created and are actively running.
   const liveTaskIds = new Set(
@@ -221,11 +221,11 @@ export async function recoverSessions(
       const existingTime = existing.started_at || '';
       const recordTime = record.started_at || '';
       if (recordTime > existingTime) {
-        // New record is newer — retire the old one
+        // New record is newer -- retire the old one
         sessionRepo.updateStatus(existing.id, 'exited', { exited_at: now });
         latestByTask.set(record.task_id, record);
       } else {
-        // Existing is newer — retire this one
+        // Existing is newer -- retire this one
         sessionRepo.updateStatus(record.id, 'exited', { exited_at: now });
       }
     }
@@ -299,7 +299,7 @@ export async function recoverSessions(
   const claude = await claudeDetector.detect(config.claude.cliPath);
   if (!claude.found || !claude.path) {
     console.warn(
-      'Session recovery: Claude CLI not found — skipping',
+      'Session recovery: Claude CLI not found -- skipping',
       toProcess.length,
       'session(s)',
     );
@@ -317,7 +317,7 @@ export async function recoverSessions(
           taskRepo.update({ id: task.id, worktree_path: null, branch_name: null });
         }
         console.log(
-          `Session recovery: cwd ${record.cwd} missing — marking exited`,
+          `Session recovery: cwd ${record.cwd} missing -- marking exited`,
         );
         sessionRepo.updateStatus(record.id, 'exited', { exited_at: now });
         skipped++;
@@ -336,7 +336,7 @@ export async function recoverSessions(
 
       // Decide whether to resume or start fresh.
       // Both SUSPENDED (clean shutdown) and ORPHANED (crash) sessions can
-      // attempt --resume as long as the claude_session_id is known — the
+      // attempt --resume as long as the claude_session_id is known -- the
       // JSONL file is usually intact. If the file is missing or corrupt,
       // Claude CLI will error and the session exits; reconciliation will
       // create a fresh one on the next app launch.
@@ -347,7 +347,7 @@ export async function recoverSessions(
       let claudeSessionId: string;
 
       if (canResume) {
-        // Resume existing Claude conversation — no extra prompt needed
+        // Resume existing Claude conversation -- no extra prompt needed
         claudeSessionId = record.claude_session_id!;
         prompt = undefined;
       } else {
@@ -520,7 +520,7 @@ export async function reconcileSessions(
       if (activeTaskIds.has(task.id)) continue; // already has a session
 
       try {
-        // Find a spawn_agent transition that targets this lane (optional — provides custom prompt)
+        // Find a spawn_agent transition that targets this lane (optional -- provides custom prompt)
         const incomingTransition = allTransitions.find(
           (t) =>
             t.to_swimlane_id === lane.id &&
@@ -546,7 +546,7 @@ export async function reconcileSessions(
           lane.permission_strategy ?? actionConfig?.permissionMode ?? config.claude.permissionMode;
         let cwd = task.worktree_path || projectPath;
 
-        // Guard: CWD must still exist — fall back to projectPath if worktree was deleted
+        // Guard: CWD must still exist -- fall back to projectPath if worktree was deleted
         if (task.worktree_path && !fs.existsSync(task.worktree_path)) {
           console.log(`Session reconciliation: worktree missing for task ${task.id} -- falling back to project path`);
           taskRepo.update({ id: task.id, worktree_path: null, branch_name: null });
@@ -554,7 +554,7 @@ export async function reconcileSessions(
         }
         if (!fs.existsSync(cwd)) {
           console.log(
-            `Session reconciliation: cwd ${cwd} missing — skipping task ${task.id}`,
+            `Session reconciliation: cwd ${cwd} missing -- skipping task ${task.id}`,
           );
           continue;
         }
@@ -567,7 +567,7 @@ export async function reconcileSessions(
         const claude = await claudeDetector.detect(config.claude.cliPath);
         if (!claude.found || !claude.path) {
           console.warn(
-            `Session reconciliation: Claude CLI not found — skipping task ${task.id}`,
+            `Session reconciliation: Claude CLI not found -- skipping task ${task.id}`,
           );
           continue;
         }

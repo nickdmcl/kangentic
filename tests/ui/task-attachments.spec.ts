@@ -52,7 +52,7 @@ test.describe('New Task Dialog Layout', () => {
     const textarea = page.locator('textarea');
     await textarea.fill('hello');
     await expect(page.locator('text=Paste or drop images here')).not.toBeVisible();
-    // Form is dirty (title filled) — Escape is blocked, use Cancel button
+    // Form is dirty (title filled) -- Escape is blocked, use Cancel button
     await page.locator('button:has-text("Cancel")').click();
   });
 
@@ -76,7 +76,7 @@ test.describe('New Task Dialog Layout', () => {
 
     await page.waitForTimeout(500);
     await expect(page.locator('text=1 image')).toBeVisible();
-    // Form is dirty (image attached) — Escape is blocked, use Cancel button
+    // Form is dirty (image attached) -- Escape is blocked, use Cancel button
     await page.locator('button:has-text("Cancel")').click();
   });
 });
@@ -117,7 +117,7 @@ test.describe('Image Attachments', () => {
     const images = thumbnails.locator('img');
     expect(await images.count()).toBeGreaterThanOrEqual(1);
 
-    // Form is dirty (image attached) — Escape is blocked, use Cancel button
+    // Form is dirty (image attached) -- Escape is blocked, use Cancel button
     await page.locator('button:has-text("Cancel")').click();
   });
 
@@ -160,7 +160,7 @@ test.describe('Image Attachments', () => {
     // Thumbnails container should disappear (no attachments)
     await expect(thumbnails).not.toBeVisible();
 
-    // After deleting the only attachment the form is clean — but use Cancel for safety
+    // After deleting the only attachment the form is clean -- but use Cancel for safety
     await page.locator('button:has-text("Cancel")').click();
   });
 

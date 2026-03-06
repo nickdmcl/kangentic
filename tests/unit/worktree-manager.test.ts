@@ -1,5 +1,5 @@
 /**
- * Unit tests for WorktreeManager — sparse-checkout logic that excludes
+ * Unit tests for WorktreeManager -- sparse-checkout logic that excludes
  * .claude/ from worktrees to prevent git contamination.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -51,7 +51,7 @@ function setupCreateWorktreeMocks() {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
-describe('WorktreeManager — sparse-checkout', () => {
+describe('WorktreeManager -- sparse-checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -146,7 +146,7 @@ describe('WorktreeManager — sparse-checkout', () => {
 
 // ── Fetch & base branch tests ─────────────────────────────────────────────
 
-describe('WorktreeManager — fetch and base branch', () => {
+describe('WorktreeManager -- fetch and base branch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -231,7 +231,7 @@ describe('WorktreeManager — fetch and base branch', () => {
 
 // ── Removal tests ─────────────────────────────────────────────────────────
 
-describe('WorktreeManager — removal', () => {
+describe('WorktreeManager -- removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -336,7 +336,7 @@ describe('WorktreeManager — removal', () => {
     const mgr = new WorktreeManager('/project');
     const wtPath = '/project/.kangentic/worktrees/test-abcd1234';
 
-    // Should not throw — logs warning instead
+    // Should not throw -- logs warning instead
     await runWithTimers(mgr.removeWorktree(wtPath));
 
     expect(warnSpy).toHaveBeenCalledWith(
@@ -378,7 +378,7 @@ describe('WorktreeManager — removal', () => {
 
 // ── listWorktrees tests ───────────────────────────────────────────────────
 
-describe('WorktreeManager — listWorktrees', () => {
+describe('WorktreeManager -- listWorktrees', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -416,7 +416,7 @@ describe('WorktreeManager — listWorktrees', () => {
 
 // ── ensureWorktree guard tests ─────────────────────────────────────────────
 
-describe('WorktreeManager — ensureWorktree', () => {
+describe('WorktreeManager -- ensureWorktree', () => {
   const gitConfig = { worktreesEnabled: true, defaultBaseBranch: 'main', copyFiles: [] as string[] };
 
   beforeEach(() => {

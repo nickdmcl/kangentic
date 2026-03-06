@@ -40,7 +40,7 @@ export async function handleTaskMove(
   // Move the task in the database
   tasks.move(input);
 
-  // Within-column reorder — no side effects needed
+  // Within-column reorder -- no side effects needed
   if (fromSwimlaneId === input.targetSwimlaneId) return;
 
   const db = getProjectDb(resolvedProjectId);
@@ -59,7 +59,7 @@ export async function handleTaskMove(
     context.commandInjector.cancel(task.id);
     if (task.session_id) {
       const record = sessionRepo.getLatestForTask(task.id);
-      // Accept 'running' AND 'exited' — exited covers Claude natural exit
+      // Accept 'running' AND 'exited' -- exited covers Claude natural exit
       if (record && record.claude_session_id
           && (record.status === 'running' || record.status === 'exited')) {
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString() });
@@ -68,7 +68,7 @@ export async function handleTaskMove(
       context.sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });
     } else {
-      // No active PTY — preserve latest exited session for future resume
+      // No active PTY -- preserve latest exited session for future resume
       const record = sessionRepo.getLatestForTask(task.id);
       if (record && record.claude_session_id
           && record.session_type === 'claude_agent'
@@ -101,7 +101,7 @@ export async function handleTaskMove(
 
   // --- Priority 3: TASK HAS ACTIVE SESSION → keep alive, skip transitions ---
   // If the agent is already running, moving between non-terminal columns
-  // (e.g. Review → Running) should NOT kill and respawn — just let it continue.
+  // (e.g. Review → Running) should NOT kill and respawn -- just let it continue.
   if (task.session_id) {
     context.commandInjector.cancel(task.id);
     if (toLane?.auto_command) {
@@ -126,7 +126,7 @@ export async function handleTaskMove(
     console.error('Transition engine error:', err);
   }
 
-  // Re-read task from DB — transition engine may have spawned a session
+  // Re-read task from DB -- transition engine may have spawned a session
   let finalTask = tasks.getById(task.id);
 
   // If task STILL has no session, resume a suspended session or spawn fresh.

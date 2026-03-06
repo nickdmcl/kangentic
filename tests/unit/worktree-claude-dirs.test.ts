@@ -3,7 +3,7 @@
  *
  * These tests create a real temp git repo with tracked `.claude/` files and
  * exercise WorktreeManager against real git operations (sparse-checkout,
- * status, staged changes, rebase). No mocks — validates that sparse-checkout
+ * status, staged changes, rebase). No mocks -- validates that sparse-checkout
  * correctly excludes `.claude/commands/` and `.claude/skills/` from worktree disk
  * while keeping the rest of `.claude/` (settings.json, etc.) and survives git operations.
  */
@@ -84,9 +84,9 @@ describe('Worktree .claude/ directory handling (sparse-checkout)', () => {
 
     // .claude/ directory should exist (settings present from git)
     expect(fs.existsSync(path.join(worktreePath, '.claude'))).toBe(true);
-    // .claude/commands/ should NOT exist — excluded by sparse-checkout
+    // .claude/commands/ should NOT exist -- excluded by sparse-checkout
     expect(fs.existsSync(path.join(worktreePath, '.claude', 'commands'))).toBe(false);
-    // .claude/skills/ should NOT exist — excluded by sparse-checkout
+    // .claude/skills/ should NOT exist -- excluded by sparse-checkout
     expect(fs.existsSync(path.join(worktreePath, '.claude', 'skills'))).toBe(false);
     // Other .claude/ contents should exist
     expect(fs.existsSync(path.join(worktreePath, '.claude', 'settings.local.json'))).toBe(true);
@@ -98,7 +98,7 @@ describe('Worktree .claude/ directory handling (sparse-checkout)', () => {
       TASK_ID, TASK_TITLE, 'main',
     );
 
-    // git status should be completely clean — no deletions reported
+    // git status should be completely clean -- no deletions reported
     const status = wtGit(worktreePath, 'status --porcelain');
     expect(status).toBe('');
   });

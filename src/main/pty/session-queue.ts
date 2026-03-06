@@ -14,7 +14,7 @@ type ActiveCountFn = () => number;
  * SessionManager delegates all "should we queue or spawn?" decisions here.
  * The reentrancy guard (`_processing` + `_dirty` loop) ensures that even
  * when multiple callers invoke `notifySlotFreed()` concurrently, only one
- * `processQueue` loop runs at a time — preventing over-spawning.
+ * `processQueue` loop runs at a time -- preventing over-spawning.
  */
 export class SessionQueue {
   private queue: QueueEntry[] = [];
@@ -62,7 +62,7 @@ export class SessionQueue {
 
   /** Signal that a slot may have opened (session exited/suspended/killed). */
   notifySlotFreed(): void {
-    // Don't await — callers (kill, suspend, onExit) shouldn't block.
+    // Don't await -- callers (kill, suspend, onExit) shouldn't block.
     // The reentrancy guard ensures only one loop runs at a time.
     this.processQueue().catch((err) => {
       console.error('[SessionQueue] processQueue error:', err);
@@ -73,7 +73,7 @@ export class SessionQueue {
    * Process the queue with a reentrancy guard.
    *
    * If another call is already inside this method, we set `_dirty` and
-   * return — the running call will re-check the queue before exiting.
+   * return -- the running call will re-check the queue before exiting.
    * This prevents concurrent async iterations from each popping an entry
    * and over-spawning beyond the limit.
    *

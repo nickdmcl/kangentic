@@ -32,7 +32,7 @@ export function cleanupTestDataDir(suiteName: string): void {
   }
 }
 
-// Temp project directory for tests — always starts fresh
+// Temp project directory for tests -- always starts fresh
 export function createTempProject(testName: string): string {
   const tmpDir = path.join(__dirname, '..', '.tmp', testName);
   // Remove stale data from previous runs to avoid session saturation
@@ -146,7 +146,7 @@ export async function waitForBoard(page: Page): Promise<void> {
 
 // Create a project via IPC (native dialog can't be automated in E2E)
 export async function createProject(page: Page, _name: string, projectPath: string): Promise<void> {
-  // Call openByPath directly — creates the project if needed and opens it
+  // Call openByPath directly -- creates the project if needed and opens it
   await page.evaluate((p: string) => window.electronAPI.projects.openByPath(p), projectPath);
   // Reload so the renderer picks up the new current project
   await page.reload();

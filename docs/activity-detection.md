@@ -31,7 +31,7 @@ A standalone Node.js script invoked by Claude Code's hook system. Each invocatio
 3. Appends a single JSON line to the events file
 4. Exits immediately
 
-The script is stateless — no persistent process, no inter-invocation memory. All writes are wrapped in try/catch so a failed write never blocks Claude Code.
+The script is stateless -- no persistent process, no inter-invocation memory. All writes are wrapped in try/catch so a failed write never blocks Claude Code.
 
 ### Event Types
 
@@ -65,12 +65,12 @@ The SessionManager derives thinking/idle state from event types using this mappi
 |------------|---------------|-----------|
 | `tool_start` | **thinking** | Agent is actively executing a tool |
 | `prompt` | **thinking** | Agent received input and will start processing |
-| `subagent_start` | **thinking** | Main agent launched a subagent — active work |
+| `subagent_start` | **thinking** | Main agent launched a subagent -- active work |
 | `compact` | **thinking** | Context compaction in progress |
 | `worktree_create` | **thinking** | Worktree creation in progress |
 | `idle` | **idle** | Agent stopped, hit a permission wall, or asked a question |
 | `interrupted` | **idle** | User interrupted; agent is no longer processing |
-| `notification` | *(no change)* | Informational only — fires unpredictably, often while idle |
+| `notification` | *(no change)* | Informational only -- fires unpredictably, often while idle |
 | `subagent_stop` | *(no change)* | Subagent finishing doesn't mean the main agent is active |
 | `tool_end` | *(no change)* | Another tool_start typically follows immediately |
 | `tool_failure` | *(no change)* | Agent continues thinking after a failure |
@@ -80,7 +80,7 @@ Key design decisions:
 - **`tool_end` does not set idle.** Between consecutive tool calls, there's a brief gap where no tool is running. Setting idle on `tool_end` would cause the spinner to flicker off and on rapidly. Instead, only explicit idle signals (`Stop`, `PermissionRequest`) set idle state.
 - **`tool_failure` does not set idle.** The agent continues processing after a tool failure (it may retry or try a different approach). Only the `Stop` hook fires when the agent truly stops.
 - **`AskUserQuestion` and `ExitPlanMode` are special-cased.** These tools indicate the agent is waiting for user input, so they fire `idle` on `PreToolUse` and `prompt` on `PostToolUse` (when the user responds and the agent resumes).
-- **`notification` does not change state.** Notifications (e.g. "Context getting full") are informational and fire unpredictably — often after an idle event, which would incorrectly flip state back to thinking.
+- **`notification` does not change state.** Notifications (e.g. "Context getting full") are informational and fire unpredictably -- often after an idle event, which would incorrectly flip state back to thinking.
 - **`subagent_stop` does not change state.** A subagent finishing is not evidence that the main agent is actively working. The main agent's own tool events drive thinking state.
 
 ## Subagent-Aware Transitions
@@ -103,8 +103,8 @@ Two guards protect against incorrect state transitions when subagents are runnin
 
 | Condition | Result | Why |
 |-----------|--------|-----|
-| Event is `prompt` | **Allow** | User responded — always reliable |
-| Event is `subagent_start` | **Allow** | Main agent spawning — always reliable |
+| Event is `prompt` | **Allow** | User responded -- always reliable |
+| Event is `subagent_start` | **Allow** | Main agent spawning -- always reliable |
 | Subagent depth = 0 | **Allow** | No subagents running, so this `tool_start` is from the main agent |
 | Subagent depth > 0 | **Suppress** | The `tool_start` is likely from a still-running subagent |
 
@@ -112,7 +112,7 @@ Two guards protect against incorrect state transitions when subagents are runnin
 
 | Condition | Result | Why |
 |-----------|--------|-----|
-| Event is `interrupted` | **Allow** | User pressed Escape — always goes through |
+| Event is `interrupted` | **Allow** | User pressed Escape -- always goes through |
 | Subagent depth = 0 | **Allow** | No subagents running, genuine idle |
 | Subagent depth > 0 | **Defer** | Set `pendingIdleWhileSubagent` flag, emit idle when last subagent finishes |
 
@@ -125,7 +125,7 @@ Two guards protect against incorrect state transitions when subagents are runnin
 
 1. **Permission prompt + subagents running:** Subagent `tool_start` events are suppressed → card stays idle (correct)
 2. **Permission approved + subagents finished:** Next `tool_start` transitions to thinking (correct)
-3. **Permission approved + subagents still running:** Stays idle briefly until subagents finish, then next `tool_start` transitions (conservative but correct — better idle than false active)
+3. **Permission approved + subagents still running:** Stays idle briefly until subagents finish, then next `tool_start` transitions (conservative but correct -- better idle than false active)
 4. **User sends new message:** `prompt` always transitions regardless of depth (correct)
 5. **Main agent spawns subagent then fires Stop:** Idle suppressed, card stays thinking while subagent works (correct)
 6. **Last subagent finishes after deferred idle:** Card transitions to idle when depth reaches 0 (correct)
@@ -174,7 +174,7 @@ All sessions (main repo and worktree) use a single code path in `CommandBuilder.
 5. Writes merged settings to `.kangentic/sessions/<id>/settings.json`
 6. Passes `--settings <path>` to the Claude CLI
 
-All Kangentic artifacts stay in `.kangentic/` — nothing is written to `.claude/settings.local.json`.
+All Kangentic artifacts stay in `.kangentic/` -- nothing is written to `.claude/settings.local.json`.
 
 ## Hook Cleanup
 

@@ -86,7 +86,7 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
       {/* Tab bar */}
       <div className="flex items-center border-b border-edge flex-shrink-0">
         <div className="flex items-center overflow-x-auto flex-1 min-w-0">
-          {/* Activity tab — visible when 1+ sessions */}
+          {/* Activity tab -- visible when 1+ sessions */}
           {showActivityTab && (
             <button
               onClick={() => setActiveSession(ACTIVITY_TAB)}
@@ -136,10 +136,10 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
         )}
       </div>
 
-      {/* Terminal panes + context bar — hidden after collapse animation completes */}
+      {/* Terminal panes + context bar -- hidden after collapse animation completes */}
       {showContent && (
         <>
-          {/* Terminal panes — only the active one is positioned; rest are display:none.
+          {/* Terminal panes -- only the active one is positioned; rest are display:none.
               Sessions owned by the detail dialog are unmounted to avoid two xterm
               instances fighting over PTY dimensions (different column widths cause
               garbled TUI output). The panel recreates the terminal from scrollback

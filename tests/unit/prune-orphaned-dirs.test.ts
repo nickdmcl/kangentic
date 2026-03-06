@@ -1,5 +1,5 @@
 /**
- * Unit tests for pruneStaleResources — background async cleanup of
+ * Unit tests for pruneStaleResources -- background async cleanup of
  * orphaned worktree, session, and task directories under .kangentic/.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -125,7 +125,7 @@ async function runWithTimers(): Promise<void> {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe('pruneStaleResources — async background cleanup', () => {
+describe('pruneStaleResources -- async background cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -218,7 +218,7 @@ describe('pruneStaleResources — async background cleanup', () => {
     pruneOrphanedWorktrees(PROJECT, taskRepo, sessionRepo, sessionMgr);
     await runWithTimers();
 
-    // None should be removed — all referenced
+    // None should be removed -- all referenced
     expect(mockRm).not.toHaveBeenCalled();
   });
 

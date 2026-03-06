@@ -91,7 +91,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   },
 
   deleteTask: async (id) => {
-    // IPC first — only update UI on success
+    // IPC first -- only update UI on success
     await window.electronAPI.tasks.delete(id);
     set((s) => ({
       tasks: s.tasks.filter((t) => t.id !== id),
@@ -324,7 +324,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
       });
       if (moveGeneration !== thisGen) return; // Skip stale reload
 
-      // Lightweight reload — only tasks (no session changes for same-column reorder)
+      // Lightweight reload -- only tasks (no session changes for same-column reorder)
       const tasks = await window.electronAPI.tasks.list();
       if (moveGeneration !== thisGen) return; // Skip stale reload
       set({ tasks });

@@ -144,7 +144,7 @@ async function waitForNoRunningSessions(page: Page, timeoutMs = 15000): Promise<
 // =========================================================================
 // Tests
 // =========================================================================
-test.describe('Claude Agent — Session Move Lifecycle', () => {
+test.describe('Claude Agent -- Session Move Lifecycle', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;
@@ -393,7 +393,7 @@ test.describe('Claude Agent — Session Move Lifecycle', () => {
     await page.waitForTimeout(1000);
 
     // Move to Done → archives. Since session is 'exited' (not 'suspended'),
-    // Done should NOT spawn or resume — just archive silently.
+    // Done should NOT spawn or resume -- just archive silently.
     await moveTask(page, taskId, lanes['role:done']);
     await page.waitForTimeout(2000);
 

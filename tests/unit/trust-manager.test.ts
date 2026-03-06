@@ -1,5 +1,5 @@
 /**
- * Unit tests for ensureWorktreeTrust() — pre-populates Claude Code's
+ * Unit tests for ensureWorktreeTrust() -- pre-populates Claude Code's
  * trust entry in ~/.claude.json so agents skip the trust prompt.
  *
  * Uses real temp files (same pattern as hook-manager.test.ts).
@@ -52,7 +52,7 @@ describe('ensureWorktreeTrust', () => {
     expect(data.projects).toBeDefined();
 
     const projects = data.projects as Record<string, Record<string, unknown>>;
-    // path.resolve + toForwardSlash may transform the path — find the entry
+    // path.resolve + toForwardSlash may transform the path -- find the entry
     const entries = Object.values(projects);
     expect(entries).toHaveLength(1);
     expect(entries[0].hasTrustDialogAccepted).toBe(true);
@@ -75,14 +75,14 @@ describe('ensureWorktreeTrust', () => {
   it('skips write if worktree is already trusted (idempotent)', () => {
     const wtPath = '/projects/myrepo/.kangentic/worktrees/fix-bug-abcd1234';
 
-    // First call — creates entry
+    // First call -- creates entry
     ensureWorktreeTrust(wtPath);
     const stat1 = fs.statSync(claudeJsonPath()).mtimeMs;
 
     // Tiny delay to ensure mtime would differ on write
     const data = readClaudeJson();
 
-    // Second call — should skip
+    // Second call -- should skip
     ensureWorktreeTrust(wtPath);
     const data2 = readClaudeJson();
 

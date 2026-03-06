@@ -125,7 +125,7 @@ export function SettingsPanel() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-edge flex-shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-fg">Settings</h2>
-            <span className="text-fg-faint select-none">—</span>
+            <span className="text-fg-faint select-none">--</span>
             <ScopeSelector
               scope={settingsScope}
               scopeProjectPath={settingsScopeProjectPath}
@@ -265,7 +265,7 @@ export function SettingsPanel() {
                       type="text"
                       value={displayConfig.claude.cliPath || ''}
                       onChange={(e) => handleUpdate({ claude: { cliPath: e.target.value || null } })}
-                      placeholder={claudeInfo?.found ? (claudeInfo.path ?? undefined) : 'Not found — enter path manually'}
+                      placeholder={claudeInfo?.found ? (claudeInfo.path ?? undefined) : 'Not found -- enter path manually'}
                       className={`${inputClass} pr-8 ${claudeInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
                     />
                     {claudeInfo && (

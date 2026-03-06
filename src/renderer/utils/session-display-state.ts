@@ -36,7 +36,7 @@ export function getSessionDisplayState(
     case 'running': {
       // "Initializing" = PTY is running but Claude CLI hasn't reported usage
       // yet (model name, context window %). Hook events may arrive earlier,
-      // but they don't carry enough info for the progress bar — keep showing
+      // but they don't carry enough info for the progress bar -- keep showing
       // the "Initializing..." spinner until the first usage report lands.
       if (!usage) {
         return { kind: 'initializing' };
@@ -55,7 +55,7 @@ export function getSessionDisplayState(
  * Subscribes to the minimal store slices needed to avoid unnecessary re-renders.
  */
 export function useSessionDisplayState(task: Task): SessionDisplayState {
-  // Select only this task's session — avoids re-rendering when unrelated sessions change.
+  // Select only this task's session -- avoids re-rendering when unrelated sessions change.
   // Zustand's Object.is check on the returned Session object is stable because the store
   // replaces session objects only when their data actually changes.
   const taskSession = useSessionStore((s) => s.sessions.find((sess) => sess.taskId === task.id));

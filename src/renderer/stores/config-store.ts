@@ -11,20 +11,20 @@ function parseClaudeVersion(version: string | null): string | null {
 export type SettingsScope = 'global' | 'project';
 
 interface ConfigStore {
-  // — App config —
+  // -- App config --
   config: AppConfig;
   globalConfig: AppConfig;
   loading: boolean;
   loadConfig: () => Promise<void>;
   updateConfig: (partial: DeepPartial<AppConfig>) => Promise<void>;
 
-  // — Claude CLI detection —
+  // -- Claude CLI detection --
   claudeInfo: { found: boolean; path: string | null; version: string | null } | null;
   claudeVersionLabel: string;
   claudeVersionNumber: string | null;
   detectClaude: () => Promise<void>;
 
-  // — Settings panel UI —
+  // -- Settings panel UI --
   settingsOpen: boolean;
   settingsInitialTab: string | null;
   settingsScope: SettingsScope;

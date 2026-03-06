@@ -143,7 +143,7 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Alpha').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open directly in edit mode — title shows as input
+    // Backlog tasks open directly in edit mode -- title shows as input
     const titleInput = page.locator('.fixed input[type="text"]');
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toHaveValue('Test Task Alpha');
@@ -157,7 +157,7 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Alpha').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open directly in edit mode — no need to click kebab → Edit
+    // Backlog tasks open directly in edit mode -- no need to click kebab → Edit
     const titleInput = page.locator('.fixed input[type="text"]');
     await titleInput.fill('Updated Task Alpha');
 
@@ -183,7 +183,7 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Beta').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open in edit mode — cancel to view mode first
+    // Backlog tasks open in edit mode -- cancel to view mode first
     await page.locator('button:has-text("Cancel")').click();
     await page.waitForTimeout(200);
 
@@ -199,7 +199,7 @@ test.describe('Task CRUD', () => {
   });
 
   test('can delete a task', async () => {
-    // "Test Task Beta" was archived above — it now lives in Done's Completed section
+    // "Test Task Beta" was archived above -- it now lives in Done's Completed section
     const doneColumn = page.locator('[data-swimlane-name="Done"]');
 
     // Expand the Completed section if not already visible
@@ -240,7 +240,7 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Gamma').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open in edit mode — cancel to view mode first
+    // Backlog tasks open in edit mode -- cancel to view mode first
     await page.locator('button:has-text("Cancel")').click();
     await page.waitForTimeout(200);
 
@@ -259,7 +259,7 @@ test.describe('Task CRUD', () => {
     await taskCard('Test Task Gamma').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open in edit mode — cancel to view mode first
+    // Backlog tasks open in edit mode -- cancel to view mode first
     await page.locator('button:has-text("Cancel")').click();
     await page.waitForTimeout(200);
 
@@ -320,7 +320,7 @@ test.describe('Session & Column Details', () => {
     await taskCard('Updated Task Alpha').click();
     await page.waitForTimeout(300);
 
-    // Backlog tasks open in edit mode — the edit textarea is visible instead of "No active session"
+    // Backlog tasks open in edit mode -- the edit textarea is visible instead of "No active session"
     const textarea = page.locator('.fixed textarea');
     await expect(textarea).toBeVisible();
 

@@ -2,7 +2,7 @@
  * Unit tests for command-builder logic, slugify, shell adaptation,
  * status-bridge script, merged settings, and shell detection.
  *
- * Migrated from tests/e2e/command-builder.spec.ts — pure logic, no Electron needed.
+ * Migrated from tests/e2e/command-builder.spec.ts -- pure logic, no Electron needed.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync, execSync } from 'node:child_process';
@@ -48,7 +48,7 @@ function buildClaudeCommand(options: {
   return parts.join(' ');
 }
 
-// ── Shell detection (test infrastructure — not a production duplicate) ──────
+// ── Shell detection (test infrastructure -- not a production duplicate) ──────
 
 interface ShellInfo {
   name: string;
@@ -481,7 +481,7 @@ describe.runIf(process.platform === 'win32')('Windows Path Conversion for Shells
   });
 });
 
-// convertWindowsExePath has no platform guard — runs on all platforms
+// convertWindowsExePath has no platform guard -- runs on all platforms
 describe('Windows Path Conversion (convertWindowsExePath)', () => {
   it('no-op for Unix paths (macOS/Linux)', () => {
     const cmd = '/usr/local/bin/claude --print "hello"';
@@ -623,7 +623,7 @@ describe('Merged Settings (statusLine)', () => {
   });
 });
 
-describe('Merged Settings — Local Settings Merge', () => {
+describe('Merged Settings -- Local Settings Merge', () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -832,7 +832,7 @@ describe('Merged Settings — Local Settings Merge', () => {
       claudePath: '/usr/bin/claude',
       taskId: 'test-task-id',
       cwd: tmpDir,
-      // no projectRoot — cwd IS the project root
+      // no projectRoot -- cwd IS the project root
       permissionMode: 'default',
       sessionId: 'main-sess',
       statusOutputPath: statusOutput,
@@ -873,7 +873,7 @@ describe('Merged Settings — Local Settings Merge', () => {
       statusOutputPath: statusOutput,
     });
 
-    // .claude/ directory should NOT be created — hooks are delivered via --settings
+    // .claude/ directory should NOT be created -- hooks are delivered via --settings
     expect(fs.existsSync(path.join(worktreeDir, '.claude'))).toBe(false);
   });
 

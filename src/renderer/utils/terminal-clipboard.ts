@@ -15,7 +15,7 @@ export function cleanSelection(raw: string, cols: number): string {
     const line = lines[i];
     current += line;
     // If this line fills exactly the terminal width, the next line
-    // is likely a soft wrap continuation — join without a newline.
+    // is likely a soft wrap continuation -- join without a newline.
     if (line.length >= cols && i < lines.length - 1) {
       continue;
     }

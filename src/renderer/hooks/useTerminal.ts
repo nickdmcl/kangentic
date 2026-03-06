@@ -10,7 +10,7 @@ import '@xterm/xterm/css/xterm.css';
  *  (Claude Code) only redraws once and scrollback isn't churned. */
 const PTY_RESIZE_DEBOUNCE_MS = 200;
 
-/** Fixed dark terminal theme — Claude Code's TUI is designed for dark backgrounds. */
+/** Fixed dark terminal theme -- Claude Code's TUI is designed for dark backgrounds. */
 const TERMINAL_THEME = {
   background: '#18181b',
   foreground: '#e4e4e7',
@@ -87,7 +87,7 @@ export function useTerminal(options: UseTerminalOptions) {
         window.electronAPI.sessions.write(options.sessionId!, data);
       });
 
-      // Debounced PTY resize — coalesces rapid dimension changes so the
+      // Debounced PTY resize -- coalesces rapid dimension changes so the
       // TUI only redraws once after resizing settles.
       const sid = options.sessionId;
       terminal.onResize(({ cols, rows }) => {
@@ -107,7 +107,7 @@ export function useTerminal(options: UseTerminalOptions) {
         if (scrollback && xtermRef.current) {
           xtermRef.current.write(scrollback);
         }
-        // Now fit — xterm reflows all content to the actual container size,
+        // Now fit -- xterm reflows all content to the actual container size,
         // and onResize fires to sync the PTY to the correct dimensions.
         if (fitAddonRef.current) {
           fitAddonRef.current.fit();
@@ -123,7 +123,7 @@ export function useTerminal(options: UseTerminalOptions) {
         });
       });
     } else {
-      // No session — just fit immediately
+      // No session -- just fit immediately
       fitAddon.fit();
     }
   }, [options.sessionId, options.fontFamily, options.fontSize]);
@@ -135,7 +135,7 @@ export function useTerminal(options: UseTerminalOptions) {
     const cleanup = window.electronAPI.sessions.onData((sessionId, data) => {
       if (sessionId !== options.sessionId || !xtermRef.current) return;
 
-      // While scrollback is loading, drop onData — it's duplicate data
+      // While scrollback is loading, drop onData -- it's duplicate data
       // already included in the scrollback replay. Any in-flight buffer
       // flushes that arrive just after scrollbackPending clears may cause
       // a brief duplicate write, but xterm handles this gracefully for

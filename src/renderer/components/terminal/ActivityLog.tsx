@@ -78,7 +78,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   const smoothScrollToBottom = () => {
     const el = containerRef.current;
     if (!el) return;
-    // Already at bottom — just re-enable
+    // Already at bottom -- just re-enable
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) {
       autoScrollRef.current = true;
       return;
@@ -88,7 +88,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
-  // Track scroll position — auto-scroll when at bottom
+  // Track scroll position -- auto-scroll when at bottom
   const handleScroll = () => {
     if (isSmoothScrollingRef.current) return;
     const el = containerRef.current;
@@ -131,7 +131,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   }, []);
 
   // Instant-scroll to bottom when switching to the Activity tab
-  // Also resets the smooth-scrolling guard — if a scroll was in progress
+  // Also resets the smooth-scrolling guard -- if a scroll was in progress
   // when the tab was hidden (display:none), scrollend won't fire.
   useEffect(() => {
     isSmoothScrollingRef.current = false;
@@ -320,7 +320,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
       return <BadgeLine {...common} badge={`${event.tool || 'Tool'} interrupted`} detail={event.detail} variant="warn" />;
 
     case EventType.Idle:
-      return <DimLine {...common} text="Idle — waiting for input" />;
+      return <DimLine {...common} text="Idle -- waiting for input" />;
 
     case EventType.Prompt:
       return (

@@ -170,7 +170,7 @@ describe('hook-manager', () => {
       expect((hooks.UserPromptSubmit[0] as { hooks: Array<{ command: string }> }).hooks[0].command).toBe('echo user-hook');
       expect(hooks.PreToolUse).toHaveLength(1);
       expect((hooks.PreToolUse[0] as { hooks: Array<{ command: string }> }).hooks[0].command).toBe('echo user-pretool');
-      // PermissionRequest, PostToolUse, PostToolUseFailure had only kangentic hooks — keys removed
+      // PermissionRequest, PostToolUse, PostToolUseFailure had only kangentic hooks -- keys removed
       expect(hooks.PermissionRequest).toBeUndefined();
       expect(hooks.PostToolUse).toBeUndefined();
       expect(hooks.PostToolUseFailure).toBeUndefined();

@@ -9,22 +9,22 @@
  *   node event-bridge.js <events-file-path> <event-type>
  *
  * Event types:
- *   tool_start      — from PreToolUse hook (reads tool name + input from stdin)
- *   tool_end        — from PostToolUse hook (reads tool name from stdin)
- *   tool_failure    — from PostToolUseFailure hook (reads tool name + is_interrupt from stdin)
- *   prompt          — from UserPromptSubmit hook
- *   idle            — from Stop / PermissionRequest hooks
- *   session_start   — from SessionStart hook
- *   session_end     — from SessionEnd hook
- *   subagent_start  — from SubagentStart hook (reads agent_type from stdin)
- *   subagent_stop   — from SubagentStop hook (reads agent_type from stdin)
- *   notification    — from Notification hook (reads message from stdin)
- *   compact         — from PreCompact hook
- *   teammate_idle   — from TeammateIdle hook
- *   task_completed  — from TaskCompleted hook
- *   config_change   — from ConfigChange hook
- *   worktree_create — from WorktreeCreate hook (reads name/path from stdin)
- *   worktree_remove — from WorktreeRemove hook (reads name/path from stdin)
+ *   tool_start      -- from PreToolUse hook (reads tool name + input from stdin)
+ *   tool_end        -- from PostToolUse hook (reads tool name from stdin)
+ *   tool_failure    -- from PostToolUseFailure hook (reads tool name + is_interrupt from stdin)
+ *   prompt          -- from UserPromptSubmit hook
+ *   idle            -- from Stop / PermissionRequest hooks
+ *   session_start   -- from SessionStart hook
+ *   session_end     -- from SessionEnd hook
+ *   subagent_start  -- from SubagentStart hook (reads agent_type from stdin)
+ *   subagent_stop   -- from SubagentStop hook (reads agent_type from stdin)
+ *   notification    -- from Notification hook (reads message from stdin)
+ *   compact         -- from PreCompact hook
+ *   teammate_idle   -- from TeammateIdle hook
+ *   task_completed  -- from TaskCompleted hook
+ *   config_change   -- from ConfigChange hook
+ *   worktree_create -- from WorktreeCreate hook (reads name/path from stdin)
+ *   worktree_remove -- from WorktreeRemove hook (reads name/path from stdin)
  *
  * Stdin: Claude Code pipes hook context as JSON. We parse it to extract
  * relevant fields for each event type.
@@ -67,7 +67,7 @@ process.stdin.on('end', () => {
         if (detail) event.detail = String(detail).slice(0, 200);
       }
     } catch {
-      // Stdin wasn't valid JSON — still write the event without tool info
+      // Stdin wasn't valid JSON -- still write the event without tool info
     }
   } else if (eventType === 'subagent_start' || eventType === 'subagent_stop') {
     try {
@@ -104,6 +104,6 @@ process.stdin.on('end', () => {
   try {
     fs.appendFileSync(outputPath, JSON.stringify(event) + '\n');
   } catch {
-    // Best effort — file may be locked or path may not exist
+    // Best effort -- file may be locked or path may not exist
   }
 });

@@ -269,7 +269,7 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec('ALTER TABLE swimlanes ADD COLUMN plan_exit_target_id TEXT DEFAULT NULL');
     // Ensure icon is explicit on any planning-role column before removing the role
     db.exec("UPDATE swimlanes SET icon = 'map' WHERE role = 'planning' AND icon IS NULL");
-    // Remove planning role — it becomes a regular column with permission_strategy='plan'
+    // Remove planning role -- it becomes a regular column with permission_strategy='plan'
     db.exec("UPDATE swimlanes SET role = NULL WHERE role = 'planning'");
     // Auto-set plan_exit_target_id for plan-mode columns to the next column by position
     // Uses > + ORDER BY ASC instead of = position+1 for gap-safe lookup
@@ -340,7 +340,7 @@ function seedActionsAndTransitions(db: Database.Database, now: string): void {
   const byRole: Record<string, string> = {};
   for (const lane of lanes) byRole[lane.role] = lane.id;
 
-  // Find plan-mode column (no longer a system role — uses permission_strategy)
+  // Find plan-mode column (no longer a system role -- uses permission_strategy)
   const planLane = db.prepare("SELECT id FROM swimlanes WHERE permission_strategy = 'plan' LIMIT 1").get() as { id: string } | undefined;
 
   const insertAction = db.prepare(

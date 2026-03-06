@@ -270,18 +270,18 @@ test.describe('Merged Settings Hooks', () => {
     const hooks = settings!.hooks as Record<string, Array<{ hooks: Array<{ command: string; type: string }> }>>;
     expect(hooks).toBeTruthy();
 
-    // PreToolUse hooks — should contain event-bridge tool_start
+    // PreToolUse hooks -- should contain event-bridge tool_start
     expect(hooks.PreToolUse).toBeInstanceOf(Array);
     expect(hooks.PreToolUse.length).toBeGreaterThanOrEqual(1);
     const ptuCommands = hooks.PreToolUse.flatMap(e => e.hooks.map(h => h.command));
     expect(ptuCommands.some(c => c.includes('event-bridge') && c.includes('tool_start'))).toBe(true);
 
-    // UserPromptSubmit hooks — should contain event-bridge prompt
+    // UserPromptSubmit hooks -- should contain event-bridge prompt
     expect(hooks.UserPromptSubmit).toBeInstanceOf(Array);
     const upsCommands = hooks.UserPromptSubmit.flatMap(e => e.hooks.map(h => h.command));
     expect(upsCommands.some(c => c.includes('event-bridge') && c.includes('prompt'))).toBe(true);
 
-    // Stop hooks — should contain event-bridge idle
+    // Stop hooks -- should contain event-bridge idle
     expect(hooks.Stop).toBeInstanceOf(Array);
     const stopCommands = hooks.Stop.flatMap(e => e.hooks.map(h => h.command));
     expect(stopCommands.some(c => c.includes('event-bridge') && c.includes('idle'))).toBe(true);
@@ -310,7 +310,7 @@ test.describe('Activity State via IPC', () => {
     await dragTaskToColumn(title, 'Code Review');
     await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
 
-    // Check activity cache has 'idle' for the session (safe default —
+    // Check activity cache has 'idle' for the session (safe default --
     // 'thinking' is only set when hooks explicitly fire)
     const activity = await page.evaluate(async () => {
       return window.electronAPI.sessions.getActivity();

@@ -58,11 +58,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const generation = get()._syncGeneration;
     const currentProjectId = useProjectStore.getState().currentProject?.id;
 
-    // Snapshot session references before async gap — used to detect
+    // Snapshot session references before async gap -- used to detect
     // IPC-delivered updates that arrive during the gap.
     const preAsyncSessions = new Map(get().sessions.map((s) => [s.id, s]));
 
-    // Sessions list is always unscoped — sidebar needs cross-project data
+    // Sessions list is always unscoped -- sidebar needs cross-project data
     const freshSessions = await window.electronAPI.sessions.list();
 
     // Usage/events are scoped to current project; activity is unscoped
@@ -83,7 +83,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const preAsync = preAsyncSessions.get(freshSession.id);
       const postAsync = postAsyncSessions.get(freshSession.id);
       // If the store's reference changed during the async gap,
-      // an IPC listener updated this session — keep the fresher version.
+      // an IPC listener updated this session -- keep the fresher version.
       if (postAsync && preAsync && postAsync !== preAsync) {
         return postAsync;
       }
@@ -93,7 +93,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const stillExists = currentState.activeSessionId
       && mergedSessions.some((s) => s.id === currentState.activeSessionId);
 
-    // For usage/activity/events: keep store on top — IPC-delivered updates
+    // For usage/activity/events: keep store on top -- IPC-delivered updates
     // are strictly more recent than the cache snapshot.
     set({
       sessions: mergedSessions,

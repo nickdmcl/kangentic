@@ -67,7 +67,7 @@ export async function cleanupProject(context: IpcContext, projectId: string, pro
     }
   }
 
-  // 3. Strip our hooks from .claude/settings.local.json (legacy cleanup —
+  // 3. Strip our hooks from .claude/settings.local.json (legacy cleanup --
   //    new sessions use --settings and don't write to settings.local.json,
   //    but existing worktrees from before the change may still have our hooks)
   stripKangenticHooks(projectPath);
@@ -88,13 +88,13 @@ export async function cleanupProject(context: IpcContext, projectId: string, pro
     if (entries.length === 0 || isOnlyOurs) {
       fs.rmSync(claudeDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
     }
-  } catch { /* may not exist or not readable — skip */ }
+  } catch { /* may not exist or not readable -- skip */ }
 
   // 5. Close the project DB connection before deleting files
   closeProjectDb(projectId);
 
   // Steps 6–7 modify the project's .gitignore and .kangentic/ directory.
-  // Skip for worktrees — their .gitignore is inherited from the parent branch
+  // Skip for worktrees -- their .gitignore is inherited from the parent branch
   // and should not be modified by ephemeral cleanup.
   const isWorktree = isInsideWorktree(projectPath);
 
@@ -154,7 +154,7 @@ export function deleteProjectFromIndex(context: IpcContext, id: string): void {
 
 /**
  * Prune all worktree-based preview projects from the global index.
- * Any project whose path contains `.kangentic/worktrees/` is ephemeral —
+ * Any project whose path contains `.kangentic/worktrees/` is ephemeral --
  * created by `/preview` and should not persist across app restarts.
  */
 export async function pruneStaleWorktreeProjects(context: IpcContext): Promise<void> {
@@ -234,7 +234,7 @@ export async function activateAllProjects(context: IpcContext): Promise<void> {
 
   const projects = context.projectRepo.list();
   for (const project of projects) {
-    // Skip the currently active project — it already ran recovery via PROJECT_OPEN
+    // Skip the currently active project -- it already ran recovery via PROJECT_OPEN
     if (project.id === context.currentProjectId) continue;
 
     try {
@@ -282,7 +282,7 @@ export function registerProjectHandlers(context: IpcContext): void {
     context.projectRepo.updateLastOpened(id);
     ensureGitignore(project.path);
 
-    // Apply project config overrides (always — config may have changed)
+    // Apply project config overrides (always -- config may have changed)
     const config = context.configManager.getEffectiveConfig(project.path);
     context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);
     context.sessionManager.setShell(config.terminal.shell);

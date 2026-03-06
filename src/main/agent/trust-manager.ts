@@ -26,7 +26,7 @@ export function ensureWorktreeTrust(worktreePath: string): void {
   }
   const projects = data.projects as Record<string, Record<string, unknown>>;
 
-  // Already trusted — nothing to do
+  // Already trusted -- nothing to do
   if (projects[resolvedPath]?.hasTrustDialogAccepted === true) {
     return;
   }

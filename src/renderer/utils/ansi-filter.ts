@@ -13,7 +13,7 @@ import { SerializeAddon } from '@xterm/addon-serialize';
  * atomically instead of emitting intermediate screen states.
  */
 
-// Shared hidden container — pointer-events:none prevents interference
+// Shared hidden container -- pointer-events:none prevents interference
 // with the visible aggregate terminal's text selection / copy.
 let hiddenContainer: HTMLDivElement | null = null;
 
@@ -30,7 +30,7 @@ function getHiddenContainer(): HTMLDivElement {
 }
 
 // Lines consisting only of box-drawing characters (U+2500-U+257F),
-// spaces, dashes, equals, and underscores — TUI decorative borders.
+// spaces, dashes, equals, and underscores -- TUI decorative borders.
 const DECORATIVE_RE = /^[\u2500-\u257F\s\-=_·•─]+$/;
 
 export function createAnsiFilter(): {

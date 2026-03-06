@@ -4,17 +4,17 @@
 
 Electron app with two processes:
 
-- **Main process** — Node.js runtime. Owns the database, PTY sessions, git operations, file I/O, and IPC handlers. Entry point: `src/main/index.ts`.
-- **Renderer process** — Chromium window running React. Communicates exclusively through `window.electronAPI` (context bridge). Entry point: `src/renderer/index.tsx`.
-- **Preload script** — Bridges main↔renderer via `contextBridge.exposeInMainWorld()`. Exposes typed `electronAPI` object. Entry point: `src/preload/preload.ts`.
+- **Main process** -- Node.js runtime. Owns the database, PTY sessions, git operations, file I/O, and IPC handlers. Entry point: `src/main/index.ts`.
+- **Renderer process** -- Chromium window running React. Communicates exclusively through `window.electronAPI` (context bridge). Entry point: `src/renderer/index.tsx`.
+- **Preload script** -- Bridges main↔renderer via `contextBridge.exposeInMainWorld()`. Exposes typed `electronAPI` object. Entry point: `src/preload/preload.ts`.
 
-Context isolation is enabled — the renderer has no direct access to Node.js APIs.
+Context isolation is enabled -- the renderer has no direct access to Node.js APIs.
 
 ## Data Flow
 
 ```
 User drags task between columns
-  → BoardStore.moveTask() — optimistic UI update
+  → BoardStore.moveTask() -- optimistic UI update
   → IPC task:move
   → Main: update DB positions
   → Main: check priority rules (Backlog? Done? Active session? No session?)
@@ -145,21 +145,21 @@ Overridable via `KANGENTIC_DATA_DIR` env var.
 
 Stores the project list. Tables:
 
-- **projects** — id, name, path, github_url, default_agent, last_opened, created_at
-- **global_config** — key/value store for app-wide settings
+- **projects** -- id, name, path, github_url, default_agent, last_opened, created_at
+- **global_config** -- key/value store for app-wide settings
 
 ### Per-Project DB (`<configDir>/projects/<projectId>.db`)
 
 Created on project open. Stored in the global config directory (not inside the project). Tables:
 
-- **swimlanes** — Kanban columns. Fields: id, name, role (`backlog`/`planning`/`done`/null), position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at
-- **tasks** — Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, archived_at, created_at, updated_at
-- **actions** — Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `webhook`. Config stored as JSON.
-- **swimlane_transitions** — Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
-- **sessions** — Session persistence for recovery/resume. Fields: id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status (`running`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
-- **task_attachments** — File attachments (images, etc.) stored on disk, metadata in DB
+- **swimlanes** -- Kanban columns. Fields: id, name, role (`backlog`/`planning`/`done`/null), position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at
+- **tasks** -- Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, archived_at, created_at, updated_at
+- **actions** -- Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `webhook`. Config stored as JSON.
+- **swimlane_transitions** -- Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
+- **sessions** -- Session persistence for recovery/resume. Fields: id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status (`running`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
+- **task_attachments** -- File attachments (images, etc.) stored on disk, metadata in DB
 
-Repositories follow a simple pattern — one class per table, all queries are synchronous (better-sqlite3). Transactions used for position shifts (task move, swimlane reorder).
+Repositories follow a simple pattern -- one class per table, all queries are synchronous (better-sqlite3). Transactions used for position shifts (task move, swimlane reorder).
 
 ## Transition Engine
 
@@ -215,10 +215,10 @@ Two watchers per session, reading files written by bridge scripts:
 
 | Watcher | File | Debounce | Emits |
 |---------|------|----------|-------|
-| Status | `status.json` | 100ms | `session:usage` — tokens, cost, model |
-| Events | `events.jsonl` | 50ms | `session:event` — tool_start/end, prompt, idle; `session:activity` — thinking/idle (derived) |
+| Status | `status.json` | 100ms | `session:usage` -- tokens, cost, model |
+| Events | `events.jsonl` | 50ms | `session:event` -- tool_start/end, prompt, idle; `session:activity` -- thinking/idle (derived) |
 
-Events watcher uses byte offset tracking to only read new lines (no full re-read). Activity state (thinking/idle) is derived from event types — see [Activity Detection](activity-detection.md).
+Events watcher uses byte offset tracking to only read new lines (no full re-read). Activity state (thinking/idle) is derived from event types -- see [Activity Detection](activity-detection.md).
 
 ### Shell Resolution
 
@@ -266,27 +266,27 @@ All stores in `src/renderer/stores/`. They call `window.electronAPI.*` for IPC a
 
 State: `tasks`, `swimlanes`, `archivedTasks`, `loading`, `completingTask`, `recentlyArchivedId`
 
-- **Optimistic updates** — all mutations update UI immediately, then sync via IPC. Errors revert via full `loadBoard()`.
-- **Stale move protection** — `moveGeneration` counter prevents older async reloads from clobbering newer moves.
-- **Session cascade** — after task move, reloads sessions to detect spawns/kills from transition engine. Auto-activates new sessions with toast notification.
-- **Completion animation** — `setCompletingTask()` captures DOM rect, `finalizeCompletion()` triggers the actual move.
+- **Optimistic updates** -- all mutations update UI immediately, then sync via IPC. Errors revert via full `loadBoard()`.
+- **Stale move protection** -- `moveGeneration` counter prevents older async reloads from clobbering newer moves.
+- **Session cascade** -- after task move, reloads sessions to detect spawns/kills from transition engine. Auto-activates new sessions with toast notification.
+- **Completion animation** -- `setCompletingTask()` captures DOM rect, `finalizeCompletion()` triggers the actual move.
 
 ### SessionStore (`session-store.ts`)
 
 State: `sessions`, `activeSessionId`, `openTaskId`, `dialogSessionId`, `sessionUsage`, `sessionActivity`, `sessionEvents`
 
-- **Terminal ownership handoff** — `dialogSessionId` ensures the bottom panel and task detail dialog never render xterm simultaneously. When the dialog opens, the panel unmounts its xterm. On close, the panel recreates from scrollback.
-- **Cache restoration** — `syncSessions()` fetches usage/activity/events from main process memory, surviving renderer reloads (Vite HMR). Usage and events are scoped to the current project; activity is fetched unscoped so sidebar badges work across all projects.
-- **Project switch cleanup** — On project switch, `activeSessionId`, `dialogSessionId`, `openTaskId`, `sessionUsage`, and `sessionEvents` are cleared before re-syncing. A generation counter invalidates in-flight syncs from the previous project. `sessionActivity` and `sessions` are preserved for sidebar badge rendering.
-- **Event capping** — max 500 events per session to bound DOM size in ActivityLog.
-- **Queue position** — `getQueuePosition()` returns 1-indexed position sorted by startedAt.
+- **Terminal ownership handoff** -- `dialogSessionId` ensures the bottom panel and task detail dialog never render xterm simultaneously. When the dialog opens, the panel unmounts its xterm. On close, the panel recreates from scrollback.
+- **Cache restoration** -- `syncSessions()` fetches usage/activity/events from main process memory, surviving renderer reloads (Vite HMR). Usage and events are scoped to the current project; activity is fetched unscoped so sidebar badges work across all projects.
+- **Project switch cleanup** -- On project switch, `activeSessionId`, `dialogSessionId`, `openTaskId`, `sessionUsage`, and `sessionEvents` are cleared before re-syncing. A generation counter invalidates in-flight syncs from the previous project. `sessionActivity` and `sessions` are preserved for sidebar badge rendering.
+- **Event capping** -- max 500 events per session to bound DOM size in ActivityLog.
+- **Queue position** -- `getQueuePosition()` returns 1-indexed position sorted by startedAt.
 
 ### ConfigStore (`config-store.ts`)
 
 State: `config` (AppConfig), `claudeInfo`, `claudeVersionLabel`, `settingsOpen`
 
-- **Theme subscription** — watches theme changes, updates `<html>` class for CSS variables.
-- **Claude detection** — `detectClaude()` finds CLI path and parses version string.
+- **Theme subscription** -- watches theme changes, updates `<html>` class for CSS variables.
+- **Claude detection** -- `detectClaude()` finds CLI path and parses version string.
 
 ### ProjectStore (`project-store.ts`)
 
@@ -319,7 +319,7 @@ Constructs the `claude` CLI invocation:
 | `default` | `--settings <path>` (uses project-settings) |
 | `plan` | `--permission-mode plan` |
 | `acceptEdits` | `--permission-mode acceptEdits` |
-| `manual` | (none — interactive prompts) |
+| `manual` | (none -- interactive prompts) |
 
 ### Permission Mode Resolution (priority order)
 
@@ -341,29 +341,29 @@ For each session, a merged settings file is created at `.kangentic/sessions/<ses
 
 On project open (`src/main/engine/session-recovery.ts`):
 
-1. **Prune orphaned worktrees** — delete tasks whose worktree directories were removed externally
-2. **Mark crash recovery** — leftover `running` DB records become `orphaned`
-3. **Deduplicate** — keep only the latest record per task_id
-4. **Filter candidates** — skip Backlog/Done, skip auto_spawn=false, skip missing CWD
-5. **Resume or respawn** — suspended sessions use `--resume`, others get fresh `--session-id`
-6. **Reconcile** — spawn fresh agents for tasks in auto_spawn columns with no session
+1. **Prune orphaned worktrees** -- delete tasks whose worktree directories were removed externally
+2. **Mark crash recovery** -- leftover `running` DB records become `orphaned`
+3. **Deduplicate** -- keep only the latest record per task_id
+4. **Filter candidates** -- skip Backlog/Done, skip auto_spawn=false, skip missing CWD
+5. **Resume or respawn** -- suspended sessions use `--resume`, others get fresh `--session-id`
+6. **Reconcile** -- spawn fresh agents for tasks in auto_spawn columns with no session
 
 ## Performance
 
-- **WebGL xterm** — attempts WebGL renderer first, falls back to canvas on context loss
-- **Resize debouncing** — PTY resize calls debounced at 200ms, suppressed during panel drag
-- **Activity log** — plain DOM list instead of xterm. Events flow through JSONL files, not terminal output.
-- **Terminal ownership handoff** — one xterm instance per session at a time prevents duplicate resize calls that corrupt TUI output
-- **Output batching** — 16ms flush interval prevents per-character IPC overhead
-- **Scrollback cap** — 512KB prevents unbounded memory growth
+- **WebGL xterm** -- attempts WebGL renderer first, falls back to canvas on context loss
+- **Resize debouncing** -- PTY resize calls debounced at 200ms, suppressed during panel drag
+- **Activity log** -- plain DOM list instead of xterm. Events flow through JSONL files, not terminal output.
+- **Terminal ownership handoff** -- one xterm instance per session at a time prevents duplicate resize calls that corrupt TUI output
+- **Output batching** -- 16ms flush interval prevents per-character IPC overhead
+- **Scrollback cap** -- 512KB prevents unbounded memory growth
 
 ## See Also
 
-- [Session Lifecycle](session-lifecycle.md) — Full state machine, spawn flow, queue, crash recovery
-- [Claude Integration](claude-integration.md) — Command building, settings merge, hooks, trust management
-- [Transition Engine](transition-engine.md) — Action types, templates, priority rules
-- [Database](database.md) — Full schema reference, migrations, repository pattern
-- [Configuration](configuration.md) — Config cascade, all settings keys
-- [Cross-Platform](cross-platform.md) — Shell resolution, path handling, packaging
-- [Activity Detection](activity-detection.md) — Event pipeline, thinking/idle state derivation
-- [Worktree Strategy](worktree-strategy.md) — Branch naming, sparse-checkout, hook delivery
+- [Session Lifecycle](session-lifecycle.md) -- Full state machine, spawn flow, queue, crash recovery
+- [Claude Integration](claude-integration.md) -- Command building, settings merge, hooks, trust management
+- [Transition Engine](transition-engine.md) -- Action types, templates, priority rules
+- [Database](database.md) -- Full schema reference, migrations, repository pattern
+- [Configuration](configuration.md) -- Config cascade, all settings keys
+- [Cross-Platform](cross-platform.md) -- Shell resolution, path handling, packaging
+- [Activity Detection](activity-detection.md) -- Event pipeline, thinking/idle state derivation
+- [Worktree Strategy](worktree-strategy.md) -- Branch naming, sparse-checkout, hook delivery

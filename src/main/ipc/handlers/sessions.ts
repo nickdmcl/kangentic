@@ -78,11 +78,11 @@ export function registerSessionHandlers(context: IpcContext): void {
 
     // Re-read task to get the new session_id
     const updated = tasks.getById(taskId);
-    if (!updated?.session_id) throw new Error('Session resume failed — no session_id on task');
+    if (!updated?.session_id) throw new Error('Session resume failed -- no session_id on task');
 
     // Return the new session object
     const newSession = context.sessionManager.getSession(updated.session_id);
-    if (!newSession) throw new Error('Session resume failed — session not in manager');
+    if (!newSession) throw new Error('Session resume failed -- session not in manager');
     return newSession;
   });
 
@@ -130,14 +130,14 @@ export function registerSessionHandlers(context: IpcContext): void {
       context.mainWindow.webContents.send(IPC.SESSION_EXIT, sessionId, exitCode, resolvedProjectId);
     }
 
-    // Persist exit status to session DB — use the session's own projectId
+    // Persist exit status to session DB -- use the session's own projectId
     // so we write to the correct DB even if the user switched projects.
     if (resolvedProjectId) {
       try {
         const db = getProjectDb(resolvedProjectId);
         const sessionRepo = new SessionRepository(db);
         // Look up by task ID from the in-memory session.
-        // Only mark 'running' records as 'exited' — never overwrite
+        // Only mark 'running' records as 'exited' -- never overwrite
         // 'suspended' status, which is set by TASK_MOVE before the
         // async onExit fires and is needed for resume on re-entry.
         let updated = false;
@@ -172,7 +172,7 @@ export function registerSessionHandlers(context: IpcContext): void {
 
   // Auto-move task when agent exits plan mode (ExitPlanMode tool)
   context.sessionManager.on('plan-exit', async (sessionId: string) => {
-    // Use the session's own projectId — not the singleton, which may have
+    // Use the session's own projectId -- not the singleton, which may have
     // changed if the user switched projects while the agent was running.
     const resolvedProjectId = context.sessionManager.getSessionProjectId(sessionId);
     if (!resolvedProjectId) return;

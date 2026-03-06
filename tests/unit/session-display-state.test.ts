@@ -1,5 +1,5 @@
 /**
- * Unit tests for getSessionDisplayState — the pure function that derives
+ * Unit tests for getSessionDisplayState -- the pure function that derives
  * the discriminated-union display state from raw session, usage, and
  * activity data.  Covers all 6 state kinds plus edge cases.
  */
@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { getSessionDisplayState } from '../../src/renderer/utils/session-display-state';
 import type { Session, SessionUsage, ActivityState } from '../../src/shared/types';
 
-/** Minimal session factory — only fields that matter for the function. */
+/** Minimal session factory -- only fields that matter for the function. */
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
     id: 'sess-1',

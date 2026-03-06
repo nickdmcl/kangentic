@@ -61,7 +61,7 @@ function writeTestConfig(dataDir: string): void {
   );
 }
 
-test.describe('Claude Agent — No False Resume on New Tasks', () => {
+test.describe('Claude Agent -- No False Resume on New Tasks', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;

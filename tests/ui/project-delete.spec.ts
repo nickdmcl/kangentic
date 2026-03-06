@@ -40,7 +40,7 @@ test.describe('Project Deletion Cleanup', () => {
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
     await page.waitForTimeout(300);
 
-    // Board clears — no swimlane columns remain
+    // Board clears -- no swimlane columns remain
     await expect(page.locator('[data-swimlane-name="Backlog"]')).not.toBeVisible();
     await expect(page.locator('[data-testid="swimlane"]')).toHaveCount(0);
 
@@ -67,7 +67,7 @@ test.describe('Project Deletion Cleanup', () => {
     await expect(backlog.locator(`text=Task A ${runId}`)).not.toBeVisible();
     await expect(backlog.locator(`text=Task B ${runId}`)).not.toBeVisible();
 
-    // Board is functional — can create new tasks
+    // Board is functional -- can create new tasks
     await createTask(page, `Fresh Task ${runId}`);
     await expect(taskCard(page, `Fresh Task ${runId}`)).toBeVisible();
   });

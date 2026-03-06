@@ -90,7 +90,7 @@ function twoProjectPreConfig(options?: { withUsage?: boolean }): string {
       state.activityCache['${SESSION_A_ID}'] = 'idle';
       state.activityCache['${SESSION_B_ID}'] = 'idle';
 
-      // Tasks — one per project
+      // Tasks -- one per project
       state.tasks.push({
         id: '${TASK_A_ID}',
         title: 'Alpha Task',
@@ -171,7 +171,7 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project A is active — should see alpha-task tab, not beta-task
+      // Project A is active -- should see alpha-task tab, not beta-task
       const alphaTab = page.locator('button:has-text("alpha-task")');
       const betaTab = page.locator('button:has-text("beta-task")');
 
@@ -188,7 +188,7 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project A active — alpha-task visible
+      // Project A active -- alpha-task visible
       await expect(page.locator('button:has-text("alpha-task")')).toBeVisible();
 
       // Switch to Project B via sidebar
@@ -212,7 +212,7 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project A is active — status bar should show 1 agent (not 2)
+      // Project A is active -- status bar should show 1 agent (not 2)
       const sessionCount = page.locator('[data-testid="session-count"]');
       await expect(sessionCount).toContainText('1 agents');
 
@@ -277,7 +277,7 @@ test.describe('Project Session Scope', () => {
       await expect(alphaRow.locator('span[title*="thinking"]')).toContainText('1');
       await expect(alphaRow.locator('span[title*="idle"]')).not.toBeVisible();
 
-      // Project Beta still idle — shows idle mail badge (not a dot)
+      // Project Beta still idle -- shows idle mail badge (not a dot)
       const betaRow = page.locator('[role="button"]:has-text("Project Beta")');
       await expect(betaRow.locator('span[title*="idle"]')).toBeVisible();
       await expect(betaRow.locator('span[title*="idle"]')).toContainText('1');
@@ -308,7 +308,7 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project Gamma has no sessions — no badges or dots at all
+      // Project Gamma has no sessions -- no badges or dots at all
       const gammaRow = page.locator('[role="button"]:has-text("Project Gamma")');
       await expect(gammaRow).toBeVisible();
       await expect(gammaRow.locator('span[title*="thinking"]')).not.toBeVisible();
@@ -379,7 +379,7 @@ test.describe('Project Session Scope', () => {
     try {
       await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
-      // Project A — alpha-task visible
+      // Project A -- alpha-task visible
       await expect(page.locator('button:has-text("alpha-task")')).toBeVisible();
 
       // Switch to Project B
@@ -392,7 +392,7 @@ test.describe('Project Session Scope', () => {
       await page.locator('[role="button"]:has-text("Project Alpha")').click();
       await page.waitForTimeout(500);
 
-      // Alpha session reappears — it was not cleared
+      // Alpha session reappears -- it was not cleared
       await expect(page.locator('button:has-text("alpha-task")')).toBeVisible();
       await expect(page.locator('button:has-text("beta-task")')).not.toBeVisible();
     } finally {

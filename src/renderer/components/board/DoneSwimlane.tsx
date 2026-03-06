@@ -121,7 +121,7 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
         </button>
       </div>
 
-      {/* Drop zone — droppable ref on the visual box */}
+      {/* Drop zone -- droppable ref on the visual box */}
       <div className="p-2 flex-shrink-0">
         <div
           ref={setNodeRef}
@@ -152,7 +152,7 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
         </div>
       </div>
 
-      {/* Collapsible archive section — always visible */}
+      {/* Collapsible archive section -- always visible */}
       <div className="flex-1 min-h-0 flex flex-col px-2 pb-2 border-t border-edge/50 pt-3">
         <button
           type="button"
@@ -179,7 +179,7 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
               </div>
             )}
 
-            {/* Archived task list — scrollable */}
+            {/* Archived task list -- scrollable */}
             <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
               {filteredArchived.map((task) => {
                 const isGrowingIn = recentlyArchivedId === task.id;

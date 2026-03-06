@@ -127,7 +127,7 @@ async function moveTaskToSwimlane(page: Page, taskTitle: string, swimlaneId: str
 // =========================================================================
 // Test: Config changes during active sessions
 // =========================================================================
-test.describe('Claude Agent — Config Changes During Active Sessions', () => {
+test.describe('Claude Agent -- Config Changes During Active Sessions', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;
@@ -192,7 +192,7 @@ test.describe('Claude Agent — Config Changes During Active Sessions', () => {
     expect(countsAfterConfigChange.running).toBe(2);
     expect(countsAfterConfigChange.queued).toBe(0);
 
-    // --- Step 5: Move 3rd task to Planning — should queue (2 running > limit of 1) ---
+    // --- Step 5: Move 3rd task to Planning -- should queue (2 running > limit of 1) ---
     await moveTaskToSwimlane(page, taskC, planningSwimlaneId);
 
     // Brief delay to let the session-manager process the spawn request
@@ -230,7 +230,7 @@ test.describe('Claude Agent — Config Changes During Active Sessions', () => {
     expect(countsAfterKill.queued).toBe(1);
     expect(countsAfterKill.exited).toBeGreaterThanOrEqual(1);
 
-    // --- Step 7: Kill the second running session — now queued should promote ---
+    // --- Step 7: Kill the second running session -- now queued should promote ---
     const remainingRunning = await page.evaluate(async () => {
       const sessions = await window.electronAPI.sessions.list();
       return sessions

@@ -37,7 +37,7 @@ interface TaskDetailDialogProps {
 function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
   const maxConcurrent = useConfigStore((s) => s.config.claude.maxConcurrentSessions);
   const runningCount = useSessionStore((s) => s.getRunningCount());
-  // Split into primitive selectors — avoids new object refs triggering re-renders
+  // Split into primitive selectors -- avoids new object refs triggering re-renders
   const queuePosition = useSessionStore((s) => {
     if (!sessionId) return 0;
     const pos = s.getQueuePosition(sessionId);
@@ -142,7 +142,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         );
         if (!cancelled) setSavedAttachments(withPreviews);
       } catch {
-        // No attachments API (e.g. in tests) — ignore
+        // No attachments API (e.g. in tests) -- ignore
       }
     })();
     return () => { cancelled = true; };
@@ -240,7 +240,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     }
   }, []);
 
-  // Close image preview on Escape (capture phase — fires before BaseDialog's handler)
+  // Close image preview on Escape (capture phase -- fires before BaseDialog's handler)
   useEffect(() => {
     if (!previewAttachment) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -296,7 +296,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
 
   const setDialogSessionId = useSessionStore((s) => s.setDialogSessionId);
   const loadBoard = useBoardStore((s) => s.loadBoard);
-  // Targeted selector — find by taskId (consistent with useSessionDisplayState).
+  // Targeted selector -- find by taskId (consistent with useSessionDisplayState).
   // task.session_id can be stale after HMR or optimistic moves; taskId is always reliable.
   const session = useSessionStore((s) =>
     s.sessions.find((sess) => sess.taskId === task.id) ?? null
@@ -415,7 +415,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   // terminal is torn down before the dialog's terminal initializes.
   useLayoutEffect(() => {
     if (session?.id) {
-      // Guard against redundant store updates — prevents re-render cascades
+      // Guard against redundant store updates -- prevents re-render cascades
       if (useSessionStore.getState().dialogSessionId !== session.id) {
         setDialogSessionId(session.id);
       }
@@ -461,7 +461,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     // Close dialog and optimistically archive (no animation)
     onClose();
     archiveTask(task.id);
-    // Persist via IPC — TASK_MOVE to Done auto-archives in the DB
+    // Persist via IPC -- TASK_MOVE to Done auto-archives in the DB
     const laneTasks = useBoardStore.getState().tasks.filter(
       (t) => t.swimlane_id === doneLane.id,
     );
@@ -476,7 +476,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     if (dontAskAgain) updateConfig({ skipDeleteConfirm: true });
     const taskTitle = task.title;
     // Close dialog first to unmount the terminal (xterm) cleanly
-    // before tearing down the session — prevents WebGL renderer crash
+    // before tearing down the session -- prevents WebGL renderer crash
     onClose();
     if (session) {
       await killSession(session.id);
@@ -536,7 +536,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                   ? 'text-green-400 hover:bg-green-400/10'
                   : 'text-fg-faint hover:bg-surface-hover hover:text-fg-tertiary'
             }`}
-            title={isQueued ? 'Queued — click to pause' : isSessionActive ? 'Pause session' : 'Resume session'}
+            title={isQueued ? 'Queued -- click to pause' : isSessionActive ? 'Pause session' : 'Resume session'}
           >
             {isQueued ? (
               <Clock size={18} />
@@ -562,7 +562,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         <h2 className="text-base font-semibold text-fg truncate min-w-0">{task.title}</h2>
       )}
 
-      {/* Open folder pill — left-aligned after title */}
+      {/* Open folder pill -- left-aligned after title */}
       {!isEditing && (task.worktree_path || projectPath) && (
         <button
           onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
@@ -657,7 +657,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                 </button>
               )}
 
-              {/* Move to — flyout submenu to the right */}
+              {/* Move to -- flyout submenu to the right */}
               {moveTargets.length > 0 && (
                 <div
                   className="relative"
@@ -711,10 +711,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                 </button>
               )}
 
-              {/* Danger zone divider — only when both Archive and Delete are shown */}
+              {/* Danger zone divider -- only when both Archive and Delete are shown */}
               {!isArchived && <div className="my-2 mx-2 border-t border-edge-input" />}
 
-              {/* Delete — always available */}
+              {/* Delete -- always available */}
               <button
                 onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); skipDeleteConfirm ? handleDelete() : setConfirmDelete(true); }}
                 className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-400/10 hover:text-red-300 transition-colors flex items-center gap-2"
@@ -806,7 +806,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           </div>
         ) : undefined}
       >
-        {/* No-session edit mode — mirrors NewTaskDialog layout exactly */}
+        {/* No-session edit mode -- mirrors NewTaskDialog layout exactly */}
         {isEditing && !hasSessionContext && (
           <div
             className="space-y-3 relative"

@@ -346,7 +346,7 @@
   animation: grow-in 250ms ease-out forwards;
 }
 
-/* Radiating pulse for idle task cards — shadow expands outward and fades */
+/* Radiating pulse for idle task cards -- shadow expands outward and fades */
 @keyframes pulse-subtle {
   0% { box-shadow: 0 0 0 0px rgba(161, 161, 170, 0.2); }
   40% { box-shadow: 0 0 0 5px rgba(161, 161, 170, 0); }

@@ -15,12 +15,12 @@ interface PendingInjection {
  * When a task moves into a column with an `auto_command`, the injector writes
  * the command text into the running terminal. It handles three scenarios:
  *
- * 1. **Existing session** — injects immediately (Ctrl+C to clear input first)
- * 2. **Freshly spawned session** — waits for first `thinking` event (CLI alive)
- * 3. **Queued session** — waits for `status:running`, then applies fresh logic
+ * 1. **Existing session** -- injects immediately (Ctrl+C to clear input first)
+ * 2. **Freshly spawned session** -- waits for first `thinking` event (CLI alive)
+ * 3. **Queued session** -- waits for `status:running`, then applies fresh logic
  *
  * The injector is keyed by taskId so rapid moves cancel previous injections.
- * All state is in-memory — no persistence needed (event-based, not recoverable).
+ * All state is in-memory -- no persistence needed (event-based, not recoverable).
  */
 export class CommandInjector {
   private pending = new Map<string, PendingInjection>();
@@ -55,13 +55,13 @@ export class CommandInjector {
       return;
     }
 
-    // Existing session (not freshly spawned) — inject immediately
+    // Existing session (not freshly spawned) -- inject immediately
     if (!freshlySpawned) {
       this.deliver(sessionId, taskId, command, true);
       return;
     }
 
-    // Queued or freshly spawned — need to wait for CLI to be alive
+    // Queued or freshly spawned -- need to wait for CLI to be alive
     const isQueued = session.status === 'queued';
     this.scheduleDeferred(taskId, sessionId, command, isQueued, timeoutMs);
   }
@@ -132,7 +132,7 @@ export class CommandInjector {
       if (!this.pending.has(taskId)) return;
 
       if (state === 'waiting' && activityState === 'thinking') {
-        // CLI is alive — detach listeners and deliver command
+        // CLI is alive -- detach listeners and deliver command
         detachAndDeliver();
       }
     };
@@ -142,7 +142,7 @@ export class CommandInjector {
       if (!this.pending.has(taskId)) return;
 
       if (state === 'queued' && status === 'running') {
-        // Session started — transition to waiting for CLI startup
+        // Session started -- transition to waiting for CLI startup
         state = 'waiting';
         startFallbackTimer();
       }

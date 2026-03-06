@@ -3,7 +3,7 @@
  *
  * When the event watcher reads JSONL events from the event-bridge, it derives
  * the activity state (thinking/idle) from the event type. This is the primary
- * mechanism for task card indicators — the event-bridge fires for ALL tools.
+ * mechanism for task card indicators -- the event-bridge fires for ALL tools.
  *
  * Mapping (via EventTypeActivity):
  *   tool_start      → thinking
@@ -198,7 +198,7 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Read' });
     await waitForWatcher();
 
-    // Activity should still be thinking — tool_end doesn't change it
+    // Activity should still be thinking -- tool_end doesn't change it
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
     // No activity emissions from tool_end
     expect(statesAfter).toHaveLength(0);
@@ -328,7 +328,7 @@ describe('Event-derived activity state', () => {
 
     // Final state should be idle (last event)
     expect(manager.getActivityCache()[session.id]).toBe('idle');
-    // Activity emissions: tool_start(thinking), idle — dedup suppresses
+    // Activity emissions: tool_start(thinking), idle -- dedup suppresses
     // the second tool_start since state is already 'thinking'
     expect(states).toEqual(['thinking', 'idle']);
   });
@@ -385,7 +385,7 @@ describe('Event-derived activity state', () => {
     const states = collectActivity(manager, session.id);
 
     // PostToolUseFailure(interrupt) fires interrupted, then Stop fires idle
-    // Both map to 'idle' — dedup should suppress the second emission
+    // Both map to 'idle' -- dedup should suppress the second emission
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Interrupted, tool: 'Bash' });
     appendEvent(eventsPath, { ts: Date.now() + 1, type: EventType.Idle });
     await waitForWatcher();
@@ -421,7 +421,7 @@ describe('Event-derived activity state', () => {
 
     const statesAfter = collectActivity(manager, session.id);
 
-    // session_start should NOT change activity — agent may be idle at prompt
+    // session_start should NOT change activity -- agent may be idle at prompt
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SessionStart });
     await waitForWatcher();
 
@@ -450,7 +450,7 @@ describe('Event-derived activity state', () => {
 
     const statesAfter = collectActivity(manager, session.id);
 
-    // subagent_stop is log-only — should NOT change activity
+    // subagent_stop is log-only -- should NOT change activity
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
 
@@ -509,7 +509,7 @@ describe('Event-derived activity state', () => {
 
     const statesAfter = collectActivity(manager, session.id);
 
-    // Notification is informational — should NOT change activity
+    // Notification is informational -- should NOT change activity
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Notification, detail: 'Context getting full' });
     await waitForWatcher();
 
@@ -601,11 +601,11 @@ describe('Event-derived activity state', () => {
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
-    // 4. Subagent fires tool_start — deduped (already thinking)
+    // 4. Subagent fires tool_start -- deduped (already thinking)
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
     await waitForWatcher();
 
-    // Still thinking — both idle and subagent tool_start were suppressed
+    // Still thinking -- both idle and subagent tool_start were suppressed
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
     expect(states).toEqual(['thinking']);
   });
@@ -685,7 +685,7 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle });
     await waitForWatcher();
 
-    // Card stays thinking — subagent is still working
+    // Card stays thinking -- subagent is still working
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
     expect(states).toEqual(['thinking']);
   });
@@ -756,7 +756,7 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Prompt });
     await waitForWatcher();
 
-    // 5. Subagent finishes — but pending flag was cleared, so no deferred idle
+    // 5. Subagent finishes -- but pending flag was cleared, so no deferred idle
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
 
@@ -785,7 +785,7 @@ describe('Event-derived activity state', () => {
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
-    // 5. First subagent finishes (depth → 1) — still > 0, no deferred idle
+    // 5. First subagent finishes (depth → 1) -- still > 0, no deferred idle
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
@@ -825,7 +825,7 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Notification, detail: 'Context getting full' });
     await waitForWatcher();
 
-    // 141-147: subagent tools (Bash end, Grep, Bash, Read) — all deduped
+    // 141-147: subagent tools (Bash end, Grep, Bash, Read) -- all deduped
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Bash' });
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Grep' });
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Grep' });
@@ -835,7 +835,7 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Read' });
     await waitForWatcher();
 
-    // Still thinking — all subagent work was correctly suppressed/deduped
+    // Still thinking -- all subagent work was correctly suppressed/deduped
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
     // 148: subagent_stop → depth 0, deferred idle emits
@@ -897,12 +897,12 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
     await waitForWatcher();
 
-    // 5. subagent_stop → depth 1 (no deferred idle — flag was cleared)
+    // 5. subagent_stop → depth 1 (no deferred idle -- flag was cleared)
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
-    // 6. subagent_stop → depth 0 (no deferred idle — flag was cleared)
+    // 6. subagent_stop → depth 0 (no deferred idle -- flag was cleared)
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
@@ -980,7 +980,7 @@ describe('Event-derived activity state', () => {
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
-    // 2. orphan subagent_stop with no prior subagent_start — depth clamped to 0
+    // 2. orphan subagent_stop with no prior subagent_start -- depth clamped to 0
     //    No pending idle flag was ever set, so deferred idle check is skipped
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
@@ -1009,11 +1009,11 @@ describe('Event-derived activity state', () => {
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('idle');
 
-    // 3. Notification fires while idle — should NOT flip back to thinking
+    // 3. Notification fires while idle -- should NOT flip back to thinking
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Notification, detail: 'Context getting full' });
     await waitForWatcher();
 
-    // Still idle — notification is log-only
+    // Still idle -- notification is log-only
     expect(manager.getActivityCache()[session.id]).toBe('idle');
     expect(states).toEqual(['thinking', 'idle']);
   });

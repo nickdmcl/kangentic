@@ -146,7 +146,7 @@ export class TransitionEngine {
     let claudeSessionId: string;
 
     if (canResume) {
-      // Resume the previous Claude conversation — no extra prompt
+      // Resume the previous Claude conversation -- no extra prompt
       claudeSessionId = previousSession.claude_session_id!;
       console.log(`[spawn_agent] RESUMING with claude_session_id=${claudeSessionId.slice(0, 8)}`);
     } else {

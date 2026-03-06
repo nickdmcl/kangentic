@@ -46,7 +46,7 @@ test.describe('Worktree Toggle', () => {
     await openNewTaskDialog();
 
     const toggle = page.locator('[data-testid="worktree-toggle"]');
-    // Default config has worktreesEnabled: true — chip should NOT have line-through
+    // Default config has worktreesEnabled: true -- chip should NOT have line-through
     const span = toggle.locator('span');
     await expect(span).not.toHaveClass(/line-through/);
 

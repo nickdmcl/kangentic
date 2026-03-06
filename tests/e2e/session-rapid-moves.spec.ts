@@ -11,7 +11,7 @@
  *
  * Uses the mock Claude CLI (tests/fixtures/mock-claude) so no real agent runs.
  * All moves are performed via IPC (window.electronAPI.tasks.move) for speed
- * and determinism — no drag-and-drop.
+ * and determinism -- no drag-and-drop.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -59,7 +59,7 @@ function writeTestConfig(dataDir: string): void {
   );
 }
 
-test.describe('Claude Agent — Rapid Task Moves', () => {
+test.describe('Claude Agent -- Rapid Task Moves', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;

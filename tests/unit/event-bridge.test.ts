@@ -145,7 +145,7 @@ describe('event-bridge', () => {
   });
 
   it('no output path does not crash', () => {
-    // No args at all — should exit 0 without creating any file
+    // No args at all -- should exit 0 without creating any file
     runBridge('{}', []);
     expect(fs.existsSync(outputFile)).toBe(false);
   });

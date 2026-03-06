@@ -59,7 +59,7 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Close image preview on Escape (capture phase — fires before BaseDialog's handler)
+  // Close image preview on Escape (capture phase -- fires before BaseDialog's handler)
   useEffect(() => {
     if (!previewAttachment) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -243,7 +243,7 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
                 onBlur={() => setTextareaFocused(false)}
                 className="w-full bg-surface border border-edge-input rounded px-3 py-2 text-sm text-fg focus:outline-none focus:border-accent min-h-[200px] max-h-[800px] resize-y overflow-y-auto"
               />
-              {/* Custom visual placeholder — vanishes when user types */}
+              {/* Custom visual placeholder -- vanishes when user types */}
               {!description && (
                 <div className={`absolute inset-0 flex flex-col pointer-events-none px-3 py-2 transition-opacity duration-200 ${textareaFocused ? 'opacity-100' : 'opacity-40'}`}>
                   <span className="text-sm text-fg-faint">Describe the task for the agent...</span>

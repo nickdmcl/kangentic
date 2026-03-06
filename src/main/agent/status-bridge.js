@@ -18,7 +18,7 @@ process.stdin.on('end', () => {
   if (outputPath) {
     try { fs.writeFileSync(outputPath, input); } catch { /* ignore write errors */ }
   }
-  // Output empty string — Kangentic shows usage data in its own UI,
+  // Output empty string -- Kangentic shows usage data in its own UI,
   // so we don't need Claude Code's TUI to display a status line.
   process.stdout.write('');
 });

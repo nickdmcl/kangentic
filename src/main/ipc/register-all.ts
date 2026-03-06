@@ -23,7 +23,7 @@ import type { IpcContext } from './ipc-context';
 let context: IpcContext | null = null;
 
 function requireContext(): IpcContext {
-  if (!context) throw new Error('IPC not initialized — call registerAllIpc first');
+  if (!context) throw new Error('IPC not initialized -- call registerAllIpc first');
   return context;
 }
 
@@ -51,7 +51,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   registerSystemHandlers(context);
 }
 
-// Thin wrappers — same signatures as before, zero changes in index.ts
+// Thin wrappers -- same signatures as before, zero changes in index.ts
 export function getSessionManager(): SessionManager {
   return requireContext().sessionManager;
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PreToolUse hook — blocks chained/piped Bash commands.
+ * PreToolUse hook -- blocks chained/piped Bash commands.
  *
  * Reads hook context JSON from stdin. If the tool is Bash and the command
  * contains forbidden shell operators outside of quoted strings, emits a
@@ -48,7 +48,7 @@ process.stdin.on('end', () => {
   try {
     data = JSON.parse(input);
   } catch {
-    return; // malformed JSON — allow
+    return; // malformed JSON -- allow
   }
 
   if (data.tool_name !== 'Bash') return;

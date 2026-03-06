@@ -8,7 +8,7 @@
  * without a real Claude installation. The mock echoes its arguments to
  * stdout with markers the tests can match against.
  *
- * Encapsulated under "Claude Agent" — future agent types (e.g. Codex, Aider)
+ * Encapsulated under "Claude Agent" -- future agent types (e.g. Codex, Aider)
  * should get their own describe blocks.
  */
 import { test, expect } from '@playwright/test';
@@ -88,7 +88,7 @@ async function ensureBoard() {
 
 /**
  * Drag a task card to a target column.
- * Duplicated from drag-and-drop.spec.ts — extracted here to keep tests
+ * Duplicated from drag-and-drop.spec.ts -- extracted here to keep tests
  * self-contained. A shared helper can be refactored later.
  */
 async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
@@ -149,7 +149,7 @@ async function waitForTerminalOutput(marker: string, timeoutMs = 15000): Promise
   throw new Error(`Timed out waiting for terminal output containing: ${marker}`);
 }
 
-test.describe('Claude Agent — Task Prompt', () => {
+test.describe('Claude Agent -- Task Prompt', () => {
   test.beforeEach(async () => {
     await ensureBoard();
   });

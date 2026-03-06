@@ -98,7 +98,7 @@ export function useSidebarResize(config: AppConfig): SidebarResizeState {
       document.removeEventListener('mouseup', onMouseUp);
 
       if (!isDragging) {
-        // Pure click — toggle sidebar
+        // Pure click -- toggle sidebar
         toggleRef.current();
         return;
       }

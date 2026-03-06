@@ -291,7 +291,7 @@ test.describe('Terminal Rendering', () => {
       return window.electronAPI.sessions.getScrollback(sessions[0].id);
     });
 
-    // PTY buffer is the source of truth — unaffected by xterm row changes.
+    // PTY buffer is the source of truth -- unaffected by xterm row changes.
     expect(scrollbackAfter).toBe(scrollbackBefore);
 
     // --- Part 2: xterm refits after resize ---

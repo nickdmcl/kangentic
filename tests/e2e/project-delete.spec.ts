@@ -137,7 +137,7 @@ test.describe('Project Delete Cleanup', () => {
     expect(fs.existsSync(path.join(tmpDir, '.kangentic'))).toBe(true);
 
     // For non-worktree sessions, hooks are passed via --settings flag
-    // pointing to .kangentic/sessions/<id>/settings.json — no
+    // pointing to .kangentic/sessions/<id>/settings.json -- no
     // .claude/settings.local.json is created in the project root.
 
     // Verify .gitignore has our entry

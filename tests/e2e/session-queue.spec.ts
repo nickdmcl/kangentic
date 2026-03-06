@@ -93,7 +93,7 @@ async function getSessionCounts(page: Page): Promise<{ running: number; queued: 
 // =========================================================================
 // Test: Multiple simultaneous spawns each get their own session
 // =========================================================================
-test.describe('Claude Agent — Multiple Simultaneous Spawns', () => {
+test.describe('Claude Agent -- Multiple Simultaneous Spawns', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;
@@ -176,7 +176,7 @@ test.describe('Claude Agent — Multiple Simultaneous Spawns', () => {
 // =========================================================================
 // Test: Session queuing when maxConcurrent is exceeded
 // =========================================================================
-test.describe('Claude Agent — Session Queue', () => {
+test.describe('Claude Agent -- Session Queue', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;

@@ -92,7 +92,7 @@ test.describe('BranchPicker', () => {
     // Dropdown is open
     await expect(page.locator('input[placeholder="Search branches..."]')).toBeVisible();
 
-    // Press Escape — should close dropdown only
+    // Press Escape -- should close dropdown only
     await page.keyboard.press('Escape');
     await expect(page.locator('input[placeholder="Search branches..."]')).not.toBeVisible();
 

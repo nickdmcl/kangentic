@@ -351,7 +351,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                 className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
                 data-testid="plan-exit-target"
               >
-                <option value="">Nowhere — stay in column</option>
+                <option value="">Nowhere -- stay in column</option>
                 {swimlanes
                   .filter((s) => s.id !== swimlane.id && s.role !== 'backlog' && s.role !== 'done')
                   .map((s) => (
@@ -365,7 +365,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
             </div>
           )}
 
-          {/* Auto-command textarea (hidden for backlog/done — sessions don't run there) */}
+          {/* Auto-command textarea (hidden for backlog/done -- sessions don't run there) */}
           {!isBacklogOrDone && (
             <div>
               <label className="text-xs text-fg-muted mb-1.5 block">Auto-command</label>

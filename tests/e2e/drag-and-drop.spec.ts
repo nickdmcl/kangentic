@@ -48,7 +48,7 @@ async function waitForMoveSettle(page: Page, column: string, taskTitle: string) 
   const col = page.locator(`[data-swimlane-name="${column}"]`);
   // Wait for the card to be visible in the target column
   await expect(col.locator(`text=${taskTitle}`).first()).toBeVisible({ timeout: 10000 });
-  // Wait for the transition/IPC to complete — the agent label is a reliable indicator.
+  // Wait for the transition/IPC to complete -- the agent label is a reliable indicator.
   // Claude CLI detection + PTY spawn can be slow (especially on Windows), so use a
   // generous timeout. The fallback covers transitions that don't spawn agents.
   try {

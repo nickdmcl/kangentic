@@ -119,7 +119,7 @@ function extractSessionId(scrollback: string, marker: 'SESSION' | 'RESUMED'): st
 // =========================================================================
 // Test: Column-move suspend & resume (Planning → Backlog → Planning)
 // =========================================================================
-test.describe('Claude Agent — Session Resume via Column Move', () => {
+test.describe('Claude Agent -- Session Resume via Column Move', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;
@@ -231,7 +231,7 @@ test.describe('Claude Agent — Session Resume via Column Move', () => {
 // =========================================================================
 // Test: Suspend & resume across app restart
 // =========================================================================
-test.describe('Claude Agent — Session Resume across App Restart', () => {
+test.describe('Claude Agent -- Session Resume across App Restart', () => {
   let tmpDir: string;
   const dataDir = getTestDataDir(`${TEST_NAME}-restart`);
 

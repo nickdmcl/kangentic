@@ -265,7 +265,7 @@ test.describe('Branch Rename on Title Edit', () => {
 
   test('rename is skipped when slug does not change', async () => {
     const originalTitle = `Slug Same ${runId}`;
-    // Only change punctuation — slug stays the same
+    // Only change punctuation -- slug stays the same
     const newTitle = `Slug Same! ${runId}`;
 
     await createTask(page, originalTitle, 'Test slug unchanged');
@@ -361,7 +361,7 @@ test.describe('Prune Orphaned Worktree Tasks', () => {
     fs.rmSync(orphanTaskData!.worktree_path!, { recursive: true, force: true });
     execSync('git worktree prune', { cwd: pruneTmpDir, stdio: 'ignore' });
 
-    // Phase 3: Relaunch — prune should fire on project open
+    // Phase 3: Relaunch -- prune should fire on project open
     result = await launchApp({ dataDir: pruneDataDir });
     pruneApp = result.app;
     prunePage = result.page;

@@ -85,7 +85,7 @@ describe('ClaudeStatusParser', () => {
       expect(pct).toBe(10);
     });
 
-    it('ignores output tokens — uses used_percentage directly', () => {
+    it('ignores output tokens -- uses used_percentage directly', () => {
       // used_percentage is input-only per Claude Code docs
       const pct = ClaudeStatusParser.computeContextPercentage({
         current_usage: {
@@ -200,7 +200,7 @@ describe('ClaudeStatusParser', () => {
       expect(usage).not.toBeNull();
       // used_percentage returned directly
       expect(usage!.contextWindow.usedPercentage).toBe(20);
-      // usedTokens: inputFromPct(20%*200k=40000) — no output added
+      // usedTokens: inputFromPct(20%*200k=40000) -- no output added
       expect(usage!.contextWindow.usedTokens).toBe(40_000);
       // cacheTokens: inputFromPct(40000) - input_tokens(20000) = 20000
       expect(usage!.contextWindow.cacheTokens).toBe(20_000);

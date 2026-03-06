@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import type { Swimlane, SwimlaneRole } from '../../shared/types';
 
-/** Generic icon component type — not tied to any icon library. */
+/** Generic icon component type -- not tied to any icon library. */
 export type IconComponent = React.ComponentType<{
   size?: number;
   strokeWidth?: number;

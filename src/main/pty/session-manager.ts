@@ -151,7 +151,7 @@ export class SessionManager extends EventEmitter {
     let shellArgs: string[];
 
     if (shellName.startsWith('wsl ')) {
-      // WSL: e.g. "wsl -d Ubuntu" — split into exe + args
+      // WSL: e.g. "wsl -d Ubuntu" -- split into exe + args
       const parts = shell.split(/\s+/);
       shellExe = parts[0];
       shellArgs = parts.slice(1);
@@ -179,7 +179,7 @@ export class SessionManager extends EventEmitter {
         env: cleanEnv as Record<string, string>,
       });
     } catch (err) {
-      // PTY spawn failed — return a dead session so the renderer sees
+      // PTY spawn failed -- return a dead session so the renderer sees
       // a failed session instead of crashing the main process
       const failedSession: ManagedSession = {
         id,
@@ -281,10 +281,10 @@ export class SessionManager extends EventEmitter {
     });
 
     ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
-      // Don't overwrite 'suspended' — suspend() sets that before killing PTY
+      // Don't overwrite 'suspended' -- suspend() sets that before killing PTY
       if (session.status !== 'suspended') {
         session.status = 'exited';
-        // Synthetic session_end — Claude Code's hook won't fire on kill
+        // Synthetic session_end -- Claude Code's hook won't fire on kill
         this.emitSessionEnd(id);
       }
       session.exitCode = exitCode;
@@ -355,7 +355,7 @@ export class SessionManager extends EventEmitter {
       session.status = 'exited';
       session.exitCode = -1;
     }
-    // A slot may have opened — let the queue promote
+    // A slot may have opened -- let the queue promote
     this.sessionQueue.notifySlotFreed();
   }
 
@@ -370,22 +370,22 @@ export class SessionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Close watchers — no longer need real-time updates
+    // Close watchers -- no longer need real-time updates
     session.statusFileWatcher?.close();
     session.statusFileWatcher = null;
     session.eventsFileWatcher?.close();
     session.eventsFileWatcher = null;
 
     // Null out file paths BEFORE killing so the onExit handler's
-    // cleanupSessionFiles() skips file deletion — files persist for resume
+    // cleanupSessionFiles() skips file deletion -- files persist for resume
     session.statusOutputPath = null;
     session.eventsOutputPath = null;
     session.mergedSettingsPath = null;
 
-    // Synthetic session_end before we kill — Claude Code's hook won't fire
+    // Synthetic session_end before we kill -- Claude Code's hook won't fire
     this.emitSessionEnd(sessionId);
 
-    // Clear subagent depth — session is no longer active
+    // Clear subagent depth -- session is no longer active
     this.subagentDepth.delete(sessionId);
     this.pendingIdleWhileSubagent.delete(sessionId);
 
@@ -551,7 +551,7 @@ export class SessionManager extends EventEmitter {
       this.usageCache.set(session.id, usage);
       this.emit('usage', session.id, usage);
     } catch {
-      // File may not exist yet — ignore
+      // File may not exist yet -- ignore
     }
   }
 
@@ -568,7 +568,7 @@ export class SessionManager extends EventEmitter {
   /**
    * Read new lines from a session's events JSONL file and process them.
    * Shared by both the fs.watch callback and polling fallback.
-   * Uses eventsFileOffset as cursor — safe to call from multiple triggers.
+   * Uses eventsFileOffset as cursor -- safe to call from multiple triggers.
    */
   private readAndProcessEvents(session: ManagedSession): void {
     if (!session.eventsOutputPath) return;
@@ -685,7 +685,7 @@ export class SessionManager extends EventEmitter {
         this.eventCache.set(session.id, trimmed);
       }
     } catch {
-      // File may not exist yet, or be partially written — ignore
+      // File may not exist yet, or be partially written -- ignore
     }
   }
 
@@ -697,11 +697,11 @@ export class SessionManager extends EventEmitter {
   private startEventWatcher(session: ManagedSession): void {
     if (!session.eventsOutputPath) return;
 
-    // Truncate existing file on resume — historical events aren't needed
+    // Truncate existing file on resume -- historical events aren't needed
     try {
       fs.writeFileSync(session.eventsOutputPath, '');
     } catch {
-      // File may not exist yet — that's OK, bridge will create it
+      // File may not exist yet -- that's OK, bridge will create it
     }
 
     const eventsPath = session.eventsOutputPath;
@@ -796,7 +796,7 @@ export class SessionManager extends EventEmitter {
       await new Promise((resolve) => setTimeout(resolve, timeoutMs));
     }
     for (const session of this.sessions.values()) {
-      // Close watchers but preserve session files —
+      // Close watchers but preserve session files --
       // sessions will be resumed on next app launch via session recovery
       session.statusFileWatcher?.close();
       session.statusFileWatcher = null;

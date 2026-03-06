@@ -33,7 +33,7 @@ export function AppLayout() {
           <ProjectSidebar onToggleSidebar={sidebar.toggle} />
         </div>
 
-        {/* Sidebar resize handle — wider hit target when collapsed */}
+        {/* Sidebar resize handle -- wider hit target when collapsed */}
         <div
           className={`flex-shrink-0 cursor-col-resize transition-colors ${
             sidebar.open
@@ -50,7 +50,7 @@ export function AppLayout() {
                 <KanbanBoard />
               </div>
 
-              {/* Resize handle — hidden when collapsed */}
+              {/* Resize handle -- hidden when collapsed */}
               {!terminal.collapsed && (
                 <div
                   className="resize-handle h-1 bg-edge flex-shrink-0 cursor-row-resize hover:bg-fg-faint transition-colors"

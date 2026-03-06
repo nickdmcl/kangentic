@@ -8,7 +8,7 @@ import { useValuePulse } from '../../hooks/useValuePulse';
 
 interface ContextBarProps {
   sessionId: string;
-  compact?: boolean; // hide version label — used in the bottom panel
+  compact?: boolean; // hide version label -- used in the bottom panel
 }
 
 const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap';
@@ -25,7 +25,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const usage = useSessionStore((s) => s.sessionUsage[sessionId]);
   const claudeVersionNumber = useConfigStore((s) => s.claudeVersionNumber);
 
-  // Pulse hooks — always called unconditionally (hooks rules)
+  // Pulse hooks -- always called unconditionally (hooks rules)
   const costRef = useValuePulse(usage?.cost.totalCostUsd);
   const inputTokens = usage?.contextWindow.totalInputTokens;
   const outputTokens = usage?.contextWindow.totalOutputTokens;

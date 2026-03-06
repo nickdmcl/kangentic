@@ -9,7 +9,7 @@ import { ConfigManager } from './config/config-manager';
 import { IPC } from '../shared/ipc-channels';
 import { THEME_BACKGROUNDS } from '../shared/types';
 
-// Global error handlers — keep the app running through transient IPC/PTY errors
+// Global error handlers -- keep the app running through transient IPC/PTY errors
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err);
 });
@@ -94,7 +94,7 @@ const createWindow = () => {
   registerAllIpc(mainWindow);
 
   // Native right-click context menu (Copy / Paste / Select All).
-  // xterm.js renders to canvas/WebGL — standard DOM copy/selectAll don't
+  // xterm.js renders to canvas/WebGL -- standard DOM copy/selectAll don't
   // reach its content.  We use the right-click coordinates (captured before
   // the menu opens) to detect if the click landed on a terminal, then
   // dispatch custom events with those coordinates so the correct terminal
@@ -167,7 +167,7 @@ const createWindow = () => {
     if (cwd && mainWindow) {
       const worktreeMatch = cwd.replace(/\\/g, '/').match(/\.kangentic\/worktrees\/([^/]+)/);
       if (worktreeMatch) {
-        mainWindow.setTitle(`Kangentic — ${worktreeMatch[1]}`);
+        mainWindow.setTitle(`Kangentic -- ${worktreeMatch[1]}`);
       }
     }
 
@@ -208,8 +208,12 @@ app.whenReady().then(async () => {
     }
   }
 
+  createWindow();
+
   // Prune stale worktree projects from crashed/force-killed preview instances.
-  // Only runs in the main app during development — preview is a dev-only feature.
+  // Only runs in the main app during development -- preview is a dev-only feature.
+  // Must run after createWindow() since pruneStaleWorktreeProjects uses IPC context
+  // initialized by registerAllIpc() inside createWindow().
   if (!isEphemeral && !app.isPackaged) {
     try {
       await pruneStaleWorktreeProjects();
@@ -217,8 +221,6 @@ app.whenReady().then(async () => {
       console.error('Failed to prune stale worktree projects:', err);
     }
   }
-
-  createWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -267,7 +269,7 @@ async function shutdownSessions(): Promise<void> {
     }
   }
 
-  // Gracefully suspend running sessions — sends /exit then waits for
+  // Gracefully suspend running sessions -- sends /exit then waits for
   // Claude Code to save its conversation state before force-killing.
   await sessionManager.suspendAll();
 

@@ -80,9 +80,9 @@ src/
     ipc-channels.ts        # IPC channel constants (single source of truth)
     paths.ts               # Path utilities, shell adaptation
 tests/
-  unit/                    # Vitest — pure logic, no browser
-  ui/                      # Playwright + headless Chromium — mock electronAPI
-  e2e/                     # Playwright + real Electron — opens windows
+  unit/                    # Vitest -- pure logic, no browser
+  ui/                      # Playwright + headless Chromium -- mock electronAPI
+  e2e/                     # Playwright + real Electron -- opens windows
   fixtures/                # Mock Claude CLI, test helpers
 scripts/
   dev.js                   # Development server (Vite + esbuild + Electron)
@@ -96,15 +96,15 @@ scripts/
 
 Three parallel processes:
 
-1. **Vite dev server** — serves renderer with HMR on port 5173 (5174+ in worktrees)
-2. **esbuild watch** — bundles `src/main/index.ts` → `.vite/build/index.js` and `src/preload/preload.ts` → `.vite/build/preload.js`
-3. **Electron** — launched with `MAIN_WINDOW_VITE_DEV_SERVER_URL` pointing to Vite
+1. **Vite dev server** -- serves renderer with HMR on port 5173 (5174+ in worktrees)
+2. **esbuild watch** -- bundles `src/main/index.ts` → `.vite/build/index.js` and `src/preload/preload.ts` → `.vite/build/preload.js`
+3. **Electron** -- launched with `MAIN_WINDOW_VITE_DEV_SERVER_URL` pointing to Vite
 
-Native modules (`better-sqlite3`, `node-pty`, `simple-git`) are marked external in esbuild — loaded at runtime from `node_modules`.
+Native modules (`better-sqlite3`, `node-pty`, `simple-git`) are marked external in esbuild -- loaded at runtime from `node_modules`.
 
 Flags:
-- `--port=<n>` — override Vite port
-- `--ephemeral` — isolated data directory, auto-cleaned on exit (used for worktree previews)
+- `--port=<n>` -- override Vite port
+- `--ephemeral` -- isolated data directory, auto-cleaned on exit (used for worktree previews)
 
 ### Production (`npm run build` / `scripts/build.js`)
 
@@ -131,7 +131,7 @@ npm run test:unit
 
 - **Runner:** Vitest
 - **Speed:** Sub-second
-- **What to test here:** Pure logic — parsers, filters, state machines, utility functions
+- **What to test here:** Pure logic -- parsers, filters, state machines, utility functions
 - **No build needed**, no browser, no Electron
 
 ### UI Tests (`tests/ui/`)
@@ -143,7 +143,7 @@ npx playwright test --project=ui
 - **Runner:** Playwright with headless Chromium
 - **Speed:** ~13s for 72 tests
 - **What to test here:** React components, forms, dialogs, drag-and-drop, board interactions
-- **No build needed** — runs against Vite dev server (auto-started by Playwright)
+- **No build needed** -- runs against Vite dev server (auto-started by Playwright)
 - **Mock:** `tests/ui/mock-electron-api.js` injects a full in-memory mock of `window.electronAPI` via `addInitScript()`. Supports full CRUD for projects, tasks, swimlanes, actions, sessions, config, attachments.
 - **Pre-configure:** `window.__mockPreConfigure(fn)` lets tests set up mock state before React mounts
 
@@ -207,12 +207,12 @@ npm run test:unit                 # Unit (separate runner)
 
 ## Conventions
 
-- **TypeScript strict mode** — `noImplicitAny` enabled
-- **No `any` types** — use proper types from `src/shared/types.ts`, `unknown` with type guards, or generic constraints
-- **Icons** — Lucide React only, no inline SVGs
-- **Test selectors** — `data-testid` and `data-swimlane-name` attributes
-- **Escape key** — all dialogs use global `useEffect` listener
-- **IPC channels** — `src/shared/ipc-channels.ts` is the single source of truth
+- **TypeScript strict mode** -- `noImplicitAny` enabled
+- **No `any` types** -- use proper types from `src/shared/types.ts`, `unknown` with type guards, or generic constraints
+- **Icons** -- Lucide React only, no inline SVGs
+- **Test selectors** -- `data-testid` and `data-swimlane-name` attributes
+- **Escape key** -- all dialogs use global `useEffect` listener
+- **IPC channels** -- `src/shared/ipc-channels.ts` is the single source of truth
 
 ## Environment Variables
 
@@ -228,16 +228,16 @@ npm run test:unit                 # Unit (separate runner)
 
 ## Further Reading
 
-- [Architecture](architecture.md) — Process model, data flow, IPC channels, stores
-- [Session Lifecycle](session-lifecycle.md) — State machine, spawn flow, queue, suspend, resume
-- [Transition Engine](transition-engine.md) — Action types, templates, execution flow
-- [Database](database.md) — Full schema reference, migrations, connection management
-- [Claude Integration](claude-integration.md) — CLI detection, command building, hooks, trust
-- [Configuration](configuration.md) — Config cascade, all settings keys, permission modes
-- [Cross-Platform](cross-platform.md) — Shell resolution, path handling, packaging, fuses
-- [Activity Detection](activity-detection.md) — Event pipeline, thinking/idle state
-- [Worktree Strategy](worktree-strategy.md) — Branch naming, sparse-checkout, hook delivery
-- [User Guide](user-guide.md) — End-user feature walkthrough
+- [Architecture](architecture.md) -- Process model, data flow, IPC channels, stores
+- [Session Lifecycle](session-lifecycle.md) -- State machine, spawn flow, queue, suspend, resume
+- [Transition Engine](transition-engine.md) -- Action types, templates, execution flow
+- [Database](database.md) -- Full schema reference, migrations, connection management
+- [Claude Integration](claude-integration.md) -- CLI detection, command building, hooks, trust
+- [Configuration](configuration.md) -- Config cascade, all settings keys, permission modes
+- [Cross-Platform](cross-platform.md) -- Shell resolution, path handling, packaging, fuses
+- [Activity Detection](activity-detection.md) -- Event pipeline, thinking/idle state
+- [Worktree Strategy](worktree-strategy.md) -- Branch naming, sparse-checkout, hook delivery
+- [User Guide](user-guide.md) -- End-user feature walkthrough
 
 ## Documentation Maintenance
 
@@ -260,8 +260,8 @@ Electron Forge handles platform-specific packaging via `forge.config.ts`:
 | All | Archive | ZIP (fallback) |
 
 Native modules:
-- `better-sqlite3` — rebuilt per platform during packaging
-- `node-pty` — uses prebuilt NAPI binaries, no rebuild needed
+- `better-sqlite3` -- rebuilt per platform during packaging
+- `node-pty` -- uses prebuilt NAPI binaries, no rebuild needed
 
 Security fuses enabled: no RunAsNode, no NodeOptions, no inspection, cookie encryption, ASAR integrity validation.
 

@@ -129,7 +129,7 @@ export function sanitizeForPty(text: string): string {
  * Quote a CLI argument if it contains characters that need escaping.
  *
  * Simple args (alphanumeric + `._/:-`) are left unquoted.
- * Backslashes are NOT considered simple — they're escape characters
+ * Backslashes are NOT considered simple -- they're escape characters
  * in Unix-like shells (Git Bash, WSL).
  *
  *  - Windows: double-quotes, escaped `"`

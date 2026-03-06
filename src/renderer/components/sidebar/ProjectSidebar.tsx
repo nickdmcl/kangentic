@@ -136,7 +136,7 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
                       {idleCount > 0 && (
                         <span
                           className="flex items-center gap-1 text-xs tabular-nums flex-shrink-0 text-amber-400"
-                          title={`${idleCount} idle — needs attention`}
+                          title={`${idleCount} idle -- needs attention`}
                         >
                           <Mail size={10} />
                           {idleCount}

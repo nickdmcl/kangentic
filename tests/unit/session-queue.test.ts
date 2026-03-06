@@ -1,5 +1,5 @@
 /**
- * Unit tests for SessionQueue — the reentrancy-safe concurrency queue
+ * Unit tests for SessionQueue -- the reentrancy-safe concurrency queue
  * that manages session spawning order and slot limits.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -88,7 +88,7 @@ describe('SessionQueue', () => {
 
     // Only 1 slot open (active=2, max=3), so only 1 should spawn
     await vi.waitFor(() => expect(spawner).toHaveBeenCalledTimes(1));
-    // After spawning, active=3 — remaining 2 stay queued
+    // After spawning, active=3 -- remaining 2 stay queued
     expect(queue.length).toBe(2);
   });
 
@@ -102,7 +102,7 @@ describe('SessionQueue', () => {
     });
     queue.enqueue(makeInput('t1'), 'sess-1');
 
-    // Raise limit — should trigger promotion
+    // Raise limit -- should trigger promotion
     queue.setMaxConcurrent(3);
 
     await vi.waitFor(() => expect(spawner).toHaveBeenCalledTimes(1));
@@ -123,7 +123,7 @@ describe('SessionQueue', () => {
     expect(queue.length).toBe(0);
   });
 
-  it('failed spawn does not stall queue — next entry still processes', async () => {
+  it('failed spawn does not stall queue -- next entry still processes', async () => {
     const spawner = vi.fn();
     const queue = new SessionQueue({
       spawner,
@@ -176,7 +176,7 @@ describe('SessionQueue', () => {
     await vi.waitFor(() => expect(spawner).toHaveBeenCalledTimes(1));
     expect(active).toBe(1);
 
-    // Release the first spawn — loop continues with _dirty re-check
+    // Release the first spawn -- loop continues with _dirty re-check
     resolveFirst!();
 
     // Should spawn t2 (active=1 < max=2), then stop (active=2 >= max=2)

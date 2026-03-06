@@ -137,7 +137,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           <div className="text-xs text-fg-faint mt-1 line-clamp-3">{task.description}</div>
         )}
 
-        {/* Bottom bar — exhaustive switch on display state */}
+        {/* Bottom bar -- exhaustive switch on display state */}
         {(() => {
           switch (displayState.kind) {
             case 'running': {

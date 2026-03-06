@@ -3,7 +3,7 @@
  *
  * When a task first spawns a session, the backend defaults activity to 'idle'
  * before any hooks fire. During this initializing phase (no usage data yet),
- * the card should show only the "Initializing..." bottom bar — no title icon.
+ * the card should show only the "Initializing..." bottom bar -- no title icon.
  */
 import { test, expect } from '@playwright/test';
 import { chromium, type Browser, type Page } from '@playwright/test';
@@ -226,7 +226,7 @@ test.describe('Task Activity Indicators', () => {
       await expect(tokens).toBeVisible();
       await expect(cost).toBeVisible();
 
-      // Verify content — icons are SVGs, so check for numeric token text
+      // Verify content -- icons are SVGs, so check for numeric token text
       await expect(tokens).toContainText('1k');
       await expect(cost).toContainText('$');
     } finally {
@@ -287,12 +287,12 @@ test.describe('Task Activity Indicators', () => {
       await expect(card).toBeVisible();
 
       // Events may arrive before usage, but "Initializing..." persists until
-      // usage data lands — no title icon (idle/thinking) without usage.
+      // usage data lands -- no title icon (idle/thinking) without usage.
       const titleRow = card.locator('..');
       await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
       await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
 
-      // Initializing bar still visible — usage is the gate, not events
+      // Initializing bar still visible -- usage is the gate, not events
       await expect(page.locator('[data-testid="status-bar"]')).toBeVisible();
       await expect(page.locator('text=Initializing...')).toBeVisible();
     } finally {
@@ -335,7 +335,7 @@ test.describe('Task Activity Indicators', () => {
       await card.click();
       await page.waitForTimeout(300);
 
-      // Should open in view mode — h2 heading visible, no title input
+      // Should open in view mode -- h2 heading visible, no title input
       const heading = page.locator('.fixed h2:has-text("Test Initializing Task")');
       await expect(heading).toBeVisible();
       const titleInput = page.locator('.fixed input[type="text"]');
@@ -468,7 +468,7 @@ test.describe('Task Activity Indicators', () => {
           });
         });
 
-        // No session pushed — task starts with no session context
+        // No session pushed -- task starts with no session context
         state.tasks.push({
           id: '${TASK_ID}',
           title: 'Test Initializing Task',
@@ -501,7 +501,7 @@ test.describe('Task Activity Indicators', () => {
       await page.locator('text=Test Initializing Task').first().click();
       await page.waitForTimeout(300);
 
-      // Should already be in edit mode — title input visible
+      // Should already be in edit mode -- title input visible
       const titleInput = page.locator('.fixed input[type="text"]');
       await expect(titleInput).toBeVisible();
 
@@ -545,7 +545,7 @@ test.describe('Task Activity Indicators', () => {
       await expect(editButton).toBeVisible();
       await expect(editButton).toBeEnabled();
 
-      // Click Edit — should enter edit mode (title input visible)
+      // Click Edit -- should enter edit mode (title input visible)
       await editButton.click();
       const titleInput = page.locator('.fixed input[type="text"]');
       await expect(titleInput).toBeVisible();

@@ -61,7 +61,7 @@ export function IconPickerDialog({
       {/* Scrollable icon grid */}
       <div className="px-4 py-3 overflow-y-auto flex-1 min-h-0">
         <div className="flex flex-wrap gap-1">
-          {/* None option — always visible */}
+          {/* None option -- always visible */}
           <button
             type="button"
             onClick={() => onSelect(null)}

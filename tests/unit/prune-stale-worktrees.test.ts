@@ -9,151 +9,47 @@ const { mockList, mockDelete, mockExistsSync, mockCloseProjectDb, mockIsKangenti
   mockIsKangenticWorktree: vi.fn((): boolean => false),
 }));
 
-// --- Mock leaf-level native modules ---
-vi.mock('electron', () => ({
-  ipcMain: { handle: vi.fn(), on: vi.fn() },
-  BrowserWindow: class {},
-  dialog: {},
-  shell: {},
-}));
-
-vi.mock('node-pty', () => ({ spawn: vi.fn() }));
-vi.mock('better-sqlite3', () => ({ default: vi.fn() }));
-vi.mock('simple-git', () => ({ default: vi.fn(() => ({})), simpleGit: vi.fn(() => ({})) }));
-
-// --- Mock fs (keep path real) ---
+// --- Mock only the modules that pruneStaleWorktreeProjects actually uses ---
 vi.mock('node:fs', () => ({
   default: {
     existsSync: mockExistsSync,
-    readFileSync: vi.fn(),
-    writeFileSync: vi.fn(),
     unlinkSync: vi.fn(),
-    rmSync: vi.fn(),
-    readdirSync: vi.fn(() => []),
-    mkdirSync: vi.fn(),
-  },
-}));
-
-// --- Mock internal dependencies using class-based constructors ---
-vi.mock('../../src/main/db/repositories/project-repository', () => ({
-  ProjectRepository: class {
-    list = mockList;
-    delete = mockDelete;
-    create = vi.fn();
-    getById = vi.fn();
-    updateLastOpened = vi.fn();
   },
 }));
 
 vi.mock('../../src/main/db/database', () => ({
-  getProjectDb: vi.fn(),
   closeProjectDb: mockCloseProjectDb,
-  closeAll: vi.fn(),
 }));
 
 vi.mock('../../src/main/config/paths', () => ({
   PATHS: {
-    configDir: '/tmp/kangentic',
-    globalDb: '/tmp/kangentic/index.db',
-    projectsDir: '/tmp/kangentic/projects',
     projectDb: (id: string) => `/tmp/kangentic/projects/${id}.db`,
   },
-  ensureDirs: vi.fn(),
 }));
 
-vi.mock('../../src/main/db/repositories/task-repository', () => ({
-  TaskRepository: class { list = vi.fn(() => []); getById = vi.fn(); create = vi.fn(); update = vi.fn(); delete = vi.fn(); move = vi.fn(); archive = vi.fn(); unarchive = vi.fn(); listArchived = vi.fn(() => []); },
-}));
-vi.mock('../../src/main/db/repositories/swimlane-repository', () => ({
-  SwimlaneRepository: class { list = vi.fn(() => []); getById = vi.fn(); create = vi.fn(); update = vi.fn(); delete = vi.fn(); reorder = vi.fn(); },
-}));
-vi.mock('../../src/main/db/repositories/action-repository', () => ({
-  ActionRepository: class { list = vi.fn(() => []); create = vi.fn(); update = vi.fn(); delete = vi.fn(); listTransitions = vi.fn(() => []); setTransitions = vi.fn(); getTransitionsFor = vi.fn(() => []); },
-}));
-vi.mock('../../src/main/db/repositories/session-repository', () => ({
-  SessionRepository: class { getLatestForTask = vi.fn(); updateStatus = vi.fn(); deleteByTaskId = vi.fn(); listAllClaudeSessionIds = vi.fn(() => []); },
-}));
-vi.mock('../../src/main/db/repositories/attachment-repository', () => ({
-  AttachmentRepository: class { list = vi.fn(() => []); add = vi.fn(); remove = vi.fn(); getDataUrl = vi.fn(); deleteByTaskId = vi.fn(); },
-}));
-vi.mock('../../src/main/pty/session-manager', () => {
-  const { EventEmitter } = require('node:events');
-  return {
-    SessionManager: class extends EventEmitter {
-      spawn = vi.fn();
-      kill = vi.fn();
-      killAll = vi.fn();
-      remove = vi.fn();
-      suspend = vi.fn();
-      suspendAll = vi.fn();
-      write = vi.fn();
-      resize = vi.fn();
-      listSessions = vi.fn(() => []);
-      getSession = vi.fn();
-      getScrollback = vi.fn();
-      getUsageCache = vi.fn(() => ({}));
-      getActivityCache = vi.fn(() => ({}));
-      getEventsForSession = vi.fn(() => []);
-      setMaxConcurrent = vi.fn();
-      setShell = vi.fn();
-    },
-  };
-});
-vi.mock('../../src/main/config/config-manager', () => ({
-  ConfigManager: class { load = vi.fn(() => ({})); save = vi.fn(); getEffectiveConfig = vi.fn(() => ({ claude: {}, git: {}, terminal: {} })); loadProjectOverrides = vi.fn(); saveProjectOverrides = vi.fn(); },
-}));
-vi.mock('../../src/main/agent/claude-detector', () => ({
-  ClaudeDetector: class { detect = vi.fn(); },
-}));
-vi.mock('../../src/main/pty/shell-resolver', () => ({
-  ShellResolver: class { getAvailableShells = vi.fn(() => []); getDefaultShell = vi.fn(); },
-}));
-vi.mock('../../src/main/engine/transition-engine', () => ({
-  TransitionEngine: class { executeTransition = vi.fn(); resumeSuspendedSession = vi.fn(); },
-}));
-vi.mock('../../src/main/agent/command-builder', () => ({
-  CommandBuilder: class { build = vi.fn(); },
-}));
-vi.mock('../../src/main/engine/session-recovery', () => ({
-  recoverSessions: vi.fn(),
-  reconcileSessions: vi.fn(),
-  pruneOrphanedWorktrees: vi.fn(),
-}));
-vi.mock('../../src/main/git/worktree-manager', () => {
-  class MockWorktreeManager {
-    createWorktree = vi.fn();
-    ensureWorktree = vi.fn();
-    removeWorktree = vi.fn();
-    removeBranch = vi.fn();
-    renameBranch = vi.fn();
-  }
-  return {
-    WorktreeManager: MockWorktreeManager,
-    isGitRepo: vi.fn(() => false),
-    isInsideWorktree: vi.fn(() => false),
-    isKangenticWorktree: mockIsKangenticWorktree,
-    isFileTracked: vi.fn(() => false),
-  };
-});
-vi.mock('../../src/main/agent/hook-manager', () => ({
-  stripKangenticHooks: vi.fn(),
-}));
-vi.mock('../../src/shared/paths', () => ({
-  adaptCommandForShell: (cmd: string) => cmd,
-}));
-vi.mock('../../src/main/db/migrations', () => ({
-  runGlobalMigrations: vi.fn(),
-  runProjectMigrations: vi.fn(),
+vi.mock('../../src/main/git/worktree-manager', () => ({
+  isKangenticWorktree: mockIsKangenticWorktree,
 }));
 
-// --- Import the function under test ---
-import { pruneStaleWorktreeProjects } from '../../src/main/ipc/register-all';
+// --- Import the impl directly (bypasses requireContext() guard in register-all.ts) ---
+import { pruneStaleWorktreeProjects } from '../../src/main/ipc/handlers/projects';
+import type { IpcContext } from '../../src/main/ipc/ipc-context';
+
+// Minimal mock context -- pruneStaleWorktreeProjects only uses context.projectRepo
+function createMockContext(): IpcContext {
+  return {
+    projectRepo: { list: mockList, delete: mockDelete },
+  } as unknown as IpcContext;
+}
 
 describe('pruneStaleWorktreeProjects', () => {
+  let mockContext: IpcContext;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockList.mockReturnValue([]);
+    mockContext = createMockContext();
   });
 
   it('prunes Kangentic worktree projects (preview instances)', async () => {
@@ -162,7 +58,7 @@ describe('pruneStaleWorktreeProjects', () => {
     ]);
     mockIsKangenticWorktree.mockReturnValue(true);
 
-    await pruneStaleWorktreeProjects();
+    await pruneStaleWorktreeProjects(mockContext);
 
     expect(mockCloseProjectDb).toHaveBeenCalledWith('proj-1');
     expect(mockDelete).toHaveBeenCalledWith('proj-1');
@@ -174,7 +70,7 @@ describe('pruneStaleWorktreeProjects', () => {
     ]);
     mockIsKangenticWorktree.mockReturnValue(false);
 
-    await pruneStaleWorktreeProjects();
+    await pruneStaleWorktreeProjects(mockContext);
 
     expect(mockCloseProjectDb).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
@@ -182,14 +78,14 @@ describe('pruneStaleWorktreeProjects', () => {
 
   it('does NOT prune external git worktrees or submodules', async () => {
     // Regression: kangentic.com was incorrectly pruned because it was a git
-    // worktree/submodule — isInsideWorktree returned true. The new check uses
+    // worktree/submodule -- isInsideWorktree returned true. The new check uses
     // isKangenticWorktree which only matches .kangentic/worktrees/ paths.
     mockList.mockReturnValue([
       { id: 'ext-wt', name: 'kangentic.com', path: '/home/dev/kangentic.com' },
     ]);
     mockIsKangenticWorktree.mockReturnValue(false);
 
-    await pruneStaleWorktreeProjects();
+    await pruneStaleWorktreeProjects(mockContext);
 
     expect(mockCloseProjectDb).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
@@ -198,7 +94,7 @@ describe('pruneStaleWorktreeProjects', () => {
   it('handles empty project list without errors', async () => {
     mockList.mockReturnValue([]);
 
-    await pruneStaleWorktreeProjects();
+    await pruneStaleWorktreeProjects(mockContext);
 
     expect(mockCloseProjectDb).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
@@ -214,7 +110,7 @@ describe('pruneStaleWorktreeProjects', () => {
       projectPath.includes('/.kangentic/worktrees/')
     );
 
-    await pruneStaleWorktreeProjects();
+    await pruneStaleWorktreeProjects(mockContext);
 
     expect(mockDelete).toHaveBeenCalledTimes(2);
     expect(mockDelete).toHaveBeenCalledWith('stale');

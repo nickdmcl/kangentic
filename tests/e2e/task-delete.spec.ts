@@ -1,5 +1,5 @@
 /**
- * E2E tests for archiving and deleting tasks — including tasks with active sessions.
+ * E2E tests for archiving and deleting tasks -- including tasks with active sessions.
  *
  * Verifies that:
  *  - Archiving a task with a running session doesn't crash the app
@@ -130,7 +130,7 @@ async function waitForSession(taskTitle: string, timeoutMs = 15000): Promise<voi
 
 /** Open the kebab menu in the task detail dialog and click an action */
 async function clickKebabAction(dialog: ReturnType<Page['locator']>, actionText: string) {
-  // Click the kebab (MoreHorizontal) button — it's the icon-only button before the divider
+  // Click the kebab (MoreHorizontal) button -- it's the icon-only button before the divider
   const kebabButton = dialog.locator('button[title="Actions"]');
   await kebabButton.waitFor({ state: 'visible', timeout: 3000 });
   await kebabButton.click();
@@ -252,7 +252,7 @@ test.describe('Task Delete', () => {
       return { planningId: planning.id, taskAId: a.id, taskBId: b.id };
     }, { a: titleA, b: titleB });
 
-    // Move task A to Planning — this one gets the running session
+    // Move task A to Planning -- this one gets the running session
     await page.evaluate(async (args) => {
       await window.electronAPI.tasks.move({
         taskId: args.taskId,
@@ -264,7 +264,7 @@ test.describe('Task Delete', () => {
     // Wait for task A to get a running session
     await waitForSession(titleA);
 
-    // Move task B to Planning — with maxConcurrent=1, this one gets queued
+    // Move task B to Planning -- with maxConcurrent=1, this one gets queued
     await page.evaluate(async (args) => {
       await window.electronAPI.tasks.move({
         taskId: args.taskId,
@@ -351,13 +351,13 @@ test.describe('Task Delete', () => {
     await card.click();
     await page.waitForTimeout(300);
 
-    // Dialog opens in edit mode for no-session tasks — click Cancel to switch to view mode
+    // Dialog opens in edit mode for no-session tasks -- click Cancel to switch to view mode
     const dialog = page.locator('.fixed.inset-0');
     const cancelBtn = dialog.locator('button:has-text("Cancel")');
     await cancelBtn.click();
     await page.waitForTimeout(200);
 
-    // Now in view mode — kebab Actions button is visible
+    // Now in view mode -- kebab Actions button is visible
     await clickKebabAction(dialog, 'Archive');
     await page.waitForTimeout(500);
 

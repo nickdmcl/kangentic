@@ -13,7 +13,7 @@ import type { IpcContext } from './ipc-context';
 
 /**
  * Ensure `.kangentic/` and `.claude/settings.local.json` are listed in the
- * project's `.gitignore`.  Fully wrapped in try-catch — a read-only project
+ * project's `.gitignore`.  Fully wrapped in try-catch -- a read-only project
  * directory or permission issue must never prevent the app from opening.
  */
 export function ensureGitignore(projectPath: string): void {
@@ -24,7 +24,7 @@ export function ensureGitignore(projectPath: string): void {
     try {
       content = fs.readFileSync(gitignorePath, 'utf-8');
     } catch {
-      // No .gitignore yet — we'll create one
+      // No .gitignore yet -- we'll create one
     }
 
     // 1. Ensure .kangentic/ is ignored
@@ -38,7 +38,7 @@ export function ensureGitignore(projectPath: string): void {
       fs.writeFileSync(gitignorePath, content);
     }
 
-    // 2. Ensure .claude/settings.local.json is ignored — but only if the project
+    // 2. Ensure .claude/settings.local.json is ignored -- but only if the project
     //    hasn't intentionally committed it (e.g. to accumulate permission allowlists).
     const linesAfter = content.split('\n');
     const settingsIgnored = linesAfter.some(
@@ -154,7 +154,7 @@ export async function cleanupTaskSession(
     const db = getProjectDb(resolvedProjectId);
     const sessionRepo = new SessionRepository(db);
 
-    // Best-effort disk cleanup (non-fatal — DB records are the source of truth)
+    // Best-effort disk cleanup (non-fatal -- DB records are the source of truth)
     if (resolvedProjectPath) {
       const records = db.prepare(
         'SELECT claude_session_id FROM sessions WHERE task_id = ? AND claude_session_id IS NOT NULL'
@@ -165,7 +165,7 @@ export async function cleanupTaskSession(
       }
     }
 
-    // Always delete DB records — this must succeed for task DELETE to pass FK check
+    // Always delete DB records -- this must succeed for task DELETE to pass FK check
     sessionRepo.deleteByTaskId(task.id);
   }
 }

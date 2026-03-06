@@ -18,7 +18,7 @@ interface AutoFocusInput {
 export function resolveAutoFocusTarget(input: AutoFocusInput): string | null {
   const { sessionId, newState, currentActiveSessionId, sessionActivity, sessions } = input;
 
-  // Activity tab is sacred — never switch away from it
+  // Activity tab is sacred -- never switch away from it
   if (currentActiveSessionId === ACTIVITY_TAB) {
     return null;
   }
@@ -35,7 +35,7 @@ export function resolveAutoFocusTarget(input: AutoFocusInput): string | null {
     return null;
   }
 
-  // newState === 'thinking' — only react if the viewed session went to thinking
+  // newState === 'thinking' -- only react if the viewed session went to thinking
   if (currentActiveSessionId === sessionId) {
     const otherIdle = sessions.find(
       (s) => s.id !== sessionId && s.status === 'running' && sessionActivity[s.id] === 'idle',

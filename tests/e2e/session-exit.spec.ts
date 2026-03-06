@@ -56,7 +56,7 @@ function writeTestConfig(dataDir: string): void {
   );
 }
 
-test.describe('Claude Agent — Session Exit Handling', () => {
+test.describe('Claude Agent -- Session Exit Handling', () => {
   let app: ElectronApplication;
   let page: Page;
   let tmpDir: string;

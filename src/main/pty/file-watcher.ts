@@ -75,7 +75,7 @@ export class FileWatcher {
   private onFileChange = (): void => {
     if (this.closed) return;
     this.lastWatcherFireTime = Date.now();
-    // Do NOT reset hasLoggedStaleRecovery here — if the watcher was restarted
+    // Do NOT reset hasLoggedStaleRecovery here -- if the watcher was restarted
     // by polling, the new fs.watch may fire once immediately (Node behavior),
     // which would reset the flag and cause repeated log spam on the next poll.
     // The flag is only reset when a poll cycle confirms the watcher is healthy.
@@ -105,7 +105,7 @@ export class FileWatcher {
         });
         this.watcher = watcher;
       } catch {
-        // Can't watch directory either — polling fallback will still work
+        // Can't watch directory either -- polling fallback will still work
       }
     }
   }
@@ -122,7 +122,7 @@ export class FileWatcher {
         this.onChange();
         this.restartWatcher();
       } else if (this.hasLoggedStaleRecovery && !this.isStale()) {
-        // Watcher recovered — allow future stale logs
+        // Watcher recovered -- allow future stale logs
         this.hasLoggedStaleRecovery = false;
       }
     }, this.pollIntervalMs);

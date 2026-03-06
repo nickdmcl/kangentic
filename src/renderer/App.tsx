@@ -52,9 +52,9 @@ export function App() {
       // Invalidate any in-flight syncSessions() calls from the previous project
       useSessionStore.getState()._bumpSyncGeneration();
 
-      // Clear all per-project view state before syncing — prevents stale data
+      // Clear all per-project view state before syncing -- prevents stale data
       // from the previous project leaking into the new project's terminal/events.
-      // Do NOT clear sessionActivity or sessions — sidebar badges need cross-project data.
+      // Do NOT clear sessionActivity or sessions -- sidebar badges need cross-project data.
       useSessionStore.setState({
         activeSessionId: null,
         dialogSessionId: null,
@@ -90,10 +90,9 @@ export function App() {
     // Debounced re-sync: when an IPC event arrives for a session ID not yet in
     // the store (e.g. background sessions spawned by activateAllProjects before
     // the renderer had a chance to sync), schedule a full syncSessions() call.
-    // Skip if the event's projectId doesn't match the current project.
-    const scheduleSyncIfUnknown = (sessionId: string, projectId?: string) => {
-      const activeProjectId = useProjectStore.getState().currentProject?.id;
-      if (projectId && activeProjectId && projectId !== activeProjectId) return;
+    // Not project-scoped: syncSessions() fetches all sessions cross-project,
+    // and sidebar badges need background project sessions to appear immediately.
+    const scheduleSyncIfUnknown = (sessionId: string) => {
       const exists = useSessionStore.getState().sessions.some((s) => s.id === sessionId);
       if (exists) return;
       if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
@@ -105,8 +104,8 @@ export function App() {
 
     // Session status transitions (queued → running)
     if (sessions.onStatus) {
-      cleanups.push(sessions.onStatus((sessionId, status, projectId) => {
-        scheduleSyncIfUnknown(sessionId, projectId);
+      cleanups.push(sessions.onStatus((sessionId, status) => {
+        scheduleSyncIfUnknown(sessionId);
         updateSessionStatus(sessionId, { status });
       }));
     }
@@ -133,7 +132,7 @@ export function App() {
       }));
     }
 
-    // Session usage data — only update store for current project sessions
+    // Session usage data -- only update store for current project sessions
     if (sessions.onUsage) {
       cleanups.push(sessions.onUsage((sessionId, data, projectId) => {
         const activeProjectId = useProjectStore.getState().currentProject?.id;
@@ -145,7 +144,7 @@ export function App() {
 
     // Session activity state (thinking/idle)
     // ALWAYS update activity (sidebar badges need cross-project data),
-    // but only run auto-focus and scheduleSyncIfUnknown for current project.
+    // but only run auto-focus for current project.
     if (sessions.onActivity) {
       cleanups.push(sessions.onActivity((sessionId, state, projectId) => {
         updateActivity(sessionId, state);
@@ -153,9 +152,7 @@ export function App() {
         const activeProjectId = useProjectStore.getState().currentProject?.id;
         const isCurrentProject = !projectId || !activeProjectId || projectId === activeProjectId;
 
-        if (isCurrentProject) {
-          scheduleSyncIfUnknown(sessionId, projectId);
-        }
+        scheduleSyncIfUnknown(sessionId);
 
         const config = useConfigStore.getState().config;
         const sessionStore = useSessionStore.getState();
@@ -185,7 +182,7 @@ export function App() {
             const task = useBoardStore.getState().tasks.find((t) => t.session_id === sessionId);
             const taskLabel = task?.title ?? 'A task';
             window.electronAPI.notifications.show({
-              title: `${projectName} — Idle`,
+              title: `${projectName} -- Idle`,
               body: `${taskLabel} needs attention`,
               projectId: session.projectId,
               taskId: task?.id ?? '',
@@ -196,7 +193,7 @@ export function App() {
       }));
     }
 
-    // Session events (tool calls, idle, prompt — activity log)
+    // Session events (tool calls, idle, prompt -- activity log)
     // Only add events for current project sessions
     if (sessions.onEvent) {
       cleanups.push(sessions.onEvent((sessionId, event, projectId) => {
@@ -207,7 +204,7 @@ export function App() {
       }));
     }
 
-    // Notification clicked — switch project and open task detail
+    // Notification clicked -- switch project and open task detail
     const notifications = window.electronAPI?.notifications;
     if (notifications?.onClicked) {
       cleanups.push(notifications.onClicked((projectId, taskId) => {
@@ -226,7 +223,7 @@ export function App() {
         useBoardStore.getState().loadBoard();
         useSessionStore.getState().syncSessions();
         useToastStore.getState().addToast({
-          message: `Plan complete — moved "${taskTitle}" to next column`,
+          message: `Plan complete -- moved "${taskTitle}" to next column`,
           variant: 'success',
         });
       }));
@@ -243,8 +240,8 @@ export function App() {
 
 // Dev-only: re-sync session caches after Vite HMR updates.
 // When HMR replaces renderer modules, IPC listeners may briefly disconnect.
-// The main process still caches all events — this re-fetches them.
-// @ts-expect-error — Vite handles import.meta.hot; tsc's "module": "commonjs" doesn't support it
+// The main process still caches all events -- this re-fetches them.
+// @ts-expect-error -- Vite handles import.meta.hot; tsc's "module": "commonjs" doesn't support it
 if (import.meta.hot) {
   // @ts-expect-error
   import.meta.hot.on('vite:afterUpdate', () => {
@@ -253,7 +250,7 @@ if (import.meta.hot) {
 }
 
 // Dev-only: expose Zustand stores for UI test automation (Playwright page.evaluate).
-// @ts-expect-error — Vite defines import.meta.env; tsc doesn't support it
+// @ts-expect-error -- Vite defines import.meta.env; tsc doesn't support it
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__zustandStores = {
     board: useBoardStore,

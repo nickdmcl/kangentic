@@ -65,7 +65,7 @@ test.describe('EditColumnDialog', () => {
     expect(value).toBe('');
 
     // First option shows resolved global value (mock default is 'default' → "Default (Allowlist)")
-    // Duplicate is filtered out — only appears once as the default option
+    // Duplicate is filtered out -- only appears once as the default option
     const options = await select.locator('option').allTextContents();
     expect(options.filter((o) => o === 'Default (Allowlist)')).toHaveLength(1);
     expect(options).toContain('Plan');
@@ -88,7 +88,7 @@ test.describe('EditColumnDialog', () => {
   test('Planning column has editable permissions set to Plan', async () => {
     await openEditDialog('Planning');
 
-    // Planning is now a regular column — permissions are editable
+    // Planning is now a regular column -- permissions are editable
     const select = page.locator('select').first();
     await expect(select).toBeEnabled();
 
@@ -116,7 +116,7 @@ test.describe('EditColumnDialog', () => {
 
     // Default target should be Executing
     const options = await planExitSelect.locator('option').allTextContents();
-    expect(options).toContain('Nowhere — stay in column');
+    expect(options).toContain('Nowhere -- stay in column');
     expect(options).toContain('Executing');
 
     // Should not include current column, Backlog, or Done

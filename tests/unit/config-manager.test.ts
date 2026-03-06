@@ -32,7 +32,7 @@ async function createConfigManager() {
   return new ConfigManager();
 }
 
-describe('Config Manager — Permission Mode Migration', () => {
+describe('Config Manager -- Permission Mode Migration', () => {
   it("migrates 'dangerously-skip' → 'bypass-permissions'", async () => {
     fs.writeFileSync(configPath, JSON.stringify({
       claude: { permissionMode: 'dangerously-skip' },
@@ -91,7 +91,7 @@ describe('Config Manager — Permission Mode Migration', () => {
   });
 
   it("fresh config (no file) defaults to 'default'", async () => {
-    // No config file written — should fall back to DEFAULT_CONFIG
+    // No config file written -- should fall back to DEFAULT_CONFIG
     const cm = await createConfigManager();
     const config = cm.load();
 

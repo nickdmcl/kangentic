@@ -25,7 +25,7 @@ export class ClaudeStatusParser {
    *
    * Claude Code's `used_percentage` is based on input tokens only
    * (input_tokens + cache_creation_input_tokens + cache_read_input_tokens).
-   * It does NOT include output_tokens. We return it directly — no scaling.
+   * It does NOT include output_tokens. We return it directly -- no scaling.
    *
    * Two tiers:
    * 1. **Primary** (`used_percentage` > 0): return it directly.

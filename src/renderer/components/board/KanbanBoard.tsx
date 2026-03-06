@@ -160,7 +160,7 @@ function getInsertionIndex(
   const overRect = over.rect;
   const midY = overRect.top + overRect.height / 2;
 
-  // Use the actual pointer position — directly reflects user intent
+  // Use the actual pointer position -- directly reflects user intent
   let pointerY: number;
   if (event.activatorEvent instanceof PointerEvent) {
     pointerY = event.activatorEvent.clientY + event.delta.y;
@@ -290,7 +290,7 @@ export function KanbanBoard() {
       return closestCenter({ ...args, droppableContainers: inColumn });
     }
 
-    // Fallback: pointer in gap between columns — closestCenter against other swimlanes
+    // Fallback: pointer in gap between columns -- closestCenter against other swimlanes
     return closestCenter({
       ...args,
       droppableContainers: swimlaneContainers.filter(
@@ -313,7 +313,7 @@ export function KanbanBoard() {
   }, []);
 
   // Track which swimlane the pointer is hovering over for column highlights.
-  // Done is excluded — it has its own drop-zone animation (green spinning border)
+  // Done is excluded -- it has its own drop-zone animation (green spinning border)
   // via useDroppable's isOver, so the generic blue ring would conflict.
   const handleDragOver = useCallback((event: DragOverEvent) => {
     if (!event.over) {
@@ -336,7 +336,7 @@ export function KanbanBoard() {
     setHoveringSwimlaneId(null);
 
     if (!over) {
-      // Cancelled — reload from DB to restore original positions
+      // Cancelled -- reload from DB to restore original positions
       if (originalSwimlane) useBoardStore.getState().loadBoard();
       return;
     }
@@ -388,7 +388,7 @@ export function KanbanBoard() {
     const state = useBoardStore.getState();
     const archivedTask = state.archivedTasks.find((t) => t.id === taskId);
     if (archivedTask) {
-      // Dropped back on Done column — no-op
+      // Dropped back on Done column -- no-op
       const doneLane = swimlanes.find((s) => s.role === 'done');
       if (doneLane && targetSwimlaneId === doneLane.id) return;
 
@@ -420,7 +420,7 @@ export function KanbanBoard() {
       // Capture where the DragOverlay was at drop time
       const initialRect = active.rect.current.initial;
       if (!initialRect) {
-        // DOM element was destroyed mid-drag — skip animation, move directly
+        // DOM element was destroyed mid-drag -- skip animation, move directly
         await moveTask({ taskId, targetSwimlaneId, targetPosition });
         return;
       }

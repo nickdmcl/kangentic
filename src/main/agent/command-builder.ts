@@ -167,7 +167,7 @@ export class CommandBuilder {
       const raw = fs.readFileSync(projectSettingsPath, 'utf-8');
       baseSettings = JSON.parse(raw);
     } catch {
-      // No existing settings — start fresh
+      // No existing settings -- start fresh
     }
 
     // 2. Deep-merge local settings from project root (gitignored, personal)

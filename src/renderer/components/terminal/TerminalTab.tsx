@@ -54,7 +54,7 @@ export function TerminalTab({ sessionId, active }: TerminalTabProps) {
   }, [initTerminal]);
 
   // Re-fit and focus when tab becomes active or container resizes.
-  // Always set up the ResizeObserver when active — even if the terminal
+  // Always set up the ResizeObserver when active -- even if the terminal
   // hasn't initialized yet. Tabs that start with display:none initialize
   // late (via the init effect's ResizeObserver), so we guard fit() calls
   // with initialized checks inside the callbacks instead of bailing early.
@@ -62,7 +62,7 @@ export function TerminalTab({ sessionId, active }: TerminalTabProps) {
     if (!active) return;
 
     // Fit after a frame to ensure layout is settled.
-    // Skip fit if scrollback is still loading — initTerminal handles the
+    // Skip fit if scrollback is still loading -- initTerminal handles the
     // fit-after-scrollback sequence to ensure proper xterm reflow.
     const initRafId = requestAnimationFrame(() => {
       if (initialized.current && !scrollbackPending.current) {

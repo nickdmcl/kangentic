@@ -36,7 +36,7 @@ export function StatusBar() {
   const totalOutput = usageValues.reduce((sum, u) => sum + u.contextWindow.totalOutputTokens, 0);
   const totalCost = usageValues.reduce((sum, u) => sum + u.cost.totalCostUsd, 0);
 
-  // Pulse hooks — always called unconditionally (hooks rules)
+  // Pulse hooks -- always called unconditionally (hooks rules)
   const tokenKey = `${totalInput}-${totalOutput}`;
   const tokenPulseRef = useValuePulse(tokenKey);
   const costPulseRef = useValuePulse(totalCost);

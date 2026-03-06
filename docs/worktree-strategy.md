@@ -10,8 +10,8 @@ Each task gets its own git worktree so agents work in isolation. Multiple agents
 
 Format: `kanban/{slug}-{taskId8}`
 
-- `slug` — slugified task title (lowercase, hyphens, truncated)
-- `taskId8` — first 8 characters of the task UUID
+- `slug` -- slugified task title (lowercase, hyphens, truncated)
+- `taskId8` -- first 8 characters of the task UUID
 
 Example: `kanban/fix-auth-bug-a1b2c3d4`
 
@@ -48,7 +48,7 @@ git sparse-checkout init --no-cone
 git sparse-checkout set '/*' '!/.claude/commands/' '!/.claude/skills/'
 ```
 
-This means worktrees get all files including `.claude/settings.json` (so Claude resolves permissions naturally), but exclude `.claude/commands/` and `.claude/skills/` to prevent duplicate slash command and skill discovery. `.claude/settings.local.json` is untracked (gitignored), so it's not present in worktrees from checkout — writes to it (from Kangentic hooks or Claude's "always allow") are invisible to git.
+This means worktrees get all files including `.claude/settings.json` (so Claude resolves permissions naturally), but exclude `.claude/commands/` and `.claude/skills/` to prevent duplicate slash command and skill discovery. `.claude/settings.local.json` is untracked (gitignored), so it's not present in worktrees from checkout -- writes to it (from Kangentic hooks or Claude's "always allow") are invisible to git.
 
 Sparse-checkout was chosen over `skip-worktree` because skip-worktree flags get lost during rebase and merge operations. Sparse-checkout survives all git operations.
 
@@ -75,12 +75,12 @@ All sessions (main repo and worktree) use a unified approach. For each session, 
 
 1. Read `.claude/settings.json` from project root (committed, shared)
 2. Deep-merge `.claude/settings.local.json` from project root (gitignored, personal)
-3. For worktrees: merge permissions from the worktree's `.claude/settings.local.json` (captures "always allow" grants — hooks are skipped since they may be stale leftovers from before the unified approach)
+3. For worktrees: merge permissions from the worktree's `.claude/settings.local.json` (captures "always allow" grants -- hooks are skipped since they may be stale leftovers from before the unified approach)
 4. Inject bridge commands into appropriate hook points
 5. Write merged file to session directory
 6. Pass `--settings <mergedSettingsPath>` to the CLI
 
-All Kangentic artifacts stay in `.kangentic/` — nothing is written to `.claude/settings.local.json`. When users hit "always allow" on a permission prompt, Claude writes to `settings.local.json` in the CWD (worktree or project root). These grants are read back on session resume (step 3) so they persist across restarts.
+All Kangentic artifacts stay in `.kangentic/` -- nothing is written to `.claude/settings.local.json`. When users hit "always allow" on a permission prompt, Claude writes to `settings.local.json` in the CWD (worktree or project root). These grants are read back on session resume (step 3) so they persist across restarts.
 
 ### Hook Identification
 
@@ -101,7 +101,7 @@ Each Claude Code session gets a directory at `<project>/.kangentic/sessions/<cla
   events.jsonl     # Structured event log + activity state (appended by event-bridge)
 ```
 
-The SessionManager watches these files with debounced `fs.watch` and emits IPC events to the renderer. Activity state (thinking/idle) is derived from event types — see [Activity Detection](activity-detection.md).
+The SessionManager watches these files with debounced `fs.watch` and emits IPC events to the renderer. Activity state (thinking/idle) is derived from event types -- see [Activity Detection](activity-detection.md).
 
 ## Session Lifecycle
 
@@ -131,7 +131,7 @@ Task moved back from Done
   → Status: running
 
 Task moved to Backlog
-  → Session killed (not suspended — no resume)
+  → Session killed (not suspended -- no resume)
   → Worktree preserved (code stays on disk)
 
 Task deleted
@@ -153,25 +153,25 @@ App reopened
 
 ### On Project Open
 
-- **`pruneOrphanedWorktrees()`** — Scans `.kangentic/worktrees/`. If a worktree directory was deleted externally, deletes the associated task (skips tasks with active PTYs).
+- **`pruneOrphanedWorktrees()`** -- Scans `.kangentic/worktrees/`. If a worktree directory was deleted externally, deletes the associated task (skips tasks with active PTYs).
 
 ### On Project Close/Delete
 
-- **`stripKangenticHooks()`** — Removes all Kangentic hooks from `.claude/settings.local.json`. Backs up the file before modification, restores on error. Removes empty settings files and `.claude/` directories if they only contained our hooks.
-- **`cleanupProject()`** — Kills all PTYs, detaches worktrees, strips hooks, removes `.kangentic/` directory and DB files, removes `.kangentic/` from `.gitignore`.
+- **`stripKangenticHooks()`** -- Removes all Kangentic hooks from `.claude/settings.local.json`. Backs up the file before modification, restores on error. Removes empty settings files and `.claude/` directories if they only contained our hooks.
+- **`cleanupProject()`** -- Kills all PTYs, detaches worktrees, strips hooks, removes `.kangentic/` directory and DB files, removes `.kangentic/` from `.gitignore`.
 
 ### On Task Delete
 
-- **`cleanupTaskResources()`** — Kills PTY, deletes session DB records, removes session directory, removes worktree, optionally deletes branch.
+- **`cleanupTaskResources()`** -- Kills PTY, deletes session DB records, removes session directory, removes worktree, optionally deletes branch.
 
 ## Safety
 
-- **No git contamination** — `.claude/commands/` and `.claude/skills/` excluded from worktrees via sparse-checkout. `.claude/settings.json` is present (from git). `settings.local.json` is untracked and gitignored. Hooks are delivered via `--settings` flag for all sessions (main repo and worktree) — Kangentic never writes to `.claude/settings.local.json`.
-- **Hook identification** — two-marker pattern (`.kangentic` + bridge name) prevents touching user hooks.
-- **Backup on strip** — `stripKangenticHooks()` backs up settings before modification, restores on failure.
-- **Orphan dedup** — on session resume, old PTY is killed and its file paths nulled before new PTY spawns. Prevents stale `onExit` handlers from deleting files the new session needs.
-- **Trust pre-population** — `ensureWorktreeTrust()` adds worktree paths to `~/.claude.json` so Claude Code doesn't prompt for trust on first run.
-- **Graceful shutdown** — Ctrl+C → `/exit` → 2s wait → force-kill. Files persist for recovery on next launch.
+- **No git contamination** -- `.claude/commands/` and `.claude/skills/` excluded from worktrees via sparse-checkout. `.claude/settings.json` is present (from git). `settings.local.json` is untracked and gitignored. Hooks are delivered via `--settings` flag for all sessions (main repo and worktree) -- Kangentic never writes to `.claude/settings.local.json`.
+- **Hook identification** -- two-marker pattern (`.kangentic` + bridge name) prevents touching user hooks.
+- **Backup on strip** -- `stripKangenticHooks()` backs up settings before modification, restores on failure.
+- **Orphan dedup** -- on session resume, old PTY is killed and its file paths nulled before new PTY spawns. Prevents stale `onExit` handlers from deleting files the new session needs.
+- **Trust pre-population** -- `ensureWorktreeTrust()` adds worktree paths to `~/.claude.json` so Claude Code doesn't prompt for trust on first run.
+- **Graceful shutdown** -- Ctrl+C → `/exit` → 2s wait → force-kill. Files persist for recovery on next launch.
 
 ## Test Coverage
 

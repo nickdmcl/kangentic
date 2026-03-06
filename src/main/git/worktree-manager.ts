@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { slugify } from '../../shared/slugify';
 
 // ---------------------------------------------------------------------------
-// Free functions — lightweight checks, no simple-git dependency
+// Free functions -- lightweight checks, no simple-git dependency
 // ---------------------------------------------------------------------------
 
 /** Check whether the project path is inside a git repository. */
@@ -114,7 +114,7 @@ export class WorktreeManager {
       await this.git.raw(['fetch', 'origin', baseBranch]);
       startPoint = `origin/${baseBranch}`;
     } catch {
-      // No remote, branch not on remote, or network unavailable — use local branch
+      // No remote, branch not on remote, or network unavailable -- use local branch
     }
 
     // Create worktree with a new branch
@@ -127,7 +127,7 @@ export class WorktreeManager {
     try {
       await wtGit.raw(['config', 'kangentic.baseBranch', baseBranch]);
     } catch {
-      // Non-fatal — merge-back falls back to 'main'
+      // Non-fatal -- merge-back falls back to 'main'
     }
 
     // Exclude .claude/commands/ and .claude/skills/ from worktree via sparse-checkout.
@@ -137,7 +137,7 @@ export class WorktreeManager {
     await wtGit.raw(['sparse-checkout', 'init', '--no-cone']);
     await wtGit.raw(['sparse-checkout', 'set', '/*', '!/.claude/commands/', '!/.claude/skills/']);
 
-    // Copy specified files into the worktree (skip .claude/ entries —
+    // Copy specified files into the worktree (skip .claude/ entries --
     // sparse-checkout keeps .claude/ but excludes commands/, and hooks
     // are delivered via --settings flag pointing to session directory)
     for (const file of copyFiles) {
@@ -155,7 +155,7 @@ export class WorktreeManager {
 
   /**
    * Rename the git branch for a task after a title edit.
-   * Only renames the branch ref — the worktree directory stays unchanged.
+   * Only renames the branch ref -- the worktree directory stays unchanged.
    * Returns the new branch name on success, null if skipped or failed.
    */
   async renameBranch(
@@ -184,7 +184,7 @@ export class WorktreeManager {
       await this.git.raw(['worktree', 'remove', worktreePath, '--force']);
       return;
     } catch {
-      // git worktree remove failed — fall through to manual removal
+      // git worktree remove failed -- fall through to manual removal
     }
 
     // On Windows the PTY process may still hold file handles for a short time
@@ -198,11 +198,11 @@ export class WorktreeManager {
         await this.git.raw(['worktree', 'prune']);
         return;
       } catch {
-        // EPERM — retry after next delay
+        // EPERM -- retry after next delay
       }
     }
 
-    // All retries exhausted — prune what we can, log the stale path
+    // All retries exhausted -- prune what we can, log the stale path
     try { await this.git.raw(['worktree', 'prune']); } catch { /* best effort */ }
     console.warn(`[WorktreeManager] Could not remove worktree after retries: ${worktreePath}`);
   }
@@ -219,7 +219,7 @@ export class WorktreeManager {
    */
   async listRemoteBranches(): Promise<string[]> {
     try { await this.git.raw(['fetch', '--prune']); } catch { /* offline OK */ }
-    // %(refname:short) shortens origin/HEAD to bare "origin" — filter by
+    // %(refname:short) shortens origin/HEAD to bare "origin" -- filter by
     // requiring the origin/ prefix before stripping it, which excludes both
     // the HEAD symref and any non-origin remotes.
     const raw = await this.git.raw(['branch', '-r', '--sort=-committerdate', '--format=%(refname:short)']);

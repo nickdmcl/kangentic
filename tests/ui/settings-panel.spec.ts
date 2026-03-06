@@ -48,22 +48,22 @@ test.describe('Settings Panel', () => {
   test('tab navigation switches content', async () => {
     await openSettings();
 
-    // Appearance tab is default — Theme setting visible
+    // Appearance tab is default -- Theme setting visible
     await expect(page.locator('text=Theme')).toBeVisible();
 
-    // Switch to Terminal — Font Size visible
+    // Switch to Terminal -- Font Size visible
     await page.locator('button:has-text("Terminal")').click();
     await expect(page.locator('text=Font Size')).toBeVisible();
 
-    // Switch to Agent — Permissions visible
+    // Switch to Agent -- Permissions visible
     await page.locator('button:has-text("Agent")').click();
     await expect(page.getByText('Permissions', { exact: true })).toBeVisible();
 
-    // Switch to Git — Enable Worktrees visible
+    // Switch to Git -- Enable Worktrees visible
     await page.locator('button:has-text("Git")').click();
     await expect(page.locator('text=Enable Worktrees')).toBeVisible();
 
-    // Switch to Behavior — Skip Task Delete visible
+    // Switch to Behavior -- Skip Task Delete visible
     await page.locator('button:has-text("Behavior")').click();
     await expect(page.locator('text=Skip Task Delete Confirmation')).toBeVisible();
 

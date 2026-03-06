@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * worktree-preview.js — Opens an OS-native terminal running a Kangentic dev
+ * worktree-preview.js -- Opens an OS-native terminal running a Kangentic dev
  * server for the current worktree.
  *
  * Creates a filesystem junction (Windows) or symlink (Unix) from
  * <worktree>/node_modules → <root>/node_modules so the worktree's dev server
- * gets instant access to properly-built dependencies — no install or rebuild.
+ * gets instant access to properly-built dependencies -- no install or rebuild.
  *
  * Must be run from inside a .kangentic/worktrees/ directory.
  *
@@ -43,7 +43,7 @@ function ensureNodeModulesLink(worktreeDir, rootDir) {
 
   if (!fs.existsSync(rootModules)) {
     throw new Error(
-      `Root project has no node_modules — run "npm install" in ${rootDir} first.`
+      `Root project has no node_modules -- run "npm install" in ${rootDir} first.`
     );
   }
 
@@ -59,17 +59,17 @@ function ensureNodeModulesLink(worktreeDir, rootDir) {
         console.log('[preview] node_modules junction already correct');
         return;
       }
-      // Points elsewhere — remove and recreate
+      // Points elsewhere -- remove and recreate
       console.log('[preview] node_modules junction points elsewhere, recreating...');
       fs.rmSync(wtModules, { recursive: true, force: true });
     } else {
-      // Real directory (from a previous npm install) — remove it
+      // Real directory (from a previous npm install) -- remove it
       console.log('[preview] Removing existing node_modules directory...');
       fs.rmSync(wtModules, { recursive: true, force: true });
     }
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
-    // Doesn't exist yet — will create below
+    // Doesn't exist yet -- will create below
   }
 
   // Create the junction/symlink
