@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu, Minus, Settings, Square, X } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';
+import logoSrc from '../../assets/logo-32.png';
 
 interface TitleBarProps {
   sidebarOpen: boolean;
@@ -34,7 +35,8 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps) {
         </div>
       )}
 
-      <div className="flex-1 text-center text-sm text-fg-muted">
+      <div className="flex-1 flex items-center justify-center text-sm text-fg-muted">
+        <img src={logoSrc} alt="Kangentic" className="w-5 h-5 mr-1.5" />
         <span className="font-semibold text-fg-secondary">Kangentic</span>
         {currentProject && (
           <span className="ml-2 text-fg-faint">
