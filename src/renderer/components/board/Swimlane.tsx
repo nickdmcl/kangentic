@@ -12,7 +12,7 @@ export interface SwimlaneProps {
   swimlane: SwimlaneType;
   tasks: Task[];
   /** Event listeners for the drag handle (only for sortable/custom columns) */
-  dragHandleProps?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- dnd-kit listener spread
+  dragHandleProps?: Record<string, unknown>;
   /** Whether this column is the current drop target during a drag */
   isDropTarget?: boolean;
 }

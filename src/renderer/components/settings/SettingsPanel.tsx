@@ -44,7 +44,7 @@ export function SettingsPanel() {
   const backdropMouseDown = useRef(false);
 
   useEffect(() => {
-    window.electronAPI.shell.getAvailable().then(setShells);
+    window.electronAPI.shell.getAvailable().then(setShells).catch(() => {});
     detectClaude();
   }, []);
 

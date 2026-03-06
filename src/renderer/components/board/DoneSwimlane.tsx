@@ -13,7 +13,7 @@ import type { Swimlane as SwimlaneType, Task } from '../../../shared/types';
 export interface DoneSwimlaneProps {
   swimlane: SwimlaneType;
   tasks: Task[];
-  dragHandleProps?: Record<string, any>;
+  dragHandleProps?: Record<string, unknown>;
 }
 
 export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {

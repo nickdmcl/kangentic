@@ -15,7 +15,7 @@ import { BranchPicker } from './BranchPicker';
 import { WorktreeChip } from './WorktreeChip';
 import type { Task, TaskAttachment } from '../../../shared/types';
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
 
 const MEDIA_TYPE_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -149,7 +149,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   }, [task.id]);
 
   const addImageFile = useCallback(async (file: File, filenameOverride?: string) => {
-    if (file.size > MAX_IMAGE_SIZE) {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
       useToastStore.getState().addToast({
         message: `Image "${file.name}" exceeds 10MB limit`,
         variant: 'warning',

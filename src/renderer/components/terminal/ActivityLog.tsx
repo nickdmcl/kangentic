@@ -5,6 +5,9 @@ import { useSessionStore } from '../../stores/session-store';
 import { EventType } from '../../../shared/types';
 import type { SessionEvent } from '../../../shared/types';
 
+const MAX_RENDERED_EVENTS = 500;
+const SCROLL_RETURN_DELAY_MS = 3000;
+
 // 8 distinct colors for session badges (Tailwind-ish)
 const BADGE_COLORS = [
   'text-blue-400',
@@ -68,9 +71,9 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     return events;
   }, [effectiveSessionIds, sessionEvents]);
 
-  // Cap display at last 500 events
+  // Cap display at last N events
   const displayEvents = useMemo(
-    () => allEvents.length > 500 ? allEvents.slice(-500) : allEvents,
+    () => allEvents.length > MAX_RENDERED_EVENTS ? allEvents.slice(-MAX_RENDERED_EVENTS) : allEvents,
     [allEvents],
   );
 
@@ -110,7 +113,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
       returnTimerRef.current = setTimeout(() => {
         returnTimerRef.current = undefined;
         smoothScrollToBottom();
-      }, 3000);
+      }, SCROLL_RETURN_DELAY_MS);
     }
   };
 

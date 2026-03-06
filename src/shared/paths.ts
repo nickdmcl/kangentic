@@ -6,7 +6,7 @@
  * MUST use these utilities instead of ad-hoc `.replace(/\\/g, '/')`.
  *
  * Key invariant: Claude Code stores paths with forward slashes on ALL
- * platforms (e.g. "C:/Users/tyler/..."), so any path written to or
+ * platforms (e.g. "C:/Users/dev/..."), so any path written to or
  * compared against ~/.claude.json must go through `toForwardSlash()`.
  */
 import path from 'node:path';
@@ -42,7 +42,7 @@ export function resolveForwardSlash(p: string): string {
 
 /**
  * Convert a Windows-style path to Git Bash POSIX format.
- *   C:\Users\tyler → /c/Users/tyler
+ *   C:\Users\dev → /c/Users/dev
  */
 export function toGitBashPath(windowsPath: string): string {
   return windowsPath.replace(
@@ -54,7 +54,7 @@ export function toGitBashPath(windowsPath: string): string {
 
 /**
  * Convert a Windows-style path to WSL POSIX format.
- *   C:\Users\tyler → /mnt/c/Users/tyler
+ *   C:\Users\dev → /mnt/c/Users/dev
  */
 export function toWslPath(windowsPath: string): string {
   return windowsPath.replace(

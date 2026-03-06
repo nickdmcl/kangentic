@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { useTerminal } from '../../hooks/useTerminal';
 import { useConfigStore } from '../../stores/config-store';
 
+const FIT_DELAY_MS = 100;
+
 interface TerminalTabProps {
   sessionId: string;
   active: boolean;
@@ -80,7 +82,7 @@ export function TerminalTab({ sessionId, active }: TerminalTabProps) {
       if (initialized.current && !scrollbackPending.current) {
         fit();
       }
-    }, 100);
+    }, FIT_DELAY_MS);
 
     // Suppress fit() while the user drags the panel resize handle.
     // Calling fit() on every frame during a drag changes xterm's row count
