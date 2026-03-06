@@ -24,6 +24,10 @@ interface BaseDialogProps {
   // Behavior
   preventBackdropClose?: boolean; // When true, clicking the backdrop does not close the dialog
 
+  // Content mouse tracking (for callers that need hover state)
+  onContentMouseEnter?: () => void;
+  onContentMouseLeave?: () => void;
+
   // Container
   className?: string;
   zIndex?: string;
@@ -41,6 +45,8 @@ export function BaseDialog({
   footer,
   preventBackdropClose,
   rawBody,
+  onContentMouseEnter,
+  onContentMouseLeave,
   className = 'w-[400px]',
   zIndex = 'z-50',
   backdropClassName,
@@ -92,6 +98,8 @@ export function BaseDialog({
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
+        onMouseEnter={onContentMouseEnter}
+        onMouseLeave={onContentMouseLeave}
         style={{ animation: contentAnimation }}
         className={`bg-surface-raised border border-edge rounded-lg shadow-2xl flex flex-col overflow-visible ${className}`}
         {...(testId ? { 'data-testid': testId } : {})}

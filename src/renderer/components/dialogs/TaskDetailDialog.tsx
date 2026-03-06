@@ -115,6 +115,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   // Attachment state
   const [savedAttachments, setSavedAttachments] = useState<AttachmentWithPreview[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<{ url: string; filename: string } | null>(null);
+  const previewOpenRef = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const isArchived = task.archived_at !== null;
@@ -235,6 +236,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const handlePreview = useCallback(async (att: AttachmentWithPreview) => {
     if (att.previewUrl) {
       setPreviewAttachment({ url: att.previewUrl, filename: att.filename });
+      previewOpenRef.current = true;
     }
   }, []);
 
@@ -245,6 +247,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       if (e.key === 'Escape') {
         e.stopPropagation();
         setPreviewAttachment(null);
+        previewOpenRef.current = false;
       }
     };
     document.addEventListener('keydown', handleKeyDown, true);
@@ -309,6 +312,9 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const isQueued = displayState.kind === 'queued';
   const isSuspended = displayState.kind === 'suspended';
 
+  // Track whether mouse is inside the dialog content (for Escape key behavior)
+  const mouseInsideDialog = useRef(false);
+
   // Use large dialog when there's an active session OR a suspended one
   const hasSessionContext = (displayState.kind !== 'none' && displayState.kind !== 'exited') || toggling;
   const dialogSizeClass = hasSessionContext && !isQueued
@@ -369,6 +375,20 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       setToggling(false);
     }
   };
+
+  // Capture-phase Escape listener: close dialog when mouse is outside content
+  // (xterm swallows Escape in bubble phase, so we must use capture phase)
+  useEffect(() => {
+    if (!hasSessionContext) return;
+    const handleEscapeCapture = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !mouseInsideDialog.current && !previewOpenRef.current) {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscapeCapture, true);
+    return () => document.removeEventListener('keydown', handleEscapeCapture, true);
+  }, [hasSessionContext, onClose]);
 
   // Refit terminal when session resumes (transitions to running)
   useEffect(() => {
@@ -753,6 +773,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           ? { title: 'Edit Task', icon: <Pencil size={14} className="text-fg-muted" /> }
           : { header: customHeader, rawBody: true }
         )}
+        onContentMouseEnter={() => { mouseInsideDialog.current = true; }}
+        onContentMouseLeave={() => { mouseInsideDialog.current = false; }}
         className={dialogSizeClass}
         backdropClassName="p-6"
         testId="task-detail-dialog"
