@@ -48,7 +48,8 @@
       "WebFetch(domain:www.electronjs.org)",
       "WebFetch(domain:playwright.dev)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:api.npmjs.org)"
+      "WebFetch(domain:api.npmjs.org)",
+      "Skill"
     ],
     "deny": []
   },
