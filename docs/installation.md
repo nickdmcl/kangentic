@@ -129,3 +129,51 @@ If `npm install` fails on native modules:
 - Ensure you have C++ build tools installed (see [From Source](#from-source) above).
 - On Windows, ensure Python 3.x is available (required by node-gyp).
 - Try clearing the npm cache: `npm cache clean --force` then `npm install` again.
+
+## Uninstall
+
+### Windows
+
+1. Open **Settings > Apps > Installed apps**.
+2. Find "Kangentic" and click **Uninstall**.
+3. Or run from command line: `%LOCALAPPDATA%\Kangentic\Update.exe --uninstall`
+4. To remove all data: delete `%APPDATA%\kangentic\`
+
+### macOS
+
+1. Drag Kangentic from Applications to the Trash.
+2. To remove all data: delete `~/Library/Application Support/kangentic/`
+
+### Linux
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -r kangentic
+
+# Fedora/RHEL
+sudo rpm -e kangentic
+```
+
+To remove all data: delete `~/.config/kangentic/`
+
+## Custom Data Directory
+
+By default, Kangentic stores its global database and project data in:
+
+| Platform | Default path |
+|----------|-------------|
+| Windows | `%APPDATA%\kangentic\` |
+| macOS | `~/Library/Application Support/kangentic/` |
+| Linux | `~/.config/kangentic/` |
+
+To use a custom location, pass `--data-dir` or set the `KANGENTIC_DATA_DIR` environment variable:
+
+```bash
+# Using the flag
+npx kangentic --data-dir=/path/to/data
+
+# Using the environment variable
+KANGENTIC_DATA_DIR=/path/to/data npx kangentic
+```
+
+If both are set, the environment variable takes priority. This is useful for running separate dev and production instances side by side.

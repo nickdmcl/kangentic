@@ -95,6 +95,18 @@ The release workflow produces 4 builds:
 
 Linux arm64 is not built in v1. Documented in the [Installation Guide](installation.md).
 
+### Local Testing
+
+Test the packaged app locally before releasing:
+
+| Command | What it does |
+|---------|-------------|
+| `npm run make` | Creates platform installers in `out/make/` |
+| `npm run publish -- --dry-run` | Builds installers + simulates publishing (no upload) |
+| `npm run publish -- --from-dry-run` | Uploads previously dry-run artifacts |
+
+The installed app and `npm run dev` share the same data directory. Set `KANGENTIC_DATA_DIR` to isolate them if needed.
+
 ## Troubleshooting
 
 ### Update not appearing

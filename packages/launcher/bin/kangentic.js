@@ -254,7 +254,7 @@ function install(platformInfo, artifactPath) {
 
 // --- Launch ---
 
-function launch(platformInfo, targetDir) {
+function launch(platformInfo, targetDir, dataDir) {
   const installPath = getInstallPath(platformInfo);
 
   if (!fs.existsSync(installPath)) {
@@ -265,18 +265,29 @@ function launch(platformInfo, targetDir) {
 
   console.log('Launching Kangentic...');
 
+  const childEnv = { ...process.env };
+  if (dataDir) {
+    childEnv.KANGENTIC_DATA_DIR = dataDir;
+  }
+
   if (platformInfo.platform === 'win32') {
     const child = spawn(installPath, [`--cwd=${targetDir}`], {
       detached: true,
       stdio: 'ignore',
+      env: childEnv,
     });
     child.unref();
   } else if (platformInfo.platform === 'darwin') {
-    execFileSync('open', ['-a', installPath, '--args', `--cwd=${targetDir}`]);
+    const openArgs = ['-a', installPath, '--args', `--cwd=${targetDir}`];
+    if (dataDir) {
+      openArgs.push(`--data-dir=${dataDir}`);
+    }
+    execFileSync('open', openArgs);
   } else if (platformInfo.platform === 'linux') {
     const child = spawn(installPath, [`--cwd=${targetDir}`], {
       detached: true,
       stdio: 'ignore',
+      env: childEnv,
     });
     child.unref();
   }
@@ -301,14 +312,46 @@ function getTempDir() {
 
 // --- Main ---
 
+function parseDataDir(arguments_) {
+  for (let index = 0; index < arguments_.length; index++) {
+    const argument = arguments_[index];
+    if (argument.startsWith('--data-dir=')) {
+      return argument.slice('--data-dir='.length);
+    }
+    if (argument === '--data-dir' && index + 1 < arguments_.length) {
+      const nextArgument = arguments_[index + 1];
+      if (!nextArgument.startsWith('-')) {
+        return nextArgument;
+      }
+    }
+  }
+  return null;
+}
+
+function findTargetDir(arguments_) {
+  for (let index = 0; index < arguments_.length; index++) {
+    const argument = arguments_[index];
+    if (argument.startsWith('-')) {
+      // Skip --data-dir's value argument
+      if (argument === '--data-dir' && index + 1 < arguments_.length) {
+        index++;
+      }
+      continue;
+    }
+    return path.resolve(argument);
+  }
+  return process.cwd();
+}
+
 async function main() {
   const arguments_ = process.argv.slice(2);
 
-  // Determine target directory
-  let targetDir = process.cwd();
-  if (arguments_.length > 0 && !arguments_[0].startsWith('-')) {
-    targetDir = path.resolve(arguments_[0]);
-  }
+  // Determine target directory (first positional argument, skipping flags and their values)
+  const targetDir = findTargetDir(arguments_);
+
+  // Resolve data directory: env var takes priority, then --data-dir flag
+  const dataDirFlag = parseDataDir(arguments_);
+  const dataDir = process.env.KANGENTIC_DATA_DIR || dataDirFlag;
 
   // Detect platform
   const platformInfo = getPlatformInfo();
@@ -321,7 +364,7 @@ async function main() {
   // Check if already installed
   if (isInstalled(platformInfo)) {
     console.log(`Kangentic v${VERSION} is already installed.`);
-    launch(platformInfo, targetDir);
+    launch(platformInfo, targetDir, dataDir);
     return;
   }
 
@@ -359,7 +402,7 @@ async function main() {
   }
 
   // Launch
-  launch(platformInfo, targetDir);
+  launch(platformInfo, targetDir, dataDir);
 }
 
 main().catch((error) => {

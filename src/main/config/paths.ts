@@ -2,10 +2,31 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 
+function getDataDirFromArgs(): string | null {
+  for (let index = 0; index < process.argv.length; index++) {
+    const argument = process.argv[index];
+    if (argument.startsWith('--data-dir=')) {
+      return argument.slice('--data-dir='.length);
+    }
+    if (argument === '--data-dir' && index + 1 < process.argv.length) {
+      const nextArgument = process.argv[index + 1];
+      if (!nextArgument.startsWith('-')) {
+        return nextArgument;
+      }
+    }
+  }
+  return null;
+}
+
 function getConfigDir(): string {
-  // Allow override for test isolation (each test run gets its own data dir)
+  // Priority: env var > CLI flag > platform default
   if (process.env.KANGENTIC_DATA_DIR) {
     return process.env.KANGENTIC_DATA_DIR;
+  }
+
+  const dataDirFromArgs = getDataDirFromArgs();
+  if (dataDirFromArgs) {
+    return dataDirFromArgs;
   }
 
   const platform = process.platform;
