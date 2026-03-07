@@ -11,7 +11,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="AGPL-3.0 License" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen.svg" alt="Platform" />
-  <a href="https://kangentic.com"><img src="https://img.shields.io/badge/website-kangentic.com-purple.svg" alt="Website" /></a>
+  <a href="https://www.kangentic.com"><img src="https://img.shields.io/badge/website-kangentic.com-purple.svg" alt="Website" /></a>
 </p>
 
 ---
@@ -57,7 +57,7 @@ kgnt open /path/to   # Open a specific project path
 
 ## Documentation
 
-Full documentation at [kangentic.com](https://kangentic.com) and in [`docs/`](docs/README.md).
+Full documentation at [kangentic.com/getting-started](https://www.kangentic.com/getting-started/) and in [`docs/`](docs/README.md).
 
 ## Why Kangentic?
 
