@@ -84,9 +84,10 @@ export function registerSystemHandlers(context: IpcContext): void {
 
   // === Notifications ===
   ipcMain.on(IPC.NOTIFICATION_SHOW, (_event, input: NotificationInput) => {
+    const iconFilename = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
     const iconPath = app.isPackaged
-      ? path.join(process.resourcesPath, 'icon.png')
-      : path.join(app.getAppPath(), 'resources', 'icon.png');
+      ? path.join(process.resourcesPath, iconFilename)
+      : path.join(app.getAppPath(), 'resources', iconFilename);
 
     const notification = new Notification({
       title: input.title,

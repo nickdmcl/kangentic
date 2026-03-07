@@ -16,7 +16,7 @@ const config: ForgeConfig = {
     name: 'Kangentic',
     executableName: 'kangentic',
     icon: './resources/icon',
-    extraResource: ['./resources/icon.png'],
+    extraResource: ['./resources/icon.png', './resources/icon.ico'],
   },
   rebuildConfig: {
     // node-pty ships NAPI prebuilt binaries that work across Node/Electron
@@ -28,6 +28,7 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       name: 'Kangentic',
       setupIcon: './resources/icon.ico',
+      setupAppId: 'com.kangentic.app',
     }),
     new MakerDMG({
       name: 'Kangentic',
