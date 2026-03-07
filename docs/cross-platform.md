@@ -48,11 +48,13 @@ Adaptations applied in `SessionManager.doSpawn()` and `adaptCommandForShell()`:
 
 ## Native Modules
 
-| Module | Build Strategy |
-|--------|---------------|
-| better-sqlite3 | Rebuilt per platform during packaging (Visual Studio Build Tools on Windows, Xcode on macOS, build-essential on Linux) |
-| node-pty | Prebuilt NAPI binaries, no rebuild needed |
-| simple-git | Pure JavaScript, no native code |
+| Module | Build Strategy | Packaging |
+|--------|---------------|-----------|
+| better-sqlite3 | Rebuilt per platform during packaging (`rebuildConfig.onlyModules`) | Whitelisted in `packagerConfig.ignore`, C++ source stripped |
+| node-pty | Prebuilt NAPI binaries, no rebuild needed | Whitelisted in `packagerConfig.ignore`, cross-platform prebuilds stripped, `asar.unpack` for current platform |
+| simple-git | Pure JavaScript, bundled by Vite | Not in node_modules (bundled into main process) |
+
+The custom `packagerConfig.ignore` in `forge.config.ts` overrides the Forge VitePlugin's default (which only allows `/.vite`). It whitelists `better-sqlite3`, `node-pty`, `bindings`, and `file-uri-to-path` while stripping build artifacts and non-current-platform prebuilds to reduce bundle size.
 
 ## Config Directory Locations
 
