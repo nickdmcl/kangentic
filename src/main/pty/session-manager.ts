@@ -787,10 +787,20 @@ export class SessionManager extends EventEmitter {
   async suspendAll(timeoutMs = 2000): Promise<string[]> {
     const taskIds: string[] = [];
     const ptysToKill: pty.IPty[] = [];
+    const freshSessionThresholdMs = 10_000;
+    const now = Date.now();
+    let hasLongRunningSession = false;
 
     for (const session of this.sessions.values()) {
       if (session.pty && session.status === 'running') {
         taskIds.push(session.taskId);
+
+        // Check if this session has been running long enough to have
+        // meaningful conversation state worth waiting for
+        const sessionAge = now - new Date(session.startedAt).getTime();
+        if (sessionAge >= freshSessionThresholdMs) {
+          hasLongRunningSession = true;
+        }
 
         // Ask Claude Code to exit gracefully: Ctrl+C interrupts any
         // in-progress operation, then /exit triggers a clean shutdown
@@ -815,9 +825,12 @@ export class SessionManager extends EventEmitter {
     }
     this.sessionQueue.clear();
 
-    // Wait for graceful exit, then force-kill any remaining
+    // Wait for graceful exit, then force-kill any remaining.
+    // Use a short timeout for freshly spawned sessions (e.g. recovery just started)
+    // since they have minimal conversation state to save.
     if (ptysToKill.length > 0) {
-      await new Promise((resolve) => setTimeout(resolve, timeoutMs));
+      const effectiveTimeout = hasLongRunningSession ? timeoutMs : 200;
+      await new Promise((resolve) => setTimeout(resolve, effectiveTimeout));
     }
     for (const session of this.sessions.values()) {
       // Close watchers but preserve session files --

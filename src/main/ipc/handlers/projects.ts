@@ -215,9 +215,13 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
     const sessionRepo = new SessionRepository(db);
     pruneOrphanedWorktrees(project.path, taskRepo, sessionRepo, context.sessionManager);
 
-    // Recover suspended/orphaned sessions, then reconcile missing ones
-    await recoverSessions(project.id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager);
-    await reconcileSessions(project.id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager);
+    // Recover suspended/orphaned sessions, then reconcile missing ones.
+    // Fire-and-forget: the board renders immediately with last-known task state;
+    // sessions appear reactively as PTYs come online via existing IPC status events.
+    recoverSessions(project.id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager)
+      .catch((err) => console.error('Background session recovery failed:', err))
+      .then(() => reconcileSessions(project.id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager))
+      .catch((err) => console.error('Background session reconciliation failed:', err));
   }
 
   return project;
@@ -298,9 +302,13 @@ export function registerProjectHandlers(context: IpcContext): void {
       const sessionRepo = new SessionRepository(db);
       pruneOrphanedWorktrees(project.path, taskRepo, sessionRepo, context.sessionManager);
 
-      // Recover any suspended/orphaned sessions, then reconcile missing ones
-      await recoverSessions(id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager);
-      await reconcileSessions(id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager);
+      // Recover suspended/orphaned sessions, then reconcile missing ones.
+      // Fire-and-forget: the board renders immediately with last-known task state;
+      // sessions appear reactively as PTYs come online via existing IPC status events.
+      recoverSessions(id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager)
+        .catch((err) => console.error('Background session recovery failed:', err))
+        .then(() => reconcileSessions(id, project.path, context.sessionManager, context.claudeDetector, context.commandBuilder, context.configManager))
+        .catch((err) => console.error('Background session reconciliation failed:', err));
     }
   });
 

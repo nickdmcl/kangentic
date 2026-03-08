@@ -107,6 +107,7 @@ function loadReactDevTools(): void {
 }
 
 const createWindow = () => {
+  if (!app.isPackaged) console.time('[startup] createWindow');
   const isTest = process.env.NODE_ENV === 'test';
 
   const iconPath = resolveIconPath();
@@ -212,6 +213,8 @@ const createWindow = () => {
     mainWindow.loadFile(fs.existsSync(forgePath) ? forgePath : standalonePath);
   }
 
+  if (!app.isPackaged) console.timeEnd('[startup] createWindow');
+
   // Once the renderer is ready, auto-open the project if --cwd was provided.
   // Await session recovery/reconciliation so tasks in agent columns have
   // live PTY sessions before the renderer is notified.
@@ -229,9 +232,12 @@ const createWindow = () => {
 
     if (cwd && mainWindow) {
       try {
+        if (!app.isPackaged) console.time('[startup] openProjectByPath');
         const project = await openProjectByPath(cwd);
+        if (!app.isPackaged) console.timeEnd('[startup] openProjectByPath');
         mainWindow.webContents.send(IPC.PROJECT_AUTO_OPENED, project);
       } catch (err) {
+        if (!app.isPackaged) console.timeEnd('[startup] openProjectByPath');
         console.error('Failed to auto-open project:', err);
       }
     }
@@ -241,16 +247,26 @@ const createWindow = () => {
       const lastProject = getLastOpenedProject();
       if (lastProject) {
         try {
+          if (!app.isPackaged) console.time('[startup] openProjectByPath');
           const project = await openProjectByPath(lastProject.path);
+          if (!app.isPackaged) console.timeEnd('[startup] openProjectByPath');
           mainWindow.webContents.send(IPC.PROJECT_AUTO_OPENED, project);
         } catch (err) {
+          if (!app.isPackaged) console.timeEnd('[startup] openProjectByPath');
           console.error('Failed to auto-open last project:', err);
         }
       }
     }
 
-    // Activate all other projects' sessions in the background
-    activateAllProjects().catch((err) => console.error('Failed to activate all projects:', err));
+    // Activate all other projects' sessions in the background.
+    // Defer by 5 seconds so the primary project's recovery completes
+    // without CPU/IO contention from all other projects.
+    setTimeout(() => {
+      if (!app.isPackaged) console.time('[startup] activateAllProjects');
+      activateAllProjects()
+        .catch((err) => console.error('Failed to activate all projects:', err))
+        .finally(() => { if (!app.isPackaged) console.timeEnd('[startup] activateAllProjects'); });
+    }, 5000);
   });
 };
 
@@ -277,11 +293,10 @@ app.whenReady().then(async () => {
   // Must run after createWindow() since pruneStaleWorktreeProjects uses IPC context
   // initialized by registerAllIpc() inside createWindow().
   if (!isEphemeral && !app.isPackaged) {
-    try {
-      await pruneStaleWorktreeProjects();
-    } catch (err) {
-      console.error('Failed to prune stale worktree projects:', err);
-    }
+    console.time('[startup] pruneStaleWorktreeProjects');
+    pruneStaleWorktreeProjects()
+      .catch((err) => console.error('Failed to prune stale worktree projects:', err))
+      .finally(() => { console.timeEnd('[startup] pruneStaleWorktreeProjects'); });
   }
 });
 
@@ -333,7 +348,9 @@ async function shutdownSessions(): Promise<void> {
 
   // Gracefully suspend running sessions -- sends /exit then waits for
   // Claude Code to save its conversation state before force-killing.
+  if (!app.isPackaged) console.time('[shutdown] suspendAll');
   await sessionManager.suspendAll();
+  if (!app.isPackaged) console.timeEnd('[shutdown] suspendAll');
 
   sessionManager.killAll();
   closeAll();

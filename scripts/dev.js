@@ -33,6 +33,7 @@ let electronProc = null;
 
 async function start() {
   // 1. Start Vite dev server using JS API
+  console.time('[dev] vite createServer');
   const { createServer } = await import('vite');
   const isWorktree = projectDir.replace(/\\/g, '/').includes('.kangentic/worktrees/');
   if (isWorktree) {
@@ -65,9 +66,11 @@ async function start() {
     });
   }
   await viteServer.listen();
+  console.timeEnd('[dev] vite createServer');
   console.log(`[dev] Vite dev server running at http://localhost:${port}`);
 
   // 2. Build main + preload with esbuild
+  console.time('[dev] esbuild');
   await Promise.all([
     esbuild.build({
       ...esbuildCommon,
@@ -80,6 +83,7 @@ async function start() {
       outfile: path.join(projectDir, '.vite/build/preload.js'),
     }),
   ]);
+  console.timeEnd('[dev] esbuild');
   console.log('[dev] Main + preload built');
 
   // 3. Launch Electron

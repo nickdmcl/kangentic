@@ -15,6 +15,7 @@ import type { SessionRecord, ActionConfig, Task, PermissionMode } from '../../sh
 import { ensureWorktreeTrust } from '../agent/trust-manager';
 import { sessionOutputPaths } from './session-paths';
 import { sanitizeForPty } from '../../shared/paths';
+import { app } from 'electron';
 
 // ---------------------------------------------------------------------------
 // Prune orphaned worktree tasks (worktree dir deleted externally)
@@ -180,6 +181,8 @@ export async function recoverSessions(
   commandBuilder: CommandBuilder,
   configManager: ConfigManager,
 ): Promise<void> {
+  const timerLabel = `[startup] recoverSessions:${projectId.slice(0, 8)}`;
+  if (!app.isPackaged) console.time(timerLabel);
   const db = getProjectDb(projectId);
   const sessionRepo = new SessionRepository(db);
   const taskRepo = new TaskRepository(db);
@@ -205,7 +208,10 @@ export async function recoverSessions(
   const suspended = sessionRepo.getResumable();
   const orphaned = sessionRepo.getOrphaned();
   const allRecords = [...suspended, ...orphaned];
-  if (allRecords.length === 0) return;
+  if (allRecords.length === 0) {
+    if (!app.isPackaged) console.timeEnd(timerLabel);
+    return;
+  }
 
   // 3. Deduplicate: for each task_id, keep only the most recent record.
   //    Mark all older duplicates as exited immediately.
@@ -287,6 +293,7 @@ export async function recoverSessions(
         `Session recovery: skipped ${skipped} of ${toRecover.length} task(s) -- all in non-auto-spawn columns or deleted`,
       );
     }
+    if (!app.isPackaged) console.timeEnd(timerLabel);
     return;
   }
 
@@ -303,6 +310,7 @@ export async function recoverSessions(
       toProcess.length,
       'session(s)',
     );
+    if (!app.isPackaged) console.timeEnd(timerLabel);
     return;
   }
 
@@ -466,6 +474,7 @@ export async function recoverSessions(
       `Session recovery: resumed ${recovered}, skipped ${skipped} (of ${toRecover.length} unique tasks, ${allRecords.length} total records)`,
     );
   }
+  if (!app.isPackaged) console.timeEnd(timerLabel);
 }
 
 // ---------------------------------------------------------------------------
@@ -488,6 +497,8 @@ export async function reconcileSessions(
   commandBuilder: CommandBuilder,
   configManager: ConfigManager,
 ): Promise<void> {
+  const reconcileTimerLabel = `[startup] reconcileSessions:${projectId.slice(0, 8)}`;
+  if (!app.isPackaged) console.time(reconcileTimerLabel);
   const db = getProjectDb(projectId);
   const taskRepo = new TaskRepository(db);
   const actionRepo = new ActionRepository(db);
@@ -499,7 +510,10 @@ export async function reconcileSessions(
   const swimlaneRepo = new SwimlaneRepository(db);
   const allLanes = swimlaneRepo.list();
   const activeLanes = allLanes.filter(l => l.auto_spawn);
-  if (activeLanes.length === 0) return;
+  if (activeLanes.length === 0) {
+    if (!app.isPackaged) console.timeEnd(reconcileTimerLabel);
+    return;
+  }
 
   // Build set of task IDs that already have a running PTY session
   const activePtySessions = sessionManager.listSessions();
@@ -515,6 +529,7 @@ export async function reconcileSessions(
     console.warn(
       'Session reconciliation: Claude CLI not found -- skipping all tasks',
     );
+    if (!app.isPackaged) console.timeEnd(reconcileTimerLabel);
     return;
   }
 
@@ -658,5 +673,6 @@ export async function reconcileSessions(
       `Session reconciliation: spawned ${reconciled} session(s) for tasks without agents`,
     );
   }
+  if (!app.isPackaged) console.timeEnd(reconcileTimerLabel);
 }
 
