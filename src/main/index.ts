@@ -228,12 +228,31 @@ const createWindow = () => {
 
   endPhase('createWindow');
 
-  // Once the renderer is ready, auto-open the project if --cwd was provided.
-  // Await session recovery/reconciliation so tasks in agent columns have
-  // live PTY sessions before the renderer is notified.
+  // Speculative preloading: start project opening immediately after createWindow()
+  // instead of waiting for did-finish-load (~2s later). DB init, session recovery,
+  // and Claude CLI detection all overlap with the renderer loading phase.
+  // IPC handlers are already registered (registerAllIpc above), and Electron queues
+  // any webContents.send() calls until the renderer is ready.
+  const cwd = getCwdArg();
+  const projectPath = cwd || getLastOpenedProject()?.path || null;
+  const preloadPromise = projectPath
+    ? (async () => {
+        try {
+          phase('openProjectByPath');
+          const project = await openProjectByPath(projectPath);
+          endPhase('openProjectByPath');
+          mark('project_opened');
+          return project;
+        } catch (err) {
+          endPhase('openProjectByPath');
+          console.error('[APP] Failed to preload project:', err);
+          return null;
+        }
+      })()
+    : Promise.resolve(null);
+
   mainWindow.webContents.on('did-finish-load', async () => {
     mark('did_finish_load');
-    const cwd = getCwdArg();
 
     // Set window title to include worktree name so the taskbar entry
     // is distinguishable from the main project window.
@@ -244,38 +263,11 @@ const createWindow = () => {
       }
     }
 
-    if (cwd && mainWindow) {
-      try {
-        phase('openProjectByPath');
-        const project = await openProjectByPath(cwd);
-        endPhase('openProjectByPath');
-        mark('project_opened');
-        finishStartupTimer();
-        mainWindow.webContents.send(IPC.PROJECT_AUTO_OPENED, project);
-      } catch (err) {
-        endPhase('openProjectByPath');
-        console.error('[APP] Failed to auto-open project:', err);
-      }
-    }
-
-    // Auto-open the last activated project if no --cwd was provided
-    if (!cwd && mainWindow) {
-      const lastProject = getLastOpenedProject();
-      if (lastProject) {
-        try {
-          phase('openProjectByPath');
-          const project = await openProjectByPath(lastProject.path);
-          endPhase('openProjectByPath');
-          mark('project_opened');
-          finishStartupTimer();
-          mainWindow.webContents.send(IPC.PROJECT_AUTO_OPENED, project);
-        } catch (err) {
-          endPhase('openProjectByPath');
-          console.error('[APP] Failed to auto-open last project:', err);
-        }
-      } else {
-        finishStartupTimer();
-      }
+    // Await the preload that started during createWindow -- typically already resolved
+    const project = await preloadPromise;
+    finishStartupTimer();
+    if (project && mainWindow) {
+      mainWindow.webContents.send(IPC.PROJECT_AUTO_OPENED, project);
     }
 
     // Activate all other projects' sessions in the background.
