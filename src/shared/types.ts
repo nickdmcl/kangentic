@@ -25,6 +25,7 @@ export interface Task {
   pr_url: string | null;
   base_branch: string | null;
   use_worktree: number | null;
+  attachment_count: number;
   archived_at: string | null;
   created_at: string;
   updated_at: string;

@@ -164,6 +164,8 @@ export function registerTaskHandlers(context: IpcContext): void {
       for (const att of pendingAttachments) {
         attachments.add(context.currentProjectPath, task.id, att.filename, att.data, att.media_type);
       }
+      // Re-fetch to get correct attachment_count from the JOIN
+      return tasks.getById(task.id) ?? task;
     }
 
     return task;

@@ -85,6 +85,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const deleteTask = useBoardStore((s) => s.deleteTask);
   const moveTask = useBoardStore((s) => s.moveTask);
   const unarchiveTask = useBoardStore((s) => s.unarchiveTask);
+  const updateAttachmentCount = useBoardStore((s) => s.updateAttachmentCount);
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const projectPath = useProjectStore((s) => s.currentProject?.path ?? null);
   const killSession = useSessionStore((s) => s.killSession);
@@ -172,6 +173,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         });
         const previewUrl = await window.electronAPI.attachments.getDataUrl(attachment.id);
         setSavedAttachments((prev) => [...prev, { ...attachment, previewUrl }]);
+        updateAttachmentCount(task.id, 1);
       } catch (err) {
         console.error('Failed to add attachment:', err);
       }
@@ -183,10 +185,11 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     try {
       await window.electronAPI.attachments.remove(id);
       setSavedAttachments((prev) => prev.filter((a) => a.id !== id));
+      updateAttachmentCount(task.id, -1);
     } catch (err) {
       console.error('Failed to remove attachment:', err);
     }
-  }, []);
+  }, [task.id, updateAttachmentCount]);
 
   const handleAttachmentPaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;

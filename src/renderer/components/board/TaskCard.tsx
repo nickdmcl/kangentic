@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail } from 'lucide-react';
+import { Loader2, Trash2, CirclePause, Mail, Image, Images } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { useSessionStore } from '../../stores/session-store';
@@ -135,6 +135,16 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
 
         {task.description && (
           <div className="text-xs text-fg-faint mt-1 line-clamp-3">{task.description}</div>
+        )}
+
+        {task.attachment_count > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-edge">
+            {task.attachment_count === 1
+              ? <Image size={15} className="text-fg-faint" />
+              : <Images size={15} className="text-fg-faint" />
+            }
+            <span className="text-xs text-fg-faint">{task.attachment_count}</span>
+          </div>
         )}
 
         {/* Bottom bar -- exhaustive switch on display state */}

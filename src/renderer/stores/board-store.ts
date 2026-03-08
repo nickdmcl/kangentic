@@ -46,6 +46,9 @@ interface BoardStore {
   // Within-column reorder
   reorderTaskInColumn: (taskId: string, swimlaneId: string, activeId: string, overId: string) => Promise<void>;
 
+  // Attachment count sync
+  updateAttachmentCount: (taskId: string, delta: number) => void;
+
   // Swimlanes
   createSwimlane: (input: SwimlaneCreateInput) => Promise<Swimlane>;
   updateSwimlane: (input: SwimlaneUpdateInput) => Promise<Swimlane>;
@@ -353,6 +356,16 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   deleteSwimlane: async (id) => {
     await window.electronAPI.swimlanes.delete(id);
     set((s) => ({ swimlanes: s.swimlanes.filter((l) => l.id !== id) }));
+  },
+
+  updateAttachmentCount: (taskId, delta) => {
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, attachment_count: Math.max(0, task.attachment_count + delta) }
+          : task
+      ),
+    }));
   },
 
   reorderSwimlanes: async (ids) => {

@@ -62,6 +62,18 @@
     return new Date().toISOString();
   }
 
+  function getAttachmentCount(taskId) {
+    return attachments.filter(function (a) { return a.task_id === taskId; }).length;
+  }
+
+  function withAttachmentCount(task) {
+    return Object.assign({}, task, { attachment_count: getAttachmentCount(task.id) });
+  }
+
+  function withAttachmentCounts(taskList) {
+    return taskList.map(withAttachmentCount);
+  }
+
   function deepMerge(base, overrides) {
     var result = Object.assign({}, base);
     for (var key in overrides) {
@@ -211,7 +223,7 @@
 
     tasks: {
       list: async function () {
-        return tasks;
+        return withAttachmentCounts(tasks);
       },
       create: async function (input) {
         var sameColumn = tasks.filter(function (t) {
@@ -232,6 +244,7 @@
           pr_url: null,
           base_branch: input.baseBranch || null,
           use_worktree: input.useWorktree != null ? (input.useWorktree ? 1 : 0) : null,
+          attachment_count: 0,
           archived_at: null,
           created_at: now(),
           updated_at: now(),
@@ -251,7 +264,7 @@
             });
           });
         }
-        return task;
+        return withAttachmentCount(task);
       },
       update: async function (input) {
         var idx = tasks.findIndex(function (t) {
@@ -333,7 +346,7 @@
         });
       },
       listArchived: async function () {
-        return archivedTasks;
+        return withAttachmentCounts(archivedTasks);
       },
       onAutoMoved: function () {
         return noop;

@@ -5,19 +5,35 @@ import type { Task, TaskCreateInput, TaskUpdateInput, TaskMoveInput } from '../.
 export class TaskRepository {
   constructor(private db: Database.Database) {}
 
+  private static readonly SELECT_WITH_COUNT = `
+    SELECT t.*, COALESCE(ac.cnt, 0) as attachment_count
+    FROM tasks t
+    LEFT JOIN (
+      SELECT task_id, COUNT(*) as cnt
+      FROM task_attachments
+      GROUP BY task_id
+    ) ac ON ac.task_id = t.id`;
+
   list(swimlaneId?: string): Task[] {
     if (swimlaneId) {
-      return this.db.prepare('SELECT * FROM tasks WHERE swimlane_id = ? AND archived_at IS NULL ORDER BY position ASC').all(swimlaneId) as Task[];
+      return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+        WHERE t.swimlane_id = ? AND t.archived_at IS NULL
+        ORDER BY t.position ASC`).all(swimlaneId) as Task[];
     }
-    return this.db.prepare('SELECT * FROM tasks WHERE archived_at IS NULL ORDER BY swimlane_id, position ASC').all() as Task[];
+    return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+      WHERE t.archived_at IS NULL
+      ORDER BY t.swimlane_id, t.position ASC`).all() as Task[];
   }
 
   getById(id: string): Task | undefined {
-    return this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Task | undefined;
+    return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+      WHERE t.id = ?`).get(id) as Task | undefined;
   }
 
   getBySessionId(sessionId: string): Task | undefined {
-    return this.db.prepare('SELECT * FROM tasks WHERE session_id = ? AND archived_at IS NULL LIMIT 1').get(sessionId) as Task | undefined;
+    return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+      WHERE t.session_id = ? AND t.archived_at IS NULL
+      LIMIT 1`).get(sessionId) as Task | undefined;
   }
 
   create(input: TaskCreateInput): Task {
@@ -41,6 +57,7 @@ export class TaskRepository {
       pr_url: null,
       base_branch: input.baseBranch || null,
       use_worktree: input.useWorktree != null ? (input.useWorktree ? 1 : 0) : null,
+      attachment_count: 0,
       archived_at: null,
       created_at: now,
       updated_at: now,
@@ -106,7 +123,9 @@ export class TaskRepository {
   }
 
   listArchived(): Task[] {
-    return this.db.prepare('SELECT * FROM tasks WHERE archived_at IS NOT NULL ORDER BY archived_at DESC').all() as Task[];
+    return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+      WHERE t.archived_at IS NOT NULL
+      ORDER BY t.archived_at DESC`).all() as Task[];
   }
 
   delete(id: string): void {
