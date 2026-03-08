@@ -591,6 +591,10 @@
       },
     },
 
+    analytics: {
+      trackRendererError: function () {},
+    },
+
     app: {
       getVersion: async function () {
         return '0.1.0';

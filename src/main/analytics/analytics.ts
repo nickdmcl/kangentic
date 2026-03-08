@@ -48,6 +48,17 @@ export function trackEvent(eventName: string, props?: Record<string, string | nu
 }
 
 /**
+ * Strip file paths from error messages to avoid leaking PII (usernames in paths).
+ * Truncates to 200 chars.
+ */
+export function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(/[A-Z]:\\[^\s:;,)]+/gi, '<path>')       // Windows paths: C:\Users\...
+    .replace(/\/(?:home|Users|tmp|var|etc|root|opt)\/[^\s:;,)]+/g, '<path>') // Unix paths
+    .slice(0, 200);
+}
+
+/**
  * Track an event and return its delivery promise. Use this when the caller
  * needs to await delivery (e.g. during shutdown) rather than fire-and-forget.
  */

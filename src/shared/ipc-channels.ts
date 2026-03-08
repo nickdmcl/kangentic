@@ -97,6 +97,9 @@ export const IPC = {
   WINDOW_FLASH_FRAME: 'window:flashFrame',
   WINDOW_IS_FOCUSED: 'window:isFocused',
 
+  // Analytics
+  TRACK_RENDERER_ERROR: 'analytics:trackRendererError',
+
   // App
   APP_GET_VERSION: 'app:getVersion',
 

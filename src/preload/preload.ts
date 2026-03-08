@@ -154,6 +154,10 @@ const api: ElectronAPI = {
     isFocused: () => ipcRenderer.invoke(IPC.WINDOW_IS_FOCUSED),
   },
 
+  analytics: {
+    trackRendererError: (message: string) => ipcRenderer.send(IPC.TRACK_RENDERER_ERROR, message),
+  },
+
   app: {
     getVersion: () => ipcRenderer.invoke(IPC.APP_GET_VERSION),
   },

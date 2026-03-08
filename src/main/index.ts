@@ -11,18 +11,26 @@ import { IPC } from '../shared/ipc-channels';
 import { THEME_BACKGROUNDS } from '../shared/types';
 import type { ThemeMode } from '../shared/types';
 import { PATHS } from './config/paths';
-import { initAnalytics, trackEvent, trackEventAsync } from './analytics/analytics';
+import { initAnalytics, trackEvent, trackEventAsync, sanitizeErrorMessage } from './analytics/analytics';
 import { initStartupTimer, mark, phase, endPhase, finishStartupTimer } from './startup-timer';
 
 initStartupTimer(PROCESS_START);
 mark('process_start');
 
 // Global error handlers -- keep the app running through transient IPC/PTY errors
-process.on('uncaughtException', (err) => {
-  console.error('[APP] Uncaught exception:', err);
+process.on('uncaughtException', (error) => {
+  console.error('[APP] Uncaught exception:', error);
+  trackEvent('app_error', {
+    source: 'uncaughtException',
+    message: sanitizeErrorMessage(error.message),
+  });
 });
 process.on('unhandledRejection', (reason) => {
   console.error('[APP] Unhandled rejection:', reason);
+  trackEvent('app_error', {
+    source: 'unhandledRejection',
+    message: sanitizeErrorMessage(reason instanceof Error ? reason.message : String(reason)),
+  });
 });
 
 // Handle Squirrel.Windows lifecycle events (install/update/uninstall shortcuts)
@@ -216,6 +224,15 @@ const createWindow = () => {
       },
     ]);
     menu.popup();
+  });
+
+  // Track renderer crashes (OOM, GPU process gone, etc.)
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    trackEvent('app_error', {
+      source: 'render-process-gone',
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

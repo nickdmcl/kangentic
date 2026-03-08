@@ -617,6 +617,11 @@ export interface ElectronAPI {
     isFocused: () => Promise<boolean>;
   };
 
+  // Analytics
+  analytics: {
+    trackRendererError: (message: string) => void;
+  };
+
   // App
   app: {
     getVersion: () => Promise<string>;

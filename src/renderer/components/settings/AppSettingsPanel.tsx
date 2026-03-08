@@ -233,6 +233,7 @@ export function AppSettingsPanel() {
           <SectionHeader label="What We Collect" />
           <ul className="list-disc list-inside text-sm text-fg-muted space-y-1 ml-1">
             <li>App launches, platform, and architecture</li>
+            <li>App crashes and errors (sanitized, no file paths)</li>
             <li>Task and project creation counts</li>
             <li>Agent session starts, exit codes, and duration</li>
           </ul>

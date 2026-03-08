@@ -1,4 +1,6 @@
-import type { BrowserWindow } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
+import { IPC } from '../../shared/ipc-channels';
+import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { ProjectRepository } from '../db/repositories/project-repository';
 import { SessionManager } from '../pty/session-manager';
 import { ConfigManager } from '../config/config-manager';
@@ -73,6 +75,14 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   registerSessionHandlers(context);
   registerBoardHandlers(context);
   registerSystemHandlers(context);
+
+  // Analytics: renderer error tracking (fire-and-forget from renderer)
+  ipcMain.on(IPC.TRACK_RENDERER_ERROR, (_event, message: string) => {
+    trackEvent('app_error', {
+      source: 'error_boundary',
+      message: sanitizeErrorMessage(message),
+    });
+  });
 }
 
 // Thin wrappers -- same signatures as before, zero changes in index.ts
