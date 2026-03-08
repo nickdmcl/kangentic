@@ -576,6 +576,7 @@ export class SessionManager extends EventEmitter {
       onChange: () => this.readAndEmitUsage(session),
       label: `Usage:${session.id.slice(0, 8)}`,
       debounceMs: 100,
+      initialGracePeriodMs: 15_000,
     });
 
     // Immediately read any existing status.json (e.g. resumed sessions after restart).
@@ -738,6 +739,7 @@ export class SessionManager extends EventEmitter {
       onChange: () => this.readAndProcessEvents(session),
       label: `Event:${session.id.slice(0, 8)}`,
       debounceMs: 50,
+      initialGracePeriodMs: 15_000,
       isStale: () => {
         try {
           const stat = fs.statSync(eventsPath);

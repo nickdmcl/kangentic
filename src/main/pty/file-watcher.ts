@@ -8,6 +8,7 @@ interface FileWatcherOptions {
   pollIntervalMs?: number;
   staleThresholdMs?: number;
   isStale?: () => boolean;
+  initialGracePeriodMs?: number;
 }
 
 /**
@@ -22,6 +23,7 @@ export class FileWatcher {
   private lastWatcherFireTime: number;
   private closed = false;
   private hasLoggedStaleRecovery = false;
+  private hasReceivedFirstEvent = false;
 
   private readonly filePath: string;
   private readonly onChange: () => void;
@@ -30,6 +32,8 @@ export class FileWatcher {
   private readonly pollIntervalMs: number;
   private readonly staleThresholdMs: number;
   private readonly isStale: () => boolean;
+  private readonly initialGracePeriodMs: number;
+  private readonly constructionTime: number;
 
   constructor(options: FileWatcherOptions) {
     this.filePath = options.filePath;
@@ -38,6 +42,8 @@ export class FileWatcher {
     this.debounceMs = options.debounceMs ?? 50;
     this.pollIntervalMs = options.pollIntervalMs ?? 3000;
     this.staleThresholdMs = options.staleThresholdMs ?? 5000;
+    this.initialGracePeriodMs = options.initialGracePeriodMs ?? 0;
+    this.constructionTime = Date.now();
     this.lastWatcherFireTime = Date.now();
 
     // Default staleness check: mtime-based (good for files overwritten on each write)
@@ -75,6 +81,7 @@ export class FileWatcher {
   private onFileChange = (): void => {
     if (this.closed) return;
     this.lastWatcherFireTime = Date.now();
+    this.hasReceivedFirstEvent = true;
     // Do NOT reset hasLoggedStaleRecovery here -- if the watcher was restarted
     // by polling, the new fs.watch may fire once immediately (Node behavior),
     // which would reset the flag and cause repeated log spam on the next poll.
@@ -116,7 +123,10 @@ export class FileWatcher {
       const timeSinceLastFire = Date.now() - this.lastWatcherFireTime;
       if (this.isStale() && timeSinceLastFire > this.staleThresholdMs) {
         if (!this.hasLoggedStaleRecovery) {
-          console.warn(`[WATCHER] ${this.label} stale (${Math.round(timeSinceLastFire / 1000)}s since last fire). Recovering.`);
+          const inGracePeriod = !this.hasReceivedFirstEvent
+            && Date.now() - this.constructionTime < this.initialGracePeriodMs;
+          const logMethod = inGracePeriod ? console.debug : console.warn;
+          logMethod(`[WATCHER] ${this.label} stale (${Math.round(timeSinceLastFire / 1000)}s since last fire). Recovering.`);
           this.hasLoggedStaleRecovery = true;
         }
         this.onChange();
