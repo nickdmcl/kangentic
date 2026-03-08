@@ -43,7 +43,7 @@ export class SessionManager extends EventEmitter {
   private activityCache = new Map<string, ActivityState>();
   private subagentDepth = new Map<string, number>();
   private pendingIdleWhileSubagent = new Map<string, boolean>();
-  private lastIdleWasPermission = new Map<string, boolean>();
+
   private eventCache = new Map<string, SessionEvent[]>();
 
   constructor() {
@@ -257,7 +257,7 @@ export class SessionManager extends EventEmitter {
     this.activityCache.set(id, 'idle');
     this.subagentDepth.delete(id);
     this.pendingIdleWhileSubagent.delete(id);
-    this.lastIdleWasPermission.delete(id);
+
     this.emit('activity', id, 'idle', false);
 
     // Batched data output (~60fps)
@@ -342,7 +342,7 @@ export class SessionManager extends EventEmitter {
     this.activityCache.delete(sessionId);
     this.subagentDepth.delete(sessionId);
     this.pendingIdleWhileSubagent.delete(sessionId);
-    this.lastIdleWasPermission.delete(sessionId);
+
     this.eventCache.delete(sessionId);
   }
 
@@ -391,7 +391,7 @@ export class SessionManager extends EventEmitter {
     // Clear subagent depth -- session is no longer active
     this.subagentDepth.delete(sessionId);
     this.pendingIdleWhileSubagent.delete(sessionId);
-    this.lastIdleWasPermission.delete(sessionId);
+
 
     // Mark suspended BEFORE killing so the async onExit handler preserves it
     session.status = 'suspended';
@@ -636,6 +636,8 @@ export class SessionManager extends EventEmitter {
                 this.emit('activity', session.id, 'idle', false);
               }
             }
+
+
           }
 
           // Derive activity state from events via declarative lookup.
@@ -666,13 +668,14 @@ export class SessionManager extends EventEmitter {
             //   main agent resuming after permission approval
             // - depth > 0 means subagents are running and this tool_start
             //   is likely from a subagent, not the main agent
+            // Permission idle is "sticky" during subagent work -- recovery
+            // happens naturally when depth reaches 0 (next tool_start allowed).
             const currentActivity = this.activityCache.get(session.id);
             const depth = this.subagentDepth.get(session.id) || 0;
             if (currentActivity === 'idle' && newActivity === 'thinking'
                 && event.type !== EventType.Prompt
                 && event.type !== EventType.SubagentStart
-                && depth > 0
-                && !this.lastIdleWasPermission.get(session.id)) {
+                && depth > 0) {
               // Suppress: subagent tool event while main agent is idle
               continue;
             }
@@ -691,13 +694,9 @@ export class SessionManager extends EventEmitter {
             // Clear stale pending idle when permission idle bypasses Guard 2
             if (newActivity === 'idle' && event.detail === 'permission') {
               this.pendingIdleWhileSubagent.delete(session.id);
-              this.lastIdleWasPermission.set(session.id, true);
             }
 
             this.activityCache.set(session.id, newActivity);
-            if (newActivity === 'thinking') {
-              this.lastIdleWasPermission.delete(session.id);
-            }
             this.emit('activity', session.id, newActivity, newActivity === 'idle' && event.detail === 'permission');
           }
         }

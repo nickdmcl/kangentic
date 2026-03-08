@@ -1018,7 +1018,7 @@ describe('Event-derived activity state', () => {
     expect(states).toEqual(['thinking', 'idle']);
   });
 
-  it('permission idle + tool_start recovers to thinking', async () => {
+  it('permission idle stays sticky -- subagent tool_start suppressed at depth > 0', async () => {
     const { session, eventsPath } = await spawnWithEvents();
     const states = collectActivity(manager, session.id);
 
@@ -1035,75 +1035,76 @@ describe('Event-derived activity state', () => {
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('idle');
 
-    // 4. tool_start after permission → recovers to thinking (flag allows it)
+    // 4. tool_start at depth > 0 → suppressed (permission idle is sticky)
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-    await waitForWatcher();
-
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
-    expect(states).toEqual(['thinking', 'idle', 'thinking']);
-  });
-
-  it('after permission recovery, subsequent tool_start stays thinking (dedup)', async () => {
-    const { session, eventsPath } = await spawnWithEvents();
-    const states = collectActivity(manager, session.id);
-
-    // 1. tool_start → thinking
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
-    await waitForWatcher();
-
-    // 2. subagent_start → depth 1
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
-    await waitForWatcher();
-
-    // 3. permission idle → emitted
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
-    await waitForWatcher();
-
-    // 4. tool_start → recovers to thinking (flag cleared)
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-    await waitForWatcher();
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
-
-    // 5. Another tool_start → stays thinking (dedup, no state thrashing)
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Grep' });
-    await waitForWatcher();
-
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
-    expect(states).toEqual(['thinking', 'idle', 'thinking']);
-  });
-
-  it('after permission recovery, normal idle is deferred correctly', async () => {
-    const { session, eventsPath } = await spawnWithEvents();
-    const states = collectActivity(manager, session.id);
-
-    // 1. tool_start → thinking
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
-    await waitForWatcher();
-
-    // 2. subagent_start → depth 1
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
-    await waitForWatcher();
-
-    // 3. permission idle → emitted
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
-    await waitForWatcher();
-
-    // 4. tool_start → recovers to thinking (flag cleared)
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-    await waitForWatcher();
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
-
-    // 5. Normal idle at depth > 0 → deferred by Guard 2 (flag was cleared)
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle });
-    await waitForWatcher();
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
-
-    // 6. subagent_stop → depth 0, deferred idle fires
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
     await waitForWatcher();
 
     expect(manager.getActivityCache()[session.id]).toBe('idle');
-    expect(states).toEqual(['thinking', 'idle', 'thinking', 'idle']);
+    expect(states).toEqual(['thinking', 'idle']);
+  });
+
+  it('permission idle suppresses all tool_starts at depth > 0', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
+    await waitForWatcher();
+
+    // 2. subagent_start → depth 1
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
+    await waitForWatcher();
+
+    // 3. permission idle → emitted
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
+    await waitForWatcher();
+
+    // 4. tool_start at depth > 0 → suppressed (permission idle is sticky)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 5. Another tool_start → still suppressed
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Grep' });
+    await waitForWatcher();
+
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+    expect(states).toEqual(['thinking', 'idle']);
+  });
+
+  it('permission idle stays through subagent_stop, recovers on depth-0 tool_start', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
+    await waitForWatcher();
+
+    // 2. subagent_start → depth 1
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
+    await waitForWatcher();
+
+    // 3. permission idle → emitted
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
+    await waitForWatcher();
+
+    // 4. subagent_stop → depth 0, but no special recovery → stays idle
+    //    (correct: permission prompt may still be blocking)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 5. User approves → tool_end (no change), then agent starts next tool
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Bash' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 6. tool_start at depth 0 → Guard 1 allows → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+    await waitForWatcher();
+
+    expect(manager.getActivityCache()[session.id]).toBe('thinking');
+    expect(states).toEqual(['thinking', 'idle', 'thinking']);
   });
 
   it('permission idle clears pending flag -- no stale deferred idle on subagent_stop', async () => {
@@ -1161,11 +1162,11 @@ describe('Event-derived activity state', () => {
     expect(states).toEqual(['thinking']);
   });
 
-  it('full bug reproduction: permission idle recovers on next tool_start', async () => {
+  it('full bug reproduction: permission idle stays sticky through all subagent events', async () => {
     const { session, eventsPath } = await spawnWithEvents();
     const states = collectActivity(manager, session.id);
 
-    // Reproduces the exact sequence from the bug report (session 57f7ea60)
+    // Reproduces the exact sequence from the bug report (sessions 34e2fa27, 53cdfadb)
     // 1. Agent starts tool → thinking
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Bash' });
     await waitForWatcher();
@@ -1175,25 +1176,109 @@ describe('Event-derived activity state', () => {
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
     await waitForWatcher();
 
-    // 3. Permission prompt fires (Bash find needs approval) → idle with detail='permission'
+    // 3. Permission prompt fires (Bash needs approval) → idle with detail='permission'
     //    Bypasses Guard 2 → UI shows idle badge immediately
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('idle');
 
-    // 4. tool_start after permission → recovers to thinking (lastIdleWasPermission flag)
-    //    OLD behavior: Guard 1 suppressed this → stuck at idle
-    //    NEW behavior: flag allows recovery → thinking restored
+    // 4. Concurrent subagent tool_start (295ms later in real life) → suppressed
+    //    OLD behavior: lastIdleWasPermission flag allowed recovery → showed green
+    //    NEW behavior: Guard 1 suppresses at depth > 0 → stays idle (amber)
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
     await waitForWatcher();
-    expect(manager.getActivityCache()[session.id]).toBe('thinking');
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
 
-    // 5. User approves (700s later in real life) → tool_end + prompt → stays thinking
+    // 5. Subagent finishes → depth 0 → no special recovery → stays idle
+    //    (permission prompt may still be blocking -- don't show green!)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 6. User approves (352s later in real life) → tool_end, then next tool_start
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Bash' });
-    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Prompt });
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Edit' });
     await waitForWatcher();
     expect(manager.getActivityCache()[session.id]).toBe('thinking');
 
+    expect(states).toEqual(['thinking', 'idle', 'thinking']);
+  });
+
+  it('permission idle at depth >= 2 not overridden by concurrent subagent', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
+    await waitForWatcher();
+
+    // 2. Two subagents start → depth 2
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Plan' });
+    await waitForWatcher();
+
+    // 3. Permission idle → emitted (bypasses Guard 2)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 4. Concurrent subagent tool_start (from the other subagent) → suppressed
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 5. More subagent tool events → still suppressed
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Read' });
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Grep' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    expect(states).toEqual(['thinking', 'idle']);
+  });
+
+  it('permission idle persists through SubagentStop to depth 0', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Agent' });
+    await waitForWatcher();
+
+    // 2. subagent_start → depth 1
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStart, detail: 'Explore' });
+    await waitForWatcher();
+
+    // 3. permission idle → emitted
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 4. subagent_stop → depth 0 → stays idle (permission prompt may still block)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.SubagentStop, detail: 'Explore' });
+    await waitForWatcher();
+
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+    expect(states).toEqual(['thinking', 'idle']);
+  });
+
+  it('permission idle at depth 0 recovers on next tool_start', async () => {
+    const { session, eventsPath } = await spawnWithEvents();
+    const states = collectActivity(manager, session.id);
+
+    // 1. tool_start → thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Bash' });
+    await waitForWatcher();
+
+    // 2. permission idle at depth 0 (no subagents)
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.Idle, detail: 'permission' });
+    await waitForWatcher();
+    expect(manager.getActivityCache()[session.id]).toBe('idle');
+
+    // 3. tool_start at depth 0 → Guard 1 allows (depth = 0) → recovers to thinking
+    appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+    await waitForWatcher();
+
+    expect(manager.getActivityCache()[session.id]).toBe('thinking');
     expect(states).toEqual(['thinking', 'idle', 'thinking']);
   });
 
