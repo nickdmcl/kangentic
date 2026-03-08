@@ -18,24 +18,25 @@ The config directory (`<configDir>`) is platform-specific:
 
 ## Settings Panels
 
-Settings are split into two panels with separate entry points:
+Settings are split into two panels with separate entry points. Both use a tabbed layout with a sidebar for navigation.
 
-- **App Settings** -- opened via the titlebar gear icon. Contains app-wide settings (theme, CLI path, max sessions, behavior toggles) and a "Project Defaults" section for default values applied to new projects. Changing a project default optionally syncs to all existing projects via a confirmation modal.
-- **Project Settings** -- opened via the gear icon on each project row in the sidebar. Contains per-project overridable settings (shell, font, permissions, git). Inherited defaults are shown as hints; overridden settings get a reset button.
+- **App Settings** -- opened via the titlebar gear icon (labeled "Global"). Tabs: Appearance, Terminal, Agent, Git, Behavior. Contains app-wide settings and project defaults. Changing a project default (theme, shell, font, permissions, git) always shows a confirmation modal to optionally sync to all existing projects.
+- **Project Settings** -- opened via the gear icon on each project row in the sidebar. Tabs: Appearance, Terminal, Agent, Git. Contains per-project overridable settings. Inherited defaults are shown as hints; overridden settings get a reset button. A "Reset All" footer appears when any overrides exist.
 
 ### App-Only Settings
 
 These settings appear only in App Settings and cannot be overridden per-project:
 
-- `theme`, `sidebarVisible`, `boardLayout`, `sidebar.width`
+- `sidebarVisible`, `boardLayout`, `sidebar.width`
 - `claude.cliPath`, `claude.maxConcurrentSessions`, `claude.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
 - `skipDeleteConfirm`, `autoFocusIdleSession`, `notifyIdleOnInactiveProject`, `activateAllProjectsOnStartup`
 
 ### Per-Project Overridable Settings
 
-These settings appear in Project Settings and can be overridden per-project:
+These settings appear in both App Settings (as defaults) and Project Settings (as overrides):
 
+- `theme`
 - `terminal.shell`, `terminal.fontSize`, `terminal.fontFamily`
 - `claude.permissionMode`
 - `git.worktreesEnabled`, `git.autoCleanup`, `git.defaultBaseBranch`, `git.copyFiles`, `git.initScript`
@@ -53,6 +54,7 @@ These settings appear in Project Settings and can be overridden per-project:
 | `autoFocusIdleSession` | boolean | `true` | Auto-switch to session tab when agent goes idle |
 | `notifyIdleOnInactiveProject` | boolean | `true` | Show native OS notification and flash taskbar when an agent goes idle on a non-active project. Clicking the notification switches to the project and opens the task detail dialog. |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
+
 ### terminal.*
 
 | Key | Type | Default | Description |
