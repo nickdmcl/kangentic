@@ -20,6 +20,12 @@ const config: ForgeConfig = {
     executableName: 'kangentic',
     icon: './resources/icon',
     extraResource: ['./resources/icon.png', './resources/icon.ico'],
+    win32metadata: {
+      ProductName: 'Kangentic',
+      FileDescription: 'Kangentic',
+      CompanyName: 'Kangentic',
+      InternalName: 'kangentic',
+    },
     ignore: (file: string) => {
       if (!file) return false;
 
@@ -75,7 +81,8 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       name: 'Kangentic',
       setupIcon: './resources/icon.ico',
-      setupAppId: 'com.kangentic.app',
+      iconUrl: 'https://raw.githubusercontent.com/Kangentic/kangentic/main/resources/icon.ico',
+      setupAppId: 'com.squirrel.Kangentic.kangentic',
       // @ts-expect-error - incorrect types exported by MakerSquirrel
       ...(process.env.AZURE_CODE_SIGNING_DLIB ? { windowsSign } : {}),
     }),

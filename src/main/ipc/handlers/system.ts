@@ -1,9 +1,17 @@
-import path from 'node:path';
-import { ipcMain, Notification, app, dialog, shell } from 'electron';
+import { ipcMain, Notification, dialog, shell, nativeImage, type NativeImage } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { WorktreeManager, isGitRepo } from '../../git/worktree-manager';
+import { resolveIconPath } from '../../index';
 import type { NotificationInput } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
+
+let cachedNotificationIcon: NativeImage | null = null;
+function getNotificationIcon(): NativeImage {
+  if (!cachedNotificationIcon) {
+    cachedNotificationIcon = nativeImage.createFromPath(resolveIconPath());
+  }
+  return cachedNotificationIcon;
+}
 
 export function registerSystemHandlers(context: IpcContext): void {
   // === Config ===
@@ -84,15 +92,10 @@ export function registerSystemHandlers(context: IpcContext): void {
 
   // === Notifications ===
   ipcMain.on(IPC.NOTIFICATION_SHOW, (_event, input: NotificationInput) => {
-    const iconFilename = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-    const iconPath = app.isPackaged
-      ? path.join(process.resourcesPath, iconFilename)
-      : path.join(app.getAppPath(), 'resources', iconFilename);
-
     const notification = new Notification({
       title: input.title,
       body: input.body,
-      icon: iconPath,
+      icon: getNotificationIcon(),
     });
 
     notification.on('click', () => {

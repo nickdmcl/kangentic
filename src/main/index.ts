@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, session } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -42,7 +42,7 @@ for (const arg of process.argv) {
 }
 
 // Tell Windows to display "Kangentic" in notification toasts instead of "Electron"
-app.setAppUserModelId('com.kangentic.app');
+app.setAppUserModelId('com.squirrel.Kangentic.kangentic');
 
 const isEphemeral = process.argv.includes('--ephemeral');
 
@@ -68,23 +68,27 @@ function resolveBackgroundColor(): string {
   }
 }
 
+export function resolveIconPath(): string {
+  const iconFilename = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  return app.isPackaged
+    ? path.join(process.resourcesPath, iconFilename)
+    : path.join(app.getAppPath(), 'resources', iconFilename);
+}
+
 const createWindow = () => {
   const isTest = process.env.NODE_ENV === 'test';
 
-  const iconFilename = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-  const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, iconFilename)
-    : path.join(app.getAppPath(), 'resources', iconFilename);
+  const iconPath = resolveIconPath();
+  const iconImage = nativeImage.createFromPath(iconPath);
 
   mainWindow = new BrowserWindow({
-    icon: iconPath,
+    icon: iconImage,
     width: 1400,
     height: 900,
     minWidth: 900,
     minHeight: 600,
     backgroundColor: resolveBackgroundColor(),
     show: false,
-    frame: false,
     titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -92,6 +96,16 @@ const createWindow = () => {
       nodeIntegration: false,
     },
   });
+
+  // Explicitly set icon for Windows/Linux taskbar
+  if (process.platform !== 'darwin') {
+    mainWindow.setIcon(iconImage);
+  }
+
+  // Set macOS dock icon in dev mode (packaged apps use Info.plist icon automatically)
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    app.dock?.setIcon(iconImage);
+  }
 
   mainWindow.once('ready-to-show', () => {
     if (!isTest) {
