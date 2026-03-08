@@ -93,7 +93,7 @@ Both `app.setAppUserModelId()` in `src/main/index.ts` and `setupAppId` in `forge
 
 ## macOS Code Signing
 
-macOS builds use hardened runtime with `entitlements.plist` providing JIT, unsigned executable memory, and dyld environment variable entitlements (required by node-pty). Notarization uses `notarytool` via `osxNotarize` in `forge.config.ts`, gated on the `APPLE_IDENTITY` environment variable.
+macOS builds use hardened runtime with `build/entitlements.plist` providing JIT, unsigned executable memory, and dyld environment variable entitlements (required by node-pty). Notarization uses `notarytool` via `osxNotarize` in `forge.config.ts`, gated on the `APPLE_IDENTITY` environment variable.
 
 ## Linux System Dependencies
 

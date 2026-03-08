@@ -129,7 +129,7 @@ jobs:
             $metadataPath = "$env:RUNNER_TEMP\metadata.json"
             $metadata | Out-File -FilePath $metadataPath -Encoding utf8NoBOM
 
-            # Set env vars for forge.config.ts / windowsSign.ts
+            # Set env vars for forge.config.ts / build/windowsSign.ts
             echo "AZURE_CODE_SIGNING_DLIB=$dlibPath" >> $env:GITHUB_ENV
             echo "AZURE_METADATA_JSON=$metadataPath" >> $env:GITHUB_ENV
             echo "AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}" >> $env:GITHUB_ENV

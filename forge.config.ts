@@ -9,7 +9,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { PublisherGithub } from '@electron-forge/publisher-github';
-import { windowsSign } from './windowsSign';
+import { windowsSign } from './build/windowsSign';
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -66,8 +66,8 @@ const config: ForgeConfig = {
       osxSign: {
         optionsForFile: () => ({
           hardenedRuntime: true,
-          entitlements: './entitlements.plist',
-          'entitlements-inherit': './entitlements.plist',
+          entitlements: './build/entitlements.plist',
+          'entitlements-inherit': './build/entitlements.plist',
         }),
       },
       osxNotarize: {
@@ -150,19 +150,19 @@ const config: ForgeConfig = {
       build: [
         {
           entry: 'src/main/index.ts',
-          config: 'vite.main.config.ts',
+          config: 'config/vite.main.config.ts',
           target: 'main',
         },
         {
           entry: 'src/preload/preload.ts',
-          config: 'vite.preload.config.ts',
+          config: 'config/vite.preload.config.ts',
           target: 'preload',
         },
       ],
       renderer: [
         {
           name: 'main_window',
-          config: 'vite.renderer.config.mts',
+          config: 'config/vite.renderer.config.mts',
         },
       ],
     }),

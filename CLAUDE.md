@@ -53,6 +53,8 @@ npm run typecheck                    # CORRECT — run from cwd, or use --prefix
 ## Project Structure
 
 ```
+build/            # Platform-specific signing & entitlement files
+config/           # Forge-specific Vite configs (referenced from forge.config.ts)
 packages/
   launcher/       # Public npm package ("kangentic") -- thin npx installer
     bin/          # kangentic.js launcher script

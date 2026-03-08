@@ -10,10 +10,10 @@ function copyBridgeScripts(): import('vite').Plugin {
   return {
     name: 'copy-bridge-scripts',
     writeBundle(options) {
-      const outDir = options.dir || resolve(__dirname, '.vite/build');
+      const outDir = options.dir || resolve(__dirname, '../.vite/build');
       if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
       for (const name of ['event-bridge.js', 'status-bridge.js']) {
-        const source = resolve(__dirname, 'src/main/agent', name);
+        const source = resolve(__dirname, '../src/main/agent', name);
         if (existsSync(source)) {
           copyFileSync(source, resolve(outDir, name));
         }
