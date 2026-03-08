@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Trash2, Plus, GripVertical, Folder, FolderOpen, Menu, Loader2, Mail, Settings } from 'lucide-react';
+import { Trash2, Plus, GripVertical, Folder, FolderOpen, ChevronsLeft, Loader2, Mail, Settings } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useSessionStore } from '../../stores/session-store';
@@ -225,7 +225,7 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
                 className="p-1 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
                 title="Hide sidebar"
               >
-                <Menu size={16} />
+                <ChevronsLeft size={16} />
               </button>
             )}
             <span className="text-xs font-semibold uppercase tracking-wider text-fg-faint">Projects</span>
