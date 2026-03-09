@@ -85,11 +85,7 @@ Electron Forge handles platform-specific packaging via `forge.config.ts`:
 
 Windows resolves taskbar icons by matching the running window's AppUserModelID (AUMID) to a `.lnk` shortcut with the same AUMID. Squirrel generates AUMIDs in the format `com.squirrel.<makerName>.<exeName>`.
 
-Both `app.setAppUserModelId()` in `src/main/index.ts` and `setupAppId` in `forge.config.ts` must use `com.squirrel.Kangentic.kangentic` in packaged builds. In dev mode, a separate AUMID (`com.kangentic.dev`) prevents the dev exe from poisoning the Windows icon cache with the default Electron icon.
-
-**Shortcut AUMID stamping:** Squirrel's `Update.exe --createShortcut` does NOT set an AUMID on the `.lnk` files it creates. Without an AUMID, Windows uses heuristics (exe name, window class) to match the process to a shortcut -- and if the user has a stale "Electron" shortcut from another project's dev mode, Windows picks that one instead, showing "Electron" in the taskbar context menu. To fix this, `app.whenReady()` patches the Desktop and Start Menu shortcuts with the correct AUMID on every launch using `shell.writeShortcutLink()`.
-
-Note: `BrowserWindow.setIcon()` does not control the Windows taskbar icon -- only the AUMID match does.
+Both `app.setAppUserModelId()` in `src/main/index.ts` and `setupAppId` in `forge.config.ts` must use `com.squirrel.Kangentic.kangentic` in packaged builds. In dev mode, a separate AUMID (`com.kangentic.dev`) prevents the dev exe from poisoning the Windows icon cache with the default Electron icon. Note: `BrowserWindow.setIcon()` does not control the Windows taskbar icon -- only the AUMID match does.
 
 ## macOS Title Bar
 

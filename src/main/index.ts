@@ -1,6 +1,6 @@
 const PROCESS_START = performance.now();
 
-import { app, BrowserWindow, Menu, nativeImage, session, shell } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -323,31 +323,6 @@ app.whenReady().then(async () => {
   app.setAppUserModelId(
     app.isPackaged ? 'com.squirrel.Kangentic.kangentic' : 'com.kangentic.dev'
   );
-
-  // Stamp AUMID on Squirrel shortcuts. Squirrel's Update.exe does NOT set an
-  // AppUserModelID on the .lnk files it creates, so Windows cannot match the
-  // running process to the shortcut and falls back to "Electron" with the
-  // default icon. We fix this by patching each shortcut on every launch.
-  if (process.platform === 'win32' && app.isPackaged) {
-    const aumid = 'com.squirrel.Kangentic.kangentic';
-    const shortcutPaths = [
-      path.join(app.getPath('desktop'), 'Kangentic.lnk'),
-      path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Kangentic', 'Kangentic.lnk'),
-    ];
-    for (const lnkPath of shortcutPaths) {
-      if (fs.existsSync(lnkPath)) {
-        try {
-          const existing = shell.readShortcutLink(lnkPath);
-          shell.writeShortcutLink(lnkPath, 'update', {
-            ...existing,
-            appUserModelId: aumid,
-          });
-        } catch {
-          // Shortcut may be locked or inaccessible -- not fatal
-        }
-      }
-    }
-  }
 
   createWindow();
 
