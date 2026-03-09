@@ -199,8 +199,8 @@ Native OS notifications fire when an agent needs attention and the user can't al
 Open a project directly from the terminal:
 
 ```bash
-kgnt open            # Open the current directory
-kgnt open /path/to   # Open a specific project path
+npx kangentic            # Open the current directory
+npx kangentic /path/to   # Open a specific project path
 ```
 
 If the project doesn't exist yet, it's created automatically.

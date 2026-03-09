@@ -20,6 +20,8 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      - run: npm publish -w packages/launcher
+      - name: Publish launcher to npm
+        run: npm publish --access public -w packages/launcher
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
