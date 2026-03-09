@@ -111,9 +111,11 @@ When a terminal reconnects (dialog close -> panel recreate):
 
 ## Worktree Path Detection
 
-`src/main/git/worktree-manager.ts` (lines 35-40):
+`src/main/git/worktree-manager.ts` (lines 35-44):
 
-Checks `parent=worktrees` and `grandparent=.kangentic` to verify a path is inside a Kangentic-managed worktree. Handles both `.claude/` and `.claude\\` prefixes (Unix vs Windows path separators).
+Checks `parent=worktrees` and `grandparent=.kangentic` to verify a path is inside a Kangentic-managed worktree. Normalizes all separators to forward slashes (`replace(/\\/g, '/')`) before splitting, so it works on both Windows and Linux.
+
+**IMPORTANT:** Never use `path.normalize()`, `path.dirname()`, or `path.basename()` on paths that may contain Windows backslashes when the code runs on Linux. Node's `path` module is platform-dependent -- on Linux, `\` is a valid filename character, not a separator. Always normalize slashes manually first.
 
 Sparse-checkout excludes `.claude/commands/` and `.claude/skills/` from worktrees to prevent duplicate slash commands.
 

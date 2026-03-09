@@ -63,8 +63,13 @@ for (const arg of process.argv) {
   }
 }
 
-// Tell Windows to display "Kangentic" in notification toasts instead of "Electron"
-app.setAppUserModelId('com.squirrel.Kangentic.kangentic');
+// Set Windows AppUserModelID so the taskbar resolves the correct icon.
+// In packaged builds, this must match Squirrel's setupAppId so Windows links
+// the running process to the .lnk shortcut icon. In dev, use a separate AUMID
+// to avoid poisoning the icon cache with the default Electron exe icon.
+app.setAppUserModelId(
+  app.isPackaged ? 'com.squirrel.Kangentic.kangentic' : 'com.kangentic.dev'
+);
 
 const appLaunchTime = Date.now();
 const isEphemeral = process.argv.includes('--ephemeral');
@@ -312,6 +317,13 @@ Menu.setApplicationMenu(
 
 app.whenReady().then(async () => {
   mark('app_ready');
+
+  // Redundant AUMID call inside whenReady -- ensures the ID is set even if
+  // Electron clears it during app initialization on some Windows versions.
+  app.setAppUserModelId(
+    app.isPackaged ? 'com.squirrel.Kangentic.kangentic' : 'com.kangentic.dev'
+  );
+
   createWindow();
 
   // Fire app_launch event (analytics initialized before app.whenReady above).

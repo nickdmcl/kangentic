@@ -165,11 +165,12 @@ describe('Command Builder Logic', () => {
 
     const backslashPath = 'C:\\Users\\dev\\.local\\bin\\claude.EXE';
     const quotedBackslash = quoteArg(backslashPath);
-    expect(quotedBackslash).toContain('"');
+    // Backslashes need quoting; quote character depends on platform (" on Windows, ' on POSIX)
+    expect(quotedBackslash).toMatch(/^["'].*["']$/);
 
     const pathWithSpaces = 'C:/Program Files/claude/claude.exe';
     const quoted = quoteArg(pathWithSpaces);
-    expect(quoted).toContain('"');
+    expect(quoted).toMatch(/^["'].*["']$/);
   });
 
   it('quoteArg sanitises multiline input', () => {

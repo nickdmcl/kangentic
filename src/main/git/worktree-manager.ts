@@ -33,10 +33,13 @@ export function isInsideWorktree(projectPath: string): boolean {
  * in the path, but the project isn't itself a preview worktree).
  */
 export function isKangenticWorktree(projectPath: string): boolean {
-  const normalized = path.normalize(projectPath);
-  const parentDir = path.basename(path.dirname(normalized));
-  const grandparentDir = path.basename(path.dirname(path.dirname(normalized)));
-  return parentDir === 'worktrees' && grandparentDir === '.kangentic';
+  // Normalize all separators to forward slashes so the check works on any OS
+  const normalized = projectPath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length < 3) return false;
+  const parentSegment = segments[segments.length - 2];
+  const grandparentSegment = segments[segments.length - 3];
+  return parentSegment === 'worktrees' && grandparentSegment === '.kangentic';
 }
 
 /** Check whether a file is tracked by git (committed or staged). */

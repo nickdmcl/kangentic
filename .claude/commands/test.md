@@ -295,6 +295,11 @@ All green. No regressions.
 - **Build only when needed.** Only run `npm run build` when E2E tests are selected.
 - **Typecheck is a gate.** Always typecheck first. If it fails, stop immediately.
 - **Use dedicated tools.** Use `Read`, `Glob`, `Grep` for file operations. Reserve `Bash` for `npm`, `npx`, and `git` commands only.
+- **Cross-platform safe tests (CI runs on Linux).** All unit and UI tests must pass on Linux. Follow these rules when writing or reviewing tests:
+  - **Never use `path.normalize()`, `path.dirname()`, `path.basename()`, or `path.join()` on hardcoded Windows backslash paths.** Node's `path` module is platform-dependent -- on Linux, backslashes are treated as literal filename characters, not separators. Instead, normalize slashes manually: `myPath.replace(/\\/g, '/')` before splitting or comparing.
+  - **Never assert a specific quote character (`"` or `'`) from `quoteArg()`.** The function uses double quotes on Windows and single quotes on POSIX. Use `/^["'].*["']$/` or check `process.platform` if the test needs to verify quoting.
+  - **Never hardcode `process.platform === 'win32'` expectations without a `runIf` guard.** Use `describe.runIf(process.platform === 'win32')` for Windows-only tests and `describe.runIf(process.platform !== 'win32')` for POSIX-only tests.
+  - **Prefer forward-slash paths in test fixtures.** Forward slashes work on all platforms. Only use backslash paths when explicitly testing Windows path handling, and guard those tests with `runIf`.
 
 ## Allowed Tools
 

@@ -27,7 +27,15 @@
     "build": "node scripts/build.js",
     "prepare": "husky"
   },
-  "keywords": [],
+  "keywords": [
+    "kangentic",
+    "kanban",
+    "claude",
+    "claude-code",
+    "agent",
+    "electron",
+    "desktop"
+  ],
   "author": {
     "name": "Kangentic",
     "url": "https://github.com/Kangentic"
