@@ -73,28 +73,6 @@ jobs:
 
       - run: npm ci
 
-      # Extract changelog section for this version to use as release body.
-      # Handles both tag-push (GITHUB_REF) and workflow_dispatch (inputs.version).
-      - name: Extract changelog
-        id: changelog
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
-          else
-            TAG="${GITHUB_REF#refs/tags/}"
-            VERSION="${TAG#v}"
-          fi
-          SECTION=$(awk "/^## \\[v${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
-          if [ -z "$SECTION" ]; then
-            SECTION="Release v${VERSION}"
-          fi
-          {
-            echo "body<<CHANGELOG_EOF"
-            echo "$SECTION"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
-
       # Import Apple Developer ID certificate using Apple's official action.
       # Handles keychain creation, partition list, and default keychain setup.
       - name: Install Apple signing certificate
@@ -138,3 +116,28 @@ jobs:
           AZURE_SIGNING_ENDPOINT: https://eus.codesigning.azure.net/
           AZURE_SIGNING_ACCOUNT: sign-kangentic
           AZURE_CERT_PROFILE: kangentic-signing
+
+  publish-notes:
+    needs: [release]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Determine version tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set release body from RELEASE_NOTES.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ steps.version.outputs.tag }}" --notes-file RELEASE_NOTES.md

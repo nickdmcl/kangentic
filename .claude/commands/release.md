@@ -122,7 +122,7 @@ Generate a concise, user-friendly summary for the GitHub Release draft body. Thi
    - **Bug Fixes** -- fixes
    - **Breaking Changes** -- only if applicable
    - Omit any section that has no entries. Do not include an "Other" section -- skip chores, docs, refactors, CI, and build commits.
-3. **Write the release notes** to `.kangentic/RELEASE_NOTES.tmp` using the Write tool:
+3. **Write the release notes** to `RELEASE_NOTES.md` at the repo root using the Write tool:
 
 ```markdown
 ## What's New
@@ -133,12 +133,12 @@ Generate a concise, user-friendly summary for the GitHub Release draft body. Thi
 - Fixed crash when opening an empty board
 ```
 
-4. This file is used in Step 7 (Report) to show the user what to paste into the GitHub Release body when publishing.
+4. This file is committed in Step 4 and used by CI to populate the draft GitHub Release body automatically.
 
 ## Step 4 -- Commit
 
-1. Stage the changed files: `git add package.json package-lock.json packages/launcher/package.json CHANGELOG.md`
-   (If this is a first release with no version bump, only stage `CHANGELOG.md`)
+1. Stage the changed files: `git add package.json package-lock.json packages/launcher/package.json CHANGELOG.md RELEASE_NOTES.md`
+   (If this is a first release with no version bump, only stage `CHANGELOG.md RELEASE_NOTES.md`)
 2. Write the commit message using the **Write tool** to `.kangentic/COMMIT_MSG.tmp`:
    ```
    chore(release): vX.Y.Z
@@ -166,9 +166,9 @@ Summarize the release:
 - Tag: vX.Y.Z
 - Commits included: N
 - Changelog entry: show the generated entry
-- **Release notes for GitHub Release:** Read `.kangentic/RELEASE_NOTES.tmp` and display the contents. Tell the user: "Paste these into the GitHub Release body when publishing (edit as needed):"
+- **Release notes:** Read `RELEASE_NOTES.md` and display the contents. Tell the user: "These release notes will be applied to the draft GitHub Release automatically by CI."
 - GitHub Actions: link to `https://github.com/Kangentic/kangentic/actions` -- the tag push triggers the Release workflow which builds platform artifacts and creates a draft GitHub Release.
-- **Remind the user:** "Review and publish the draft release at https://github.com/Kangentic/kangentic/releases once the workflow completes."
+- **Remind the user:** "Review and publish the draft release at https://github.com/Kangentic/kangentic/releases once the workflow completes. The release description will already be populated from RELEASE_NOTES.md."
 
 ## Allowed Tools
 
