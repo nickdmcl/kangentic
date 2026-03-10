@@ -110,6 +110,11 @@ export class SessionManager extends EventEmitter {
     this.configuredShell = shell;
   }
 
+  /** Return the resolved shell name (configured or system default). */
+  async getShell(): Promise<string> {
+    return this.configuredShell || await this.shellResolver.getDefaultShell();
+  }
+
   private get activeCount(): number {
     let count = 0;
     for (const s of this.sessions.values()) {
@@ -157,7 +162,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private async doSpawn(input: SpawnSessionInput): Promise<Session> {
-    const shell = this.configuredShell || await this.shellResolver.getDefaultShell();
+    const shell = await this.getShell();
     const existing = input.taskId ? this.findByTaskId(input.taskId) : null;
     const id = existing?.id || uuidv4();
 

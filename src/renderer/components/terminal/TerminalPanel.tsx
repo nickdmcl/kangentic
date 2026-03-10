@@ -7,6 +7,7 @@ import { TerminalTab } from './TerminalTab';
 import { ActivityLog } from './ActivityLog';
 import { ContextBar } from './ContextBar';
 import { slugify } from '../../utils/slugify';
+import { shellDisplayName } from '../../utils/shell-display-name';
 import { ACTIVITY_TAB } from '../../../shared/types';
 
 interface TerminalPanelProps {
@@ -101,27 +102,31 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
             </button>
           )}
 
-          {activeSessions.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => setActiveSession(session.id)}
-              onDoubleClick={() => setOpenTaskId(session.taskId)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-edge transition-colors whitespace-nowrap ${
-                effectiveActiveId === session.id
-                  ? 'bg-surface-raised text-fg'
-                  : 'text-fg-faint hover:text-fg-tertiary hover:bg-surface-raised/50'
-              }`}
-            >
-              {session.status === 'running' && sessionActivity[session.id] !== 'idle' ? (
-                <Loader2 size={8} className="text-green-400 animate-spin" />
-              ) : (
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  session.status === 'running' ? 'bg-green-400' : 'bg-fg-faint'
-                }`} />
-              )}
-              {taskLabelMap.get(session.id) || session.taskId.slice(0, 8)}
-            </button>
-          ))}
+          {activeSessions.map((session) => {
+            const label = taskLabelMap.get(session.id) || session.taskId.slice(0, 8);
+            return (
+              <button
+                key={session.id}
+                onClick={() => setActiveSession(session.id)}
+                onDoubleClick={() => setOpenTaskId(session.taskId)}
+                title={`${label} (${shellDisplayName(session.shell)})`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border-r border-edge transition-colors whitespace-nowrap ${
+                  effectiveActiveId === session.id
+                    ? 'bg-surface-raised text-fg'
+                    : 'text-fg-faint hover:text-fg-tertiary hover:bg-surface-raised/50'
+                }`}
+              >
+                {session.status === 'running' && sessionActivity[session.id] !== 'idle' ? (
+                  <Loader2 size={8} className="text-green-400 animate-spin" />
+                ) : (
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    session.status === 'running' ? 'bg-green-400' : 'bg-fg-faint'
+                  }`} />
+                )}
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Collapse / expand toggle */}

@@ -314,6 +314,9 @@ export async function recoverSessions(
     return;
   }
 
+  // Resolve shell once for all sessions (same global setting)
+  const resolvedShell = await sessionManager.getShell();
+
   // --- Preparation pass (synchronous): build spawn inputs ---
   interface SpawnInput {
     record: SessionRecord;
@@ -419,6 +422,7 @@ export async function recoverSessions(
         resume: canResume,
         statusOutputPath,
         eventsOutputPath,
+        shell: resolvedShell,
       });
 
       spawnInputs.push({
@@ -562,6 +566,9 @@ export async function reconcileSessions(
     return;
   }
 
+  // Resolve shell once for all sessions (same global setting)
+  const resolvedShell = await sessionManager.getShell();
+
   // Cache transitions and actions for building commands
   const allTransitions = actionRepo.listTransitions();
   const allActions = actionRepo.list();
@@ -664,6 +671,7 @@ export async function reconcileSessions(
           sessionId: claudeSessionId,
           statusOutputPath,
           eventsOutputPath,
+          shell: resolvedShell,
         });
 
         spawnInputs.push({

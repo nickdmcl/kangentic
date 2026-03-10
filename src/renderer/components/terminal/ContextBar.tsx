@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { getProgressColor } from '../../utils/color-lerp';
 import { formatTokenCount } from '../../utils/format-tokens';
+import { shellDisplayName } from '../../utils/shell-display-name';
 import { useValuePulse } from '../../hooks/useValuePulse';
 
 interface ContextBarProps {
@@ -23,6 +24,12 @@ const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap';
  */
 export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const usage = useSessionStore((s) => s.sessionUsage[sessionId]);
+  const sessionShell = useSessionStore((s) => {
+    for (const sess of s.sessions) {
+      if (sess.id === sessionId) return sess.shell;
+    }
+    return undefined;
+  });
   const claudeVersionNumber = useConfigStore((s) => s.claudeVersionNumber);
 
   // Pulse hooks -- always called unconditionally (hooks rules)
@@ -53,6 +60,14 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
       className="h-8 bg-surface/80 border-t border-edge flex items-center px-3 gap-2 text-xs flex-shrink-0"
       data-testid="usage-bar"
     >
+      {!compact && sessionShell && (
+        <>
+          <span className={`${pill} text-fg-faint`} title={sessionShell}>
+            {shellDisplayName(sessionShell)}
+          </span>
+          <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />
+        </>
+      )}
       {!compact && (
         <span className={`${pill} text-fg-muted`}>
           Claude Code

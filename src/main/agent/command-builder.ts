@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { toForwardSlash, quoteArg } from '../../shared/paths';
+import { toForwardSlash, quoteArg, isUnixLikeShell } from '../../shared/paths';
 import { buildEventHooks } from './hook-manager';
 import type { ClaudeHookEntry } from './hook-manager';
 import type { PermissionMode } from '../../shared/types';
@@ -24,6 +24,7 @@ interface CommandOptions {
   nonInteractive?: boolean;
   statusOutputPath?: string; // path where the status bridge writes JSON
   eventsOutputPath?: string; // path where the event bridge appends JSONL
+  shell?: string; // target shell name -- controls quoting style (single vs double quotes)
 }
 
 /**
@@ -99,7 +100,8 @@ export class CommandBuilder {
   }
 
   buildClaudeCommand(options: CommandOptions): string {
-    const parts = [quoteArg(options.claudePath)];
+    const { shell } = options;
+    const parts = [quoteArg(options.claudePath, shell)];
 
     // Build the --settings path. When statusOutputPath is provided we always
     // create a merged settings file that includes the statusLine config so
@@ -127,13 +129,13 @@ export class CommandBuilder {
     // --settings flag: all sessions (main repo and worktree) use a merged
     // settings file in the session directory
     if (mergedSettingsPath) {
-      parts.push('--settings', quoteArg(toForwardSlash(mergedSettingsPath)));
+      parts.push('--settings', quoteArg(toForwardSlash(mergedSettingsPath), shell));
     }
 
     // Session: --resume for existing conversations, --session-id for new ones
     if (options.sessionId) {
       const flag = options.resume ? '--resume' : '--session-id';
-      parts.push(flag, quoteArg(options.sessionId));
+      parts.push(flag, quoteArg(options.sessionId, shell));
     }
 
     // Non-interactive mode (print and exit) vs interactive
@@ -143,14 +145,20 @@ export class CommandBuilder {
 
     // The prompt as positional argument (omitted for resumed sessions)
     if (options.prompt) {
-      // Replace double quotes to prevent PowerShell quoting breakage:
-      // quoteArg wraps in "..." on Windows and escapes " as \" which
-      // PowerShell misinterprets (it uses "" or `" not \").
-      // Single quotes are safe inside double-quoted strings on all shells.
-      const safePrompt = options.prompt.replace(/"/g, "'");
+      // For double-quoted shells (PowerShell, cmd), replace double quotes
+      // with single quotes to prevent quoting breakage: quoteArg wraps in
+      // "..." and escapes " as \" which PowerShell misinterprets.
+      // For single-quoted shells (bash, zsh, WSL), double quotes inside
+      // single-quoted strings are preserved literally -- no replacement needed.
+      const needsDoubleQuoteReplacement = shell
+        ? !isUnixLikeShell(shell)
+        : process.platform === 'win32';
+      const safePrompt = needsDoubleQuoteReplacement
+        ? options.prompt.replace(/"/g, "'")
+        : options.prompt;
       // -- (end-of-options) prevents content like -> or --flag from being
       // parsed as CLI options regardless of shell quoting behavior.
-      parts.push('--', quoteArg(safePrompt));
+      parts.push('--', quoteArg(safePrompt, shell));
     }
 
     return parts.join(' ');

@@ -170,6 +170,7 @@ export class TransitionEngine {
     }
     const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
 
+    const shell = await this.sessionManager.getShell();
     const command = this.commandBuilder.buildClaudeCommand({
       claudePath: claude.path,
       taskId: task.id,
@@ -182,6 +183,7 @@ export class TransitionEngine {
       nonInteractive: config.nonInteractive ?? false,
       statusOutputPath,
       eventsOutputPath,
+      shell,
     });
 
     const session = await this.sessionManager.spawn({

@@ -132,15 +132,23 @@ export function sanitizeForPty(text: string): string {
  * Backslashes are NOT considered simple -- they're escape characters
  * in Unix-like shells (Git Bash, WSL).
  *
+ * When `shell` is provided, quoting style is chosen by shell type:
+ *  - Unix-like shells (bash, zsh, fish, WSL): single-quotes (no expansion)
+ *  - PowerShell/cmd: double-quotes, escaped `"`
+ *
+ * When `shell` is omitted, falls back to platform detection:
  *  - Windows: double-quotes, escaped `"`
  *  - Unix:    single-quotes, escaped `'`
  */
-export function quoteArg(arg: string): string {
+export function quoteArg(arg: string, shell?: string): string {
   if (/^[a-zA-Z0-9_.\/:-]+$/.test(arg)) {
     return arg;
   }
   const sanitised = sanitizeForPty(arg);
-  if (process.platform === 'win32') {
+  const useDoubleQuotes = shell
+    ? !isUnixLikeShell(shell)
+    : process.platform === 'win32';
+  if (useDoubleQuotes) {
     return `"${sanitised.replace(/"/g, '\\"')}"`;
   }
   return `'${sanitised.replace(/'/g, "'\\''")}'`;

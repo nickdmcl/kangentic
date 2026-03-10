@@ -223,6 +223,42 @@ describe('Command Builder Logic', () => {
     expect(result).toBe('Fix bug in ');
   });
 
+  it('quoteArg uses single quotes when shell is bash (prevents $var expansion)', () => {
+    const result = quoteArg('fix $count bug', 'bash');
+    expect(result).toBe("'fix $count bug'");
+  });
+
+  it('quoteArg uses single quotes when shell is WSL', () => {
+    const result = quoteArg('deploy to $HOME/app', 'wsl -d Ubuntu');
+    expect(result).toBe("'deploy to $HOME/app'");
+  });
+
+  it('quoteArg uses double quotes when shell is PowerShell', () => {
+    const result = quoteArg('fix the bug', 'powershell');
+    expect(result).toBe('"fix the bug"');
+  });
+
+  it('quoteArg uses double quotes when shell is cmd', () => {
+    const result = quoteArg('fix the bug', 'cmd');
+    expect(result).toBe('"fix the bug"');
+  });
+
+  it('quoteArg escapes single quotes inside single-quoted strings for bash', () => {
+    const result = quoteArg("it's a bug", 'bash');
+    expect(result).toBe("'it'\\''s a bug'");
+  });
+
+  it('quoteArg preserves backtick commands in single-quoted mode', () => {
+    const result = quoteArg('check `whoami` output', '/usr/bin/bash');
+    expect(result).toBe("'check `whoami` output'");
+  });
+
+  it('quoteArg with shell omitted falls back to platform detection', () => {
+    const result = quoteArg('hello world');
+    // Should produce either single or double quotes depending on platform
+    expect(result).toMatch(/^["']hello world["']$/);
+  });
+
   it('full pipeline: interpolateTemplate + quoteArg with multiline description (pre-cleaned)', () => {
     // In the real pipeline, description is cleaned before interpolation
     const template = '{{title}}{{description}}';
