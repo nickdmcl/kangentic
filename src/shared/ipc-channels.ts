@@ -106,4 +106,9 @@ export const IPC = {
   // Notifications
   NOTIFICATION_SHOW: 'notification:show',
   NOTIFICATION_CLICKED: 'notification:clicked',
+
+  // Updater
+  UPDATE_CHECK: 'updater:check',
+  UPDATE_INSTALL: 'updater:install',
+  UPDATE_DOWNLOADED: 'updater:downloaded',
 } as const;

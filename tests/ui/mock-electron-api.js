@@ -633,6 +633,12 @@
       },
     },
 
+    updater: {
+      checkForUpdate: async function () {},
+      installUpdate: async function () {},
+      onUpdateDownloaded: function () { return noop; },
+    },
+
     notifications: {
       show: noop,
       onClicked: function () {

@@ -50,9 +50,24 @@ export function App() {
       // Refresh the project list to include the auto-opened project
       loadProjects();
     });
+
+    // Listen for auto-update downloaded notification
+    const cleanupUpdateListener = window.electronAPI.updater?.onUpdateDownloaded((info) => {
+      useToastStore.getState().addToast({
+        message: `Version ${info.version} is ready to install`,
+        variant: 'info',
+        duration: 0, // persistent -- user must act or dismiss
+        action: {
+          label: 'Restart to update',
+          onClick: () => window.electronAPI.updater.installUpdate(),
+        },
+      });
+    });
+
     return () => {
       if (mountTimerRafId !== undefined) cancelAnimationFrame(mountTimerRafId);
       cleanupAutoOpen();
+      cleanupUpdateListener?.();
     };
   }, []);
 

@@ -16,11 +16,11 @@ This downloads the pre-built binary for your platform, installs it, and launches
 
 | Platform | Update mechanism | User action |
 |----------|-----------------|-------------|
-| Windows | `electron-updater` (NSIS) | None. Downloads in background, installs on next restart. |
+| Windows | `electron-updater` (NSIS) | Click "Restart to update" toast, or quit normally -- installs silently on next launch. |
 | macOS | `electron-updater` | Click "Restart to update" when prompted. Requires code signing -- see [macOS signing note](#macos-auto-update-requires-signing). |
 | Linux | None | Re-run `npx kangentic` or download from [GitHub Releases](https://github.com/Kangentic/kangentic/releases). |
 
-**Auto-update is currently disabled** -- no published GitHub releases exist yet. Re-enable in `src/main/index.ts` once the first GitHub Release is published.
+Auto-update is implemented in `src/main/updater.ts`. It checks for updates 5 seconds after launch, then every 4 hours. Updates download in the background; a persistent toast notifies the user when ready. v0.1.0 users must manually update to v0.2.0 -- auto-update kicks in from v0.2.0 onward.
 
 ### Install a Specific Version
 
@@ -86,7 +86,7 @@ Electron's `autoUpdater` on macOS only works with signed apps (Electron docs: "m
 
 ### Draft Releases Are Invisible to Auto-Updater
 
-`update-electron-app` (when re-enabled) only sees **published** releases. Draft releases are invisible to the auto-updater and to `npx kangentic`. The manual publish step is the review gate -- always verify artifacts before publishing.
+`electron-updater` only sees **published** releases. Draft releases are invisible to the auto-updater and to `npx kangentic`. The manual publish step is the review gate -- always verify artifacts before publishing.
 
 ### GitHub Actions Workflows
 

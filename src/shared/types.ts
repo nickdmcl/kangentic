@@ -384,6 +384,12 @@ export const DEFAULT_CONFIG: AppConfig = {
   activateAllProjectsOnStartup: true,
 };
 
+// === Updater ===
+
+export interface UpdateDownloadedInfo {
+  version: string;
+}
+
 // === IPC API Types ===
 
 export interface TaskCreateInput {
@@ -625,6 +631,13 @@ export interface ElectronAPI {
   // App
   app: {
     getVersion: () => Promise<string>;
+  };
+
+  // Updater
+  updater: {
+    checkForUpdate: () => Promise<void>;
+    installUpdate: () => Promise<void>;
+    onUpdateDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => () => void;
   };
 
   // Platform

@@ -100,7 +100,7 @@ The deb package declares `depends` on Electron's required system libraries (`lib
 
 ## Auto-Update Platform Guard
 
-Auto-update via `electron-updater` is currently disabled on all platforms -- no published GitHub releases exist yet. Once the first release is published, re-enable auto-update for Windows and macOS in `src/main/index.ts`. Linux will never use auto-update -- users update via the launcher package (`npx kangentic`).
+Auto-update via `electron-updater` runs on Windows and macOS only. The guard in `src/main/updater.ts` checks `app.isPackaged && process.platform !== 'linux'` -- dev mode and Linux are excluded. Linux users update via the launcher package (`npx kangentic`).
 
 ## Security Fuses
 

@@ -38,16 +38,7 @@ process.on('unhandledRejection', (reason) => {
   }
 });
 
-// Auto-update from GitHub Releases via electron-updater.
-// Linux users update via the launcher package (no auto-update backend).
-//
-// DISABLED: No published GitHub releases yet. Re-enable once the first
-// GitHub Release is published.
-//
-// import { autoUpdater } from 'electron-updater';
-// if (app.isPackaged && process.platform !== 'linux') {
-//   autoUpdater.checkForUpdatesAndNotify();
-// }
+import { initUpdater, stopUpdaterTimers } from './updater';
 
 // Initialize anonymous analytics BEFORE app.whenReady() -- the SDK requires this
 // to register protocol schemes. The analytics module decides whether to activate
@@ -347,6 +338,7 @@ app.whenReady().then(async () => {
   );
 
   createWindow();
+  initUpdater(mainWindow!);
 
   // Fire app_launch event (analytics initialized before app.whenReady above).
   // trackEvent is a no-op if analytics is disabled, so no guard needed here.
@@ -400,6 +392,7 @@ function syncShutdownCleanup(): void {
     clearTimeout(activateAllProjectsTimer);
     activateAllProjectsTimer = null;
   }
+  stopUpdaterTimers();
 
   try {
     const sessionManager = getSessionManager();

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '../shared/ipc-channels';
-import type { ElectronAPI, NotificationInput, Project, SessionStatus, SessionUsage, ActivityState, SessionEvent } from '../shared/types';
+import type { ElectronAPI, NotificationInput, Project, SessionStatus, SessionUsage, ActivityState, SessionEvent, UpdateDownloadedInfo } from '../shared/types';
 
 const api: ElectronAPI = {
   projects: {
@@ -160,6 +160,16 @@ const api: ElectronAPI = {
 
   app: {
     getVersion: () => ipcRenderer.invoke(IPC.APP_GET_VERSION),
+  },
+
+  updater: {
+    checkForUpdate: () => ipcRenderer.invoke(IPC.UPDATE_CHECK),
+    installUpdate: () => ipcRenderer.invoke(IPC.UPDATE_INSTALL),
+    onUpdateDownloaded: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, info: UpdateDownloadedInfo) => callback(info);
+      ipcRenderer.on(IPC.UPDATE_DOWNLOADED, handler);
+      return () => ipcRenderer.removeListener(IPC.UPDATE_DOWNLOADED, handler);
+    },
   },
 
   platform: process.platform,
