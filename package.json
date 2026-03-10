@@ -3,9 +3,6 @@
   "productName": "Kangentic",
   "version": "0.2.0",
   "description": "Cross-platform desktop Kanban for Claude Code agents",
-  "bin": {
-    "kgnt": "./bin/kgnt.js"
-  },
   "main": ".vite/build/index.js",
   "repository": "https://github.com/Kangentic/kangentic",
   "private": true,

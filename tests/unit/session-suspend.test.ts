@@ -59,7 +59,7 @@ describe('SessionManager suspend logic', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kgnt-suspend-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-suspend-'));
     manager = new SessionManager(tmpDir);
   });
 

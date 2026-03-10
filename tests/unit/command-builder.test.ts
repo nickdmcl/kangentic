@@ -628,7 +628,7 @@ describe('Merged Settings -- Local Settings Merge', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kgnt-cmd-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-cmd-'));
   });
 
   afterEach(() => {

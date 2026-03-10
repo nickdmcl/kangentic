@@ -44,7 +44,7 @@ function writeFile(relPath: string, content: string): void {
 // ── Setup / Teardown ───────────────────────────────────────────────────────
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kgnt-wt-claude-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-wt-claude-'));
 
   // Initialize a git repo with tracked .claude/ files
   git('init -b main');

@@ -63,7 +63,7 @@ function createMockPty() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kgnt-smmgr-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-session-'));
 });
 
 afterEach(() => {

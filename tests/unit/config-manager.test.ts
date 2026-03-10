@@ -14,7 +14,7 @@ let tmpDir: string;
 let configPath: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kgnt-config-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-config-'));
   fs.mkdirSync(path.join(tmpDir, 'projects'), { recursive: true });
   configPath = path.join(tmpDir, 'config.json');
   process.env.KANGENTIC_DATA_DIR = tmpDir;
