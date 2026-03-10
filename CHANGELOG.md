@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.3.1] - 2026-03-10
+
+### Fixes
+- Bundle electron-updater instead of marking it external, fixing "Cannot find module" crash on launch (9a1f5e9)
+
 ## [v0.3.0] - 2026-03-10
 
 ### Features
