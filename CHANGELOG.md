@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.3.0] - 2026-03-10
+
+### Features
+- Auto-spawn agent when creating task in auto-spawn column (8a9e6df)
+- Improve first-launch experience with welcome overlay and git detection (69caf9a)
+- Add Notifications tab, terminal options, idle timeout, and window restore (78d7078)
+
+### Fixes
+- Add cold Vite cache message to dev startup (8a01c93)
+- Suppress welcome overlay flash during config store re-sync (5fb17d7)
+- Re-sync all IPC-backed stores after Vite HMR update (3f95493)
+- Suppress bottom panel switch when Task Detail dialog is open (3bd5cff)
+- Include output tokens in context window percentage (9ce3891)
+
+### Other
+- Shrink task detail dialog during edit mode (3dacac3)
+- Remove dead kgnt CLI entry point (e97d2d9)
+- Center project name in title bar (f36d27b)
+- Restructure header branding, sidebar collapse, and version badge (ac5f868)
+- Documentation updates and README improvements (bc09a13, 2f457a1, eb80fdb, 6587722, 03d7b52)
+
 ## [v0.2.0] - 2026-03-09
 
 ### Features
