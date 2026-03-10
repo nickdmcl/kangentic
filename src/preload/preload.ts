@@ -105,6 +105,11 @@ const api: ElectronAPI = {
       ipcRenderer.on(IPC.SESSION_EVENT, handler);
       return () => ipcRenderer.removeListener(IPC.SESSION_EVENT, handler);
     },
+    onIdleTimeout: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string, taskId: string, timeoutMinutes: number, projectId?: string) => callback(sessionId, taskId, timeoutMinutes, projectId);
+      ipcRenderer.on(IPC.SESSION_IDLE_TIMEOUT, handler);
+      return () => ipcRenderer.removeListener(IPC.SESSION_IDLE_TIMEOUT, handler);
+    },
   },
 
   config: {

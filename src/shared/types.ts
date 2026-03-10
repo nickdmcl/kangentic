@@ -313,6 +313,22 @@ export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends (infer U)[] ? U[] : T[P] extends object ? DeepPartial<T[P]> : T[P];
 };
 
+export interface NotificationConfig {
+  desktop: {
+    onAgentIdle: boolean;
+    onAgentCrash: boolean;
+    onPlanComplete: boolean;
+  };
+  toasts: {
+    onAgentIdle: boolean;
+    onAgentCrash: boolean;
+    onPlanComplete: boolean;
+    durationSeconds: number;
+    maxCount: number;
+  };
+  cooldownSeconds: number;
+}
+
 export interface AppConfig {
   theme: ThemeMode;
   sidebarVisible: boolean;
@@ -324,6 +340,8 @@ export interface AppConfig {
     fontSize: number;
     showPreview: boolean;
     panelHeight: number; // persisted terminal panel height in px
+    scrollbackLines: number;
+    cursorStyle: 'block' | 'underline' | 'bar';
   };
 
   claude: {
@@ -331,6 +349,7 @@ export interface AppConfig {
     cliPath: string | null; // null = auto-detect on PATH
     maxConcurrentSessions: number;
     queueOverflow: 'queue' | 'reject';
+    idleTimeoutMinutes: number; // 0 = disabled
   };
 
   sidebar: {
@@ -345,10 +364,13 @@ export interface AppConfig {
     initScript: string | null;
   };
 
+  notifications: NotificationConfig;
+
   skipDeleteConfirm: boolean;
   autoFocusIdleSession: boolean;
-  notifyIdleOnInactiveProject: boolean;
   activateAllProjectsOnStartup: boolean;
+  restoreWindowPosition: boolean;
+  windowBounds: { x: number; y: number; width: number; height: number } | null;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -361,12 +383,15 @@ export const DEFAULT_CONFIG: AppConfig = {
     fontSize: 14,
     showPreview: false,
     panelHeight: 250,
+    scrollbackLines: 5000,
+    cursorStyle: 'block',
   },
   claude: {
     permissionMode: 'default',
     cliPath: null,
     maxConcurrentSessions: 8,
     queueOverflow: 'queue',
+    idleTimeoutMinutes: 0,
   },
   sidebar: {
     width: 224,
@@ -378,10 +403,26 @@ export const DEFAULT_CONFIG: AppConfig = {
     copyFiles: [],
     initScript: null,
   },
+  notifications: {
+    desktop: {
+      onAgentIdle: true,
+      onAgentCrash: true,
+      onPlanComplete: true,
+    },
+    toasts: {
+      onAgentIdle: true,
+      onAgentCrash: true,
+      onPlanComplete: true,
+      durationSeconds: 4,
+      maxCount: 5,
+    },
+    cooldownSeconds: 10,
+  },
   skipDeleteConfirm: false,
   autoFocusIdleSession: true,
-  notifyIdleOnInactiveProject: true,
   activateAllProjectsOnStartup: true,
+  restoreWindowPosition: true,
+  windowBounds: null,
 };
 
 // === Updater ===
@@ -571,6 +612,7 @@ export interface ElectronAPI {
     getEvents: (sessionId: string) => Promise<SessionEvent[]>;
     getEventsCache: (projectId?: string) => Promise<Record<string, SessionEvent[]>>;
     onEvent: (callback: (sessionId: string, event: SessionEvent, projectId?: string) => void) => () => void;
+    onIdleTimeout: (callback: (sessionId: string, taskId: string, timeoutMinutes: number, projectId?: string) => void) => () => void;
   };
 
   // Config

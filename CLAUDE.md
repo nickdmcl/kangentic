@@ -101,6 +101,7 @@ scripts/          # Build and dev scripts
 - **Icons** use Lucide React — no inline SVGs
 - **PTY sessions** handle cross-platform shells (PowerShell needs `& ` prefix, WSL splits into exe + args, fish/nushell skip `--login`)
 - **Claude CLI** is invoked with `cwd` set to the project directory (or worktree path) so that `.claude/`, `CLAUDE.md`, and commands are loaded into context
+- **Settings tab separator** — In `AppSettingsPanel`, tabs above the `separator: true` marker are project-overridable (also shown in `ProjectSettingsPanel`). Tabs below it (Behavior, Notifications, Privacy) are global-only and never appear in project settings. When adding new settings, decide if they are per-project or global and place the tab accordingly.
 
 ### Shutdown (CRITICAL)
 

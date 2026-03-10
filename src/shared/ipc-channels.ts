@@ -62,6 +62,7 @@ export const IPC = {
   SESSION_STATUS: 'session:status',
   SESSION_SUSPEND: 'session:suspend',
   SESSION_RESUME: 'session:resume',
+  SESSION_IDLE_TIMEOUT: 'session:idleTimeout',
 
   // Config
   CONFIG_GET: 'config:get',

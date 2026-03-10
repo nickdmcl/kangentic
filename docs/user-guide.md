@@ -190,9 +190,9 @@ The sidebar shows all your projects. Click to switch between them. Each project 
 
 When an agent goes idle (waiting for input or stopped) on a non-active project, the sidebar shows a badge. This helps you notice when agents need attention across projects.
 
-### Desktop Notifications
+### Notifications
 
-Native OS notifications fire when an agent needs attention and the user can't already see it -- either the window is minimized/unfocused, or a different project is active. Events that trigger notifications: agent idle, permission-blocked idle (body shows "Needs permission"), session crash (non-zero exit), and plan-completion auto-moves. The task name is the title and the project name is the body. Clicking a notification brings the window to the foreground, switches to the correct project, and opens the task detail dialog. The taskbar also flashes on Windows. A 10-second per-session cooldown prevents repeated notifications from the same agent. Configurable via `notifyIdleOnInactiveProject`.
+Desktop and toast notifications fire when an agent needs attention and the user can't already see it -- either the window is minimized/unfocused, or a different project is active. Notification events: agent idle, permission-blocked idle (body shows "Needs permission"), session crash (non-zero exit, always on), and plan-completion auto-moves. The task name is the title and the project name is the body. Clicking a desktop notification brings the window to the foreground, switches to the correct project, and opens the task detail dialog. The taskbar also flashes on Windows. A 10-second per-session cooldown prevents repeated desktop notifications from the same agent. Configurable per-event in Settings > Notifications -- each event can be set to Desktop & Toast, Desktop Only, Toast Only, or Off. Toast duration and max visible count are also configurable.
 
 ## CLI
 

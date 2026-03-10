@@ -1,6 +1,6 @@
 const PROCESS_START = performance.now();
 
-import { app, BrowserWindow, Menu, nativeImage, session } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, screen, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,8 +9,10 @@ import { closeAll, getProjectDb } from './db/database';
 import { SessionRepository } from './db/repositories/session-repository';
 import { IPC } from '../shared/ipc-channels';
 import { THEME_BACKGROUNDS } from '../shared/types';
-import type { ThemeMode } from '../shared/types';
+import type { AppConfig, ThemeMode } from '../shared/types';
 import { PATHS } from './config/paths';
+import { ConfigManager } from './config/config-manager';
+const windowConfigManager = new ConfigManager();
 import { initAnalytics, trackEvent, sanitizeErrorMessage } from './analytics/analytics';
 import { initStartupTimer, mark, phase, endPhase, finishStartupTimer } from './startup-timer';
 
@@ -144,6 +146,28 @@ function loadReactDevTools(): void {
     .catch((err) => console.log('[APP] Failed to load React DevTools:', err));
 }
 
+/** Read saved window bounds from config, with screen-boundary validation. */
+function resolveWindowBounds(): { x: number; y: number; width: number; height: number } | null {
+  try {
+    const raw = fs.readFileSync(PATHS.configFile, 'utf-8');
+    const config = JSON.parse(raw) as Partial<AppConfig>;
+    if (!config.restoreWindowPosition || !config.windowBounds) return null;
+    const { x, y, width, height } = config.windowBounds;
+    if (width < 400 || height < 300) return null;
+    // Verify the window overlaps at least one display (e.g. external monitor disconnected)
+    const displays = screen.getAllDisplays();
+    const overlapsDisplay = displays.some((display) => {
+      const { x: displayX, y: displayY, width: displayWidth, height: displayHeight } = display.bounds;
+      return x < displayX + displayWidth && x + width > displayX
+        && y < displayY + displayHeight && y + height > displayY;
+    });
+    if (!overlapsDisplay) return null;
+    return { x, y, width, height };
+  } catch {
+    return null;
+  }
+}
+
 const createWindow = () => {
   phase('createWindow');
   const isTest = process.env.NODE_ENV === 'test';
@@ -151,10 +175,11 @@ const createWindow = () => {
   const iconPath = resolveIconPath();
   const iconImage = nativeImage.createFromPath(iconPath);
 
+  const savedBounds = resolveWindowBounds();
+
   mainWindow = new BrowserWindow({
     icon: iconImage,
-    width: 1400,
-    height: 900,
+    ...(savedBounds ? savedBounds : { width: 1400, height: 900 }),
     minWidth: 900,
     minHeight: 600,
     backgroundColor: resolveBackgroundColor(),
@@ -180,11 +205,24 @@ const createWindow = () => {
 
   mainWindow.once('ready-to-show', () => {
     mark('ready_to_show');
-    if (!isTest) {
+    if (!isTest && !savedBounds) {
       mainWindow!.maximize();
     }
     mainWindow!.show();
   });
+
+  // Debounced save of window bounds on move/resize
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null;
+  const saveBounds = () => {
+    if (boundsTimer) clearTimeout(boundsTimer);
+    boundsTimer = setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized() || mainWindow.isMinimized()) return;
+      const bounds = mainWindow.getBounds();
+      windowConfigManager.save({ windowBounds: bounds });
+    }, 500);
+  };
+  mainWindow.on('move', saveBounds);
+  mainWindow.on('resize', saveBounds);
 
   // Register all IPC handlers
   registerAllIpc(mainWindow);

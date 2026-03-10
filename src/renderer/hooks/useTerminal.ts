@@ -38,6 +38,8 @@ interface UseTerminalOptions {
   sessionId: string | null;
   fontFamily?: string;
   fontSize?: number;
+  scrollbackLines?: number;
+  cursorStyle?: 'block' | 'underline' | 'bar';
 }
 
 export function useTerminal(options: UseTerminalOptions) {
@@ -57,8 +59,9 @@ export function useTerminal(options: UseTerminalOptions) {
       fontFamily: options.fontFamily || 'Consolas, "Courier New", monospace',
       fontSize: options.fontSize || 14,
       theme: xtermTheme,
-      scrollback: 5000,
+      scrollback: options.scrollbackLines || 5000,
       cursorBlink: true,
+      cursorStyle: options.cursorStyle || 'block',
       allowProposedApi: true,
     });
 
@@ -126,7 +129,7 @@ export function useTerminal(options: UseTerminalOptions) {
       // No session -- just fit immediately
       fitAddon.fit();
     }
-  }, [options.sessionId, options.fontFamily, options.fontSize]);
+  }, [options.sessionId, options.fontFamily, options.fontSize, options.scrollbackLines, options.cursorStyle]);
 
   // Set up data listener
   useEffect(() => {

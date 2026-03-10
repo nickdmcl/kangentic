@@ -15,6 +15,8 @@ export function TerminalTab({ sessionId, active }: TerminalTabProps) {
     sessionId,
     fontFamily: config.terminal.fontFamily,
     fontSize: config.terminal.fontSize,
+    scrollbackLines: config.terminal.scrollbackLines,
+    cursorStyle: config.terminal.cursorStyle,
   });
   const initialized = useRef(false);
   const draggingRef = useRef(false);

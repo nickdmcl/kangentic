@@ -1,22 +1,80 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, Check, CircleAlert, GitBranch, Globe, Palette, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal } from 'lucide-react';
+import { Bell, Bot, Check, CircleAlert, GitBranch, Globe, Palette, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { SettingsPanelShell, SectionHeader, SettingRow, Select, ToggleSwitch, INPUT_CLASS } from './shared';
 import type { SettingsTabDefinition } from './shared';
-import type { AppConfig, DeepPartial, PermissionMode, ThemeMode } from '../../../shared/types';
+import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode } from '../../../shared/types';
 import { NAMED_THEMES } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
 
+/**
+ * App Settings tab layout:
+ *
+ * Tabs ABOVE the separator are project-overridable settings (also shown in
+ * ProjectSettingsPanel). Changes here set the global default and optionally
+ * sync to existing projects.
+ *
+ * Tabs BELOW the separator (after `separator: true`) are global-only settings
+ * that apply to the entire app, not per-project. These tabs do NOT appear in
+ * the ProjectSettingsPanel.
+ */
 const APP_TABS: SettingsTabDefinition[] = [
+  // -- Project-overridable defaults --
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'agent', label: 'Agent', icon: Bot },
   { id: 'git', label: 'Git', icon: GitBranch },
+  // -- Global-only (separator marks the boundary) --
   { id: 'behavior', label: 'Behavior', icon: SlidersHorizontal, separator: true },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'privacy', label: 'Privacy', icon: ShieldCheck },
 ];
+
+type NotifyEventKey = 'onAgentIdle' | 'onPlanComplete';
+
+/** Map desktop/toast booleans to a single dropdown value. */
+function notifyChannelValue(desktop: boolean, toast: boolean): string {
+  if (desktop && toast) return 'both';
+  if (desktop) return 'desktop';
+  if (toast) return 'toast';
+  return 'off';
+}
+
+/** Reusable row for a notification event with a Desktop/Toast channel dropdown. */
+function NotifyChannelRow({ label, description, eventKey, config, onUpdate }: {
+  label: string;
+  description: string;
+  eventKey: NotifyEventKey;
+  config: NotificationConfig;
+  onUpdate: (partial: DeepPartial<AppConfig>) => void;
+}) {
+  const value = notifyChannelValue(config.desktop[eventKey], config.toasts[eventKey]);
+  return (
+    <SettingRow label={label} description={description}>
+      <Select
+        value={value}
+        onChange={(event) => {
+          const selected = event.target.value;
+          const desktop = selected === 'both' || selected === 'desktop';
+          const toast = selected === 'both' || selected === 'toast';
+          onUpdate({
+            notifications: {
+              desktop: { [eventKey]: desktop },
+              toasts: { [eventKey]: toast },
+            },
+          });
+        }}
+      >
+        <option value="both">Desktop & Toast</option>
+        <option value="desktop">Desktop Only</option>
+        <option value="toast">Toast Only</option>
+        <option value="off">Off</option>
+      </Select>
+    </SettingRow>
+  );
+}
 
 export function AppSettingsPanel() {
   const globalConfig = useConfigStore((state) => state.globalConfig);
@@ -135,6 +193,27 @@ export function AppSettingsPanel() {
               className={INPUT_CLASS}
             />
           </SettingRow>
+          <SettingRow label="Scrollback Lines" description="Maximum lines kept in terminal buffer">
+            <input
+              type="number"
+              value={displayConfig.terminal.scrollbackLines}
+              onChange={(event) => handleDefaultUpdate({ terminal: { scrollbackLines: Number(event.target.value) } })}
+              min={1000}
+              max={100000}
+              step={1000}
+              className={INPUT_CLASS}
+            />
+          </SettingRow>
+          <SettingRow label="Cursor Style" description="Terminal cursor appearance">
+            <Select
+              value={displayConfig.terminal.cursorStyle}
+              onChange={(event) => handleDefaultUpdate({ terminal: { cursorStyle: event.target.value as 'block' | 'underline' | 'bar' } })}
+            >
+              <option value="block">Block</option>
+              <option value="underline">Underline</option>
+              <option value="bar">Bar</option>
+            </Select>
+          </SettingRow>
         </>
       )}
 
@@ -178,7 +257,16 @@ export function AppSettingsPanel() {
               <option value="reject">Reject</option>
             </Select>
           </SettingRow>
-          <SectionHeader label="Project Default" description="Default for new projects. Can optionally sync to existing projects." prominent />
+          <SettingRow label="Idle Timeout (minutes)" description="Auto-suspend sessions after this many minutes idle. 0 to disable.">
+            <input
+              type="number"
+              value={globalConfig.claude.idleTimeoutMinutes}
+              onChange={(event) => handleAppUpdate({ claude: { idleTimeoutMinutes: Number(event.target.value) } })}
+              min={0}
+              max={120}
+              className={INPUT_CLASS}
+            />
+          </SettingRow>
           <SettingRow label="Permissions" description="How Claude handles tool approvals">
             <Select
               value={displayConfig.claude.permissionMode}
@@ -207,16 +295,57 @@ export function AppSettingsPanel() {
               onChange={(value) => handleAppUpdate({ autoFocusIdleSession: value })}
             />
           </SettingRow>
-          <SettingRow label="Desktop Notifications" description="Show native notifications when agents need attention on non-visible projects">
-            <ToggleSwitch
-              checked={globalConfig.notifyIdleOnInactiveProject}
-              onChange={(value) => handleAppUpdate({ notifyIdleOnInactiveProject: value })}
-            />
-          </SettingRow>
           <SettingRow label="Launch All Projects on Startup" description="Start agents across all projects on launch, not just the current open one">
             <ToggleSwitch
               checked={globalConfig.activateAllProjectsOnStartup}
               onChange={(value) => handleAppUpdate({ activateAllProjectsOnStartup: value })}
+            />
+          </SettingRow>
+          <SettingRow label="Restore Window Position" description="Remember window size and position between launches">
+            <ToggleSwitch
+              checked={globalConfig.restoreWindowPosition}
+              onChange={(value) => handleAppUpdate({ restoreWindowPosition: value })}
+            />
+          </SettingRow>
+        </>
+      )}
+
+      {/* ── Notifications ── */}
+      {activeTab === 'notifications' && (
+        <>
+          <NotifyChannelRow
+            label="Agent Idle"
+            description="When an agent needs attention on a non-visible project"
+            eventKey="onAgentIdle"
+            config={globalConfig.notifications}
+            onUpdate={handleAppUpdate}
+          />
+          <NotifyChannelRow
+            label="Plan Complete"
+            description="When a plan finishes and the task auto-moves"
+            eventKey="onPlanComplete"
+            config={globalConfig.notifications}
+            onUpdate={handleAppUpdate}
+          />
+          <div className="border-t border-edge my-2" />
+          <SettingRow label="Toast Auto-Dismiss" description="How long toasts remain visible">
+            <input
+              type="number"
+              value={globalConfig.notifications.toasts.durationSeconds}
+              onChange={(event) => handleAppUpdate({ notifications: { toasts: { durationSeconds: Number(event.target.value) } } })}
+              min={1}
+              max={30}
+              className={INPUT_CLASS}
+            />
+          </SettingRow>
+          <SettingRow label="Max Visible Toasts" description="Maximum simultaneous toasts on screen">
+            <input
+              type="number"
+              value={globalConfig.notifications.toasts.maxCount}
+              onChange={(event) => handleAppUpdate({ notifications: { toasts: { maxCount: Number(event.target.value) } } })}
+              min={1}
+              max={10}
+              className={INPUT_CLASS}
             />
           </SettingRow>
         </>

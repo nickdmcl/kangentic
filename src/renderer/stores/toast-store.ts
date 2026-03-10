@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useConfigStore } from './config-store';
 
 export type ToastVariant = 'info' | 'success' | 'warning' | 'error';
 
@@ -33,15 +34,18 @@ export const useToastStore = create<ToastStore>((set) => ({
 
   addToast: (input) => {
     const id = crypto.randomUUID();
+    const toastConfig = useConfigStore.getState().config.notifications.toasts;
+    const defaultDuration = toastConfig.durationSeconds * 1000;
+    const maxCount = toastConfig.maxCount;
     const toast: Toast = {
       id,
       message: input.message,
       variant: input.variant ?? 'info',
-      duration: input.duration ?? 4000,
+      duration: input.duration ?? defaultDuration,
       action: input.action,
     };
     set((s) => ({
-      toasts: [...s.toasts, toast].slice(-5),
+      toasts: [...s.toasts, toast].slice(-maxCount),
     }));
     return id;
   },

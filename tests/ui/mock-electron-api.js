@@ -26,6 +26,8 @@
       fontSize: 14,
       showPreview: false,
       panelHeight: 250,
+      scrollbackLines: 5000,
+      cursorStyle: 'block',
     },
     sidebar: {
       width: 224,
@@ -35,6 +37,7 @@
       cliPath: null,
       maxConcurrentSessions: 8,
       queueOverflow: 'queue',
+      idleTimeoutMinutes: 0,
     },
     git: {
       worktreesEnabled: true,
@@ -43,10 +46,26 @@
       copyFiles: [],
       initScript: null,
     },
+    notifications: {
+      desktop: {
+        onAgentIdle: true,
+        onAgentCrash: true,
+        onPlanComplete: true,
+      },
+      toasts: {
+        onAgentIdle: true,
+        onAgentCrash: true,
+        onPlanComplete: true,
+        durationSeconds: 4,
+        maxCount: 5,
+      },
+      cooldownSeconds: 10,
+    },
     skipDeleteConfirm: false,
     autoFocusIdleSession: true,
-    notifyIdleOnInactiveProject: true,
     activateAllProjectsOnStartup: true,
+    restoreWindowPosition: true,
+    windowBounds: null,
   };
 
   function uuid() {
@@ -558,6 +577,9 @@
         return Object.assign({}, eventCache);
       },
       onEvent: function () {
+        return noop;
+      },
+      onIdleTimeout: function () {
         return noop;
       },
     },

@@ -19,6 +19,7 @@ export function registerSystemHandlers(context: IpcContext): void {
     const effective = context.configManager.getEffectiveConfig(context.currentProjectPath || undefined);
     context.sessionManager.setMaxConcurrent(effective.claude.maxConcurrentSessions);
     context.sessionManager.setShell(effective.terminal.shell);
+    context.sessionManager.setIdleTimeout(effective.claude.idleTimeoutMinutes);
   });
 
   ipcMain.handle(IPC.CONFIG_GET_PROJECT, () => {

@@ -47,6 +47,8 @@ export class SessionManager extends EventEmitter {
   private idleTimestamp = new Map<string, number>();
 
   private eventCache = new Map<string, SessionEvent[]>();
+  private idleTimeoutMinutes = 0;
+  private idleTimeoutInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     super();
@@ -59,6 +61,49 @@ export class SessionManager extends EventEmitter {
 
   setMaxConcurrent(max: number): void {
     this.sessionQueue.setMaxConcurrent(max);
+  }
+
+  setIdleTimeout(minutes: number): void {
+    this.idleTimeoutMinutes = minutes;
+
+    // Clear existing interval
+    if (this.idleTimeoutInterval) {
+      clearInterval(this.idleTimeoutInterval);
+      this.idleTimeoutInterval = null;
+    }
+
+    // Start checking every 60s if timeout is enabled.
+    // unref() ensures this interval doesn't keep the process alive during shutdown.
+    if (minutes > 0) {
+      this.idleTimeoutInterval = setInterval(() => this.checkIdleTimeouts(), 60_000);
+      this.idleTimeoutInterval.unref();
+    }
+  }
+
+  private checkIdleTimeouts(): void {
+    if (this.idleTimeoutMinutes <= 0) return;
+
+    const timeoutMs = this.idleTimeoutMinutes * 60_000;
+    const now = Date.now();
+
+    for (const [sessionId, activity] of this.activityCache) {
+      if (activity !== 'idle') continue;
+      const session = this.sessions.get(sessionId);
+      if (!session || session.status !== 'running') continue;
+
+      const idleStart = this.idleTimestamp.get(sessionId);
+      if (idleStart && (now - idleStart) > timeoutMs) {
+        this.suspend(sessionId);
+        this.emit('idle-timeout', sessionId, session.taskId, this.idleTimeoutMinutes);
+      }
+    }
+  }
+
+  dispose(): void {
+    if (this.idleTimeoutInterval) {
+      clearInterval(this.idleTimeoutInterval);
+      this.idleTimeoutInterval = null;
+    }
   }
 
   setShell(shell: string | null): void {

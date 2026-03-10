@@ -30,14 +30,16 @@ These settings appear only in App Settings and cannot be overridden per-project:
 - `sidebarVisible`, `boardLayout`, `sidebar.width`
 - `claude.cliPath`, `claude.maxConcurrentSessions`, `claude.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
-- `skipDeleteConfirm`, `autoFocusIdleSession`, `notifyIdleOnInactiveProject`, `activateAllProjectsOnStartup`
+- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`, `restoreWindowPosition`
+- `notifications.*` (all notification settings)
+- `claude.idleTimeoutMinutes`
 
 ### Per-Project Overridable Settings
 
 These settings appear in both App Settings (as defaults) and Project Settings (as overrides):
 
 - `theme`
-- `terminal.shell`, `terminal.fontSize`, `terminal.fontFamily`
+- `terminal.shell`, `terminal.fontSize`, `terminal.fontFamily`, `terminal.scrollbackLines`, `terminal.cursorStyle`
 - `claude.permissionMode`
 - `git.worktreesEnabled`, `git.autoCleanup`, `git.defaultBaseBranch`, `git.copyFiles`, `git.initScript`
 
@@ -52,8 +54,9 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `boardLayout` | `'horizontal'` \| `'vertical'` | `'horizontal'` | Board scroll direction. Global-only. |
 | `skipDeleteConfirm` | boolean | `false` | Skip confirmation dialog on task delete |
 | `autoFocusIdleSession` | boolean | `true` | Auto-switch to session tab when agent goes idle |
-| `notifyIdleOnInactiveProject` | boolean | `true` | Show native OS notifications when agents need attention on non-visible projects (idle, permission-blocked, crash, plan completion). Clicking the notification switches to the project and opens the task detail dialog. 10s per-session cooldown. |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
+| `restoreWindowPosition` | boolean | `true` | Remember window size and position between launches. Global-only. |
+| `windowBounds` | object \| null | `null` | Persisted window bounds `{x, y, width, height}`. Auto-saved, not shown in UI. |
 
 ### terminal.*
 
@@ -64,6 +67,8 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `terminal.fontSize` | number | `14` | Terminal font size (px) |
 | `terminal.showPreview` | boolean | `false` | Show terminal preview in task cards. Global-only. |
 | `terminal.panelHeight` | number | `250` | Bottom panel height (px). Global-only. |
+| `terminal.scrollbackLines` | number | `5000` | Maximum lines kept in terminal buffer (1000-100000) |
+| `terminal.cursorStyle` | `'block'` \| `'underline'` \| `'bar'` | `'block'` | Terminal cursor appearance |
 
 ### claude.*
 
@@ -73,6 +78,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `claude.cliPath` | string \| null | `null` | Claude CLI path. `null` = auto-detect on PATH. Global-only. |
 | `claude.maxConcurrentSessions` | number | `8` | Max concurrent PTY sessions. Global-only. |
 | `claude.queueOverflow` | `'queue'` \| `'reject'` | `'queue'` | What to do when max sessions reached. Global-only. |
+| `claude.idleTimeoutMinutes` | number | `0` | Auto-suspend sessions after this many minutes idle. 0 = disabled. Global-only. |
 
 PermissionMode values:
 
@@ -91,6 +97,20 @@ PermissionMode values:
 | `git.defaultBaseBranch` | string | `'main'` | Default base branch for worktrees |
 | `git.copyFiles` | string[] | `[]` | Files to copy from repo root into worktrees |
 | `git.initScript` | string \| null | `null` | Shell script to run after worktree creation |
+
+### notifications.*
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `notifications.desktop.onAgentIdle` | boolean | `true` | Desktop notification when agent goes idle on non-visible project |
+| `notifications.desktop.onAgentCrash` | boolean | `true` | Desktop notification when session exits with error (always on) |
+| `notifications.desktop.onPlanComplete` | boolean | `true` | Desktop notification when plan completes and task auto-moves |
+| `notifications.toasts.onAgentIdle` | boolean | `true` | In-app toast when agent goes idle |
+| `notifications.toasts.onAgentCrash` | boolean | `true` | In-app toast when session exits with error (always on) |
+| `notifications.toasts.onPlanComplete` | boolean | `true` | In-app toast when plan completes |
+| `notifications.toasts.durationSeconds` | number | `4` | Toast auto-dismiss time in seconds (1-30) |
+| `notifications.toasts.maxCount` | number | `5` | Maximum simultaneous visible toasts (1-10) |
+| `notifications.cooldownSeconds` | number | `10` | Minimum wait between repeat desktop notifications per session |
 
 ### sidebar.*
 

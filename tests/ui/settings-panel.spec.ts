@@ -43,12 +43,13 @@ test.describe('App Settings Panel', () => {
     await closeSettings();
   });
 
-  test('shows Agent section with CLI Path and Max Sessions', async () => {
+  test('shows Agent section with CLI Path, Max Sessions, and Idle Timeout', async () => {
     await openAppSettings();
     await page.getByRole('button', { name: 'Agent' }).click();
     await expect(page.locator('text=CLI Path')).toBeVisible();
     await expect(page.locator('text=Max Concurrent Sessions')).toBeVisible();
     await expect(page.locator('text=When Max Sessions Reached')).toBeVisible();
+    await expect(page.getByText('Idle Timeout (minutes)')).toBeVisible();
     await closeSettings();
   });
 
@@ -57,18 +58,32 @@ test.describe('App Settings Panel', () => {
     await page.getByRole('button', { name: 'Behavior' }).click();
     await expect(page.locator('text=Skip Task Delete Confirmation')).toBeVisible();
     await expect(page.locator('text=Auto-Focus Idle Sessions')).toBeVisible();
-    await expect(page.locator('text=Desktop Notifications')).toBeVisible();
     await expect(page.locator('text=Launch All Projects on Startup')).toBeVisible();
+    await expect(page.locator('text=Restore Window Position')).toBeVisible();
     await closeSettings();
   });
 
-  test('shows Terminal tab with shell, font size, and font family', async () => {
+  test('shows Notifications tab with event grid and delivery settings', async () => {
+    await openAppSettings();
+    await page.getByRole('button', { name: 'Notifications' }).click();
+    // Event rows with Desktop/Toast inline labels
+    await expect(page.getByText('Agent Idle')).toBeVisible();
+    await expect(page.getByText('Plan Complete')).toBeVisible();
+    // Delivery settings
+    await expect(page.getByText('Toast Auto-Dismiss')).toBeVisible();
+    await expect(page.getByText('Max Visible Toasts')).toBeVisible();
+    await closeSettings();
+  });
+
+  test('shows Terminal tab with shell, font size, font family, scrollback, and cursor style', async () => {
     await openAppSettings();
     await page.getByRole('button', { name: 'Terminal' }).click();
 
     await expect(page.getByText('Shell', { exact: true })).toBeVisible();
     await expect(page.getByText('Font Size', { exact: true })).toBeVisible();
     await expect(page.getByText('Font Family', { exact: true })).toBeVisible();
+    await expect(page.getByText('Scrollback Lines')).toBeVisible();
+    await expect(page.getByText('Cursor Style')).toBeVisible();
 
     await closeSettings();
   });

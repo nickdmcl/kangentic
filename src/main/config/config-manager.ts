@@ -12,10 +12,11 @@ export class ConfigManager {
     if (this.config) return this.config;
 
     ensureDirs();
+    let parsed: Record<string, unknown> | null = null;
     try {
       const raw = fs.readFileSync(PATHS.configFile, 'utf-8');
-      const parsed = JSON.parse(raw);
-      this.config = deepMerge(DEFAULT_CONFIG, parsed);
+      parsed = JSON.parse(raw);
+      this.config = deepMerge(DEFAULT_CONFIG, parsed as Partial<AppConfig>);
     } catch {
       this.config = { ...DEFAULT_CONFIG };
     }
@@ -24,6 +25,13 @@ export class ConfigManager {
     const pm = this.config.claude.permissionMode as string;
     if (pm === 'dangerously-skip' || pm === 'project-settings') {
       this.config.claude.permissionMode = pm === 'dangerously-skip' ? 'bypass-permissions' : 'default';
+      this.save(this.config);
+    }
+
+    // One-time migration: notifyIdleOnInactiveProject → notifications.desktop.onAgentIdle
+    if (parsed && 'notifyIdleOnInactiveProject' in parsed) {
+      this.config.notifications.desktop.onAgentIdle = Boolean(parsed.notifyIdleOnInactiveProject);
+      delete (this.config as unknown as Record<string, unknown>).notifyIdleOnInactiveProject;
       this.save(this.config);
     }
 

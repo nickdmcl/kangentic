@@ -142,6 +142,13 @@ export function registerSessionHandlers(context: IpcContext): void {
     }
   });
 
+  context.sessionManager.on('idle-timeout', (sessionId: string, taskId: string, timeoutMinutes: number) => {
+    if (!context.mainWindow.isDestroyed()) {
+      const projectId = context.sessionManager.getSessionProjectId(sessionId);
+      context.mainWindow.webContents.send(IPC.SESSION_IDLE_TIMEOUT, sessionId, taskId, timeoutMinutes, projectId);
+    }
+  });
+
   context.sessionManager.on('exit', (sessionId: string, exitCode: number) => {
     const resolvedProjectId = context.sessionManager.getSessionProjectId(sessionId);
 

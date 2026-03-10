@@ -8,6 +8,11 @@ import type { AppConfig, DeepPartial, PermissionMode, ThemeMode } from '../../..
 import { NAMED_THEMES } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
 
+/**
+ * Project Settings only shows tabs that are project-overridable (the tabs
+ * above the separator in AppSettingsPanel). Global-only tabs like Behavior,
+ * Notifications, and Privacy are NOT shown here.
+ */
 const PROJECT_TABS: SettingsTabDefinition[] = [
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: Terminal },

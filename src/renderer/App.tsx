@@ -158,14 +158,13 @@ export function App() {
 
     // Notification helpers -- shared by idle, exit, and auto-move handlers.
     const notificationCooldowns = new Map<string, number>();
-    const NOTIFICATION_COOLDOWN_MS = 10_000;
 
     async function shouldNotify(key: string, sessionProjectId: string): Promise<boolean> {
       const notifyConfig = useConfigStore.getState().config;
-      if (!notifyConfig.notifyIdleOnInactiveProject) return false;
+      const cooldownMs = notifyConfig.notifications.cooldownSeconds * 1000;
 
       const lastNotified = notificationCooldowns.get(key) ?? 0;
-      if (Date.now() - lastNotified < NOTIFICATION_COOLDOWN_MS) return false;
+      if (Date.now() - lastNotified < cooldownMs) return false;
 
       const focused = await window.electronAPI.window.isFocused();
       const activeProjectId = useProjectStore.getState().currentProject?.id;
@@ -189,20 +188,24 @@ export function App() {
 
         updateSessionStatus(sessionId, { status: 'exited', exitCode });
 
+        const notifyConfig = useConfigStore.getState().config.notifications;
+
         // Only show toast if exited session belongs to current project
         const activeProjectId = useProjectStore.getState().currentProject?.id;
         if ((projectId ?? currentSession?.projectId) === activeProjectId) {
-          const task = useBoardStore.getState().tasks.find((t) => t.session_id === sessionId)
-            ?? useBoardStore.getState().tasks.find((t) => t.id === currentSession?.taskId);
-          const label = task ? `"${task.title}"` : sessionId.slice(0, 8);
-          useToastStore.getState().addToast({
-            message: `Session ended for ${label} (exit ${exitCode})`,
-            variant: exitCode === 0 ? 'info' : 'warning',
-          });
+          if (notifyConfig.toasts.onAgentCrash) {
+            const task = useBoardStore.getState().tasks.find((t) => t.session_id === sessionId)
+              ?? useBoardStore.getState().tasks.find((t) => t.id === currentSession?.taskId);
+            const label = task ? `"${task.title}"` : sessionId.slice(0, 8);
+            useToastStore.getState().addToast({
+              message: `Session ended for ${label} (exit ${exitCode})`,
+              variant: exitCode === 0 ? 'info' : 'warning',
+            });
+          }
         }
 
         // Desktop notification for non-zero exit on non-visible projects
-        if (exitCode !== 0) {
+        if (exitCode !== 0 && notifyConfig.desktop.onAgentCrash) {
           const resolvedProjectId = projectId ?? currentSession?.projectId;
           if (resolvedProjectId) {
             shouldNotify(sessionId, resolvedProjectId).then((notify) => {
@@ -261,17 +264,36 @@ export function App() {
 
         // OS notification + taskbar flash for idle sessions not visible to the user
         if (state === 'idle') {
-          const session = sessionStore.sessions.find((s) => s.id === sessionId);
-          if (session) {
-            shouldNotify(sessionId, session.projectId).then((notify) => {
-              if (!notify) return;
-              const project = useProjectStore.getState().projects.find((p) => p.id === session.projectId);
-              const projectName = project?.name ?? 'A project';
-              const label = taskTitle ?? 'A task';
-              const body = isPermission ? `Needs permission -- ${projectName}` : projectName;
-              sendNotification(sessionId, label, body, session.projectId, taskId ?? '');
-            });
+          const notifyConfig = useConfigStore.getState().config.notifications;
+          if (notifyConfig.desktop.onAgentIdle) {
+            const session = sessionStore.sessions.find((s) => s.id === sessionId);
+            if (session) {
+              shouldNotify(sessionId, session.projectId).then((notify) => {
+                if (!notify) return;
+                const project = useProjectStore.getState().projects.find((p) => p.id === session.projectId);
+                const projectName = project?.name ?? 'A project';
+                const label = taskTitle ?? 'A task';
+                const body = isPermission ? `Needs permission -- ${projectName}` : projectName;
+                sendNotification(sessionId, label, body, session.projectId, taskId ?? '');
+              });
+            }
           }
+        }
+      }));
+    }
+
+    // Idle timeout -- session auto-suspended after N minutes idle
+    if (sessions.onIdleTimeout) {
+      cleanups.push(sessions.onIdleTimeout((sessionId, timeoutTaskId, timeoutMinutes, timeoutProjectId) => {
+        updateSessionStatus(sessionId, { status: 'suspended' });
+        const activeProjectId = useProjectStore.getState().currentProject?.id;
+        if ((timeoutProjectId ?? '') === activeProjectId) {
+          const task = useBoardStore.getState().tasks.find((t) => t.id === timeoutTaskId);
+          const label = task ? `"${task.title}"` : sessionId.slice(0, 8);
+          useToastStore.getState().addToast({
+            message: `Session suspended after ${timeoutMinutes} minutes idle: ${label}`,
+            variant: 'info',
+          });
         }
       }));
     }
@@ -309,13 +331,17 @@ export function App() {
       cleanups.push(tasks.onAutoMoved((autoMovedTaskId, _targetSwimlaneId, taskTitle, autoMoveProjectId) => {
         useBoardStore.getState().loadBoard();
         useSessionStore.getState().syncSessions();
-        useToastStore.getState().addToast({
-          message: `Plan complete -- moved "${taskTitle}" to next column`,
-          variant: 'success',
-        });
+
+        const notifyConfig = useConfigStore.getState().config.notifications;
+        if (notifyConfig.toasts.onPlanComplete) {
+          useToastStore.getState().addToast({
+            message: `Plan complete -- moved "${taskTitle}" to next column`,
+            variant: 'success',
+          });
+        }
 
         // Desktop notification for auto-moves on non-visible projects
-        if (autoMoveProjectId) {
+        if (autoMoveProjectId && notifyConfig.desktop.onPlanComplete) {
           shouldNotify(`automove:${autoMovedTaskId}`, autoMoveProjectId).then((notify) => {
             if (!notify) return;
             const project = useProjectStore.getState().projects.find((p) => p.id === autoMoveProjectId);
