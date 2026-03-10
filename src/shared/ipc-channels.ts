@@ -86,6 +86,7 @@ export const IPC = {
   SHELL_OPEN_EXTERNAL: 'shell:openExternal',
 
   // Git
+  GIT_DETECT: 'git:detect',
   GIT_LIST_BRANCHES: 'git:listBranches',
 
   // Dialog

@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { GripVertical, Pencil } from 'lucide-react';
+import { GripVertical, Pencil, Plus } from 'lucide-react';
 import { TaskCard } from './TaskCard';
 import { NewTaskDialog } from '../dialogs/NewTaskDialog';
 import { EditColumnDialog } from '../dialogs/EditColumnDialog';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
+import { useConfigStore } from '../../stores/config-store';
 import type { Swimlane as SwimlaneType, Task } from '../../../shared/types';
 
 export interface SwimlaneProps {
@@ -25,9 +26,12 @@ export function Swimlane({ swimlane, tasks, dragHandleProps, isDropTarget }: Swi
     data: { type: 'swimlane' },
   });
 
+  const hasCompletedFirstRun = useConfigStore((state) => state.config.hasCompletedFirstRun);
+
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   const role = swimlane.role;
+  const showFirstRunHint = role === 'backlog' && tasks.length === 0 && !hasCompletedFirstRun;
   const isSystemColumn = role !== null;
   const isDraggable = !!dragHandleProps;
 
@@ -109,6 +113,22 @@ export function Swimlane({ swimlane, tasks, dragHandleProps, isDropTarget }: Swi
             <TaskCard key={task.id} task={task} />
           ))}
         </SortableContext>
+
+        {showFirstRunHint && (
+          <button
+            onClick={() => setShowNewTask(true)}
+            className="w-full p-4 rounded-lg border-2 border-dashed border-accent/40 hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer text-left"
+            data-testid="first-run-hint"
+          >
+            <div className="flex items-center gap-2 text-sm text-fg font-medium mb-1.5">
+              <Plus size={16} className="text-accent" />
+              <span>Create your first task</span>
+            </div>
+            <p className="text-xs text-fg-muted pl-6 leading-relaxed">
+              Describe what you want an agent to do, then drag it to a column to start a session.
+            </p>
+          </button>
+        )}
       </div>
 
       {/* Add task button */}

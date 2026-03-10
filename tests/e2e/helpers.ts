@@ -70,6 +70,20 @@ export async function launchApp(options?: {
   // generate one from the Playwright worker index to avoid collisions.
   const dataDir = options?.dataDir || getTestDataDir(`worker-${process.pid}`);
 
+  // Ensure hasCompletedFirstRun is true so the WelcomeOverlay doesn't block tests.
+  // Tests may pre-write their own config.json (e.g. with mock Claude CLI paths),
+  // so merge into existing config rather than overwriting.
+  const configPath = path.join(dataDir, 'config.json');
+  try {
+    const existing = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (!existing.hasCompletedFirstRun) {
+      existing.hasCompletedFirstRun = true;
+      fs.writeFileSync(configPath, JSON.stringify(existing));
+    }
+  } catch {
+    fs.writeFileSync(configPath, JSON.stringify({ hasCompletedFirstRun: true }));
+  }
+
   const args = [mainEntry];
   if (options?.cwd) {
     args.push(`--cwd=${options.cwd}`);

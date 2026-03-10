@@ -366,6 +366,7 @@ export interface AppConfig {
 
   notifications: NotificationConfig;
 
+  hasCompletedFirstRun: boolean;
   skipDeleteConfirm: boolean;
   autoFocusIdleSession: boolean;
   activateAllProjectsOnStartup: boolean;
@@ -418,6 +419,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     },
     cooldownSeconds: 10,
   },
+  hasCompletedFirstRun: false,
   skipDeleteConfirm: false,
   autoFocusIdleSession: true,
   activateAllProjectsOnStartup: true,
@@ -642,6 +644,7 @@ export interface ElectronAPI {
 
   // Git
   git: {
+    detect: () => Promise<{ found: boolean; path: string | null; version: string | null; meetsMinimum: boolean }>;
     listBranches: () => Promise<string[]>;
   };
 

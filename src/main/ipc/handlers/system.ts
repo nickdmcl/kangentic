@@ -69,6 +69,8 @@ export function registerSystemHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.SHELL_OPEN_EXTERNAL, (_, url: string) => shell.openExternal(url));
 
   // === Git ===
+  ipcMain.handle(IPC.GIT_DETECT, () => context.gitDetector.detect());
+
   ipcMain.handle(IPC.GIT_LIST_BRANCHES, async () => {
     if (!context.currentProjectPath || !isGitRepo(context.currentProjectPath)) return [];
     try {

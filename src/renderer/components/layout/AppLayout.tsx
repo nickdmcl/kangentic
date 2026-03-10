@@ -29,44 +29,49 @@ export function AppLayout() {
       <TitleBar />
 
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar area -- animates between full width and collapsed strip */}
-        <div
-          className={`flex-shrink-0 overflow-hidden border-r border-edge relative ${
-            sidebar.ready && !sidebar.isResizing ? 'transition-[width] duration-200 ease-in-out' : ''
-          }`}
-          style={{ width: sidebar.open ? sidebar.width : COLLAPSED_STRIP_WIDTH }}
-        >
-          {/* Full sidebar content -- hidden when collapsed */}
-          <div
-            className={`h-full ${
-              sidebar.ready ? 'transition-opacity duration-200 ease-in-out' : ''
-            } ${sidebar.open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          >
-            <ProjectSidebar onToggleSidebar={sidebar.toggle} />
-          </div>
-
-          {/* Collapsed strip overlay -- visible when closed */}
-          <div
-            className={`absolute inset-0 bg-surface-raised flex flex-col items-center pt-3 px-1.5 ${
-              sidebar.ready ? 'transition-opacity duration-200 ease-in-out' : ''
-            } ${sidebar.open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          >
-            <button
-              onClick={sidebar.toggle}
-              className="p-1.5 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
-              title="Show sidebar"
-              data-testid="sidebar-expand-button"
+        {/* Hide sidebar entirely when no projects (welcome screen is primary UI) */}
+        {projects.length > 0 && (
+          <>
+            {/* Sidebar area -- animates between full width and collapsed strip */}
+            <div
+              className={`flex-shrink-0 overflow-hidden border-r border-edge relative ${
+                sidebar.ready && !sidebar.isResizing ? 'transition-[width] duration-200 ease-in-out' : ''
+              }`}
+              style={{ width: sidebar.open ? sidebar.width : COLLAPSED_STRIP_WIDTH }}
             >
-              <PanelLeft size={18} />
-            </button>
-          </div>
-        </div>
+              {/* Full sidebar content -- hidden when collapsed */}
+              <div
+                className={`h-full ${
+                  sidebar.ready ? 'transition-opacity duration-200 ease-in-out' : ''
+                } ${sidebar.open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              >
+                <ProjectSidebar onToggleSidebar={sidebar.toggle} />
+              </div>
 
-        {/* Sidebar resize handle -- click to toggle, drag to resize */}
-        <div
-          className="flex-shrink-0 cursor-col-resize transition-colors w-1 bg-edge hover:bg-fg-faint"
-          onMouseDown={sidebar.onResizeStart}
-        />
+              {/* Collapsed strip overlay -- visible when closed */}
+              <div
+                className={`absolute inset-0 bg-surface-raised flex flex-col items-center pt-3 px-1.5 ${
+                  sidebar.ready ? 'transition-opacity duration-200 ease-in-out' : ''
+                } ${sidebar.open ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              >
+                <button
+                  onClick={sidebar.toggle}
+                  className="p-1.5 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
+                  title="Show sidebar"
+                  data-testid="sidebar-expand-button"
+                >
+                  <PanelLeft size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Sidebar resize handle -- click to toggle, drag to resize */}
+            <div
+              className="flex-shrink-0 cursor-col-resize transition-colors w-1 bg-edge hover:bg-fg-faint"
+              onMouseDown={sidebar.onResizeStart}
+            />
+          </>
+        )}
 
         <div className="flex-1 flex flex-col min-w-0" ref={terminal.contentColRef}>
           {currentProject ? (

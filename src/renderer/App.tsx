@@ -15,6 +15,7 @@ export function App() {
   const loadConfig = useConfigStore((s) => s.loadConfig);
   const loadAppVersion = useConfigStore((s) => s.loadAppVersion);
   const detectClaude = useConfigStore((s) => s.detectClaude);
+  const detectGit = useConfigStore((s) => s.detectGit);
   const updateSessionStatus = useSessionStore((s) => s.updateSessionStatus);
   const updateUsage = useSessionStore((s) => s.updateUsage);
   const updateActivity = useSessionStore((s) => s.updateActivity);
@@ -29,6 +30,7 @@ export function App() {
     loadConfig();
     loadAppVersion();
     detectClaude();
+    detectGit();
     loadProjects();
     // Restore the current project after a page reload (e.g. Vite HMR).
     // The main process retains currentProjectId across renderer reloads.

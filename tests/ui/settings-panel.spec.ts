@@ -120,8 +120,8 @@ test.describe('App Settings Panel', () => {
   test('CLI path status indicator appears after panel opens', async () => {
     await openAppSettings();
     await page.getByRole('button', { name: 'Agent' }).click();
-    // The mock returns { found: false }, so the indicator div has title="Claude CLI not found"
-    await expect(page.locator('[title="Claude CLI not found"]')).toBeVisible();
+    // The mock returns { found: true }, so the indicator div has a "Detected:" title
+    await expect(page.locator('[title^="Detected:"]')).toBeVisible();
     await closeSettings();
   });
 

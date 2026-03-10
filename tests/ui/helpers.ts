@@ -50,8 +50,16 @@ export async function createProject(
     (window as any).__mockFolderPath = '/mock/projects/' + n;
   }, name);
 
-  const addButton = page.locator('button[title="Open folder as project"]');
-  await addButton.click();
+  // When no projects exist the sidebar is hidden and the welcome screen
+  // provides the "Open a Project" button. Otherwise use the sidebar button.
+  const welcomeButton = page.locator('[data-testid="welcome-open-project"]');
+  const sidebarButton = page.locator('button[title="Open folder as project"]');
+
+  if (await welcomeButton.isVisible()) {
+    await welcomeButton.click();
+  } else {
+    await sidebarButton.click();
+  }
 
   await waitForBoard(page);
 }

@@ -16,7 +16,7 @@
   let eventCache = {};
   let currentProjectId = null;
 
-  let config = {
+  let config = Object.assign({
     theme: 'dark',
     sidebarVisible: true,
     boardLayout: 'horizontal',
@@ -61,12 +61,13 @@
       },
       cooldownSeconds: 10,
     },
+    hasCompletedFirstRun: true,
     skipDeleteConfirm: false,
     autoFocusIdleSession: true,
     activateAllProjectsOnStartup: true,
     restoreWindowPosition: true,
     windowBounds: null,
-  };
+  }, window.__mockConfigOverrides || {});
 
   function uuid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -609,7 +610,7 @@
 
     claude: {
       detect: async function () {
-        return { found: false, path: null, version: null };
+        return { found: true, path: '/usr/bin/claude', version: '2.1.72 (Claude Code)' };
       },
     },
 
@@ -639,6 +640,9 @@
     },
 
     git: {
+      detect: async function () {
+        return { found: true, path: '/usr/bin/git', version: '2.43.0', meetsMinimum: true };
+      },
       listBranches: async function () {
         return ['main', 'develop', 'feature/auth', 'feature/dashboard', 'fix/login-bug'];
       },

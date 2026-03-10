@@ -26,6 +26,7 @@ import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
 import { AddColumnButton } from './AddColumnButton';
+import { WelcomeOverlay } from './WelcomeOverlay';
 import { useBoardStore } from '../../stores/board-store';
 import type { Task, Swimlane as SwimlaneType } from '../../../shared/types';
 import { useToastStore } from '../../stores/toast-store';
@@ -462,7 +463,8 @@ export function KanbanBoard() {
   }, []);
 
   return (
-    <div className="h-full overflow-x-auto overflow-y-hidden p-4">
+    <div className="relative h-full overflow-x-auto overflow-y-hidden p-4">
+      <WelcomeOverlay />
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}

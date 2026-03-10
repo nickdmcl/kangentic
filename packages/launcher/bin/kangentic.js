@@ -268,21 +268,27 @@ function launch(platformInfo, targetDir, dataDir) {
     childEnv.KANGENTIC_DATA_DIR = dataDir;
   }
 
+  const launchArgs = targetDir ? [`--cwd=${targetDir}`] : [];
+
   if (platformInfo.platform === 'win32') {
-    const child = spawn(installPath, [`--cwd=${targetDir}`], {
+    const child = spawn(installPath, launchArgs, {
       detached: true,
       stdio: 'ignore',
       env: childEnv,
     });
     child.unref();
   } else if (platformInfo.platform === 'darwin') {
-    const openArgs = ['-a', installPath, '--args', `--cwd=${targetDir}`];
+    const openArgs = ['-a', installPath];
+    const appArgs = [...launchArgs];
     if (dataDir) {
-      openArgs.push(`--data-dir=${dataDir}`);
+      appArgs.push(`--data-dir=${dataDir}`);
+    }
+    if (appArgs.length > 0) {
+      openArgs.push('--args', ...appArgs);
     }
     execFileSync('open', openArgs);
   } else if (platformInfo.platform === 'linux') {
-    const child = spawn(installPath, [`--cwd=${targetDir}`], {
+    const child = spawn(installPath, launchArgs, {
       detached: true,
       stdio: 'ignore',
       env: childEnv,
@@ -338,7 +344,7 @@ function findTargetDir(arguments_) {
     }
     return path.resolve(argument);
   }
-  return process.cwd();
+  return null;
 }
 
 async function main() {

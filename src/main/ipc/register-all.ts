@@ -5,6 +5,7 @@ import { ProjectRepository } from '../db/repositories/project-repository';
 import { SessionManager } from '../pty/session-manager';
 import { ConfigManager } from '../config/config-manager';
 import { ClaudeDetector } from '../agent/claude-detector';
+import { GitDetector } from '../agent/git-detector';
 import { ShellResolver } from '../pty/shell-resolver';
 import { CommandBuilder } from '../agent/command-builder';
 import { CommandInjector } from '../engine/command-injector';
@@ -39,6 +40,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   let projectRepo: ProjectRepository | null = null;
   let configManager: ConfigManager | null = null;
   let claudeDetector: ClaudeDetector | null = null;
+  let gitDetector: GitDetector | null = null;
   let shellResolver: ShellResolver | null = null;
   let commandBuilder: CommandBuilder | null = null;
 
@@ -56,6 +58,10 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     get claudeDetector() {
       if (!claudeDetector) claudeDetector = new ClaudeDetector();
       return claudeDetector;
+    },
+    get gitDetector() {
+      if (!gitDetector) gitDetector = new GitDetector();
+      return gitDetector;
     },
     get shellResolver() {
       if (!shellResolver) shellResolver = new ShellResolver();

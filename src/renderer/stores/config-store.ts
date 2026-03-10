@@ -25,6 +25,10 @@ interface ConfigStore {
   claudeVersionNumber: string | null;
   detectClaude: () => Promise<void>;
 
+  // -- Git detection --
+  gitInfo: { found: boolean; path: string | null; version: string | null; meetsMinimum: boolean } | null;
+  detectGit: () => Promise<void>;
+
   // -- App Settings panel UI --
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
@@ -61,6 +65,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   appVersion: null,
   claudeInfo: null,
   claudeVersionNumber: null,
+  gitInfo: null,
   loading: false,
   settingsOpen: false,
   projectSettingsOpen: false,
@@ -91,6 +96,11 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
       claudeInfo,
       claudeVersionNumber: version,
     });
+  },
+
+  detectGit: async () => {
+    const gitInfo = await window.electronAPI.git.detect();
+    set({ gitInfo });
   },
 
   setSettingsOpen: (open) => set({ settingsOpen: open }),

@@ -10,6 +10,7 @@ const projectDir = path.resolve(__dirname, '..');
 const portArg = process.argv.find(a => a.startsWith('--port='));
 const port = portArg ? parseInt(portArg.split('=')[1], 10) : 5173;
 const ephemeral = process.argv.includes('--ephemeral');
+const fresh = process.argv.includes('--fresh');
 
 // Detect Electron executable path per-platform
 const electronExe = process.platform === 'win32'
@@ -101,8 +102,11 @@ async function start() {
 
   // 3. Launch Electron
   const positionalArgs = process.argv.slice(2).filter(a => !a.startsWith('--'));
-  const targetDir = positionalArgs[0] || projectDir;
-  const electronArgs = [projectDir, `--cwd=${path.resolve(targetDir)}`];
+  const targetDir = positionalArgs[0] || (fresh ? null : projectDir);
+  const electronArgs = [projectDir];
+  if (targetDir) {
+    electronArgs.push(`--cwd=${path.resolve(targetDir)}`);
+  }
 
   // Preview instances get their own user data directory to avoid disk cache
   // conflicts with the primary Electron instance, and their own data directory
@@ -110,7 +114,7 @@ async function start() {
   // .kangentic/ which is already cleaned up on ephemeral exit.
   let spawnEnv = process.env;
   if (ephemeral) {
-    const resolvedTarget = path.resolve(targetDir);
+    const resolvedTarget = targetDir ? path.resolve(targetDir) : projectDir;
     const userDataDir = path.join(resolvedTarget, '.kangentic', 'electron-data');
     electronArgs.push(`--user-data-dir=${userDataDir}`);
     electronArgs.push('--ephemeral');

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { Task, Swimlane, TaskCreateInput, TaskUpdateInput, TaskMoveInput, TaskUnarchiveInput, SwimlaneCreateInput, SwimlaneUpdateInput } from '../../shared/types';
+import { useConfigStore } from './config-store';
 import { useSessionStore } from './session-store';
 import { useToastStore } from './toast-store';
 
@@ -81,6 +82,13 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   createTask: async (input) => {
     const task = await window.electronAPI.tasks.create(input);
     set((s) => ({ tasks: [...s.tasks, task] }));
+
+    // Mark first-run onboarding complete after the user's first task creation
+    const { config, updateConfig } = useConfigStore.getState();
+    if (!config.hasCompletedFirstRun) {
+      updateConfig({ hasCompletedFirstRun: true });
+    }
+
     return task;
   },
 

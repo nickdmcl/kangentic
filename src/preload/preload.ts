@@ -135,6 +135,7 @@ const api: ElectronAPI = {
   },
 
   git: {
+    detect: () => ipcRenderer.invoke(IPC.GIT_DETECT),
     listBranches: () => ipcRenderer.invoke(IPC.GIT_LIST_BRANCHES),
   },
 

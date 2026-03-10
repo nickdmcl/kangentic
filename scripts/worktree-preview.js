@@ -116,9 +116,11 @@ async function findAvailablePort(startPort) {
 // Command builder
 // ---------------------------------------------------------------------------
 
-function buildCommand(worktreeDir, port) {
+function buildCommand(worktreeDir, port, { fresh = false } = {}) {
   const devScript = path.join(worktreeDir, 'scripts', 'dev.js');
-  return `node "${devScript}" --port=${port} --ephemeral`;
+  const flags = [`--port=${port}`, '--ephemeral'];
+  if (fresh) flags.push('--fresh');
+  return `node "${devScript}" ${flags.join(' ')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +203,7 @@ function openTerminal(cwd, command) {
 
 async function main() {
   const worktreeDir = process.cwd();
+  const isFresh = process.argv.includes('--fresh');
 
   const rootDir = findRootProject(worktreeDir);
   if (!rootDir) {
@@ -213,11 +216,12 @@ async function main() {
 
   console.log(`[preview] Root project: ${rootDir}`);
   console.log(`[preview] Worktree:     ${worktreeDir}`);
+  if (isFresh) console.log('[preview] Fresh mode: launching without --cwd (Welcome Screen)');
 
   ensureNodeModulesLink(worktreeDir, rootDir);
 
   const port = await findAvailablePort(5174);
-  const command = buildCommand(worktreeDir, port);
+  const command = buildCommand(worktreeDir, port, { fresh: isFresh });
 
   console.log(`[preview] Opening preview terminal...`);
   console.log(`[preview]   Port:    ${port}`);

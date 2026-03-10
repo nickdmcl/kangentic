@@ -40,8 +40,8 @@ test.describe('App Launch', () => {
     expect(title).toBe('Kangentic');
   });
 
-  test('shows project sidebar on start', async () => {
-    await expect(page.getByText('Projects', { exact: true })).toBeVisible();
+  test('shows welcome screen on start (no projects)', async () => {
+    await expect(page.locator('[data-testid="welcome-open-project"]')).toBeVisible();
   });
 
   test('title bar displays Kangentic branding', async () => {
