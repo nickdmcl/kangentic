@@ -117,7 +117,7 @@ Checks `parent=worktrees` and `grandparent=.kangentic` to verify a path is insid
 
 **IMPORTANT:** Never use `path.normalize()`, `path.dirname()`, or `path.basename()` on paths that may contain Windows backslashes when the code runs on Linux. Node's `path` module is platform-dependent -- on Linux, `\` is a valid filename character, not a separator. Always normalize slashes manually first.
 
-Sparse-checkout excludes `.claude/commands/` and `.claude/skills/` from worktrees to prevent duplicate slash commands.
+Sparse-checkout excludes `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` from worktrees to prevent duplicate slash commands, skills, and agents.
 
 ## Key Source Files
 

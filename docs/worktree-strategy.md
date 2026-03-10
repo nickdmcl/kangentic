@@ -41,18 +41,18 @@ The chosen base branch is stored in the worktree's git config as `kangentic.base
 
 ## Sparse-Checkout
 
-Worktrees exclude `.claude/commands/` and `.claude/skills/` from checkout using sparse-checkout in `--no-cone` mode:
+Worktrees exclude `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` from checkout using sparse-checkout in `--no-cone` mode:
 
 ```
 git sparse-checkout init --no-cone
-git sparse-checkout set '/*' '!/.claude/commands/' '!/.claude/skills/'
+git sparse-checkout set '/*' '!/.claude/commands/' '!/.claude/skills/' '!/.claude/agents/'
 ```
 
-This means worktrees get all files including `.claude/settings.json` (so Claude resolves permissions naturally), but exclude `.claude/commands/` and `.claude/skills/` to prevent duplicate slash command and skill discovery. `.claude/settings.local.json` is untracked (gitignored), so it's not present in worktrees from checkout -- writes to it (from Kangentic hooks or Claude's "always allow") are invisible to git.
+This means worktrees get all files including `.claude/settings.json` (so Claude resolves permissions naturally), but exclude `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` to prevent duplicate slash command, skill, and agent discovery. `.claude/settings.local.json` is untracked (gitignored), so it's not present in worktrees from checkout -- writes to it (from Kangentic hooks or Claude's "always allow") are invisible to git.
 
 Sparse-checkout was chosen over `skip-worktree` because skip-worktree flags get lost during rebase and merge operations. Sparse-checkout survives all git operations.
 
-Sparse-checkout requires git 2.25+. On older git versions (some Linux distros), the commands fail gracefully -- worktrees still work but `.claude/commands/` and `.claude/skills/` will be present, which may cause duplicate slash command discovery.
+Sparse-checkout requires git 2.25+. On older git versions (some Linux distros), the commands fail gracefully -- worktrees still work but `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` will be present, which may cause duplicate discovery.
 
 ## Hook Delivery
 
@@ -170,7 +170,7 @@ App reopened
 
 ## Safety
 
-- **No git contamination** -- `.claude/commands/` and `.claude/skills/` excluded from worktrees via sparse-checkout. `.claude/settings.json` is present (from git). `settings.local.json` is untracked and gitignored. Hooks are delivered via `--settings` flag for all sessions (main repo and worktree) -- Kangentic never writes to `.claude/settings.local.json`.
+- **No git contamination** -- `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` excluded from worktrees via sparse-checkout. `.claude/settings.json` is present (from git). `settings.local.json` is untracked and gitignored. Hooks are delivered via `--settings` flag for all sessions (main repo and worktree) -- Kangentic never writes to `.claude/settings.local.json`.
 - **Hook identification** -- two-marker pattern (`.kangentic` + bridge name) prevents touching user hooks.
 - **Backup on strip** -- `stripKangenticHooks()` backs up settings before modification, restores on failure.
 - **Orphan dedup** -- on session resume, old PTY is killed and its file paths nulled before new PTY spawns. Prevents stale `onExit` handlers from deleting files the new session needs.
@@ -195,8 +195,8 @@ Uses real temp files with mocked `os.homedir()`.
 
 ### Worktree Manager (`worktree-manager.test.ts`)
 
-**Sparse-checkout** (`.claude/commands/` and `.claude/skills/` exclusion):
-- Initializes sparse-checkout with `--no-cone` and excludes `.claude/commands/` and `.claude/skills/`
+**Sparse-checkout** (`.claude/commands/`, `.claude/skills/`, and `.claude/agents/` exclusion):
+- Initializes sparse-checkout with `--no-cone` and excludes `.claude/commands/`, `.claude/skills/`, and `.claude/agents/`
 - Sparse-checkout runs before `copyFiles`
 - Skips `.claude/` entries in `copyFiles`
 - No `skip-worktree` or `update-index` calls

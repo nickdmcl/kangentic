@@ -56,7 +56,7 @@ describe('WorktreeManager -- sparse-checkout', () => {
     vi.clearAllMocks();
   });
 
-  it('initializes sparse-checkout with --no-cone and excludes .claude/commands/ and .claude/skills/', async () => {
+  it('initializes sparse-checkout with --no-cone and excludes .claude/commands/, .claude/skills/, and .claude/agents/', async () => {
     setupCreateWorktreeMocks();
 
     const mgr = new WorktreeManager('/project');
@@ -67,9 +67,9 @@ describe('WorktreeManager -- sparse-checkout', () => {
       'sparse-checkout', 'init', '--no-cone',
     ]);
 
-    // Verify sparse-checkout set was called to exclude .claude/commands/ and .claude/skills/
+    // Verify sparse-checkout set was called to exclude .claude/commands/, .claude/skills/, and .claude/agents/
     expect(mockWorktreeGit.raw).toHaveBeenCalledWith([
-      'sparse-checkout', 'set', '/*', '!/.claude/commands/', '!/.claude/skills/',
+      'sparse-checkout', 'set', '/*', '!/.claude/commands/', '!/.claude/skills/', '!/.claude/agents/',
     ]);
   });
 
