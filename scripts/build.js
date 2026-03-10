@@ -10,7 +10,7 @@ const esbuildCommon = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  external: ['electron', 'better-sqlite3', 'node-pty', 'electron-updater'],
+  external: ['electron', 'better-sqlite3', 'node-pty'],
   define: {
     'MAIN_WINDOW_VITE_DEV_SERVER_URL': JSON.stringify(''),
     'MAIN_WINDOW_VITE_NAME': JSON.stringify('main_window'),
