@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/icon-256.png" alt="Kangentic Logo" width="128" />
+  <a href="https://www.kangentic.com"><img src="resources/icon-256.png" alt="Kangentic Logo" width="128" /></a>
 </p>
 
 <h1 align="center"><a href="https://www.kangentic.com">Kangentic</a></h1>
@@ -22,7 +22,7 @@
 <p align="center">One board to manage all your Claude Code agents.</p>
 
 <p align="center">
-  <img src="resources/kanban-demo.png" alt="Kangentic Kanban Board" width="800" />
+  <a href="https://www.kangentic.com"><img src="resources/kanban-demo.png" alt="Kangentic Kanban Board" width="800" /></a>
 </p>
 
 ## How It Works
