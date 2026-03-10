@@ -20,7 +20,7 @@ The config directory (`<configDir>`) is platform-specific:
 
 Settings are split into two panels with separate entry points. Both use a tabbed layout with a sidebar for navigation.
 
-- **App Settings** -- opened via the titlebar gear icon (labeled "Global"). Tabs: Appearance, Terminal, Agent, Git, Behavior, Privacy. Contains app-wide settings and project defaults. Changing a project default (theme, shell, font, permissions, git) always shows a confirmation modal to optionally sync to all existing projects.
+- **App Settings** -- opened via the titlebar gear icon (labeled "Global"). Tabs: Appearance, Terminal, Agent, Git, Behavior, Notifications, Privacy. Contains app-wide settings and project defaults. Changing a project default (theme, shell, font, permissions, git) always shows a confirmation modal to optionally sync to all existing projects.
 - **Project Settings** -- opened via the gear icon on each project row in the sidebar. Tabs: Appearance, Terminal, Agent, Git. Contains per-project overridable settings. Inherited defaults are shown as hints; overridden settings get a reset button. A "Reset All" footer appears when any overrides exist.
 
 ### App-Only Settings
@@ -86,7 +86,9 @@ PermissionMode values:
 - `default` -- uses `--settings` (project-settings behavior)
 - `plan` -- `--permission-mode plan` (read-only tools auto-approved)
 - `acceptEdits` -- `--permission-mode acceptEdits` (edits auto-approved)
-- `manual` -- no flags, interactive prompts
+- `manual` -- no flags, interactive prompts (defined in types but not exposed in any UI)
+
+The global App Settings "Permissions" dropdown only offers three choices: `default`, `acceptEdits`, and `bypass-permissions`. The `plan` mode is only available as a per-column override in the Edit Column dialog. The `manual` mode is defined in types but is not exposed in any settings UI.
 
 ### git.*
 

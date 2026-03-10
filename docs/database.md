@@ -23,12 +23,13 @@ Overridable via the `KANGENTIC_DATA_DIR` environment variable. When set, all dat
 
 ## Configuration
 
-All database connections are opened with:
+All database connections are opened with three pragmas:
 
-- **WAL mode** for concurrent reads
-- **busy_timeout = 5000ms** to wait on locked databases
-- **foreign_keys = ON** to enforce referential integrity
-- **better-sqlite3** (synchronous, no async) -- all queries block the Node.js event loop briefly but avoid callback complexity
+- `journal_mode = WAL` -- concurrent reads without blocking writers
+- `busy_timeout = 5000` -- wait up to 5 seconds on locked databases before returning SQLITE_BUSY
+- `foreign_keys = ON` -- enforce referential integrity on all foreign key constraints
+
+All queries are synchronous via **better-sqlite3** -- they block the Node.js event loop briefly but avoid callback complexity.
 
 ## Global DB Schema
 
@@ -144,6 +145,8 @@ Valid session_type values: `claude_agent`, `run_script`.
 
 Valid status values: `running`, `suspended`, `exited`, `orphaned`.
 
+Valid permission_mode values: `bypass-permissions`, `default`, `manual`, `plan`, `acceptEdits` (see `PermissionMode` type in `src/shared/types.ts`).
+
 ### task_attachments table
 
 | Column | Type | Constraints | Default |
@@ -160,21 +163,132 @@ Index: `idx_task_attachments_task_id` on (task_id).
 
 ## Migration Strategy
 
-Migrations run automatically on database open. The strategy uses three approaches depending on the change:
+Migrations run automatically on database open via `runGlobalMigrations()` and `runProjectMigrations()` in `src/main/db/migrations.ts`. The strategy uses three approaches depending on the change:
 
 - **Initial schema** uses `CREATE TABLE IF NOT EXISTS` so first-run and re-runs are idempotent.
 - **Incremental changes** use `ALTER TABLE ADD COLUMN` with existence checks via `PRAGMA table_info()` to avoid errors on already-migrated databases.
 - **Table recreation** is used when foreign key constraints need removal (e.g., `swimlane_transitions` wildcard source required dropping the FK on `from_swimlane_id`).
 - **Data migrations** (e.g., converting explicit transitions to wildcards, updating legacy permission modes) run alongside schema changes.
 
+### Key Migrations (Per-Project DB)
+
+Listed in execution order within `runProjectMigrations()`:
+
+1. **`role` column on swimlanes** -- adds the `role` column and backfills `backlog`, `planning`, `running` by position, plus `done` for archived columns.
+2. **`icon` column on swimlanes** -- adds custom icon support.
+3. **`archived_at` column on tasks** -- supports the Done auto-archive feature.
+4. **`base_branch` column on tasks** -- per-task base branch override.
+5. **`use_worktree` column on tasks** -- per-task worktree override.
+6. **`swimlane_transitions` table recreation** -- drops the foreign key constraint on `from_swimlane_id` to allow wildcard `*` source. SQLite requires full table recreation to remove a constraint.
+7. **Wildcard transition data migration** -- converts explicit per-source transitions (e.g., Backlog->Planning) into wildcard transitions (*->Planning). Groups by target swimlane and action, keeping the lowest execution_order.
+8. **`task_attachments` table** -- creates the table with `ON DELETE CASCADE` on `task_id` and an index on `task_id`.
+9. **`spawn_agent` config data migrations** (single pass over all spawn_agent actions):
+   - Appends `{{attachments}}` to prompt templates that lack it
+   - Removes legacy permission modes (`dangerously-skip`, `bypass-permissions`) from action config
+   - Updates old `Task: {{title}}...` prompt template to `{{title}}{{description}}{{attachments}}`
+10. **`permission_strategy` and `auto_spawn` columns on swimlanes** -- adds per-column permission strategy and auto-spawn toggle. Backfills: backlog/done get `auto_spawn = 0`, planning gets `permission_strategy = 'plan'`, running role is converted to a custom column.
+11. **`auto_command` column on swimlanes** -- per-column auto-command support.
+12. **`is_terminal` renamed to `is_archived`** -- uses `ALTER TABLE RENAME COLUMN`.
+13. **`plan_exit_target_id` column on swimlanes** -- adds plan exit target and removes the `planning` system role. Sets icon to `map` for former planning-role columns, clears the role, and auto-sets `plan_exit_target_id` to the next column by position.
+14. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes.
+
+### Key Migrations (Global DB)
+
+1. **`position` column on projects** -- adds explicit project ordering. Backfills positions based on `last_opened DESC` order to preserve the original visual order.
+
 ## Repository Pattern
 
-One repository class per table:
+One repository class per table. All queries are synchronous (better-sqlite3). Transactions are used for position shifts (task move, swimlane reorder, project reorder) to ensure consistent ordering.
 
-- `ProjectRepository` -- operates on the global DB.
-- `TaskRepository`, `SwimlaneRepository`, `ActionRepository`, `SessionRepository`, `AttachmentRepository` -- operate on per-project DBs.
+### ProjectRepository
 
-All queries are synchronous (better-sqlite3). Transactions are used for position shifts (task move, swimlane reorder, project reorder) to ensure consistent ordering.
+Operates on the global DB. Uses `getGlobalDb()` internally -- no constructor argument needed.
+
+| Method | Description |
+|--------|-------------|
+| `list()` | All projects ordered by position ASC |
+| `getById(id)` | Single project by ID |
+| `create(input)` | Insert at position 0, shifting all existing projects down |
+| `getLastOpened()` | Most recently opened project (by `last_opened` DESC) |
+| `updateLastOpened(id)` | Set `last_opened` to now |
+| `delete(id)` | Delete and reindex positions to keep them contiguous (0..N-1) |
+| `reorder(ids)` | Set positions from the ordered array of IDs |
+
+### TaskRepository
+
+Operates on a per-project DB.
+
+| Method | Description |
+|--------|-------------|
+| `list(swimlaneId?)` | Active (non-archived) tasks, optionally filtered by swimlane. Includes `attachment_count` via LEFT JOIN on `task_attachments`. |
+| `getById(id)` | Single task by ID (includes `attachment_count`) |
+| `getBySessionId(sessionId)` | Find the active (non-archived) task that owns a given PTY session |
+| `create(input)` | Insert at the end of the target swimlane (next position) |
+| `update(input)` | Partial update -- only provided fields are changed |
+| `move(input)` | Transactional move: shift positions in old and new swimlanes, update task |
+| `archive(id)` | Set `archived_at` to now (soft-delete for Done column) |
+| `unarchive(id, targetSwimlaneId, position)` | Clear `archived_at`, move to target swimlane and position |
+| `listArchived()` | All archived tasks ordered by `archived_at` DESC |
+| `delete(id)` | Hard delete with position shift in the owning swimlane |
+
+### SwimlaneRepository
+
+Operates on a per-project DB.
+
+| Method | Description |
+|--------|-------------|
+| `list()` | All swimlanes ordered by position ASC. Maps integer columns to booleans (`is_archived`, `auto_spawn`). |
+| `getById(id)` | Single swimlane by ID |
+| `create(input)` | Insert before the `done` column (if any), otherwise at the end. Shifts positions of existing columns. |
+| `update(input)` | Partial update -- only provided fields are changed |
+| `reorder(ids)` | Set positions from ordered array. Enforces constraints: backlog must be position 0, custom columns (role=null) cannot be position 0. |
+| `delete(id)` | Delete a custom column. System columns (`backlog`, `done`) cannot be deleted. Columns with tasks cannot be deleted. Also cleans up related transitions and dangling `plan_exit_target_id` references. |
+
+### ActionRepository
+
+Operates on a per-project DB.
+
+| Method | Description |
+|--------|-------------|
+| `list()` | All actions ordered by name ASC |
+| `getById(id)` | Single action by ID |
+| `create(input)` | Insert a new action |
+| `update(input)` | Partial update -- only provided fields are changed |
+| `delete(id)` | Delete action and all associated transitions |
+| `listTransitions()` | All transitions ordered by from_swimlane_id, to_swimlane_id, execution_order |
+| `getTransitionsFor(fromId, toId)` | Get transitions for a specific move. Exact source match takes priority; falls back to wildcard `*` source if no exact match exists. |
+| `getAgentSwimlaneIds()` | Returns the set of swimlane IDs that have `spawn_agent` transitions targeting them |
+| `setTransitions(fromId, toId, actionIds)` | Replace all transitions for a given from/to pair. Deletes existing, inserts new with execution_order from array index. |
+
+### SessionRepository
+
+Operates on a per-project DB.
+
+| Method | Description |
+|--------|-------------|
+| `insert(record)` | Insert a new session record (ID is auto-generated) |
+| `updateStatus(id, status, extra?)` | Update session status with optional `exit_code`, `suspended_at`, `exited_at` |
+| `getResumable()` | Get suspended `claude_agent` sessions that can be resumed |
+| `markAllRunningAsOrphaned()` | Mark all `running` sessions as `orphaned` (crash recovery on startup) |
+| `markRunningAsOrphanedExcluding(excludeTaskIds)` | Same as above but skips sessions whose task_id is in the exclusion set (prevents HMR re-entrant recovery from orphaning active sessions) |
+| `getOrphaned()` | Get orphaned `claude_agent` sessions |
+| `deleteByTaskId(taskId)` | Delete all session records for a given task |
+| `getLatestForTask(taskId)` | Find the most recent session record for a task (by `started_at` DESC) |
+| `listAllClaudeSessionIds()` | Get all distinct `claude_session_id` values (for stale session directory cleanup) |
+
+### AttachmentRepository
+
+Operates on a per-project DB. Manages both database records and files on disk under `<projectPath>/.kangentic/tasks/<taskId>/attachments/`.
+
+| Method | Description |
+|--------|-------------|
+| `list(taskId)` | All attachments for a task ordered by `created_at` ASC |
+| `getById(id)` | Single attachment by ID |
+| `add(projectPath, taskId, filename, base64Data, mediaType)` | Decode base64 data, write file to disk, insert DB record. Filename is sanitized and prefixed with the attachment UUID. |
+| `remove(id)` | Delete file from disk and DB record |
+| `deleteByTaskId(taskId)` | Delete all attachments for a task (files + DB records). Attempts to clean up empty directories. |
+| `getPathsForTask(taskId)` | Get file paths for all attachments on a task (for passing to Claude CLI) |
+| `getDataUrl(id)` | Read file from disk and return as a `data:` URL with the correct media type |
 
 ## Connection Management
 

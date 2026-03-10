@@ -40,7 +40,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `project:reorder` | invoke | Reorder projects by ID array |
 | `project:autoOpened` | on | Event: project auto-opened on launch |
 
-### Tasks (7 channels)
+### Tasks (8 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `task:list` | invoke | Fetch tasks, optionally by swimlane |
@@ -50,6 +50,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `task:move` | invoke | Move task between swimlanes (triggers transitions) |
 | `task:list-archived` | invoke | Fetch archived tasks |
 | `task:unarchive` | invoke | Restore archived task |
+| `task:autoMoved` | on | Event: task was auto-moved by transition engine |
 
 ### Attachments (4 channels)
 | Channel | Pattern | Purpose |
@@ -83,7 +84,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `transition:set` | invoke | Set action chain for lane A→B |
 | `transition:getFor` | invoke | Get transitions for lane pair (exact match, then wildcard) |
 
-### Sessions (18 channels)
+### Sessions (19 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `session:spawn` | invoke | Spawn PTY session (may queue) |
@@ -104,14 +105,19 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `session:usage` | on | Usage data updated (includes `projectId`) |
 | `session:activity` | on | Activity state changed (includes `projectId`, `taskId`, `taskTitle`) |
 | `session:event` | on | Structured event (includes `projectId`) |
+| `session:idleTimeout` | on | Session idle timeout fired |
 
-### Config (4 channels)
+### Config (7 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
-| `config:get` | invoke | Fetch global AppConfig |
+| `config:get` | invoke | Fetch effective AppConfig (global merged with project overrides) |
+| `config:getGlobal` | invoke | Fetch global-only AppConfig (no project overrides) |
 | `config:set` | invoke | Update global config (partial merge) |
 | `config:getProject` | invoke | Fetch project-level config overrides |
 | `config:setProject` | invoke | Update project-level overrides |
+| `config:getProjectByPath` | invoke | Fetch project overrides by filesystem path |
+| `config:setProjectByPath` | invoke | Update project overrides by filesystem path |
+| `config:syncDefaultToProjects` | invoke | Sync default config values to all project configs |
 
 ### Notifications (2 channels)
 | Channel | Pattern | Purpose |
@@ -119,18 +125,55 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `notification:show` | send | Show native OS notification (task name + project name) |
 | `notification:clicked` | on | User clicked a notification (includes projectId, taskId) |
 
-### Claude, Shell, Dialog, Window (9 channels)
+### Claude (1 channel)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `claude:detect` | invoke | Detect Claude CLI (path, version) |
+
+### Shell (4 channels)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
 | `shell:getAvailable` | invoke | List available shells |
 | `shell:getDefault` | invoke | Get default shell |
 | `shell:openPath` | invoke | Open directory in file explorer |
+| `shell:openExternal` | invoke | Open URL in default browser |
+
+### Git (2 channels)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `git:detect` | invoke | Detect git installation (path, version, minimum version check) |
+| `git:listBranches` | invoke | List branches for a repository |
+
+### Dialog (1 channel)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
 | `dialog:selectFolder` | invoke | OS folder picker |
+
+### Window (5 channels)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
 | `window:minimize` | send | Minimize window |
 | `window:maximize` | send | Maximize/restore window |
 | `window:close` | send | Close window |
+| `window:flashFrame` | send | Flash taskbar icon to attract attention |
 | `window:isFocused` | invoke | Check if window has focus (for notification gating) |
+
+### Analytics (1 channel)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `analytics:trackRendererError` | invoke | Report renderer-side errors to main process |
+
+### App (1 channel)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `app:getVersion` | invoke | Get Electron app version string |
+
+### Updater (3 channels)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `updater:check` | invoke | Check for application updates |
+| `updater:install` | invoke | Install downloaded update (quit and install) |
+| `updater:downloaded` | on | Event: update has been downloaded and is ready to install |
 
 ## Database
 
@@ -155,7 +198,7 @@ Stores the project list. Tables:
 Created on project open. Stored in the global config directory (not inside the project). Tables:
 
 - **swimlanes** -- Kanban columns. Fields: id, name, role (`backlog`/`planning`/`done`/null), position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, created_at
-- **tasks** -- Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, archived_at, created_at, updated_at
+- **tasks** -- Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, use_worktree, archived_at, created_at, updated_at
 - **actions** -- Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `webhook`. Config stored as JSON.
 - **swimlane_transitions** -- Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
 - **sessions** -- Session persistence for recovery/resume. Fields: id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status (`running`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
@@ -285,11 +328,13 @@ State: `sessions`, `activeSessionId`, `openTaskId`, `dialogSessionId`, `sessionU
 
 ### ConfigStore (`config-store.ts`)
 
-State: `config` (AppConfig), `appVersion`, `claudeInfo`, `claudeVersionNumber`, `settingsOpen`
+State: `config` (AppConfig), `globalConfig`, `appVersion`, `claudeInfo`, `claudeVersionNumber`, `gitInfo`, `settingsOpen`, `projectSettingsOpen`, `projectOverrides`
 
 - **Theme subscription** -- watches theme changes, updates `<html>` class for CSS variables.
 - **App version** -- `loadAppVersion()` fetches the Electron app version via IPC.
 - **Claude detection** -- `detectClaude()` finds CLI path and parses version string.
+- **Git detection** -- `detectGit()` checks for git installation, version, and minimum version requirement.
+- **Project overrides** -- `loadProjectOverrides()`, `updateProjectOverride()`, `removeProjectOverride()` manage per-project config overrides by filesystem path.
 
 ### ProjectStore (`project-store.ts`)
 

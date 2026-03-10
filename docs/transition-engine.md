@@ -12,11 +12,11 @@ When a task moves from one column to another, the IPC handler (`task:move`) chec
 |----------|-----------|--------|
 | 1 | Target is **Backlog** (role=`backlog`) | Kill session, preserve worktree |
 | 2 | Target is **Done** (role=`done`) | Suspend session (resumable), archive task |
-| 3 | Target has `auto_spawn=false` | Suspend session |
-| 4 | Task has **active session** | Keep session alive. If target has `auto_command`, inject it via CommandInjector |
-| 5 | Task has **no session** | Resume suspended session OR create worktree (if enabled) + execute transition action chain |
+| 2.5 | Target has `auto_spawn=false` (non-backlog, non-done) | Suspend session |
+| 3 | Task has **active session** | Keep session alive. If target has `auto_command`, inject it via CommandInjector |
+| 4 | Task has **no session** | Resume suspended session OR create worktree (if enabled) + execute transition action chain |
 
-Transition action chains (case 5) only fire when a task has no active session. This means moving between active columns with a running agent simply keeps the agent running -- no restart, no context loss.
+Transition action chains (priority 4) only fire when a task has no active session. This means moving between active columns with a running agent simply keeps the agent running -- no restart, no context loss.
 
 ## Transition Lookup
 
@@ -30,13 +30,13 @@ The wildcard `*` source is the common case. It means "from any column into this 
 
 ## Action Chain
 
-When a transition fires, its actions execute sequentially in `execution_order`:
+A single transition lookup (`from_swimlane_id` + `to_swimlane_id`) returns multiple `swimlane_transitions` records, each pointing to one action via `action_id`. These records are ordered by `execution_order` and executed sequentially:
 
 ```
-transition fires
-  → action_0 (execution_order: 0) -- e.g., kill_session
-  → action_1 (execution_order: 1) -- e.g., spawn_agent
-  → action_2 (execution_order: 2) -- e.g., send_command
+transition lookup (from → to)
+  → swimlane_transitions[0] → action_id → kill_session  (execution_order: 0)
+  → swimlane_transitions[1] → action_id → spawn_agent   (execution_order: 1)
+  → swimlane_transitions[2] → action_id → send_command   (execution_order: 2)
 ```
 
 Each action is a record in the `actions` table with a `type` and `config_json`.

@@ -38,24 +38,36 @@ The script is stateless -- no persistent process, no inter-invocation memory. Al
 | Type | Meaning | Hook Point |
 |------|---------|------------|
 | `tool_start` | Agent began using a tool | `PreToolUse` (blank matcher) |
-| `tool_end` | Tool execution completed | `PostToolUse` (blank matcher) |
-| `tool_failure` | Tool execution failed | `PostToolUseFailure` (blank matcher) |
-| `prompt` | Agent submitted/received a prompt | `UserPromptSubmit`, `PostToolUse` (AskUserQuestion, ExitPlanMode) |
-| `idle` | Agent stopped or is waiting | `Stop`, `PermissionRequest`, `PreToolUse` (AskUserQuestion, ExitPlanMode) |
-| `interrupted` | User interrupted the agent | Detected from hook payload (`is_interrupted` flag) |
+| `tool_end` | Tool execution completed | `PostToolUse` (blank matcher), or `PostToolUseFailure` when `is_interrupt` is false |
+| `prompt` | Agent submitted/received a prompt | `UserPromptSubmit` (blank matcher) |
+| `idle` | Agent stopped or is waiting | `Stop`, `PermissionRequest` (blank matchers) |
+| `interrupted` | User interrupted the agent | `PostToolUseFailure` when `is_interrupt` is true |
+| `session_start` | Claude Code session started | `SessionStart` (blank matcher) |
+| `session_end` | Claude Code session ended | `SessionEnd` (blank matcher) |
+| `subagent_start` | Main agent launched a subagent | `SubagentStart` (blank matcher) |
+| `subagent_stop` | Subagent finished | `SubagentStop` (blank matcher) |
+| `notification` | Informational notification | `Notification` (blank matcher) |
+| `compact` | Context compaction in progress | `PreCompact` (blank matcher) |
+| `teammate_idle` | A teammate agent went idle | `TeammateIdle` (blank matcher) |
+| `task_completed` | Agent completed a task | `TaskCompleted` (blank matcher) |
+| `config_change` | Configuration changed | `ConfigChange` (blank matcher) |
+| `worktree_create` | Worktree creation in progress | `WorktreeCreate` (blank matcher) |
+| `worktree_remove` | Worktree removal in progress | `WorktreeRemove` (blank matcher) |
+
+Note: `tool_failure` is passed as the event type argument to the bridge script, but is never written to the JSONL file as-is. The bridge reads `is_interrupt` from the hook payload and converts it to either `interrupted` (if true) or `tool_end` (if false).
 
 ### Output Format
 
 Each line in `events.jsonl` is a self-contained JSON object:
 
 ```json
-{"ts":1709312400000,"event":"tool_start","tool":"Read","file":"/src/main.ts"}
-{"ts":1709312400100,"event":"tool_end","tool":"Read"}
-{"ts":1709312400200,"event":"tool_start","tool":"Edit","file":"/src/main.ts"}
-{"ts":1709312400300,"event":"idle"}
+{"ts":1709312400000,"type":"tool_start","tool":"Read","detail":"/src/main.ts"}
+{"ts":1709312400100,"type":"tool_end","tool":"Read"}
+{"ts":1709312400200,"type":"tool_start","tool":"Edit","detail":"/src/main.ts"}
+{"ts":1709312400300,"type":"idle"}
 ```
 
-Fields vary by event type. Common fields: `ts` (Unix ms), `event` (type string). Tool events include `tool` (tool name) and may include `file` or other metadata extracted from the hook payload.
+Fields vary by event type. Common fields: `ts` (Unix ms), `type` (event type string). Tool events include `tool` (tool name) and may include `detail` (file path, command, or other metadata extracted from the hook payload's `tool_input`).
 
 ## Activity State Derivation
 
@@ -73,13 +85,17 @@ The SessionManager derives thinking/idle state from event types using this mappi
 | `notification` | *(no change)* | Informational only -- fires unpredictably, often while idle |
 | `subagent_stop` | *(no change)* | Subagent finishing doesn't mean the main agent is active |
 | `tool_end` | *(no change)* | Another tool_start typically follows immediately |
-| `tool_failure` | *(no change)* | Agent continues thinking after a failure |
+| `session_start` | *(no change)* | Lifecycle event only -- session just started |
+| `session_end` | *(no change)* | Lifecycle event only -- session ended |
+| `teammate_idle` | *(no change)* | Informational -- a teammate agent went idle |
+| `task_completed` | *(no change)* | Informational -- agent completed a task |
+| `config_change` | *(no change)* | Informational -- configuration changed |
+| `worktree_remove` | *(no change)* | Informational -- worktree removal |
 
 Key design decisions:
 
 - **`tool_end` does not set idle.** Between consecutive tool calls, there's a brief gap where no tool is running. Setting idle on `tool_end` would cause the spinner to flicker off and on rapidly. Instead, only explicit idle signals (`Stop`, `PermissionRequest`) set idle state.
-- **`tool_failure` does not set idle.** The agent continues processing after a tool failure (it may retry or try a different approach). Only the `Stop` hook fires when the agent truly stops.
-- **`AskUserQuestion` and `ExitPlanMode` are special-cased.** These tools indicate the agent is waiting for user input, so they fire `idle` on `PreToolUse` and `prompt` on `PostToolUse` (when the user responds and the agent resumes).
+- **`tool_failure` is never a final event type.** The event bridge converts `PostToolUseFailure` payloads based on the `is_interrupt` flag: `interrupted` if the user pressed Escape, `tool_end` otherwise. There is no `tool_failure` entry in the JSONL file or the activity state mapping.
 - **`notification` does not change state.** Notifications (e.g. "Context getting full") are informational and fire unpredictably -- often after an idle event, which would incorrectly flip state back to thinking.
 - **`subagent_stop` does not change state.** A subagent finishing is not evidence that the main agent is actively working. The main agent's own tool events drive thinking state.
 
@@ -154,33 +170,31 @@ When idle is caused by a `PermissionRequest` (detail='permission'), a `permissio
 
 ## Hook Configuration
 
-Hooks are injected into Claude Code's settings as part of the session settings merge. The event-bridge is registered on six hook points:
+Hooks are injected into Claude Code's settings as part of the session settings merge. The event-bridge is registered on 17 hook points, all using blank matchers (`matcher: ''`):
 
 ```
-PreToolUse:
-  "" (blank)         → tool_start    # Any tool starting
-  "AskUserQuestion"  → idle          # Agent asking user a question
-  "ExitPlanMode"     → idle          # Agent requesting plan approval
-
-PostToolUse:
-  "" (blank)         → tool_end      # Any tool completed
-  "AskUserQuestion"  → prompt        # User answered, agent resumes
-  "ExitPlanMode"     → prompt        # User approved plan, agent resumes
-
-PostToolUseFailure:
-  "" (blank)         → tool_failure  # Any tool failed
-
-UserPromptSubmit:
-  "" (blank)         → prompt        # User submitted a prompt
-
-Stop:
-  "" (blank)         → idle          # Agent stopped naturally
-
-PermissionRequest:
-  "" (blank)         → idle (detail: permission)  # Agent hit a permission wall
+PreToolUse:          "" → tool_start       # Any tool starting
+PostToolUse:         "" → tool_end         # Any tool completed
+PostToolUseFailure:  "" → tool_failure*    # Any tool failed (*converted by bridge)
+UserPromptSubmit:    "" → prompt           # User submitted a prompt
+Stop:                "" → idle             # Agent stopped naturally
+PermissionRequest:   "" → idle (permission)# Agent hit a permission wall
+SessionStart:        "" → session_start    # Session started
+SessionEnd:          "" → session_end      # Session ended
+SubagentStart:       "" → subagent_start   # Subagent launched
+SubagentStop:        "" → subagent_stop    # Subagent finished
+Notification:        "" → notification     # Informational notification
+PreCompact:          "" → compact          # Context compaction
+TeammateIdle:        "" → teammate_idle    # Teammate went idle
+TaskCompleted:       "" → task_completed   # Agent completed task
+ConfigChange:        "" → config_change    # Configuration changed
+WorktreeCreate:      "" → worktree_create  # Worktree created
+WorktreeRemove:      "" → worktree_remove  # Worktree removed
 ```
 
-Matcher priority: Claude Code evaluates specific matchers before blank matchers. When `AskUserQuestion` fires, both the specific matcher (`→ idle`) and the blank matcher (`→ tool_start`) run. The specific matcher's event is appended after the blank matcher's event, so the final derived state is `idle` (correct).
+*`tool_failure` is passed as the argument to event-bridge.js, but the bridge converts it to `interrupted` (if `is_interrupt` is true in the payload) or `tool_end` (otherwise) before writing to the JSONL file.
+
+All hooks use blank matchers, meaning they fire for every invocation of that hook point regardless of tool name. There are no tool-specific matchers (e.g. no `AskUserQuestion` or `ExitPlanMode` matchers).
 
 ## Hook Injection
 
@@ -189,17 +203,17 @@ All sessions (main repo and worktree) use a single code path in `CommandBuilder.
 1. Reads `.claude/settings.json` from project root (committed, shared)
 2. Deep-merges `.claude/settings.local.json` from project root (personal)
 3. For worktrees: merges permissions from the worktree's `.claude/settings.local.json` (captures "always allow" grants)
-4. Appends event-bridge entries to each hook point
-5. Writes merged settings to `.kangentic/sessions/<id>/settings.json`
+4. Calls `buildEventHooks()` from `hook-manager.ts` to append event-bridge entries to all hook points
+5. Writes the merged settings to `.kangentic/sessions/<id>/settings.json`
 6. Passes `--settings <path>` to the Claude CLI
 
-All Kangentic artifacts stay in `.kangentic/` -- nothing is written to `.claude/settings.local.json`.
+All Kangentic hooks live in `.kangentic/sessions/<id>/settings.json` -- nothing is written to `.claude/settings.local.json`.
 
 ## Hook Cleanup
 
-`stripActivityHooks()` in `src/main/agent/hook-manager.ts` removes all Kangentic hooks on project close or delete:
+`stripKangenticHooks()` in `src/main/agent/hook-manager.ts` removes all Kangentic hooks on project close or delete. This function is deprecated since the unified `--settings` approach (hooks are now in `.kangentic/sessions/<id>/settings.json`), but is kept for backward compatibility with older worktrees that may still have hooks in `.claude/settings.local.json`:
 
-- Identifies hooks by two markers: `.kangentic` in the path AND a known bridge name (`event-bridge` or `status-bridge`)
+- Identifies hooks by two markers: `.kangentic` in the command AND a known bridge name (`activity-bridge` or `event-bridge`)
 - Backs up `settings.local.json` before modification
 - Validates JSON integrity before writing
 - Restores from backup on any error

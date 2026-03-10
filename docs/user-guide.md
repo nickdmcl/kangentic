@@ -78,9 +78,19 @@ Drag the panel divider to resize. The terminal resizes to match. Resize events a
 Click a task card to open the detail dialog. From here you can:
 
 - Edit the task title and description
-- View and manage attachments (images, files)
+- View and manage image attachments (drag-and-drop files onto the dialog, or paste from clipboard)
+- Click any attachment thumbnail to open a full-size preview modal (press Escape to close)
 - See the full terminal output (takes ownership from the bottom panel while open)
 - View session status, usage stats, and model info
+- Pause or resume the agent session using the circular play/pause button in the header
+- Access the kebab menu (three-dot icon) for additional actions:
+  - **Edit** -- switch to edit mode for title and description
+  - **Open folder** -- open the worktree or project directory in your file manager
+  - **View PR** -- open the associated pull request (if one exists)
+  - **Pause / Resume session** -- manually suspend or resume the agent
+  - **Move to** -- submenu listing all other columns as move targets
+  - **Archive** -- move the task to Done and archive it
+  - **Delete** -- permanently delete the task, session, and worktree
 
 When the dialog is open, it claims the terminal session -- the bottom panel releases it. When you close the dialog, the bottom panel reclaims the session.
 
@@ -128,16 +138,22 @@ Choose from 10 themes:
 | Setting | Description |
 |---------|-------------|
 | Shell | Override the auto-detected shell |
-| Font Family | Terminal font |
-| Font Size | Terminal text size |
+| Font Size | Terminal text size in pixels |
+| Font Family | CSS font-family for the terminal |
+| Scrollback Lines | Maximum lines kept in terminal buffer (1000--100000, default 5000) |
+| Cursor Style | Terminal cursor appearance (block, underline, or bar) |
 
-### Claude Settings
+### Agent Settings
 
 | Setting | Description |
 |---------|-------------|
-| Permission Mode | Default for all sessions (bypass, default, plan, acceptEdits, manual) |
-| CLI Path | Override auto-detected Claude CLI path |
-| Max Concurrent Sessions | How many agents can run at once (excess tasks queue) |
+| CLI Path | Path to Claude CLI binary (auto-detected if empty) |
+| Max Concurrent Sessions | Limit how many agents can run at the same time (1--20) |
+| When Max Sessions Reached | How new agent requests are handled when all slots are in use (Queue or Reject) |
+| Idle Timeout (minutes) | Auto-suspend sessions after N minutes idle; 0 to disable |
+| Permissions | Default permission mode for all sessions (Default, Accept Edits, or Bypass) |
+
+Note: Plan mode is not available as a global default -- it can only be set per-column in the column settings dialog.
 
 ### Git Settings
 
@@ -156,6 +172,17 @@ Settings have two scopes:
 - **Project** -- overrides global settings for this project only (stored in `.kangentic/config.json`)
 
 Some settings are global-only and cannot be overridden per-project (e.g., max concurrent sessions, sidebar width).
+
+### Behavior Settings
+
+These are global-only settings that apply to the entire app.
+
+| Setting | Description |
+|---------|-------------|
+| Skip Task Delete Confirmation | Delete tasks immediately without a confirmation dialog |
+| Auto-Focus Idle Sessions | Automatically switch the bottom panel to the most recently idle session |
+| Launch All Projects on Startup | Start agents across all projects on launch, not just the current one |
+| Restore Window Position | Remember window size and position between launches |
 
 ## Worktrees
 
@@ -192,7 +219,9 @@ When an agent goes idle (waiting for input or stopped) on a non-active project, 
 
 ### Notifications
 
-Desktop and toast notifications fire when an agent needs attention and the user can't already see it -- either the window is minimized/unfocused, or a different project is active. Notification events: agent idle, permission-blocked idle (body shows "Needs permission"), session crash (non-zero exit, always on), and plan-completion auto-moves. The task name is the title and the project name is the body. Clicking a desktop notification brings the window to the foreground, switches to the correct project, and opens the task detail dialog. The taskbar also flashes on Windows. A 10-second per-session cooldown prevents repeated desktop notifications from the same agent. Configurable per-event in Settings > Notifications -- each event can be set to Desktop & Toast, Desktop Only, Toast Only, or Off. Toast duration and max visible count are also configurable.
+Desktop and toast notifications fire when an agent needs attention and the user can't already see it -- either the window is minimized/unfocused, or a different project is active. Notification events: agent idle, permission-blocked idle (body shows "Needs permission"), session crash (non-zero exit), and plan-completion auto-moves. The task name is the title and the project name is the body. Clicking a desktop notification brings the window to the foreground, switches to the correct project, and opens the task detail dialog. The taskbar also flashes on Windows. A 10-second per-session cooldown prevents repeated desktop notifications from the same agent.
+
+The Settings > Notifications panel exposes two configurable events: **Agent Idle** and **Plan Complete**. Each can be set to Desktop & Toast, Desktop Only, Toast Only, or Off. Toast duration and max visible count are also configurable. The **Agent Crash** notification (non-zero exit) is always on and not exposed in the settings UI.
 
 ## CLI
 
@@ -209,11 +238,11 @@ If the project doesn't exist yet, it's created automatically.
 
 Sessions survive app restarts. When you close Kangentic:
 
-1. All running sessions receive a graceful shutdown signal (Ctrl+C then /exit)
-2. Claude Code saves its conversation state
-3. On next launch, sessions are automatically resumed via `--resume`
+1. All running sessions are marked as `suspended` in the database
+2. PTY processes are force-killed (there is no graceful shutdown window)
+3. On next launch, sessions are automatically resumed via `--resume` using the saved session ID
 
-If the app crashes, orphaned sessions are detected and recovered on the next launch.
+Because Claude Code supports `--resume`, conversation context is fully preserved despite the hard kill. If the app crashes, orphaned sessions are detected and recovered on the next launch.
 
 ## Keyboard Shortcuts
 

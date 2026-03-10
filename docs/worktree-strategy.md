@@ -65,7 +65,9 @@ All in `src/main/agent/`:
 | Script | Output File | Hook Points | Data |
 |--------|-------------|-------------|------|
 | `status-bridge.js` | `status.json` | statusLine | Token usage, cost, model, context % |
-| `event-bridge.js` | `events.jsonl` | PreToolUse, PostToolUse, PostToolUseFailure, UserPromptSubmit, Stop, PermissionRequest | Tool calls, prompts, interrupts, activity state (JSONL) |
+| `event-bridge.js` | `events.jsonl` | 17 hook event types (see below) | Tool calls, prompts, interrupts, activity state (JSONL) |
+
+The event bridge injects into all 17 Claude Code hook events: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `Notification`, `PreCompact`, `TeammateIdle`, `TaskCompleted`, `ConfigChange`, `WorktreeCreate`, `WorktreeRemove`. See [Claude Integration](claude-integration.md#hook-injection) for the full mapping.
 
 Each bridge reads JSON from stdin (piped by Claude Code), writes to its output file, and exits. All writes are try/catch wrapped for non-fatal failures.
 
@@ -88,9 +90,9 @@ All Kangentic artifacts stay in `.kangentic/` -- nothing is written to `.claude/
 
 Kangentic hooks are identified by two markers in the command string:
 - Contains `.kangentic` (path component)
-- Contains a known bridge name (`event-bridge` or `status-bridge`)
+- Contains a known bridge name (`activity-bridge` or `event-bridge`)
 
-Both must match. This prevents false positives on user-defined hooks with similar names.
+Both must match. This prevents false positives on user-defined hooks with similar names. The `activity-bridge` check is for backwards compatibility with older session directories -- the current bridge script is `event-bridge`.
 
 ## Session Directory
 

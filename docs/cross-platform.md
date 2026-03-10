@@ -111,6 +111,7 @@ Electron fuses enabled for production builds:
 - **Inspection disabled** -- no `--inspect` debugging in production
 - **Cookie encryption enabled** -- encrypts stored cookies
 - **ASAR integrity validation** -- verifies archive hasn't been tampered with
+- **OnlyLoadAppFromAsar** -- prevents loading code from extracted directories
 
 ## WSL Support
 

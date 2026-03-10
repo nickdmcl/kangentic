@@ -125,9 +125,9 @@ Additionally, `PreToolUse` with specific matchers (`AskUserQuestion`, `ExitPlanM
 
 Kangentic hooks are identified by two markers in the command string:
 - Contains `.kangentic` (path component)
-- Contains a known bridge name (`event-bridge` or `status-bridge`)
+- Contains a known bridge name (`activity-bridge` or `event-bridge`)
 
-Both must match. This two-marker pattern prevents false positives on user-defined hooks with similar names.
+Both must match. This two-marker pattern prevents false positives on user-defined hooks with similar names. The `activity-bridge` check is for backwards compatibility with older session directories -- the current bridge script is `event-bridge`.
 
 ### Hook Cleanup
 
