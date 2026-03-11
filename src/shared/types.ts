@@ -129,6 +129,8 @@ export interface Session {
 
 export type SessionRecordStatus = 'running' | 'suspended' | 'exited' | 'orphaned';
 
+export type SuspendedBy = 'user' | 'system';
+
 export interface SessionRecord {
   id: string;
   task_id: string;
@@ -143,6 +145,7 @@ export interface SessionRecord {
   started_at: string;
   suspended_at: string | null;
   exited_at: string | null;
+  suspended_by: SuspendedBy | null;
 }
 
 // === Session Activity (Claude Code Hooks) ===

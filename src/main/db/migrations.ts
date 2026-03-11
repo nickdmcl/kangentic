@@ -298,6 +298,13 @@ export function runProjectMigrations(db: Database.Database): void {
     `);
   }
 
+  // Migration: add 'suspended_by' column to track who suspended the session
+  const hasSuspendedBy = (db.pragma('table_info(sessions)') as Array<{ name: string }>)
+    .some((col) => col.name === 'suspended_by');
+  if (!hasSuspendedBy) {
+    db.exec("ALTER TABLE sessions ADD COLUMN suspended_by TEXT DEFAULT NULL");
+  }
+
   // Data migration: rename legacy permission_strategy values in swimlanes
   db.prepare("UPDATE swimlanes SET permission_strategy = 'default' WHERE permission_strategy = 'project-settings'").run();
   db.prepare("UPDATE swimlanes SET permission_strategy = 'bypass-permissions' WHERE permission_strategy = 'dangerously-skip'").run();

@@ -283,6 +283,12 @@ export async function recoverSessions(
       continue;
     }
 
+    // Skip user-paused sessions -- they should stay suspended until manually resumed
+    if (record.status === 'suspended' && record.suspended_by === 'user') {
+      skipped++;
+      continue;
+    }
+
     toProcess.push({ record, task });
   }
 
@@ -290,7 +296,7 @@ export async function recoverSessions(
   if (toProcess.length === 0) {
     if (skipped > 0) {
       console.log(
-        `[SESSION_RECOVERY] Skipped ${skipped} of ${toRecover.length} task(s) -- all in non-auto-spawn columns or deleted`,
+        `[SESSION_RECOVERY] Skipped ${skipped} of ${toRecover.length} task(s) -- non-auto-spawn columns, deleted, or user-paused`,
       );
     }
     if (!app.isPackaged) console.timeEnd(timerLabel);
@@ -480,6 +486,7 @@ export async function recoverSessions(
         started_at: now,
         suspended_at: null,
         exited_at: null,
+        suspended_by: null,
       });
 
       taskRepo.update({
@@ -569,6 +576,9 @@ export async function reconcileSessions(
   // Resolve shell once for all sessions (same global setting)
   const resolvedShell = await sessionManager.getShell();
 
+  // Batch-fetch user-paused task IDs to skip during reconciliation
+  const userPausedTaskIds = sessionRepo.getUserPausedTaskIds();
+
   // Cache transitions and actions for building commands
   const allTransitions = actionRepo.listTransitions();
   const allActions = actionRepo.list();
@@ -592,6 +602,9 @@ export async function reconcileSessions(
     const tasks = taskRepo.list(lane.id);
     for (const task of tasks) {
       if (activeTaskIds.has(task.id)) continue; // already has a session
+
+      // Skip tasks whose latest session was user-paused -- respect user intent
+      if (userPausedTaskIds.has(task.id)) continue;
 
       try {
         // Find a spawn_agent transition that targets this lane (optional -- provides custom prompt)
@@ -730,6 +743,7 @@ export async function reconcileSessions(
         started_at: reconcileNow,
         suspended_at: null,
         exited_at: null,
+        suspended_by: null,
       });
 
       reconciled++;

@@ -457,7 +457,7 @@ function syncShutdownCleanup(): void {
         for (const session of sessions) {
           const record = sessionRepo.getLatestForTask(session.taskId);
           if (record && record.status === 'running') {
-            sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: now });
+            sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: now, suspended_by: 'system' });
           }
         }
       } catch {

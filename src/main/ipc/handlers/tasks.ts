@@ -68,7 +68,7 @@ export async function handleTaskMove(
       // Accept 'running' AND 'exited' -- exited covers Claude natural exit
       if (record && record.claude_session_id
           && (record.status === 'running' || record.status === 'exited')) {
-        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString() });
+        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
         console.log(`[TASK_MOVE] Suspended session record ${record.id.slice(0, 8)} for task ${task.id.slice(0, 8)}`);
       }
       context.sessionManager.suspend(task.session_id);
@@ -79,7 +79,7 @@ export async function handleTaskMove(
       if (record && record.claude_session_id
           && record.session_type === 'claude_agent'
           && record.status === 'exited') {
-        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString() });
+        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
         console.log(`[TASK_MOVE] Preserved exited session ${record.id.slice(0, 8)} for future resume`);
       }
     }
@@ -96,7 +96,7 @@ export async function handleTaskMove(
       const record = sessionRepo.getLatestForTask(task.id);
       if (record && record.claude_session_id
           && (record.status === 'running' || record.status === 'exited')) {
-        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString() });
+        sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
       }
       context.sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });

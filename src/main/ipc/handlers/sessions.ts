@@ -48,7 +48,7 @@ export function registerSessionHandlers(context: IpcContext): void {
     const record = sessionRepo.getLatestForTask(task.id);
     if (record && record.claude_session_id
         && (record.status === 'running' || record.status === 'exited')) {
-      sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString() });
+      sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'user' });
     }
 
     // Kill PTY but preserve session files

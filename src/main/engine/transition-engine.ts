@@ -223,6 +223,7 @@ export class TransitionEngine {
         started_at: new Date().toISOString(),
         suspended_at: null,
         exited_at: null,
+        suspended_by: null,
       });
     }
   }

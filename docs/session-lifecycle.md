@@ -134,11 +134,11 @@ On project open (`session-recovery.ts`):
 2. **Mark crash recovery** -- leftover `running` DB records become `orphaned` (skip records with live PTYs to handle re-entrant calls)
 3. **Collect candidates** -- all `suspended` + `orphaned` claude_agent records
 4. **Deduplicate** -- keep only the latest record per `task_id`, mark older duplicates as `exited`
-5. **Filter** -- skip tasks in non-auto-spawn columns, skip missing CWD, skip deleted/archived tasks
+5. **Filter** -- skip tasks in non-auto-spawn columns, skip user-paused sessions (`suspended_by = 'user'`), skip missing CWD, skip deleted/archived tasks
 6. **Resume or respawn**:
    - Suspended/orphaned with `claude_session_id` -- use `--resume` (attempts to restore conversation)
    - No session ID -- fresh `--session-id` with prompt from matching `spawn_agent` action
-7. **Reconcile** -- spawn fresh agents for tasks in auto_spawn columns with no session at all
+7. **Reconcile** -- spawn fresh agents for tasks in auto_spawn columns with no session at all (skips user-paused tasks)
 
 ## Shutdown
 
@@ -148,7 +148,7 @@ The actual shutdown sequence (`syncShutdownCleanup()` in `src/main/index.ts`):
 
 1. Cancel all pending command injections
 2. List all in-memory sessions with `running` or `queued` status
-3. For each, find the corresponding DB record and mark it `suspended` (with `suspended_at` timestamp) so sessions can resume on next launch
+3. For each, find the corresponding DB record and mark it `suspended` (with `suspended_at` timestamp and `suspended_by = 'system'`) so sessions can resume on next launch
 4. Call `SessionManager.killAll()` which force-kills all PTYs immediately (no graceful `/exit`, no waiting)
 5. Clean up session files and clear in-memory session maps
 6. Delete ephemeral project from index (if applicable)

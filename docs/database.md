@@ -140,10 +140,13 @@ Index: `idx_transitions_from_to` on (from_swimlane_id, to_swimlane_id).
 | started_at | TEXT | NOT NULL | |
 | suspended_at | TEXT | | NULL |
 | exited_at | TEXT | | NULL |
+| suspended_by | TEXT | | NULL |
 
 Valid session_type values: `claude_agent`, `run_script`.
 
 Valid status values: `running`, `suspended`, `exited`, `orphaned`.
+
+Valid suspended_by values: `user` (explicit pause button), `system` (shutdown, task move, idle timeout), or `NULL` (legacy records, treated as `system`).
 
 Valid permission_mode values: `bypass-permissions`, `default`, `manual`, `plan`, `acceptEdits` (see `PermissionMode` type in `src/shared/types.ts`).
 
@@ -267,13 +270,14 @@ Operates on a per-project DB.
 | Method | Description |
 |--------|-------------|
 | `insert(record)` | Insert a new session record (ID is auto-generated) |
-| `updateStatus(id, status, extra?)` | Update session status with optional `exit_code`, `suspended_at`, `exited_at` |
+| `updateStatus(id, status, extra?)` | Update session status with optional `exit_code`, `suspended_at`, `exited_at`, `suspended_by` |
 | `getResumable()` | Get suspended `claude_agent` sessions that can be resumed |
 | `markAllRunningAsOrphaned()` | Mark all `running` sessions as `orphaned` (crash recovery on startup) |
 | `markRunningAsOrphanedExcluding(excludeTaskIds)` | Same as above but skips sessions whose task_id is in the exclusion set (prevents HMR re-entrant recovery from orphaning active sessions) |
 | `getOrphaned()` | Get orphaned `claude_agent` sessions |
 | `deleteByTaskId(taskId)` | Delete all session records for a given task |
 | `getLatestForTask(taskId)` | Find the most recent session record for a task (by `started_at` DESC) |
+| `getUserPausedTaskIds()` | Get task IDs whose latest session was user-paused (`suspended_by = 'user'`) |
 | `listAllClaudeSessionIds()` | Get all distinct `claude_session_id` values (for stale session directory cleanup) |
 
 ### AttachmentRepository
