@@ -5,10 +5,28 @@ const MOCK_SCRIPT = path.join(__dirname, 'mock-electron-api.js');
 const VITE_URL = `http://localhost:${process.env.PLAYWRIGHT_VITE_PORT || '5173'}`;
 
 /**
+ * Poll the Vite dev server until it responds with HTTP 200.
+ * Prevents thundering-herd timeouts when multiple workers launch simultaneously
+ * before Vite finishes its initial compilation.
+ */
+export async function waitForViteReady(url: string = VITE_URL, timeoutMs = 30000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch { /* server not ready */ }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  throw new Error(`Vite dev server at ${url} not ready after ${timeoutMs}ms`);
+}
+
+/**
  * Launch a headless Chromium page with the electronAPI mock injected.
  * The Vite dev server must be running (started by playwright webServer config).
  */
 export async function launchPage(): Promise<{ browser: Browser; page: Page }> {
+  await waitForViteReady();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
@@ -85,5 +103,5 @@ export async function createTask(
 
   const createButton = page.locator('button:has-text("Create")');
   await createButton.click();
-  await page.waitForTimeout(300);
+  await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 3000 });
 }

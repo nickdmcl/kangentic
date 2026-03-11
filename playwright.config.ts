@@ -59,7 +59,7 @@ export default defineConfig({
     command: `npx vite --port ${vitePort}`,
     port: vitePort,
     reuseExistingServer: reuseServer,
-    timeout: 30000,
+    timeout: 60000,
   },
   reporter: [
     ['list'],

@@ -19,13 +19,13 @@ test.afterAll(async () => {
 /** Open the App Settings panel by clicking the gear button in the title bar. */
 async function openAppSettings() {
   await page.locator('button[title="App Settings"]').click();
-  await page.waitForTimeout(300);
+  await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 }
 
 /** Close any open settings panel via Escape. */
 async function closeSettings() {
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await page.locator('h2:has-text("Settings")').waitFor({ state: 'hidden', timeout: 2000 });
 }
 
 test.describe('App Settings Panel', () => {
@@ -104,7 +104,7 @@ test.describe('App Settings Panel', () => {
     await expect(page.locator('text=Global')).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'hidden', timeout: 2000 });
     await expect(page.locator('text=Global')).not.toBeVisible({ timeout: 2000 });
   });
 
@@ -112,7 +112,7 @@ test.describe('App Settings Panel', () => {
     const gearButton = page.locator('button[title="App Settings"]');
 
     await gearButton.click();
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
     await expect(gearButton).toHaveClass(/bg-surface-hover/);
 
     await closeSettings();
@@ -165,7 +165,7 @@ test.describe('Project Settings Panel', () => {
     const gearButton = page.locator('button[title="Project settings"]').first();
     await expect(gearButton).toBeVisible();
     await gearButton.click();
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 
     // Should show "Settings" header with project name subtitle
     await expect(page.locator('h2:has-text("Settings")')).toBeVisible();
@@ -177,7 +177,7 @@ test.describe('Project Settings Panel', () => {
     const projectRow = page.locator('[role="button"]').filter({ hasText: 'Settings Test' }).first();
     await projectRow.hover();
     await page.locator('button[title="Project settings"]').first().click();
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 
     // Appearance tab (default)
     await expect(page.locator('text=Theme')).toBeVisible();
@@ -203,7 +203,7 @@ test.describe('Project Settings Panel', () => {
     const projectRow = page.locator('[role="button"]').filter({ hasText: 'Settings Test' }).first();
     await projectRow.hover();
     await page.locator('button[title="Project settings"]').first().click();
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 
     // Agent tab -- should NOT have CLI Path, Max Sessions, etc.
     await page.getByRole('button', { name: 'Agent' }).click();
@@ -220,13 +220,13 @@ test.describe('Project Settings Panel', () => {
     const projectRow = page.locator('[role="button"]').filter({ hasText: 'Settings Test' }).first();
     await projectRow.hover();
     await page.locator('button[title="Project settings"]').first().click();
-    await page.waitForTimeout(300);
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 
     const header = page.locator('h2:has-text("Settings")');
     await expect(header).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await header.waitFor({ state: 'hidden', timeout: 2000 });
     await expect(header).not.toBeVisible({ timeout: 2000 });
   });
 });
