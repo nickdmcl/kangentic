@@ -31,6 +31,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
     return undefined;
   });
   const claudeVersionNumber = useConfigStore((s) => s.claudeVersionNumber);
+  const contextBarConfig = useConfigStore((s) => s.config.contextBar);
 
   // Pulse hooks -- always called unconditionally (hooks rules)
   const costRef = useValuePulse(usage?.cost.totalCostUsd);
@@ -55,20 +56,36 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
 
   const barTooltip = `${formatTokenCount(cacheTokens)} cached (system) \u00b7 ${formatTokenCount(Math.max(0, usedTokens - cacheTokens))} conversation`;
 
+  // Determine which elements are visible
+  const showShell = !compact && !!sessionShell && contextBarConfig.showShell;
+  const showVersion = !compact && contextBarConfig.showVersion;
+  const showModel = contextBarConfig.showModel;
+  const showCost = contextBarConfig.showCost;
+  const showTokens = !compact && contextBarConfig.showTokens;
+  const showFraction = contextBarConfig.showContextFraction;
+  const showProgressBar = contextBarConfig.showProgressBar;
+
+  // Left pills: shell, version, model, cost. Right pills: tokens, fraction, progress bar.
+  const hasLeftPills = showShell || showVersion || showModel || showCost;
+  const hasRightPills = showTokens || showFraction || showProgressBar;
+
+  // Return null if everything is hidden
+  if (!hasLeftPills && !hasRightPills) return null;
+
   return (
     <div
       className="h-8 bg-surface/80 border-t border-edge flex items-center px-3 gap-2 text-xs flex-shrink-0"
       data-testid="usage-bar"
     >
-      {!compact && sessionShell && (
+      {showShell && (
         <>
-          <span className={`${pill} text-fg-faint`} title={sessionShell}>
-            {shellDisplayName(sessionShell)}
+          <span className={`${pill} text-fg-faint`} title={sessionShell as string}>
+            {shellDisplayName(sessionShell as string)}
           </span>
           <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />
         </>
       )}
-      {!compact && (
+      {showVersion && (
         <span className={`${pill} text-fg-muted`}>
           Claude Code
           {claudeVersionNumber && (
@@ -76,12 +93,14 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
           )}
         </span>
       )}
-      <span className={`${pill} text-fg-muted`}>{modelName}</span>
-      <span ref={costRef} className={`${pill} text-fg-muted tabular-nums`} title="Session API cost">${usage.cost.totalCostUsd.toFixed(2)}</span>
+      {showModel && <span className={`${pill} text-fg-muted`}>{modelName}</span>}
+      {showCost && <span ref={costRef} className={`${pill} text-fg-muted tabular-nums`} title="Session API cost">${usage.cost.totalCostUsd.toFixed(2)}</span>}
 
-      <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />
+      {hasLeftPills && hasRightPills && (
+        <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />
+      )}
 
-      {!compact && (
+      {showTokens && (
         <span ref={tokenRef} className={`${pill} text-fg-muted tabular-nums flex items-center gap-3`} title="Input / output tokens">
           <span className="flex items-center gap-1">
             <ArrowUp size={11} className="text-fg-faint" />
@@ -94,19 +113,23 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
         </span>
       )}
 
-      <span ref={fractionRef} className={`${pill} text-fg-muted tabular-nums`} title="Context tokens used / total window size">
-        {formatTokenCount(usedTokens)} / {formatTokenCount(contextWindowSize)}
-      </span>
+      {showFraction && (
+        <span ref={fractionRef} className={`${pill} text-fg-muted tabular-nums`} title="Context tokens used / total window size">
+          {formatTokenCount(usedTokens)} / {formatTokenCount(contextWindowSize)}
+        </span>
+      )}
 
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden" title={barTooltip}>
-          <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: progressColor }}
-          />
+      {showProgressBar && (
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex-1 h-1.5 bg-surface-hover rounded-full overflow-hidden" title={barTooltip}>
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: progressColor }}
+            />
+          </div>
+          <span ref={pctRef} className="tabular-nums text-fg-faint whitespace-nowrap transition-colors duration-300" title={`${100 - pct}% remaining`}>{pct}% context</span>
         </div>
-        <span ref={pctRef} className="tabular-nums text-fg-faint whitespace-nowrap transition-colors duration-300" title={`${100 - pct}% remaining`}>{pct}% context</span>
-      </div>
+      )}
     </div>
   );
 }

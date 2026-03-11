@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, RotateCcw, X } from 'lucide-react';
+import { useSettingsPanelContext } from './setting-scope';
+import type { SettingScope } from './setting-scope';
+
+// Re-export scope primitives so consumers can import everything from './shared'.
+export { SettingsPanelProvider, useScopedUpdate, useSettingsPanelType } from './setting-scope';
+export type { SettingScope } from './setting-scope';
 
 type Phase = 'entering' | 'visible' | 'exiting';
 
@@ -160,13 +166,20 @@ interface SettingRowProps {
   label: string;
   description: string;
   children: React.ReactNode;
+  /** Controls handler dispatch and visibility filtering. See `SettingScope`. */
+  scope?: SettingScope;
   isOverridden?: boolean;
   onReset?: () => void;
   /** Muted placeholder text for the inherited default value. */
   inheritedHint?: string;
 }
 
-export function SettingRow({ label, description, children, isOverridden, onReset, inheritedHint }: SettingRowProps) {
+export function SettingRow({ label, description, children, scope, isOverridden, onReset, inheritedHint }: SettingRowProps) {
+  const { panelType } = useSettingsPanelContext();
+
+  // Global-only settings are hidden in the project panel.
+  if (scope === 'global' && panelType === 'project') return null;
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-start justify-between gap-2">
@@ -227,6 +240,42 @@ export function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange
         }`}
       />
     </button>
+  );
+}
+
+/* ── Compact Toggle List ── */
+
+export interface CompactToggleItem {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}
+
+/**
+ * Single-column list of label + toggle pairs. Material Design-style compact
+ * rows for dense boolean groups (e.g. context bar visibility toggles).
+ * Hidden entirely in project panels when scope is 'global'.
+ */
+export function CompactToggleList({ items, scope }: { items: CompactToggleItem[]; scope?: SettingScope }) {
+  const { panelType } = useSettingsPanelContext();
+
+  if (scope === 'global' && panelType === 'project') return null;
+
+  return (
+    <div className="space-y-1">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center justify-between gap-4 py-1.5">
+          <div className="min-w-0">
+            <div className="text-sm text-fg-secondary leading-tight">{item.label}</div>
+            {item.description && (
+              <div className="text-xs text-fg-faint leading-tight">{item.description}</div>
+            )}
+          </div>
+          <ToggleSwitch checked={item.checked} onChange={item.onChange} />
+        </div>
+      ))}
+    </div>
   );
 }
 

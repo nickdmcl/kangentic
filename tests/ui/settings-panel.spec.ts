@@ -79,11 +79,12 @@ test.describe('App Settings Panel', () => {
     await openAppSettings();
     await page.getByRole('button', { name: 'Terminal' }).click();
 
-    await expect(page.getByText('Shell', { exact: true })).toBeVisible();
+    await expect(page.getByText('Terminal shell used for agent sessions')).toBeVisible();
     await expect(page.getByText('Font Size', { exact: true })).toBeVisible();
     await expect(page.getByText('Font Family', { exact: true })).toBeVisible();
     await expect(page.getByText('Scrollback Lines')).toBeVisible();
     await expect(page.getByText('Cursor Style')).toBeVisible();
+    await expect(page.getByText('Context Bar')).toBeVisible();
 
     await closeSettings();
   });

@@ -364,6 +364,16 @@ export interface AppConfig {
     initScript: string | null;
   };
 
+  contextBar: {
+    showShell: boolean;
+    showVersion: boolean;
+    showModel: boolean;
+    showCost: boolean;
+    showTokens: boolean;
+    showContextFraction: boolean;
+    showProgressBar: boolean;
+  };
+
   notifications: NotificationConfig;
 
   hasCompletedFirstRun: boolean;
@@ -403,6 +413,15 @@ export const DEFAULT_CONFIG: AppConfig = {
     defaultBaseBranch: 'main',
     copyFiles: [],
     initScript: null,
+  },
+  contextBar: {
+    showShell: true,
+    showVersion: true,
+    showModel: true,
+    showCost: true,
+    showTokens: true,
+    showContextFraction: true,
+    showProgressBar: true,
   },
   notifications: {
     desktop: {

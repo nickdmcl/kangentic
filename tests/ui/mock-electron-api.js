@@ -46,6 +46,15 @@
       copyFiles: [],
       initScript: null,
     },
+    contextBar: {
+      showShell: true,
+      showVersion: true,
+      showModel: true,
+      showCost: true,
+      showTokens: true,
+      showContextFraction: true,
+      showProgressBar: true,
+    },
     notifications: {
       desktop: {
         onAgentIdle: true,
