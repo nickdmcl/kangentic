@@ -20,10 +20,34 @@ export interface SettingsTabDefinition {
   separator?: boolean;
 }
 
+/* ── Scope Tabs ── */
+
+export interface ScopeTabItem {
+  label: string;
+  icon: React.ElementType;
+  active: boolean;
+  onClick?: () => void;
+  /** Test ID for the tab element. */
+  testId?: string;
+}
+
+/* ── Settings Content Props ── */
+
+/** Props passed from SettingsPanel to each scope's content component. */
+export interface SettingsContentProps {
+  activeTab: string;
+  isSearching: boolean;
+  searchQuery: string;
+  matchingTabs: SettingsTabDefinition[];
+  navigateToTab: (tabId: string) => void;
+  shells: Array<{ name: string; path: string }>;
+}
+
 /* ── Panel Shell ── */
 
 interface SettingsPanelShellProps {
-  subtitle?: React.ReactNode;
+  /** Scope tabs rendered inline next to "Settings" (e.g. Global / Project). */
+  scopeTabs?: ScopeTabItem[];
   onClose: () => void;
   children: React.ReactNode;
   tabs?: SettingsTabDefinition[];
@@ -36,7 +60,7 @@ interface SettingsPanelShellProps {
   isSearching?: boolean;
 }
 
-export function SettingsPanelShell({ subtitle, onClose, children, tabs, activeTab, onTabChange, footer, searchQuery, onSearchChange, tabMatchCounts, isSearching }: SettingsPanelShellProps) {
+export function SettingsPanelShell({ scopeTabs, onClose, children, tabs, activeTab, onTabChange, footer, searchQuery, onSearchChange, tabMatchCounts, isSearching }: SettingsPanelShellProps) {
   const [phase, setPhase] = useState<Phase>('entering');
   const backdropMouseDown = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -100,17 +124,44 @@ export function SettingsPanelShell({ subtitle, onClose, children, tabs, activeTa
         onMouseDown={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-edge flex-shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="flex-shrink-0 border-b border-edge">
+          <div className="flex items-center justify-between px-6 py-4">
             <h2 className="text-base font-semibold text-fg">Settings</h2>
-            {subtitle && <div>{subtitle}</div>}
+            <button
+              onClick={requestClose}
+              className="p-1.5 text-fg-faint hover:text-fg-tertiary hover:bg-surface-hover rounded transition-colors"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={requestClose}
-            className="p-1.5 text-fg-faint hover:text-fg-tertiary hover:bg-surface-hover rounded transition-colors"
-          >
-            <X size={16} />
-          </button>
+          {scopeTabs && scopeTabs.length > 1 && (
+            <div className="flex items-center gap-1 px-6 pt-3 border-t border-edge">
+              {scopeTabs.map((scopeTab) => {
+                const ScopeIcon = scopeTab.icon;
+                return scopeTab.active ? (
+                  <span
+                    key={scopeTab.testId || scopeTab.label}
+                    data-testid={scopeTab.testId}
+                    className="inline-flex items-center gap-1.5 px-3 pb-3 border-b-2 border-accent text-xs font-medium text-fg"
+                  >
+                    <ScopeIcon size={14} className="text-accent flex-shrink-0" />
+                    <span className="truncate max-w-[200px]">{scopeTab.label}</span>
+                  </span>
+                ) : (
+                  <button
+                    key={scopeTab.testId || scopeTab.label}
+                    type="button"
+                    data-testid={scopeTab.testId}
+                    onClick={scopeTab.onClick}
+                    className="inline-flex items-center gap-1.5 px-3 pb-3 border-b-2 border-transparent text-xs text-fg-muted hover:text-fg-secondary transition-colors"
+                  >
+                    <ScopeIcon size={14} className="flex-shrink-0" />
+                    <span className="truncate max-w-[200px]">{scopeTab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Search bar */}
@@ -264,13 +315,11 @@ interface SettingRowProps {
   scope?: SettingScope;
   isOverridden?: boolean;
   onReset?: () => void;
-  /** Muted placeholder text for the inherited default value. */
-  inheritedHint?: string;
   /** Registry ID for search filtering. */
   searchId?: string;
 }
 
-export function SettingRow({ label, description, children, scope, isOverridden, onReset, inheritedHint, searchId }: SettingRowProps) {
+export function SettingRow({ label, description, children, scope, isOverridden, onReset, searchId }: SettingRowProps) {
   const { panelType } = useSettingsPanelContext();
   const visible = useSettingVisible(searchId);
 
@@ -286,9 +335,6 @@ export function SettingRow({ label, description, children, scope, isOverridden, 
         <div>
           <div className="text-sm font-medium text-fg-secondary">{label}</div>
           <div className="text-xs text-fg-faint">{description}</div>
-          {inheritedHint && !isOverridden && (
-            <div className="text-xs text-fg-disabled mt-0.5">Default: {inheritedHint}</div>
-          )}
         </div>
         {isOverridden && onReset && (
           <button

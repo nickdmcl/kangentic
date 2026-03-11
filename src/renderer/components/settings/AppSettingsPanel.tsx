@@ -1,15 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, Bot, Check, CircleAlert, GitBranch, Globe, Palette, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { Bell, Bot, Check, CircleAlert, GitBranch, Palette, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
-import { SettingsPanelShell, SettingsPanelProvider, SectionHeader, SettingRow, Select, ToggleSwitch, CompactToggleList, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
-import type { SettingsTabDefinition, SettingScope } from './shared';
+import { SettingsPanelProvider, SectionHeader, SettingRow, Select, ToggleSwitch, CompactToggleList, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
+import type { SettingsTabDefinition, SettingScope, SettingsContentProps } from './shared';
 import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode } from '../../../shared/types';
 import { NAMED_THEMES } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
-import { SETTINGS_REGISTRY, settingProps } from './settings-registry';
-import { SettingsSearchProvider, computeSearchResults } from './settings-search';
+import { settingProps } from './settings-registry';
 
 /**
  * App Settings tab layout:
@@ -22,7 +21,7 @@ import { SettingsSearchProvider, computeSearchResults } from './settings-search'
  * that apply to the entire app, not per-project. These tabs do NOT appear in
  * the ProjectSettingsPanel.
  */
-const APP_TABS: SettingsTabDefinition[] = [
+export const APP_TABS: SettingsTabDefinition[] = [
   // -- Project-overridable defaults --
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
@@ -33,6 +32,11 @@ const APP_TABS: SettingsTabDefinition[] = [
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'privacy', label: 'Privacy', icon: ShieldCheck },
 ];
+
+/** Tab IDs that are project-overridable (above the separator). */
+export const PROJECT_OVERRIDABLE_TAB_IDS = new Set(
+  APP_TABS.slice(0, APP_TABS.findIndex((tab) => tab.separator)).map((tab) => tab.id),
+);
 
 type NotifyEventKey = 'onAgentIdle' | 'onPlanComplete';
 
@@ -78,24 +82,16 @@ function NotifyChannelRow({ eventKey, config, searchId }: {
   );
 }
 
-export function AppSettingsPanel() {
+/**
+ * Global settings content. Rendered inside the unified SettingsPanel shell.
+ * Manages its own sync confirmation dialog and SettingsPanelProvider context.
+ */
+export function AppSettingsContent({ activeTab, isSearching, searchQuery, matchingTabs, navigateToTab, shells }: SettingsContentProps) {
   const globalConfig = useConfigStore((state) => state.globalConfig);
   const updateConfig = useConfigStore((state) => state.updateConfig);
   const claudeInfo = useConfigStore((state) => state.claudeInfo);
-  const detectClaude = useConfigStore((state) => state.detectClaude);
-  const setSettingsOpen = useConfigStore((state) => state.setSettingsOpen);
 
-  const [shells, setShells] = useState<Array<{ name: string; path: string }>>([]);
   const [pendingSyncPartial, setPendingSyncPartial] = useState<DeepPartial<AppConfig> | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    window.electronAPI.shell.getAvailable().then(setShells).catch(() => {});
-    detectClaude();
-  }, []);
-
-  const handleClose = () => setSettingsOpen(false);
-
   /**
    * Unified update dispatcher. Scope determines behavior:
    * - 'project' → triggers sync confirmation modal
@@ -127,103 +123,51 @@ export function AppSettingsPanel() {
     ? deepMergeConfig(globalConfig, pendingSyncPartial)
     : globalConfig;
 
-  const [activeTab, setActiveTab] = useState('appearance');
-
-  // Search computation
-  const searchResults = useMemo(
-    () => computeSearchResults(searchQuery, SETTINGS_REGISTRY),
-    [searchQuery],
-  );
-  const isSearching = searchQuery.trim().length > 0;
-
-  /** When clearing search, if results were in exactly one tab, switch to it. */
-  const handleSearchChange = useCallback((query: string) => {
-    if (!query && searchQuery) {
-      // Clearing search. If results were in exactly one tab, auto-switch.
-      const tabsWithMatches = Array.from(searchResults.tabMatchCounts.keys());
-      if (tabsWithMatches.length === 1) {
-        setActiveTab(tabsWithMatches[0]);
-      }
-    }
-    setSearchQuery(query);
-  }, [searchQuery, searchResults.tabMatchCounts]);
-
-  /** Ordered list of tabs that have search matches. */
-  const matchingTabs = useMemo(() => {
-    if (!isSearching) return [];
-    return APP_TABS.filter((tab) => (searchResults.tabMatchCounts.get(tab.id) || 0) > 0);
-  }, [isSearching, searchResults.tabMatchCounts]);
-
-  /** Clear search and navigate to a specific tab. */
-  const navigateToTab = useCallback((tabId: string) => {
-    setSearchQuery('');
-    setActiveTab(tabId);
-  }, []);
-
   return (
     <SettingsPanelProvider value={{ panelType: 'app', updateSetting }}>
-      <SettingsSearchProvider query={searchQuery} matchingIds={searchResults.matchingIds}>
-        <SettingsPanelShell
-          subtitle={
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-fg-faint/10 text-fg-muted text-xs">
-              <Globe size={14} />
-              Global
-            </span>
-          }
-          onClose={handleClose}
-          tabs={APP_TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          tabMatchCounts={searchResults.tabMatchCounts}
-          isSearching={isSearching}
-        >
-          {isSearching ? (
-            // Search mode: render all matching tabs stacked
-            matchingTabs.length > 0 ? (
-              matchingTabs.map((tab, index) => (
-                <div key={tab.id}>
-                  <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
-                  <div className="space-y-4">
-                    {tab.id === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
-                    {tab.id === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
-                    {tab.id === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
-                    {tab.id === 'git' && <GitTab displayConfig={displayConfig} />}
-                    {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
-                    {tab.id === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
-                    {tab.id === 'privacy' && <PrivacyTab />}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <NoSearchResults query={searchQuery} />
-            )
-          ) : (
-            // Normal mode: single active tab
-            <>
-              {activeTab === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
-              {activeTab === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
-              {activeTab === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
-              {activeTab === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
-              {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
-              {activeTab === 'privacy' && <PrivacyTab />}
-              {activeTab === 'git' && <GitTab displayConfig={displayConfig} />}
-            </>
-          )}
+      {isSearching ? (
+        // Search mode: render all matching tabs stacked
+        matchingTabs.length > 0 ? (
+          matchingTabs.map((tab, index) => (
+            <div key={tab.id}>
+              <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
+              <div className="space-y-4">
+                {tab.id === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
+                {tab.id === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
+                {tab.id === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+                {tab.id === 'git' && <GitTab displayConfig={displayConfig} />}
+                {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
+                {tab.id === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
+                {tab.id === 'privacy' && <PrivacyTab />}
+              </div>
+            </div>
+          ))
+        ) : (
+          <NoSearchResults query={searchQuery} />
+        )
+      ) : (
+        // Normal mode: single active tab
+        <>
+          {activeTab === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
+          {activeTab === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
+          {activeTab === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+          {activeTab === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
+          {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
+          {activeTab === 'privacy' && <PrivacyTab />}
+          {activeTab === 'git' && <GitTab displayConfig={displayConfig} />}
+        </>
+      )}
 
-          {/* Sync defaults confirmation */}
-          {pendingSyncPartial && (
-            <ConfirmDialog
-              title="Apply to all projects?"
-              message="Apply this change to all projects? New projects will use this setting by default."
-              confirmLabel="Apply to All"
-              onConfirm={handleSyncConfirm}
-              onCancel={handleSyncCancel}
-            />
-          )}
-        </SettingsPanelShell>
-      </SettingsSearchProvider>
+      {/* Sync defaults confirmation */}
+      {pendingSyncPartial && (
+        <ConfirmDialog
+          title="Apply to all projects?"
+          message="Apply this change to all projects? New projects will use this setting by default."
+          confirmLabel="Apply to All"
+          onConfirm={handleSyncConfirm}
+          onCancel={handleSyncCancel}
+        />
+      )}
     </SettingsPanelProvider>
   );
 }

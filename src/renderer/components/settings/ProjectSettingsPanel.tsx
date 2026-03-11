@@ -1,21 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, FolderOpen, GitBranch, Palette, Terminal } from 'lucide-react';
+import React from 'react';
+import { Bot, GitBranch, Palette, Terminal } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
-import { SettingsPanelShell, SettingsPanelProvider, SettingRow, Select, ToggleSwitch, ResetOverridesFooter, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
-import type { SettingsTabDefinition } from './shared';
+import { SettingsPanelProvider, SettingRow, Select, ToggleSwitch, INPUT_CLASS, SearchTabGroupHeader, NoSearchResults } from './shared';
+import type { SettingsTabDefinition, SettingsContentProps } from './shared';
 import type { AppConfig, DeepPartial, PermissionMode, ThemeMode } from '../../../shared/types';
 import { NAMED_THEMES } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
 import { SETTINGS_REGISTRY, settingProps } from './settings-registry';
-import { SettingsSearchProvider, computeSearchResults } from './settings-search';
 
 /**
  * Project Settings only shows tabs that are project-overridable (the tabs
  * above the separator in AppSettingsPanel). Global-only tabs like Behavior,
  * Notifications, and Privacy are NOT shown here.
  */
-const PROJECT_TABS: SettingsTabDefinition[] = [
+export const PROJECT_TABS: SettingsTabDefinition[] = [
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'agent', label: 'Agent', icon: Bot },
@@ -24,28 +23,20 @@ const PROJECT_TABS: SettingsTabDefinition[] = [
 
 /** Only project-overridable settings for search. */
 const PROJECT_TAB_IDS = new Set(PROJECT_TABS.map((tab) => tab.id));
-const PROJECT_REGISTRY = SETTINGS_REGISTRY.filter(
+export const PROJECT_REGISTRY = SETTINGS_REGISTRY.filter(
   (setting) => PROJECT_TAB_IDS.has(setting.tabId) && setting.scope === 'project',
 );
 
-export function ProjectSettingsPanel() {
+/**
+ * Project settings content. Rendered inside the unified SettingsPanel shell.
+ * Manages its own SettingsPanelProvider context for project override writes.
+ */
+export function ProjectSettingsContent({ activeTab, isSearching, searchQuery, matchingTabs, navigateToTab, shells }: SettingsContentProps) {
   const globalConfig = useConfigStore((state) => state.globalConfig);
-  const projectSettingsProjectName = useConfigStore((state) => state.projectSettingsProjectName);
   const projectOverrides = useConfigStore((state) => state.projectOverrides);
   const updateProjectOverride = useConfigStore((state) => state.updateProjectOverride);
   const removeProjectOverride = useConfigStore((state) => state.removeProjectOverride);
-  const resetAllProjectOverrides = useConfigStore((state) => state.resetAllProjectOverrides);
   const isOverridden = useConfigStore((state) => state.isOverridden);
-  const setProjectSettingsOpen = useConfigStore((state) => state.setProjectSettingsOpen);
-
-  const [shells, setShells] = useState<Array<{ name: string; path: string }>>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    window.electronAPI.shell.getAvailable().then(setShells).catch(() => {});
-  }, []);
-
-  const handleClose = () => setProjectSettingsOpen(false);
 
   const displayConfig = projectOverrides
     ? deepMergeConfig(globalConfig, projectOverrides)
@@ -56,174 +47,41 @@ export function ProjectSettingsPanel() {
     updateProjectOverride(partial);
   };
 
-  const hasAnyOverrides = projectOverrides != null && Object.keys(projectOverrides).length > 0;
-
-  /** Format a global default value for display as an inherited hint. */
-  const defaultHint = (value: unknown): string => {
-    if (value === null || value === undefined) return 'Auto-detect';
-    if (typeof value === 'boolean') return value ? 'On' : 'Off';
-    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '(none)';
-    return String(value);
+  const tabProps: ProjectTabProps = {
+    displayConfig,
+    isOverridden,
+    removeProjectOverride,
+    updateProjectOverride,
   };
-
-  const [activeTab, setActiveTab] = useState('appearance');
-
-  // Search computation
-  const searchResults = useMemo(
-    () => computeSearchResults(searchQuery, PROJECT_REGISTRY),
-    [searchQuery],
-  );
-  const isSearching = searchQuery.trim().length > 0;
-
-  /** When clearing search, if results were in exactly one tab, switch to it. */
-  const handleSearchChange = useCallback((query: string) => {
-    if (!query && searchQuery) {
-      const tabsWithMatches = Array.from(searchResults.tabMatchCounts.keys());
-      if (tabsWithMatches.length === 1) {
-        setActiveTab(tabsWithMatches[0]);
-      }
-    }
-    setSearchQuery(query);
-  }, [searchQuery, searchResults.tabMatchCounts]);
-
-  /** Ordered list of tabs that have search matches. */
-  const matchingTabs = useMemo(() => {
-    if (!isSearching) return [];
-    return PROJECT_TABS.filter((tab) => (searchResults.tabMatchCounts.get(tab.id) || 0) > 0);
-  }, [isSearching, searchResults.tabMatchCounts]);
-
-  /** Clear search and navigate to a specific tab. */
-  const navigateToTab = useCallback((tabId: string) => {
-    setSearchQuery('');
-    setActiveTab(tabId);
-  }, []);
-
-  const resetFooter = hasAnyOverrides ? (
-    <ResetOverridesFooter onReset={resetAllProjectOverrides} />
-  ) : undefined;
 
   return (
     <SettingsPanelProvider value={{ panelType: 'project', updateSetting }}>
-      <SettingsSearchProvider query={searchQuery} matchingIds={searchResults.matchingIds}>
-        <SettingsPanelShell
-          subtitle={projectSettingsProjectName ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-accent/10 text-accent text-xs">
-              <FolderOpen size={14} />
-              {projectSettingsProjectName}
-            </span>
-          ) : undefined}
-          onClose={handleClose}
-          tabs={PROJECT_TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          footer={resetFooter}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          tabMatchCounts={searchResults.tabMatchCounts}
-          isSearching={isSearching}
-        >
-          {isSearching ? (
-            // Search mode: render all matching tabs stacked
-            matchingTabs.length > 0 ? (
-              matchingTabs.map((tab, index) => (
-                <div key={tab.id}>
-                  <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
-                  <div className="space-y-4">
-                    {tab.id === 'appearance' && (
-                      <AppearanceTabProject
-                        displayConfig={displayConfig}
-                        globalConfig={globalConfig}
-                        isOverridden={isOverridden}
-                        removeProjectOverride={removeProjectOverride}
-                        updateProjectOverride={updateProjectOverride}
-                        defaultHint={defaultHint}
-                      />
-                    )}
-                    {tab.id === 'terminal' && (
-                      <TerminalTabProject
-                        displayConfig={displayConfig}
-                        globalConfig={globalConfig}
-                        shells={shells}
-                        isOverridden={isOverridden}
-                        removeProjectOverride={removeProjectOverride}
-                        updateProjectOverride={updateProjectOverride}
-                        defaultHint={defaultHint}
-                      />
-                    )}
-                    {tab.id === 'agent' && (
-                      <AgentTabProject
-                        displayConfig={displayConfig}
-                        globalConfig={globalConfig}
-                        isOverridden={isOverridden}
-                        removeProjectOverride={removeProjectOverride}
-                        updateProjectOverride={updateProjectOverride}
-                        defaultHint={defaultHint}
-                      />
-                    )}
-                    {tab.id === 'git' && (
-                      <GitTabProject
-                        displayConfig={displayConfig}
-                        globalConfig={globalConfig}
-                        isOverridden={isOverridden}
-                        removeProjectOverride={removeProjectOverride}
-                        updateProjectOverride={updateProjectOverride}
-                        defaultHint={defaultHint}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <NoSearchResults query={searchQuery} />
-            )
-          ) : (
-            // Normal mode: single active tab
-            <>
-              {activeTab === 'appearance' && (
-                <AppearanceTabProject
-                  displayConfig={displayConfig}
-                  globalConfig={globalConfig}
-                  isOverridden={isOverridden}
-                  removeProjectOverride={removeProjectOverride}
-                  updateProjectOverride={updateProjectOverride}
-                  defaultHint={defaultHint}
-                />
-              )}
-              {activeTab === 'terminal' && (
-                <TerminalTabProject
-                  displayConfig={displayConfig}
-                  globalConfig={globalConfig}
-                  shells={shells}
-                  isOverridden={isOverridden}
-                  removeProjectOverride={removeProjectOverride}
-                  updateProjectOverride={updateProjectOverride}
-                  defaultHint={defaultHint}
-                />
-              )}
-              {activeTab === 'agent' && (
-                <AgentTabProject
-                  displayConfig={displayConfig}
-                  globalConfig={globalConfig}
-                  isOverridden={isOverridden}
-                  removeProjectOverride={removeProjectOverride}
-                  updateProjectOverride={updateProjectOverride}
-                  defaultHint={defaultHint}
-                />
-              )}
-              {activeTab === 'git' && (
-                <GitTabProject
-                  displayConfig={displayConfig}
-                  globalConfig={globalConfig}
-                  isOverridden={isOverridden}
-                  removeProjectOverride={removeProjectOverride}
-                  updateProjectOverride={updateProjectOverride}
-                  defaultHint={defaultHint}
-                />
-              )}
-            </>
-          )}
-        </SettingsPanelShell>
-      </SettingsSearchProvider>
+      {isSearching ? (
+        // Search mode: render all matching tabs stacked
+        matchingTabs.length > 0 ? (
+          matchingTabs.map((tab, index) => (
+            <div key={tab.id}>
+              <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
+              <div className="space-y-4">
+                {tab.id === 'appearance' && <AppearanceTabProject {...tabProps} />}
+                {tab.id === 'terminal' && <TerminalTabProject {...tabProps} shells={shells} />}
+                {tab.id === 'agent' && <AgentTabProject {...tabProps} />}
+                {tab.id === 'git' && <GitTabProject {...tabProps} />}
+              </div>
+            </div>
+          ))
+        ) : (
+          <NoSearchResults query={searchQuery} />
+        )
+      ) : (
+        // Normal mode: single active tab
+        <>
+          {activeTab === 'appearance' && <AppearanceTabProject {...tabProps} />}
+          {activeTab === 'terminal' && <TerminalTabProject {...tabProps} shells={shells} />}
+          {activeTab === 'agent' && <AgentTabProject {...tabProps} />}
+          {activeTab === 'git' && <GitTabProject {...tabProps} />}
+        </>
+      )}
     </SettingsPanelProvider>
   );
 }
@@ -232,20 +90,17 @@ export function ProjectSettingsPanel() {
 
 interface ProjectTabProps {
   displayConfig: AppConfig;
-  globalConfig: AppConfig;
   isOverridden: (path: string) => boolean;
   removeProjectOverride: (path: string) => void;
   updateProjectOverride: (partial: DeepPartial<AppConfig>) => void;
-  defaultHint: (value: unknown) => string;
 }
 
-function AppearanceTabProject({ displayConfig, globalConfig, isOverridden, removeProjectOverride, updateProjectOverride, defaultHint }: ProjectTabProps) {
+function AppearanceTabProject({ displayConfig, isOverridden, removeProjectOverride, updateProjectOverride }: ProjectTabProps) {
   return (
     <SettingRow
       {...settingProps('theme')}
       isOverridden={isOverridden('theme')}
       onReset={() => removeProjectOverride('theme')}
-      inheritedHint={defaultHint(globalConfig.theme)}
     >
       <Select
         value={displayConfig.theme}
@@ -274,14 +129,13 @@ interface TerminalTabProjectProps extends ProjectTabProps {
   shells: Array<{ name: string; path: string }>;
 }
 
-function TerminalTabProject({ displayConfig, globalConfig, shells, isOverridden, removeProjectOverride, updateProjectOverride, defaultHint }: TerminalTabProjectProps) {
+function TerminalTabProject({ displayConfig, shells, isOverridden, removeProjectOverride, updateProjectOverride }: TerminalTabProjectProps) {
   return (
     <>
       <SettingRow
         {...settingProps('terminal.shell')}
         isOverridden={isOverridden('terminal.shell')}
         onReset={() => removeProjectOverride('terminal.shell')}
-        inheritedHint={defaultHint(globalConfig.terminal.shell)}
       >
         <Select
           value={displayConfig.terminal.shell || ''}
@@ -297,7 +151,6 @@ function TerminalTabProject({ displayConfig, globalConfig, shells, isOverridden,
         {...settingProps('terminal.fontSize')}
         isOverridden={isOverridden('terminal.fontSize')}
         onReset={() => removeProjectOverride('terminal.fontSize')}
-        inheritedHint={defaultHint(globalConfig.terminal.fontSize)}
       >
         <input
           type="number"
@@ -312,7 +165,6 @@ function TerminalTabProject({ displayConfig, globalConfig, shells, isOverridden,
         {...settingProps('terminal.fontFamily')}
         isOverridden={isOverridden('terminal.fontFamily')}
         onReset={() => removeProjectOverride('terminal.fontFamily')}
-        inheritedHint={defaultHint(globalConfig.terminal.fontFamily)}
       >
         <input
           type="text"
@@ -325,13 +177,12 @@ function TerminalTabProject({ displayConfig, globalConfig, shells, isOverridden,
   );
 }
 
-function AgentTabProject({ displayConfig, globalConfig, isOverridden, removeProjectOverride, updateProjectOverride, defaultHint }: ProjectTabProps) {
+function AgentTabProject({ displayConfig, isOverridden, removeProjectOverride, updateProjectOverride }: ProjectTabProps) {
   return (
     <SettingRow
       {...settingProps('claude.permissionMode')}
       isOverridden={isOverridden('claude.permissionMode')}
       onReset={() => removeProjectOverride('claude.permissionMode')}
-      inheritedHint={defaultHint(globalConfig.claude.permissionMode)}
     >
       <Select
         value={displayConfig.claude.permissionMode}
@@ -345,14 +196,13 @@ function AgentTabProject({ displayConfig, globalConfig, isOverridden, removeProj
   );
 }
 
-function GitTabProject({ displayConfig, globalConfig, isOverridden, removeProjectOverride, updateProjectOverride, defaultHint }: ProjectTabProps) {
+function GitTabProject({ displayConfig, isOverridden, removeProjectOverride, updateProjectOverride }: ProjectTabProps) {
   return (
     <>
       <SettingRow
         {...settingProps('git.worktreesEnabled')}
         isOverridden={isOverridden('git.worktreesEnabled')}
         onReset={() => removeProjectOverride('git.worktreesEnabled')}
-        inheritedHint={defaultHint(globalConfig.git.worktreesEnabled)}
       >
         <ToggleSwitch
           checked={displayConfig.git.worktreesEnabled}
@@ -363,7 +213,6 @@ function GitTabProject({ displayConfig, globalConfig, isOverridden, removeProjec
         {...settingProps('git.autoCleanup')}
         isOverridden={isOverridden('git.autoCleanup')}
         onReset={() => removeProjectOverride('git.autoCleanup')}
-        inheritedHint={defaultHint(globalConfig.git.autoCleanup)}
       >
         <ToggleSwitch
           checked={displayConfig.git.autoCleanup}
@@ -374,7 +223,6 @@ function GitTabProject({ displayConfig, globalConfig, isOverridden, removeProjec
         {...settingProps('git.defaultBaseBranch')}
         isOverridden={isOverridden('git.defaultBaseBranch')}
         onReset={() => removeProjectOverride('git.defaultBaseBranch')}
-        inheritedHint={defaultHint(globalConfig.git.defaultBaseBranch)}
       >
         <BranchPicker
           variant="input"
@@ -387,7 +235,6 @@ function GitTabProject({ displayConfig, globalConfig, isOverridden, removeProjec
         {...settingProps('git.copyFiles')}
         isOverridden={isOverridden('git.copyFiles')}
         onReset={() => removeProjectOverride('git.copyFiles')}
-        inheritedHint={defaultHint(globalConfig.git.copyFiles)}
       >
         <input
           type="text"
@@ -404,7 +251,6 @@ function GitTabProject({ displayConfig, globalConfig, isOverridden, removeProjec
         {...settingProps('git.initScript')}
         isOverridden={isOverridden('git.initScript')}
         onReset={() => removeProjectOverride('git.initScript')}
-        inheritedHint={defaultHint(globalConfig.git.initScript)}
       >
         <input
           type="text"

@@ -9,7 +9,7 @@ const isMac = window.electronAPI.platform === 'darwin';
 export function TitleBar() {
   const currentProject = useProjectStore((s) => s.currentProject);
   const setSettingsOpen = useConfigStore((s) => s.setSettingsOpen);
-  const settingsOpen = useConfigStore((s) => s.settingsOpen);
+  const settingsScope = useConfigStore((s) => s.settingsScope);
 
   const isWorktree = currentProject?.path
     ? currentProject.path.replace(/\\/g, '/').includes('.kangentic/worktrees/')
@@ -43,9 +43,9 @@ export function TitleBar() {
 
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <button
-          onClick={() => setSettingsOpen(!settingsOpen)}
+          onClick={() => setSettingsOpen(!settingsScope)}
           className={`p-1.5 hover:bg-surface-hover rounded transition-colors ${
-            settingsOpen ? 'text-fg bg-surface-hover' : 'text-fg-muted hover:text-fg'
+            settingsScope ? 'text-fg bg-surface-hover' : 'text-fg-muted hover:text-fg'
           }`}
           title="App Settings"
         >

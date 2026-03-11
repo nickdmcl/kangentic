@@ -5,8 +5,7 @@ import { StatusBar } from './StatusBar';
 import { ProjectSidebar } from '../sidebar/ProjectSidebar';
 import { KanbanBoard } from '../board/KanbanBoard';
 import { TerminalPanel } from '../terminal/TerminalPanel';
-import { AppSettingsPanel } from '../settings/AppSettingsPanel';
-import { ProjectSettingsPanel } from '../settings/ProjectSettingsPanel';
+import { SettingsPanel } from '../settings/SettingsPanel';
 import { WelcomeScreen } from './WelcomeScreen';
 import { useConfigStore } from '../../stores/config-store';
 import { useProjectStore } from '../../stores/project-store';
@@ -15,8 +14,7 @@ import { useSidebarResize, COLLAPSED_STRIP_WIDTH } from '../../hooks/useSidebarR
 import { useTerminalResize, COLLAPSED_HEIGHT } from '../../hooks/useTerminalResize';
 
 export function AppLayout() {
-  const settingsOpen = useConfigStore((s) => s.settingsOpen);
-  const projectSettingsOpen = useConfigStore((s) => s.projectSettingsOpen);
+  const settingsScope = useConfigStore((s) => s.settingsScope);
   const config = useConfigStore((s) => s.config);
   const currentProject = useProjectStore((s) => s.currentProject);
   const projects = useProjectStore((s) => s.projects);
@@ -115,8 +113,7 @@ export function AppLayout() {
       </div>
 
       <StatusBar />
-      {settingsOpen && <AppSettingsPanel />}
-      {projectSettingsOpen && <ProjectSettingsPanel />}
+      {settingsScope && <SettingsPanel />}
       <ToastContainer />
     </div>
   );

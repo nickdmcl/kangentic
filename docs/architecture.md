@@ -328,7 +328,7 @@ State: `sessions`, `activeSessionId`, `openTaskId`, `dialogSessionId`, `sessionU
 
 ### ConfigStore (`config-store.ts`)
 
-State: `config` (AppConfig), `globalConfig`, `appVersion`, `claudeInfo`, `claudeVersionNumber`, `gitInfo`, `settingsOpen`, `projectSettingsOpen`, `projectOverrides`
+State: `config` (AppConfig), `globalConfig`, `appVersion`, `claudeInfo`, `claudeVersionNumber`, `gitInfo`, `settingsScope`, `projectOverrides`
 
 - **Theme subscription** -- watches theme changes, updates `<html>` class for CSS variables.
 - **App version** -- `loadAppVersion()` fetches the Electron app version via IPC.

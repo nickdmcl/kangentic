@@ -29,15 +29,16 @@ interface ConfigStore {
   gitInfo: { found: boolean; path: string | null; version: string | null; meetsMinimum: boolean } | null;
   detectGit: () => Promise<void>;
 
-  // -- App Settings panel UI --
-  settingsOpen: boolean;
+  // -- Settings panel UI --
+  settingsScope: 'global' | 'project' | null;
   setSettingsOpen: (open: boolean) => void;
+  setSettingsScope: (scope: 'global' | 'project') => void;
 
-  // -- Project Settings panel UI --
-  projectSettingsOpen: boolean;
+  // -- Project Settings --
   projectSettingsPath: string | null;
   projectSettingsProjectName: string | null;
-  openProjectSettings: (projectPath: string, projectName: string) => void;
+  projectSettingsInitialTab: string | null;
+  openProjectSettings: (projectPath: string, projectName: string, initialTab?: string) => void;
   setProjectSettingsOpen: (open: boolean) => void;
 
   // -- Project overrides --
@@ -67,10 +68,10 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   claudeVersionNumber: null,
   gitInfo: null,
   loading: true,
-  settingsOpen: false,
-  projectSettingsOpen: false,
+  settingsScope: null,
   projectSettingsPath: null,
   projectSettingsProjectName: null,
+  projectSettingsInitialTab: null,
   projectOverrides: null,
   loadConfig: async () => {
     set({ loading: true });
@@ -103,19 +104,53 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     set({ gitInfo });
   },
 
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setSettingsOpen: (open) => {
+    if (open) {
+      set({ settingsScope: 'global' });
+    } else {
+      const wasProject = get().settingsScope === 'project';
+      set({
+        settingsScope: null,
+        ...(wasProject ? {
+          projectSettingsPath: null,
+          projectSettingsProjectName: null,
+          projectSettingsInitialTab: null,
+          projectOverrides: null,
+        } : {}),
+      });
+      if (wasProject) {
+        refreshConfigs().then((configs) => set(configs));
+      }
+    }
+  },
+
+  setSettingsScope: (scope) => {
+    const wasProject = get().settingsScope === 'project';
+    set({
+      settingsScope: scope,
+      ...(wasProject && scope === 'global' ? {
+        projectSettingsPath: null,
+        projectSettingsProjectName: null,
+        projectSettingsInitialTab: null,
+        projectOverrides: null,
+      } : {}),
+    });
+    if (wasProject && scope === 'global') {
+      refreshConfigs().then((configs) => set(configs));
+    }
+  },
 
   // -- Project settings --
-  openProjectSettings: (projectPath, projectName) => {
+  openProjectSettings: (projectPath, projectName, initialTab) => {
+    const currentPath = get().projectSettingsPath;
     set({
-      projectSettingsOpen: true,
+      settingsScope: 'project',
       projectSettingsPath: projectPath,
       projectSettingsProjectName: projectName,
-      projectOverrides: null,
+      projectSettingsInitialTab: initialTab || null,
+      ...(currentPath !== projectPath ? { projectOverrides: null } : {}),
     });
-    // Load overrides asynchronously
     window.electronAPI.config.getProjectOverridesByPath(projectPath).then((overrides) => {
-      // Only apply if the path hasn't changed during the async call
       if (get().projectSettingsPath === projectPath) {
         set({ projectOverrides: overrides });
       }
@@ -125,15 +160,13 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   setProjectSettingsOpen: (open) => {
     if (!open) {
       set({
-        projectSettingsOpen: false,
+        settingsScope: null,
         projectSettingsPath: null,
         projectSettingsProjectName: null,
+        projectSettingsInitialTab: null,
         projectOverrides: null,
       });
-      // Re-fetch effective config in case overrides changed
       refreshConfigs().then((configs) => set(configs));
-    } else {
-      set({ projectSettingsOpen: open });
     }
   },
 

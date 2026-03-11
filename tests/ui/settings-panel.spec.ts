@@ -41,7 +41,7 @@ test.describe('App Settings Panel', () => {
   test('titlebar gear opens App Settings panel', async () => {
     await openAppSettings();
     await expect(page.locator('h2:has-text("Settings")')).toBeVisible();
-    await expect(page.locator('text=Global')).toBeVisible();
+    await expect(page.getByTestId('scope-tab-global')).toBeVisible();
     await closeSettings();
   });
 
@@ -110,11 +110,11 @@ test.describe('App Settings Panel', () => {
 
   test('Escape key closes panel', async () => {
     await openAppSettings();
-    await expect(page.locator('text=Global')).toBeVisible();
+    await expect(page.getByTestId('scope-tab-global')).toBeVisible();
 
     await page.keyboard.press('Escape');
     await page.locator('h2:has-text("Settings")').waitFor({ state: 'hidden', timeout: 2000 });
-    await expect(page.locator('text=Global')).not.toBeVisible({ timeout: 2000 });
+    await expect(page.getByTestId('scope-tab-global')).not.toBeVisible({ timeout: 2000 });
   });
 
   test('settings gear shows active state when panel is open', async () => {
@@ -237,6 +237,66 @@ test.describe('Project Settings Panel', () => {
     await page.keyboard.press('Escape');
     await header.waitFor({ state: 'hidden', timeout: 2000 });
     await expect(header).not.toBeVisible({ timeout: 2000 });
+  });
+});
+
+test.describe('Settings Scope Tabs', () => {
+  test('project scope tab visible on overridable tabs, hidden on global-only tabs', async () => {
+    await openAppSettings();
+
+    // Appearance is project-overridable -- project scope tab should be visible
+    const projectTab = page.getByTestId('scope-tab-project');
+    await expect(projectTab).toBeVisible();
+
+    // Switch to Behavior (global-only) -- project tab should disappear
+    await page.getByRole('button', { name: 'Behavior' }).click();
+    await expect(projectTab).not.toBeVisible();
+
+    // Switch back to Terminal (project-overridable) -- project tab reappears
+    await page.getByRole('button', { name: 'Terminal' }).click();
+    await expect(projectTab).toBeVisible();
+
+    await closeSettings();
+  });
+
+  test('clicking project scope tab opens project settings on same tab', async () => {
+    await openAppSettings();
+
+    // Switch to Terminal tab, then click the project scope tab
+    await page.getByRole('button', { name: 'Terminal' }).click();
+    const projectTab = page.getByTestId('scope-tab-project');
+    await expect(projectTab).toBeVisible();
+    await projectTab.click();
+
+    // Project Settings should open with project scope tab active
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
+    await expect(page.getByTestId('scope-tab-project')).toBeVisible();
+
+    // Should be on the Terminal tab (the tab we were on in App Settings)
+    await expect(page.getByText('Shell', { exact: true })).toBeVisible();
+
+    await closeSettings();
+  });
+
+  test('clicking global scope tab from project settings navigates back', async () => {
+    // Open project settings
+    const projectRow = page.locator('[role="button"]').filter({ hasText: 'Settings Test' }).first();
+    await projectRow.hover();
+    await page.locator('button[title="Project settings"]').first().click();
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
+
+    // Verify global scope tab is visible and clickable
+    const globalTab = page.getByTestId('scope-tab-global');
+    await expect(globalTab).toBeVisible();
+
+    // Click it to navigate to global settings
+    await globalTab.click();
+
+    // App Settings should open with Global scope tab active
+    await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
+    await expect(page.getByTestId('scope-tab-global')).toBeVisible();
+
+    await closeSettings();
   });
 });
 
