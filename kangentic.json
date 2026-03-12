@@ -28,20 +28,22 @@
       "name": "Code Review",
       "icon": "code",
       "color": "#f59e0b",
-      "autoSpawn": true
+      "autoSpawn": true,
+      "autoCommand": "/code-review"
     },
     {
       "id": "1da886f1-804b-42ea-960e-2109f776d451",
       "name": "Tests",
       "icon": "flask-conical",
       "color": "#06b6d4",
-      "autoSpawn": true
+      "autoSpawn": true,
+      "autoCommand": "/test"
     },
     {
       "id": "8adfe5cc-955c-4c4f-83a2-461e2a9d3c14",
       "name": "Ship It",
       "icon": "sailboat",
-      "color": "#F97316",
+      "color": "#f97316",
       "autoSpawn": true,
       "autoCommand": "/merge-back"
     },
