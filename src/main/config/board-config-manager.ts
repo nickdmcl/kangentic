@@ -28,6 +28,7 @@ const CURRENT_VERSION = 1;
  * while the project was inactive. No background watchers for inactive projects.
  */
 export class BoardConfigManager {
+  private readonly isEphemeral: boolean;
   private activeProjectId: string | null = null;
   private activeProjectPath: string | null = null;
   private mainWindow: BrowserWindow | null = null;
@@ -35,6 +36,10 @@ export class BoardConfigManager {
   private localWatcher: FileWatcher | null = null;
   private isWritingBack = false;
   private writeBackDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(options?: { ephemeral?: boolean }) {
+    this.isEphemeral = options?.ephemeral ?? false;
+  }
 
   /**
    * Set the active project (for write-back and file watching) and start watchers.
@@ -394,6 +399,7 @@ export class BoardConfigManager {
   // --- Write-back (DB -> file) ---
 
   writeBack(): void {
+    if (this.isEphemeral) return;
     if (!this.activeProjectId || !this.activeProjectPath) return;
 
     // Debounce rapid sequential UI changes
@@ -499,6 +505,7 @@ export class BoardConfigManager {
   // --- Export (bootstrap kangentic.json from existing DB) ---
 
   exportFromDb(): void {
+    if (this.isEphemeral) return;
     if (!this.activeProjectId || !this.activeProjectPath) return;
     // Write-back immediately (synchronous, no debounce).
     // doWriteBack() manages isWritingBack internally.

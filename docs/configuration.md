@@ -151,7 +151,7 @@ Each swimlane has its own overrides (stored in the per-project DB):
 | `config:setProjectByPath` | Update project-level overrides by project path |
 | `config:syncDefaultToProjects` | Sync changed default values to all existing projects (deep merge) |
 | `boardConfig:exists` | Check if `kangentic.json` exists for the active project |
-| `boardConfig:export` | Export current board state to `kangentic.json` (opt-in) |
+| `boardConfig:export` | Export current board state to `kangentic.json` (auto-runs on project open) |
 | `boardConfig:apply` | Apply pending config file changes (reconcile file into DB) |
 | `boardConfig:changed` | Event: `kangentic.json` or `kangentic.local.json` changed on disk |
 

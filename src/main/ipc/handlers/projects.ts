@@ -4,6 +4,7 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { SessionRepository } from '../../db/repositories/session-repository';
+import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { recoverSessions, reconcileSessions, pruneOrphanedWorktrees } from '../../engine/session-recovery';
 import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree } from '../../git/worktree-manager';
 import { stripKangenticHooks } from '../../agent/hook-manager';
@@ -226,8 +227,18 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
     for (const warning of configWarnings) {
       console.warn('[BOARD_CONFIG] Initial reconcile:', warning);
     }
+  } else {
+    // Auto-heal: if kangentic.json was deleted (e.g. after a bad reconcile from
+    // ephemeral UUIDs), un-ghost all ghost columns so originals become visible again.
+    const ghostDb = getProjectDb(project.id);
+    const swimlaneRepo = new SwimlaneRepository(ghostDb);
+    const cleared = swimlaneRepo.clearAllGhosts();
+    if (cleared > 0) {
+      console.log(`[BOARD_CONFIG] No kangentic.json found. Un-ghosted ${cleared} columns.`);
+    }
   }
-  // No auto-export: kangentic.json is opt-in (user must explicitly export)
+  // Always export DB state to kangentic.json so teams can commit it
+  context.boardConfigManager.exportFromDb();
 
   const config = context.configManager.getEffectiveConfig(project.path);
   context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);
@@ -331,8 +342,18 @@ export function registerProjectHandlers(context: IpcContext): void {
       for (const warning of configWarnings) {
         console.warn('[BOARD_CONFIG] Initial reconcile:', warning);
       }
+    } else {
+      // Auto-heal: if kangentic.json was deleted (e.g. after a bad reconcile from
+      // ephemeral UUIDs), un-ghost all ghost columns so originals become visible again.
+      const ghostDb = getProjectDb(id);
+      const swimlaneRepo = new SwimlaneRepository(ghostDb);
+      const cleared = swimlaneRepo.clearAllGhosts();
+      if (cleared > 0) {
+        console.log(`[BOARD_CONFIG] No kangentic.json found. Un-ghosted ${cleared} columns.`);
+      }
     }
-    // No auto-export: kangentic.json is opt-in (user must explicitly export)
+    // Always export DB state to kangentic.json so teams can commit it
+    context.boardConfigManager.exportFromDb();
 
     // Apply project config overrides (always -- config may have changed)
     const config = context.configManager.getEffectiveConfig(project.path);

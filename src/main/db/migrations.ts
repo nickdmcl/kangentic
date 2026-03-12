@@ -358,8 +358,7 @@ export function runProjectMigrations(db: Database.Database): void {
       seedActionsAndTransitions(db, now);
     });
     tx();
-  }
-}
+  }}
 
 function seedActionsAndTransitions(db: Database.Database, now: string): void {
   // Build role → lane ID map from the DB so we don't rely on array indices

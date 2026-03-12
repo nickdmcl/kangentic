@@ -2,7 +2,7 @@
   "version": 1,
   "columns": [
     {
-      "id": "456f5595-47d5-470d-b331-7c881389f3e6",
+      "id": "e6350e8a-77fa-43a2-815b-6447820adf40",
       "name": "Backlog",
       "role": "backlog",
       "icon": "layers",
@@ -38,18 +38,19 @@
       "autoSpawn": true
     },
     {
-      "id": "ffd0f24d-1c6c-4e57-b5be-f67bb0a0e274",
+      "id": "8adfe5cc-955c-4c4f-83a2-461e2a9d3c14",
       "name": "Ship It",
       "icon": "sailboat",
       "color": "#F97316",
-      "autoSpawn": true
+      "autoSpawn": true,
+      "autoCommand": "/merge-back"
     },
     {
-      "id": "ba646a55-f947-4503-a59c-c5e767edcfc4",
+      "id": "64f9ef9a-c05d-44f8-a846-329a8f15e69f",
       "name": "Done",
       "role": "done",
       "icon": "circle-check-big",
-      "color": "#10b981"
+      "color": "#64748B"
     }
   ],
   "actions": [

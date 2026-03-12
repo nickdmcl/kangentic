@@ -36,7 +36,9 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   // Eagerly create SessionManager + CommandInjector + BoardConfigManager (lightweight, needed early)
   const sessionManager = new SessionManager();
   const commandInjector = new CommandInjector(sessionManager);
-  const boardConfigManager = new BoardConfigManager();
+  const boardConfigManager = new BoardConfigManager({
+    ephemeral: process.argv.includes('--ephemeral'),
+  });
 
   // Lazy-initialize heavy objects on first access
   let projectRepo: ProjectRepository | null = null;
