@@ -62,6 +62,34 @@ export class ConfigManager {
     fs.writeFileSync(configPath, JSON.stringify(overrides, null, 2));
   }
 
+  /** Extract the project-overridable subset of the current global config.
+   *  Used to snapshot defaults when a new project is created so that
+   *  future global changes don't retroactively alter existing projects.
+   *  KEEP IN SYNC with snapshotOverridableDefaults() in tests/ui/mock-electron-api.js */
+  getProjectOverridableDefaults(): Partial<AppConfig> {
+    const global = this.load();
+    return {
+      theme: global.theme,
+      terminal: {
+        shell: global.terminal.shell,
+        fontSize: global.terminal.fontSize,
+        fontFamily: global.terminal.fontFamily,
+        scrollbackLines: global.terminal.scrollbackLines,
+        cursorStyle: global.terminal.cursorStyle,
+      },
+      claude: {
+        permissionMode: global.claude.permissionMode,
+      },
+      git: {
+        worktreesEnabled: global.git.worktreesEnabled,
+        autoCleanup: global.git.autoCleanup,
+        defaultBaseBranch: global.git.defaultBaseBranch,
+        copyFiles: global.git.copyFiles,
+        initScript: global.git.initScript,
+      },
+    } as Partial<AppConfig>;
+  }
+
   getEffectiveConfig(projectPath?: string): AppConfig {
     const global = this.load();
     if (!projectPath) return global;

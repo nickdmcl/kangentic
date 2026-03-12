@@ -1,21 +1,19 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { Bell, Bot, Check, CircleAlert, GitBranch, Palette, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
-import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { SettingsPanelProvider, SectionHeader, SettingRow, Select, ToggleSwitch, CompactToggleList, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
 import type { SettingsTabDefinition, SettingScope, SettingsContentProps } from './shared';
 import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode } from '../../../shared/types';
 import { NAMED_THEMES } from '../../../shared/types';
-import { deepMergeConfig } from '../../../shared/object-utils';
 import { settingProps } from './settings-registry';
 
 /**
  * App Settings tab layout:
  *
  * Tabs ABOVE the separator are project-overridable settings (also shown in
- * ProjectSettingsPanel). Changes here set the global default and optionally
- * sync to existing projects.
+ * ProjectSettingsPanel). Changes here set the global default. Projects without
+ * explicit overrides inherit the new value automatically.
  *
  * Tabs BELOW the separator (after `separator: true`) are global-only settings
  * that apply to the entire app, not per-project. These tabs do NOT appear in
@@ -84,44 +82,18 @@ function NotifyChannelRow({ eventKey, config, searchId }: {
 
 /**
  * Global settings content. Rendered inside the unified SettingsPanel shell.
- * Manages its own sync confirmation dialog and SettingsPanelProvider context.
+ * All changes save immediately to the global config. Projects without explicit
+ * overrides inherit the new default automatically (VS Code-style).
  */
 export function AppSettingsContent({ activeTab, isSearching, searchQuery, matchingTabs, navigateToTab, shells }: SettingsContentProps) {
   const globalConfig = useConfigStore((state) => state.globalConfig);
   const updateConfig = useConfigStore((state) => state.updateConfig);
   const claudeInfo = useConfigStore((state) => state.claudeInfo);
 
-  const [pendingSyncPartial, setPendingSyncPartial] = useState<DeepPartial<AppConfig> | null>(null);
-  /**
-   * Unified update dispatcher. Scope determines behavior:
-   * - 'project' → triggers sync confirmation modal
-   * - 'global'  → applies immediately (no sync)
-   */
-  const updateSetting = useCallback((partial: DeepPartial<AppConfig>, scope: SettingScope) => {
-    if (scope === 'project') {
-      setPendingSyncPartial(partial);
-    } else {
-      updateConfig(partial);
-    }
+  /** Save directly to global config regardless of scope. */
+  const updateSetting = useCallback((partial: DeepPartial<AppConfig>, _scope: SettingScope) => {
+    updateConfig(partial);
   }, [updateConfig]);
-
-  const handleSyncConfirm = (_dontAskAgain: boolean) => {
-    if (pendingSyncPartial) {
-      updateConfig(pendingSyncPartial);
-      window.electronAPI.config.syncDefaultToProjects(pendingSyncPartial).catch(() => {});
-    }
-    setPendingSyncPartial(null);
-  };
-
-  /** Dismiss the sync modal -- discard the pending change entirely. */
-  const handleSyncCancel = () => {
-    setPendingSyncPartial(null);
-  };
-
-  // Show pending value in controls while the sync modal is open.
-  const displayConfig = pendingSyncPartial
-    ? deepMergeConfig(globalConfig, pendingSyncPartial)
-    : globalConfig;
 
   return (
     <SettingsPanelProvider value={{ panelType: 'app', updateSetting }}>
@@ -132,10 +104,10 @@ export function AppSettingsContent({ activeTab, isSearching, searchQuery, matchi
             <div key={tab.id}>
               <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
               <div className="space-y-4">
-                {tab.id === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
-                {tab.id === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
-                {tab.id === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
-                {tab.id === 'git' && <GitTab displayConfig={displayConfig} />}
+                {tab.id === 'appearance' && <AppearanceTab globalConfig={globalConfig} />}
+                {tab.id === 'terminal' && <TerminalTab globalConfig={globalConfig} shells={shells} />}
+                {tab.id === 'agent' && <AgentTab globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+                {tab.id === 'git' && <GitTab globalConfig={globalConfig} />}
                 {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
                 {tab.id === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
                 {tab.id === 'privacy' && <PrivacyTab />}
@@ -148,25 +120,14 @@ export function AppSettingsContent({ activeTab, isSearching, searchQuery, matchi
       ) : (
         // Normal mode: single active tab
         <>
-          {activeTab === 'appearance' && <AppearanceTab displayConfig={displayConfig} />}
-          {activeTab === 'terminal' && <TerminalTab displayConfig={displayConfig} shells={shells} />}
-          {activeTab === 'agent' && <AgentTab displayConfig={displayConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+          {activeTab === 'appearance' && <AppearanceTab globalConfig={globalConfig} />}
+          {activeTab === 'terminal' && <TerminalTab globalConfig={globalConfig} shells={shells} />}
+          {activeTab === 'agent' && <AgentTab globalConfig={globalConfig} claudeInfo={claudeInfo} />}
           {activeTab === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
           {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
           {activeTab === 'privacy' && <PrivacyTab />}
-          {activeTab === 'git' && <GitTab displayConfig={displayConfig} />}
+          {activeTab === 'git' && <GitTab globalConfig={globalConfig} />}
         </>
-      )}
-
-      {/* Sync defaults confirmation */}
-      {pendingSyncPartial && (
-        <ConfirmDialog
-          title="Apply to all projects?"
-          message="Apply this change to all projects? New projects will use this setting by default."
-          confirmLabel="Apply to All"
-          onConfirm={handleSyncConfirm}
-          onCancel={handleSyncCancel}
-        />
       )}
     </SettingsPanelProvider>
   );
@@ -174,12 +135,12 @@ export function AppSettingsContent({ activeTab, isSearching, searchQuery, matchi
 
 /* ── Tab Components ── */
 
-function AppearanceTab({ displayConfig }: { displayConfig: AppConfig }) {
+function AppearanceTab({ globalConfig }: { globalConfig: AppConfig }) {
   const updateProject = useScopedUpdate('project');
   return (
     <SettingRow {...settingProps('theme')}>
       <Select
-        value={displayConfig.theme}
+        value={globalConfig.theme}
         onChange={(event) => updateProject({ theme: event.target.value as ThemeMode })}
       >
         <optgroup label="Standard">
@@ -201,14 +162,14 @@ function AppearanceTab({ displayConfig }: { displayConfig: AppConfig }) {
   );
 }
 
-function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shells: Array<{ name: string; path: string }> }) {
+function TerminalTab({ globalConfig, shells }: { globalConfig: AppConfig; shells: Array<{ name: string; path: string }> }) {
   const updateProject = useScopedUpdate('project');
   const updateGlobal = useScopedUpdate('global');
   return (
     <>
       <SettingRow {...settingProps('terminal.shell')}>
         <Select
-          value={displayConfig.terminal.shell || ''}
+          value={globalConfig.terminal.shell || ''}
           onChange={(event) => updateProject({ terminal: { shell: event.target.value || null } })}
         >
           <option value="">Auto-detect</option>
@@ -220,7 +181,7 @@ function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shel
       <SettingRow {...settingProps('terminal.fontSize')}>
         <input
           type="number"
-          value={displayConfig.terminal.fontSize}
+          value={globalConfig.terminal.fontSize}
           onChange={(event) => updateProject({ terminal: { fontSize: Number(event.target.value) } })}
           min={8}
           max={32}
@@ -230,7 +191,7 @@ function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shel
       <SettingRow {...settingProps('terminal.fontFamily')}>
         <input
           type="text"
-          value={displayConfig.terminal.fontFamily}
+          value={globalConfig.terminal.fontFamily}
           onChange={(event) => updateProject({ terminal: { fontFamily: event.target.value } })}
           className={INPUT_CLASS}
         />
@@ -238,7 +199,7 @@ function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shel
       <SettingRow {...settingProps('terminal.scrollbackLines')}>
         <input
           type="number"
-          value={displayConfig.terminal.scrollbackLines}
+          value={globalConfig.terminal.scrollbackLines}
           onChange={(event) => updateProject({ terminal: { scrollbackLines: Number(event.target.value) } })}
           min={1000}
           max={100000}
@@ -248,7 +209,7 @@ function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shel
       </SettingRow>
       <SettingRow {...settingProps('terminal.cursorStyle')}>
         <Select
-          value={displayConfig.terminal.cursorStyle}
+          value={globalConfig.terminal.cursorStyle}
           onChange={(event) => updateProject({ terminal: { cursorStyle: event.target.value as 'block' | 'underline' | 'bar' } })}
         >
           <option value="block">Block</option>
@@ -266,19 +227,19 @@ function TerminalTab({ displayConfig, shells }: { displayConfig: AppConfig; shel
         ]}
       />
       <CompactToggleList scope="global" items={[
-        { label: 'Shell', description: 'Detected shell name', checked: displayConfig.contextBar.showShell, onChange: (value) => updateGlobal({ contextBar: { showShell: value } }), searchId: 'contextBar.showShell' },
-        { label: 'Version', description: 'Claude Code version', checked: displayConfig.contextBar.showVersion, onChange: (value) => updateGlobal({ contextBar: { showVersion: value } }), searchId: 'contextBar.showVersion' },
-        { label: 'Model', description: 'Active model name', checked: displayConfig.contextBar.showModel, onChange: (value) => updateGlobal({ contextBar: { showModel: value } }), searchId: 'contextBar.showModel' },
-        { label: 'Cost', description: 'Session API cost', checked: displayConfig.contextBar.showCost, onChange: (value) => updateGlobal({ contextBar: { showCost: value } }), searchId: 'contextBar.showCost' },
-        { label: 'Token Counts', description: 'Input / output totals', checked: displayConfig.contextBar.showTokens, onChange: (value) => updateGlobal({ contextBar: { showTokens: value } }), searchId: 'contextBar.showTokens' },
-        { label: 'Context Window', description: 'Used / total tokens', checked: displayConfig.contextBar.showContextFraction, onChange: (value) => updateGlobal({ contextBar: { showContextFraction: value } }), searchId: 'contextBar.showContextFraction' },
-        { label: 'Progress Bar', description: 'Usage bar and percentage', checked: displayConfig.contextBar.showProgressBar, onChange: (value) => updateGlobal({ contextBar: { showProgressBar: value } }), searchId: 'contextBar.showProgressBar' },
+        { label: 'Shell', description: 'Detected shell name', checked: globalConfig.contextBar.showShell, onChange: (value) => updateGlobal({ contextBar: { showShell: value } }), searchId: 'contextBar.showShell' },
+        { label: 'Version', description: 'Claude Code version', checked: globalConfig.contextBar.showVersion, onChange: (value) => updateGlobal({ contextBar: { showVersion: value } }), searchId: 'contextBar.showVersion' },
+        { label: 'Model', description: 'Active model name', checked: globalConfig.contextBar.showModel, onChange: (value) => updateGlobal({ contextBar: { showModel: value } }), searchId: 'contextBar.showModel' },
+        { label: 'Cost', description: 'Session API cost', checked: globalConfig.contextBar.showCost, onChange: (value) => updateGlobal({ contextBar: { showCost: value } }), searchId: 'contextBar.showCost' },
+        { label: 'Token Counts', description: 'Input / output totals', checked: globalConfig.contextBar.showTokens, onChange: (value) => updateGlobal({ contextBar: { showTokens: value } }), searchId: 'contextBar.showTokens' },
+        { label: 'Context Window', description: 'Used / total tokens', checked: globalConfig.contextBar.showContextFraction, onChange: (value) => updateGlobal({ contextBar: { showContextFraction: value } }), searchId: 'contextBar.showContextFraction' },
+        { label: 'Progress Bar', description: 'Usage bar and percentage', checked: globalConfig.contextBar.showProgressBar, onChange: (value) => updateGlobal({ contextBar: { showProgressBar: value } }), searchId: 'contextBar.showProgressBar' },
       ]} />
     </>
   );
 }
 
-function AgentTab({ displayConfig, globalConfig, claudeInfo }: { displayConfig: AppConfig; globalConfig: AppConfig; claudeInfo: { found: boolean; path: string | null; version: string | null } | null }) {
+function AgentTab({ globalConfig, claudeInfo }: { globalConfig: AppConfig; claudeInfo: { found: boolean; path: string | null; version: string | null } | null }) {
   const updateGlobal = useScopedUpdate('global');
   const updateProject = useScopedUpdate('project');
   return (
@@ -332,7 +293,7 @@ function AgentTab({ displayConfig, globalConfig, claudeInfo }: { displayConfig: 
       </SettingRow>
       <SettingRow {...settingProps('claude.permissionMode')}>
         <Select
-          value={displayConfig.claude.permissionMode}
+          value={globalConfig.claude.permissionMode}
           onChange={(event) => updateProject({ claude: { permissionMode: event.target.value as PermissionMode } })}
         >
           <option value="default">Default (Allowlist)</option>
@@ -453,26 +414,26 @@ function PrivacyTab() {
   );
 }
 
-function GitTab({ displayConfig }: { displayConfig: AppConfig }) {
+function GitTab({ globalConfig }: { globalConfig: AppConfig }) {
   const updateProject = useScopedUpdate('project');
   return (
     <>
       <SettingRow {...settingProps('git.worktreesEnabled')}>
         <ToggleSwitch
-          checked={displayConfig.git.worktreesEnabled}
+          checked={globalConfig.git.worktreesEnabled}
           onChange={(value) => updateProject({ git: { worktreesEnabled: value } })}
         />
       </SettingRow>
       <SettingRow {...settingProps('git.autoCleanup')}>
         <ToggleSwitch
-          checked={displayConfig.git.autoCleanup}
+          checked={globalConfig.git.autoCleanup}
           onChange={(value) => updateProject({ git: { autoCleanup: value } })}
         />
       </SettingRow>
       <SettingRow {...settingProps('git.defaultBaseBranch')}>
         <BranchPicker
           variant="input"
-          value={displayConfig.git.defaultBaseBranch}
+          value={globalConfig.git.defaultBaseBranch}
           defaultBranch="main"
           onChange={(branch) => updateProject({ git: { defaultBaseBranch: branch } })}
         />
@@ -480,7 +441,7 @@ function GitTab({ displayConfig }: { displayConfig: AppConfig }) {
       <SettingRow {...settingProps('git.copyFiles')}>
         <input
           type="text"
-          value={displayConfig.git.copyFiles.join(', ')}
+          value={globalConfig.git.copyFiles.join(', ')}
           onChange={(event) => {
             const files = event.target.value.split(',').map((file) => file.trim()).filter(Boolean);
             updateProject({ git: { copyFiles: files } });
@@ -492,7 +453,7 @@ function GitTab({ displayConfig }: { displayConfig: AppConfig }) {
       <SettingRow {...settingProps('git.initScript')}>
         <input
           type="text"
-          value={displayConfig.git.initScript || ''}
+          value={globalConfig.git.initScript || ''}
           onChange={(event) => updateProject({ git: { initScript: event.target.value || null } })}
           placeholder="npm install"
           className={`${INPUT_CLASS} placeholder-fg-faint`}

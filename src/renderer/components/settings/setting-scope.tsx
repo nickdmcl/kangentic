@@ -4,19 +4,18 @@ import type { AppConfig, DeepPartial } from '../../../shared/types';
 /**
  * Determines how a setting behaves across app and project panels:
  *
- * - `'project'` -- Project-overridable. In AppSettingsPanel, changing this
- *   triggers the "Apply to all projects?" sync modal. Visible in both
- *   AppSettingsPanel and ProjectSettingsPanel.
+ * - `'project'` -- Project-overridable. Visible in both AppSettingsPanel and
+ *   ProjectSettingsPanel. In AppSettingsPanel, saves to the global default.
+ *   In ProjectSettingsPanel, saves to the project override file.
  *
- * - `'global'` -- App-wide only. Changes apply immediately without a sync
- *   modal. Hidden in ProjectSettingsPanel (auto-filtered).
+ * - `'global'` -- App-wide only. Hidden in ProjectSettingsPanel (auto-filtered).
  */
 export type SettingScope = 'global' | 'project';
 
 interface SettingsPanelContextValue {
   panelType: 'app' | 'project';
   /** Dispatch a config update. Scope determines the handler:
-   *  - In AppSettingsPanel: 'project' triggers sync modal, 'global' applies directly.
+   *  - In AppSettingsPanel: both scopes save directly to global config.
    *  - In ProjectSettingsPanel: scope is ignored, always writes to project overrides. */
   updateSetting: (partial: DeepPartial<AppConfig>, scope: SettingScope) => void;
 }
@@ -29,7 +28,7 @@ const SettingsPanelContext = createContext<SettingsPanelContextValue>({
 export const SettingsPanelProvider = SettingsPanelContext.Provider;
 
 /** Returns a scoped update handler. Call with a config partial to dispatch
- *  to the correct handler (sync modal vs direct update) automatically. */
+ *  to the correct panel handler automatically. */
 export function useScopedUpdate(scope: SettingScope) {
   const { updateSetting } = useContext(SettingsPanelContext);
   return useCallback(

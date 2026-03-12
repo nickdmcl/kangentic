@@ -194,6 +194,10 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
     project = context.projectRepo.create({ name, path: normalized });
     // Initialize the project database (creates tables + default swimlanes)
     getProjectDb(project.id);
+    // Snapshot current global defaults as project overrides so future
+    // global changes don't retroactively alter this project's settings.
+    const defaults = context.configManager.getProjectOverridableDefaults();
+    context.configManager.saveProjectOverrides(normalized, defaults);
   }
 
   // Skip full recovery if re-opening the same project
@@ -271,6 +275,10 @@ export function registerProjectHandlers(context: IpcContext): void {
     const project = context.projectRepo.create(input);
     // Initialize the project database (creates tables + default swimlanes)
     getProjectDb(project.id);
+    // Snapshot current global defaults as project overrides so future
+    // global changes don't retroactively alter this project's settings.
+    const defaults = context.configManager.getProjectOverridableDefaults();
+    context.configManager.saveProjectOverrides(project.path, defaults);
     trackEvent('project_create');
     return project;
   });

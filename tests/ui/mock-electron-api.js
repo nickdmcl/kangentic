@@ -15,6 +15,7 @@
   let activityCache = {};
   let eventCache = {};
   let currentProjectId = null;
+  let projectConfigs = {};
 
   let config = Object.assign({
     theme: 'dark',
@@ -123,6 +124,31 @@
     return result;
   }
 
+  /** Snapshot the project-overridable subset of global config.
+   *  KEEP IN SYNC with ConfigManager.getProjectOverridableDefaults() in src/main/config/config-manager.ts */
+  function snapshotOverridableDefaults() {
+    return {
+      theme: config.theme,
+      terminal: {
+        shell: config.terminal.shell,
+        fontSize: config.terminal.fontSize,
+        fontFamily: config.terminal.fontFamily,
+        scrollbackLines: config.terminal.scrollbackLines,
+        cursorStyle: config.terminal.cursorStyle,
+      },
+      claude: {
+        permissionMode: config.claude.permissionMode,
+      },
+      git: {
+        worktreesEnabled: config.git.worktreesEnabled,
+        autoCleanup: config.git.autoCleanup,
+        defaultBaseBranch: config.git.defaultBaseBranch,
+        copyFiles: config.git.copyFiles.slice(),
+        initScript: config.git.initScript,
+      },
+    };
+  }
+
   var DEFAULT_SWIMLANES = [
     { name: 'Backlog', role: 'backlog', color: '#6b7280', icon: 'layers', is_archived: false, permission_strategy: null, auto_spawn: false, auto_command: null, plan_exit_target_id: null },
     { name: 'Planning', role: null, color: '#8b5cf6', icon: 'map', is_archived: false, permission_strategy: 'plan', auto_spawn: true, auto_command: null, plan_exit_target_id: '__executing__' },
@@ -154,15 +180,21 @@
           created_at: now(),
         };
         projects.push(project);
+        // Snapshot current global defaults as project overrides
+        projectConfigs[project.path] = snapshotOverridableDefaults();
         return project;
       },
       delete: async function (id) {
+        var deletedProject = projects.find(function (p) { return p.id === id; });
         projects = projects.filter(function (p) {
           return p.id !== id;
         });
         // Reindex positions to keep contiguous
         projects.sort(function (a, b) { return a.position - b.position; });
         projects.forEach(function (p, i) { p.position = i; });
+        if (deletedProject) {
+          delete projectConfigs[deletedProject.path];
+        }
         if (currentProjectId === id) {
           currentProjectId = null;
           tasks = [];
@@ -222,6 +254,8 @@
           created_at: now(),
         };
         projects.push(project);
+        // Snapshot current global defaults as project overrides
+        projectConfigs[project.path] = snapshotOverridableDefaults();
         currentProjectId = project.id;
         if (swimlanes.length === 0) {
           swimlanes = DEFAULT_SWIMLANES.map(function (s, i) {
@@ -597,6 +631,11 @@
 
     config: {
       get: async function () {
+        // Return effective config: global merged with current project's overrides
+        var currentProject = projects.find(function (p) { return p.id === currentProjectId; });
+        if (currentProject && projectConfigs[currentProject.path]) {
+          return deepMerge(config, projectConfigs[currentProject.path]);
+        }
         return config;
       },
       getGlobal: async function () {
@@ -606,13 +645,24 @@
         config = deepMerge(config, partial);
       },
       getProjectOverrides: async function () {
+        var currentProject = projects.find(function (p) { return p.id === currentProjectId; });
+        if (currentProject && projectConfigs[currentProject.path]) {
+          return projectConfigs[currentProject.path];
+        }
         return null;
       },
-      setProjectOverrides: async function () {},
-      getProjectOverridesByPath: async function () {
-        return null;
+      setProjectOverrides: async function (overrides) {
+        var currentProject = projects.find(function (p) { return p.id === currentProjectId; });
+        if (currentProject) {
+          projectConfigs[currentProject.path] = overrides;
+        }
       },
-      setProjectOverridesByPath: async function () {},
+      getProjectOverridesByPath: async function (projectPath) {
+        return projectConfigs[projectPath] || null;
+      },
+      setProjectOverridesByPath: async function (projectPath, overrides) {
+        projectConfigs[projectPath] = overrides;
+      },
       syncDefaultToProjects: async function () {
         return 0;
       },
@@ -706,6 +756,7 @@
       sessions: sessions,
       activityCache: activityCache,
       eventCache: eventCache,
+      projectConfigs: projectConfigs,
       uuid: uuid,
       now: now,
       DEFAULT_SWIMLANES: DEFAULT_SWIMLANES,
