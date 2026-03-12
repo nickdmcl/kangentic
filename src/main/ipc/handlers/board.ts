@@ -3,6 +3,15 @@ import { IPC } from '../../../shared/ipc-channels';
 import { getProjectRepos } from '../helpers';
 import type { IpcContext } from '../ipc-context';
 
+/** Trigger write-back if kangentic.json exists. */
+function triggerWriteBack(context: IpcContext): void {
+  try {
+    context.boardConfigManager.writeBack();
+  } catch {
+    // Non-fatal: write-back failure should never block UI operations
+  }
+}
+
 export function registerBoardHandlers(context: IpcContext): void {
   // === Attachments ===
   ipcMain.handle(IPC.ATTACHMENT_LIST, (_, taskId: string) => {
@@ -37,22 +46,28 @@ export function registerBoardHandlers(context: IpcContext): void {
 
   ipcMain.handle(IPC.SWIMLANE_CREATE, (_, input) => {
     const { swimlanes } = getProjectRepos(context);
-    return swimlanes.create(input);
+    const result = swimlanes.create(input);
+    triggerWriteBack(context);
+    return result;
   });
 
   ipcMain.handle(IPC.SWIMLANE_UPDATE, (_, input) => {
     const { swimlanes } = getProjectRepos(context);
-    return swimlanes.update(input);
+    const result = swimlanes.update(input);
+    triggerWriteBack(context);
+    return result;
   });
 
   ipcMain.handle(IPC.SWIMLANE_DELETE, (_, id) => {
     const { swimlanes } = getProjectRepos(context);
     swimlanes.delete(id);
+    triggerWriteBack(context);
   });
 
   ipcMain.handle(IPC.SWIMLANE_REORDER, (_, ids) => {
     const { swimlanes } = getProjectRepos(context);
     swimlanes.reorder(ids);
+    triggerWriteBack(context);
   });
 
   // === Actions ===
@@ -63,17 +78,22 @@ export function registerBoardHandlers(context: IpcContext): void {
 
   ipcMain.handle(IPC.ACTION_CREATE, (_, input) => {
     const { actions } = getProjectRepos(context);
-    return actions.create(input);
+    const result = actions.create(input);
+    triggerWriteBack(context);
+    return result;
   });
 
   ipcMain.handle(IPC.ACTION_UPDATE, (_, input) => {
     const { actions } = getProjectRepos(context);
-    return actions.update(input);
+    const result = actions.update(input);
+    triggerWriteBack(context);
+    return result;
   });
 
   ipcMain.handle(IPC.ACTION_DELETE, (_, id) => {
     const { actions } = getProjectRepos(context);
     actions.delete(id);
+    triggerWriteBack(context);
   });
 
   // === Transitions ===
@@ -85,10 +105,27 @@ export function registerBoardHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.TRANSITION_SET, (_, fromId, toId, actionIds) => {
     const { actions } = getProjectRepos(context);
     actions.setTransitions(fromId, toId, actionIds);
+    triggerWriteBack(context);
   });
 
   ipcMain.handle(IPC.TRANSITION_GET_FOR, (_, fromId, toId) => {
     const { actions } = getProjectRepos(context);
     return actions.getTransitionsFor(fromId, toId);
+  });
+
+  // === Board Config ===
+  ipcMain.handle(IPC.BOARD_CONFIG_EXISTS, () => {
+    return context.boardConfigManager.exists();
+  });
+
+  ipcMain.handle(IPC.BOARD_CONFIG_EXPORT, () => {
+    context.boardConfigManager.exportFromDb();
+  });
+
+  ipcMain.handle(IPC.BOARD_CONFIG_APPLY, (_, projectId: string) => {
+    const project = context.projectRepo.getById(projectId);
+    if (!project) throw new Error(`Project ${projectId} not found`);
+    const result = context.boardConfigManager.applyFileChange(projectId, project.path);
+    return result.warnings;
   });
 }

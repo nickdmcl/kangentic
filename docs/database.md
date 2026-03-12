@@ -70,6 +70,7 @@ All queries are synchronous via **better-sqlite3** -- they block the Node.js eve
 | auto_spawn | INTEGER | NOT NULL | 1 |
 | auto_command | TEXT | | NULL |
 | plan_exit_target_id | TEXT | | NULL |
+| is_ghost | INTEGER | NOT NULL | 0 |
 | created_at | TEXT | NOT NULL | |
 
 Valid role values: `backlog`, `done`, or NULL (custom column).
@@ -194,6 +195,7 @@ Listed in execution order within `runProjectMigrations()`:
 12. **`is_terminal` renamed to `is_archived`** -- uses `ALTER TABLE RENAME COLUMN`.
 13. **`plan_exit_target_id` column on swimlanes** -- adds plan exit target and removes the `planning` system role. Sets icon to `map` for former planning-role columns, clears the role, and auto-sets `plan_exit_target_id` to the next column by position.
 14. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes.
+15. **`is_ghost` column on swimlanes** -- adds ghost column support for board config reconciliation. Ghost columns are columns removed from `kangentic.json` but still holding tasks.
 
 ### Key Migrations (Global DB)
 

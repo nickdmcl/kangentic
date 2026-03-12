@@ -23,6 +23,9 @@ import type { IpcContext } from '../ipc-context';
  * Does NOT touch the `.claude/` directory, git branches, or any user data.
  */
 export async function cleanupProject(context: IpcContext, projectId: string, projectPath: string): Promise<void> {
+  // Detach board config manager before cleanup
+  context.boardConfigManager.detach();
+
   // Guard: project path must exist
   if (!fs.existsSync(projectPath)) {
     console.warn(`[PROJECT_DELETE] Project path does not exist: ${projectPath} -- skipping filesystem cleanup`);
@@ -107,7 +110,8 @@ export async function cleanupProject(context: IpcContext, projectId: string, pro
         const content = fs.readFileSync(gitignorePath, 'utf-8');
         const filtered = content.split('\n').filter(
           (l) => l.trim() !== '.kangentic' && l.trim() !== '.kangentic/'
-            && l.trim() !== '.claude/settings.local.json',
+            && l.trim() !== '.claude/settings.local.json'
+            && l.trim() !== 'kangentic.local.json',
         );
         const newContent = filtered.join('\n');
         if (newContent.replace(/\s/g, '').length === 0) {
@@ -117,6 +121,12 @@ export async function cleanupProject(context: IpcContext, projectId: string, pro
         }
       }
     } catch { /* non-fatal */ }
+  }
+
+  // 6b. Remove kangentic.json and kangentic.local.json from project root
+  if (!isWorktree) {
+    try { fs.unlinkSync(path.join(projectPath, 'kangentic.json')); } catch { /* may not exist */ }
+    try { fs.unlinkSync(path.join(projectPath, 'kangentic.local.json')); } catch { /* may not exist */ }
   }
 
   // 7. Remove .kangentic/ directory (ours entirely)
@@ -208,6 +218,16 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
   context.currentProjectPath = project.path;
   context.projectRepo.updateLastOpened(project.id);
   ensureGitignore(project.path);
+
+  // Attach board config manager for file watching and reconciliation
+  context.boardConfigManager.attach(project.id, project.path, context.mainWindow);
+  if (context.boardConfigManager.exists()) {
+    const configWarnings = context.boardConfigManager.initialReconcile();
+    for (const warning of configWarnings) {
+      console.warn('[BOARD_CONFIG] Initial reconcile:', warning);
+    }
+  }
+  // No auto-export: kangentic.json is opt-in (user must explicitly export)
 
   const config = context.configManager.getEffectiveConfig(project.path);
   context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);
@@ -303,6 +323,16 @@ export function registerProjectHandlers(context: IpcContext): void {
     context.currentProjectPath = project.path;
     context.projectRepo.updateLastOpened(id);
     ensureGitignore(project.path);
+
+    // Attach board config manager for file watching and reconciliation
+    context.boardConfigManager.attach(id, project.path, context.mainWindow);
+    if (context.boardConfigManager.exists()) {
+      const configWarnings = context.boardConfigManager.initialReconcile();
+      for (const warning of configWarnings) {
+        console.warn('[BOARD_CONFIG] Initial reconcile:', warning);
+      }
+    }
+    // No auto-export: kangentic.json is opt-in (user must explicitly export)
 
     // Apply project config overrides (always -- config may have changed)
     const config = context.configManager.getEffectiveConfig(project.path);

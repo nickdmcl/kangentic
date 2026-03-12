@@ -31,17 +31,21 @@ export function Swimlane({ swimlane, tasks, dragHandleProps, isDropTarget }: Swi
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   const role = swimlane.role;
+  const isGhost = swimlane.is_ghost;
   const showFirstRunHint = role === 'backlog' && tasks.length === 0 && !hasCompletedFirstRun;
   const isSystemColumn = role !== null;
-  const isDraggable = !!dragHandleProps;
+  const isDraggable = !!dragHandleProps && !isGhost;
 
   return (
     <div
       data-testid="swimlane"
       data-swimlane-name={swimlane.name}
       className={`flex-shrink-0 w-72 h-full flex flex-col rounded-lg ${
+        isGhost ? 'opacity-50 border-2 border-dashed border-fg-disabled' : ''
+      } ${
         isDropTarget ? 'ring-2 ring-accent/40' : isSystemColumn ? 'ring-1 ring-edge/50' : ''
       } ${isSystemColumn ? 'bg-surface-raised/70' : 'bg-surface-raised/50'}`}
+      title={isGhost ? 'Removed from team config. Move tasks to continue.' : undefined}
     >
       {/* Accent bar */}
       <div
@@ -131,15 +135,24 @@ export function Swimlane({ swimlane, tasks, dragHandleProps, isDropTarget }: Swi
         )}
       </div>
 
-      {/* Add task button */}
-      <div className="p-2 border-t border-edge/50">
-        <button
-          onClick={() => setShowNewTask(true)}
-          className="w-full text-sm text-fg-faint hover:text-fg-tertiary hover:bg-surface-hover/50 rounded px-2 py-1 transition-colors text-left"
-        >
-          + Add task
-        </button>
-      </div>
+      {/* Add task button (hidden for ghost columns) */}
+      {!isGhost && (
+        <div className="p-2 border-t border-edge/50">
+          <button
+            onClick={() => setShowNewTask(true)}
+            className="w-full text-sm text-fg-faint hover:text-fg-tertiary hover:bg-surface-hover/50 rounded px-2 py-1 transition-colors text-left"
+          >
+            + Add task
+          </button>
+        </div>
+      )}
+      {isGhost && (
+        <div className="px-3 py-2 border-t border-edge/50">
+          <span className="text-xs text-fg-disabled italic">
+            Removed from team config
+          </span>
+        </div>
+      )}
 
       {showNewTask && (
         <NewTaskDialog

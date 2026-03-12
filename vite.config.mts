@@ -15,7 +15,7 @@ export default defineConfig({
       // Ignore .kangentic/ (worktrees, sessions, etc.) created inside the project.
       // Without this, Vite detects tsconfig.json in worktrees and triggers a
       // full page reload, which loses all React state.
-      ignored: ['**/.kangentic/**'],
+      ignored: ['**/.kangentic/**', '**/kangentic.json', '**/kangentic.local.json'],
     },
   },
   optimizeDeps: {

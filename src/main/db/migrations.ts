@@ -305,6 +305,13 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec("ALTER TABLE sessions ADD COLUMN suspended_by TEXT DEFAULT NULL");
   }
 
+  // Migration: add 'is_ghost' column to swimlanes
+  const hasSwimlaneIsGhost = (db.pragma('table_info(swimlanes)') as Array<{ name: string }>)
+    .some((col) => col.name === 'is_ghost');
+  if (!hasSwimlaneIsGhost) {
+    db.exec('ALTER TABLE swimlanes ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0');
+  }
+
   // Data migration: rename legacy permission_strategy values in swimlanes
   db.prepare("UPDATE swimlanes SET permission_strategy = 'default' WHERE permission_strategy = 'project-settings'").run();
   db.prepare("UPDATE swimlanes SET permission_strategy = 'bypass-permissions' WHERE permission_strategy = 'dangerously-skip'").run();

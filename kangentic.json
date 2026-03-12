@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "columns": [
+    {
+      "id": "456f5595-47d5-470d-b331-7c881389f3e6",
+      "name": "Backlog",
+      "role": "backlog",
+      "icon": "layers",
+      "color": "#6b7280"
+    },
+    {
+      "id": "4873bb89-9291-4f05-a2f7-e93f2dcc0c26",
+      "name": "Planning",
+      "icon": "map",
+      "color": "#8b5cf6",
+      "autoSpawn": true,
+      "permissionStrategy": "plan",
+      "planExitTarget": "Executing"
+    },
+    {
+      "id": "dc9f2b38-5882-4182-8f09-923f2a583b08",
+      "name": "Executing",
+      "icon": "square-terminal",
+      "autoSpawn": true
+    },
+    {
+      "id": "623a36ef-9045-4437-b9c8-f67312dc5437",
+      "name": "Code Review",
+      "icon": "code",
+      "color": "#f59e0b",
+      "autoSpawn": true
+    },
+    {
+      "id": "1da886f1-804b-42ea-960e-2109f776d451",
+      "name": "Tests",
+      "icon": "flask-conical",
+      "color": "#06b6d4",
+      "autoSpawn": true
+    },
+    {
+      "id": "ffd0f24d-1c6c-4e57-b5be-f67bb0a0e274",
+      "name": "Ship It",
+      "icon": "sailboat",
+      "color": "#F97316",
+      "autoSpawn": true
+    },
+    {
+      "id": "ba646a55-f947-4503-a59c-c5e767edcfc4",
+      "name": "Done",
+      "role": "done",
+      "icon": "circle-check-big",
+      "color": "#10b981"
+    }
+  ],
+  "actions": [
+    {
+      "id": "6849712a-b0ea-4785-9ef0-8fcad5dcb599",
+      "name": "Kill Session",
+      "type": "kill_session",
+      "config": {}
+    },
+    {
+      "id": "6b6d8c02-4865-497d-9186-591a4133c915",
+      "name": "Start Planning Agent",
+      "type": "spawn_agent",
+      "config": {
+        "agent": "claude",
+        "promptTemplate": "{{title}}{{description}}{{attachments}}"
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "from": "*",
+      "to": "Planning",
+      "actions": [
+        "Kill Session",
+        "Start Planning Agent"
+      ]
+    },
+    {
+      "from": "*",
+      "to": "Done",
+      "actions": [
+        "Kill Session"
+      ]
+    }
+  ]
+}

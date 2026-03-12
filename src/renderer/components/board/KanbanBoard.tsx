@@ -22,12 +22,16 @@ import {
   arrayMove,
   useSortable,
 } from '@dnd-kit/sortable';
+import { AlertTriangle, X } from 'lucide-react';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
 import { AddColumnButton } from './AddColumnButton';
 import { WelcomeOverlay } from './WelcomeOverlay';
+import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { useBoardStore } from '../../stores/board-store';
+import { useConfigStore } from '../../stores/config-store';
+import { useProjectStore } from '../../stores/project-store';
 import type { Task, Swimlane as SwimlaneType } from '../../../shared/types';
 import { useToastStore } from '../../stores/toast-store';
 
@@ -176,6 +180,58 @@ function getInsertionIndex(
   return pointerY < midY ? overIndex : overIndex + 1;
 }
 
+/** Warning banner shown when kangentic.json has validation errors. */
+function ConfigWarningBanner() {
+  const configWarnings = useBoardStore((s) => s.configWarnings);
+  const dismissConfigWarnings = useBoardStore((s) => s.dismissConfigWarnings);
+
+  if (configWarnings.length === 0) return null;
+
+  return (
+    <div className="mx-4 mt-4 mb-0 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-sm text-amber-400">
+      <AlertTriangle size={16} className="flex-shrink-0" />
+      <span className="flex-1">{configWarnings[0]}</span>
+      <button
+        type="button"
+        onClick={dismissConfigWarnings}
+        className="flex-shrink-0 p-0.5 hover:text-amber-300 transition-colors"
+        aria-label="Dismiss warning"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+/** Confirm dialog for board config changes, showing the project name. */
+function ConfigChangeDialog({ projectId, onConfirm, onCancel }: {
+  projectId: string;
+  onConfirm: (dontAskAgain: boolean) => void;
+  onCancel: () => void;
+}) {
+  const projects = useProjectStore((s) => s.projects);
+  const currentProject = useProjectStore((s) => s.currentProject);
+  const project = projects.find((p) => p.id === projectId);
+  const projectName = project?.name ?? 'Unknown project';
+  const isCrossProject = currentProject?.id !== projectId;
+  const message = isCrossProject
+    ? `Changes detected in kangentic.json for "${projectName}". Apply the updated board configuration? This will switch to that project.`
+    : 'Changes detected in kangentic.json. Apply the updated board configuration?';
+
+  return (
+    <ConfirmDialog
+      title="Board configuration changed"
+      message={message}
+      confirmLabel="Apply"
+      cancelLabel="Dismiss"
+      showDontAskAgain
+      dontAskAgainLabel="Always apply automatically"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
 export function KanbanBoard() {
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const tasks = useBoardStore((s) => s.tasks);
@@ -183,6 +239,10 @@ export function KanbanBoard() {
   const setCompletingTask = useBoardStore((s) => s.setCompletingTask);
   const reorderSwimlanes = useBoardStore((s) => s.reorderSwimlanes);
   const reorderTaskInColumn = useBoardStore((s) => s.reorderTaskInColumn);
+  const pendingConfigChange = useBoardStore((s) => s.pendingConfigChange);
+  const applyConfigChange = useBoardStore((s) => s.applyConfigChange);
+  const dismissConfigChange = useBoardStore((s) => s.dismissConfigChange);
+  const updateConfig = useConfigStore((s) => s.updateConfig);
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
   const [hoveringSwimlaneId, setHoveringSwimlaneId] = useState<string | null>(null);
 
@@ -462,8 +522,17 @@ export function KanbanBoard() {
     useBoardStore.getState().loadBoard();
   }, []);
 
+  const handleConfigConfirm = useCallback((dontAskAgain: boolean) => {
+    if (dontAskAgain) {
+      updateConfig({ skipBoardConfigConfirm: true });
+    }
+    applyConfigChange();
+  }, [applyConfigChange, updateConfig]);
+
   return (
-    <div className="relative h-full overflow-x-auto overflow-y-hidden p-4">
+    <div className="relative h-full overflow-x-auto overflow-y-hidden flex flex-col">
+      <ConfigWarningBanner />
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
       <WelcomeOverlay />
       <DndContext
         sensors={sensors}
@@ -496,6 +565,15 @@ export function KanbanBoard() {
         </DragOverlay>
       </DndContext>
       <FlyingCard />
+      </div>
+
+      {pendingConfigChange && (
+        <ConfigChangeDialog
+          projectId={pendingConfigChange}
+          onConfirm={handleConfigConfirm}
+          onCancel={dismissConfigChange}
+        />
+      )}
     </div>
   );
 }

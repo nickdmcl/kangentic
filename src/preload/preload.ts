@@ -178,6 +178,17 @@ const api: ElectronAPI = {
     },
   },
 
+  boardConfig: {
+    exists: () => ipcRenderer.invoke(IPC.BOARD_CONFIG_EXISTS),
+    export: () => ipcRenderer.invoke(IPC.BOARD_CONFIG_EXPORT),
+    apply: (projectId: string) => ipcRenderer.invoke(IPC.BOARD_CONFIG_APPLY, projectId),
+    onChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, projectId: string) => callback(projectId);
+      ipcRenderer.on(IPC.BOARD_CONFIG_CHANGED, handler);
+      return () => ipcRenderer.removeListener(IPC.BOARD_CONFIG_CHANGED, handler);
+    },
+  },
+
   platform: process.platform,
 };
 

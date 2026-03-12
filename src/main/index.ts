@@ -4,7 +4,7 @@ import { app, BrowserWindow, Menu, nativeImage, screen, session } from 'electron
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { registerAllIpc, getSessionManager, getCommandInjector, getCurrentProjectId, openProjectByPath, deleteProjectFromIndex, pruneStaleWorktreeProjects, activateAllProjects, getLastOpenedProject } from './ipc/register-all';
+import { registerAllIpc, getSessionManager, getCommandInjector, getBoardConfigManager, getCurrentProjectId, openProjectByPath, deleteProjectFromIndex, pruneStaleWorktreeProjects, activateAllProjects, getLastOpenedProject } from './ipc/register-all';
 import { closeAll, getProjectDb } from './db/database';
 import { SessionRepository } from './db/repositories/session-repository';
 import { IPC } from '../shared/ipc-channels';
@@ -433,6 +433,9 @@ function syncShutdownCleanup(): void {
   stopUpdaterTimers();
 
   try {
+    // Close active project's file watchers before killing sessions
+    getBoardConfigManager().detach();
+
     const sessionManager = getSessionManager();
     getCommandInjector().cancelAll();
 

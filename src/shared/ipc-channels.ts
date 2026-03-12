@@ -109,6 +109,12 @@ export const IPC = {
   NOTIFICATION_SHOW: 'notification:show',
   NOTIFICATION_CLICKED: 'notification:clicked',
 
+  // Board Config
+  BOARD_CONFIG_EXISTS: 'boardConfig:exists',
+  BOARD_CONFIG_EXPORT: 'boardConfig:export',
+  BOARD_CONFIG_APPLY: 'boardConfig:apply',
+  BOARD_CONFIG_CHANGED: 'boardConfig:changed',
+
   // Updater
   UPDATE_CHECK: 'updater:check',
   UPDATE_INSTALL: 'updater:install',

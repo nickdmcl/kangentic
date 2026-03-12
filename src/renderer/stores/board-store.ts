@@ -4,6 +4,7 @@ import type { Task, Swimlane, TaskCreateInput, TaskUpdateInput, TaskMoveInput, T
 import { useConfigStore } from './config-store';
 import { useSessionStore } from './session-store';
 import { useToastStore } from './toast-store';
+import { useProjectStore } from './project-store';
 
 interface CompletingTask {
   taskId: string;
@@ -19,6 +20,10 @@ interface BoardStore {
   swimlanes: Swimlane[];
   archivedTasks: Task[];
   loading: boolean;
+
+  // Board config warnings (shown as banner when kangentic.json has errors)
+  configWarnings: string[];
+  pendingConfigChange: string | null; // projectId that changed, or null
 
   // Completion animation state
   completingTask: CompletingTask | null;
@@ -55,6 +60,15 @@ interface BoardStore {
   updateSwimlane: (input: SwimlaneUpdateInput) => Promise<Swimlane>;
   deleteSwimlane: (id: string) => Promise<void>;
   reorderSwimlanes: (ids: string[]) => Promise<void>;
+
+  // Config warnings
+  setConfigWarnings: (warnings: string[]) => void;
+  dismissConfigWarnings: () => void;
+
+  // Pending config change (file watcher detected external change)
+  setPendingConfigChange: (projectId: string | null) => void;
+  applyConfigChange: () => Promise<void>;
+  dismissConfigChange: () => void;
 }
 
 /** Generation counter for stale reload protection.
@@ -67,6 +81,8 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   swimlanes: [],
   archivedTasks: [],
   loading: false,
+  configWarnings: [],
+  pendingConfigChange: null,
   completingTask: null,
   recentlyArchivedId: null,
   loadBoard: async () => {
@@ -394,5 +410,44 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         variant: 'error',
       });
     }
+  },
+
+  setConfigWarnings: (warnings) => {
+    set({ configWarnings: warnings });
+  },
+
+  dismissConfigWarnings: () => {
+    set({ configWarnings: [] });
+  },
+
+  setPendingConfigChange: (projectId) => {
+    set({ pendingConfigChange: projectId });
+  },
+
+  applyConfigChange: async () => {
+    const projectId = get().pendingConfigChange;
+    if (!projectId) return;
+    set({ pendingConfigChange: null });
+
+    // Switch project if needed
+    const activeProjectId = useProjectStore.getState().currentProject?.id;
+    if (projectId !== activeProjectId) {
+      await useProjectStore.getState().openProject(projectId);
+    }
+
+    const warnings = await window.electronAPI.boardConfig.apply(projectId);
+    if (warnings.length > 0) {
+      set({ configWarnings: warnings });
+      for (const warning of warnings) {
+        useToastStore.getState().addToast({ message: warning, variant: 'warning' });
+      }
+    } else {
+      set({ configWarnings: [] });
+    }
+    await get().loadBoard();
+  },
+
+  dismissConfigChange: () => {
+    set({ pendingConfigChange: null });
   },
 }));

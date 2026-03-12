@@ -48,9 +48,13 @@ async function start() {
     // Ignore runtime dirs that Electron/Claude write into during the session.
     // We can't reuse vite.config.mts because its **/.kangentic/** pattern
     // matches every file in the worktree. Use absolute paths instead.
-    const ignoreDirs = ['.kangentic', '.claude', '.vite'].map(
-      d => path.join(projectDir, d).replace(/\\/g, '/') + '/**'
-    );
+    const ignorePatterns = [
+      ...(['.kangentic', '.claude', '.vite'].map(
+        d => path.join(projectDir, d).replace(/\\/g, '/') + '/**'
+      )),
+      path.join(projectDir, 'kangentic.json').replace(/\\/g, '/'),
+      path.join(projectDir, 'kangentic.local.json').replace(/\\/g, '/'),
+    ];
     viteServer = await createServer({
       configFile: false,
       root: projectDir,
@@ -62,7 +66,7 @@ async function start() {
       optimizeDeps: {
         include: rendererOptimizeDeps,
       },
-      server: { port, strictPort: true, watch: { ignored: ignoreDirs } },
+      server: { port, strictPort: true, watch: { ignored: ignorePatterns } },
     });
   } else {
     viteServer = await createServer({

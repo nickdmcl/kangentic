@@ -108,3 +108,4 @@ tests/reports/
 test-results/
 playwright-report/
 .claude/settings.local.json
+kangentic.local.json

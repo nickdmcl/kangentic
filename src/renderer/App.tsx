@@ -328,6 +328,19 @@ export function App() {
       }));
     }
 
+    // Board config changed (kangentic.json file watch -- active project only)
+    const boardConfig = window.electronAPI?.boardConfig;
+    if (boardConfig?.onChanged) {
+      cleanups.push(boardConfig.onChanged((changedProjectId) => {
+        if (useConfigStore.getState().config.skipBoardConfigConfirm) {
+          useBoardStore.getState().setPendingConfigChange(changedProjectId);
+          useBoardStore.getState().applyConfigChange();
+        } else {
+          useBoardStore.getState().setPendingConfigChange(changedProjectId);
+        }
+      }));
+    }
+
     // Task auto-moved (plan exit → next column)
     const tasks = window.electronAPI?.tasks;
     if (tasks?.onAutoMoved) {

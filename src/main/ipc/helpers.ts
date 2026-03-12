@@ -48,8 +48,19 @@ export function ensureGitignore(projectPath: string): void {
       const settingsTracked = isFileTracked(projectPath, '.claude/settings.local.json');
       if (!settingsTracked) {
         const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-        fs.writeFileSync(gitignorePath, content + separator + '.claude/settings.local.json\n');
+        content = content + separator + '.claude/settings.local.json\n';
+        fs.writeFileSync(gitignorePath, content);
       }
+    }
+
+    // 3. Ensure kangentic.local.json is ignored (personal board overrides)
+    const linesAfterLocal = content.split('\n');
+    const localConfigIgnored = linesAfterLocal.some(
+      (l) => l.trim() === 'kangentic.local.json',
+    );
+    if (!localConfigIgnored) {
+      const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+      fs.writeFileSync(gitignorePath, content + separator + 'kangentic.local.json\n');
     }
   } catch (err) {
     // Non-fatal: log and continue. Project may be read-only or on a network drive.

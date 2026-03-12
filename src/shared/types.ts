@@ -51,6 +51,7 @@ export interface Swimlane {
   color: string;
   icon: string | null;
   is_archived: boolean;
+  is_ghost: boolean;
   permission_strategy: PermissionMode | null;
   auto_spawn: boolean;
   auto_command: string | null;
@@ -383,6 +384,7 @@ export interface AppConfig {
 
   hasCompletedFirstRun: boolean;
   skipDeleteConfirm: boolean;
+  skipBoardConfigConfirm: boolean;
   autoFocusIdleSession: boolean;
   activateAllProjectsOnStartup: boolean;
   restoreWindowPosition: boolean;
@@ -410,7 +412,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     idleTimeoutMinutes: 0,
   },
   sidebar: {
-    width: 224,
+    width: 400,
   },
   git: {
     worktreesEnabled: true,
@@ -445,6 +447,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   hasCompletedFirstRun: false,
   skipDeleteConfirm: false,
+  skipBoardConfigConfirm: false,
   autoFocusIdleSession: true,
   activateAllProjectsOnStartup: true,
   restoreWindowPosition: true,
@@ -517,6 +520,7 @@ export interface SwimlaneUpdateInput {
   icon?: string | null;
   position?: number;
   is_archived?: boolean;
+  is_ghost?: boolean;
   permission_strategy?: PermissionMode | null;
   auto_spawn?: boolean;
   auto_command?: string | null;
@@ -559,6 +563,41 @@ export interface NotificationInput {
   body: string;
   projectId: string;
   taskId: string;
+}
+
+// === Board Configuration (kangentic.json) ===
+
+export interface BoardColumnConfig {
+  id?: string; // opaque DB UUID for reconciliation identity
+  name: string;
+  role?: SwimlaneRole;
+  icon?: string;
+  color?: string;
+  autoSpawn?: boolean;
+  permissionStrategy?: PermissionMode | null;
+  planExitTarget?: string; // name of target column
+  archived?: boolean;
+  autoCommand?: string | null;
+}
+
+export interface BoardActionConfig {
+  id?: string; // opaque DB UUID for reconciliation identity
+  name: string;
+  type: ActionType;
+  config: ActionConfig;
+}
+
+export interface BoardTransitionConfig {
+  from: string; // column name or '*'
+  to: string; // column name
+  actions: string[]; // action names
+}
+
+export interface BoardConfig {
+  version: number;
+  columns: BoardColumnConfig[];
+  actions: BoardActionConfig[];
+  transitions: BoardTransitionConfig[];
 }
 
 // === Preload API (exposed to renderer via contextBridge) ===
@@ -709,6 +748,14 @@ export interface ElectronAPI {
     checkForUpdate: () => Promise<void>;
     installUpdate: () => Promise<void>;
     onUpdateDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => () => void;
+  };
+
+  // Board Config
+  boardConfig: {
+    exists: () => Promise<boolean>;
+    export: () => Promise<void>;
+    apply: (projectId: string) => Promise<string[]>;
+    onChanged: (callback: (projectId: string) => void) => () => void;
   };
 
   // Platform

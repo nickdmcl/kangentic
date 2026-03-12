@@ -4,6 +4,7 @@ import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { ProjectRepository } from '../db/repositories/project-repository';
 import { SessionManager } from '../pty/session-manager';
 import { ConfigManager } from '../config/config-manager';
+import { BoardConfigManager } from '../config/board-config-manager';
 import { ClaudeDetector } from '../agent/claude-detector';
 import { GitDetector } from '../agent/git-detector';
 import { ShellResolver } from '../pty/shell-resolver';
@@ -32,9 +33,10 @@ function requireContext(): IpcContext {
 }
 
 export function registerAllIpc(mainWindow: BrowserWindow): void {
-  // Eagerly create SessionManager + CommandInjector (lightweight, needed early)
+  // Eagerly create SessionManager + CommandInjector + BoardConfigManager (lightweight, needed early)
   const sessionManager = new SessionManager();
   const commandInjector = new CommandInjector(sessionManager);
+  const boardConfigManager = new BoardConfigManager();
 
   // Lazy-initialize heavy objects on first access
   let projectRepo: ProjectRepository | null = null;
@@ -51,6 +53,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
       return projectRepo;
     },
     sessionManager,
+    boardConfigManager,
     get configManager() {
       if (!configManager) configManager = new ConfigManager();
       return configManager;
@@ -98,6 +101,10 @@ export function getSessionManager(): SessionManager {
 
 export function getCommandInjector(): CommandInjector {
   return requireContext().commandInjector;
+}
+
+export function getBoardConfigManager(): BoardConfigManager {
+  return requireContext().boardConfigManager;
 }
 
 export function getCurrentProjectId(): string | null {

@@ -2,20 +2,31 @@ import { v4 as uuidv4 } from 'uuid';
 import type Database from 'better-sqlite3';
 import type { Action, ActionCreateInput, ActionUpdateInput, SwimlaneTransition } from '../../../shared/types';
 
+/** Raw row shape returned by better-sqlite3 for the actions table. */
+interface ActionRow {
+  id: string;
+  name: string;
+  type: string;
+  config_json: string;
+  created_at: string;
+}
+
 export class ActionRepository {
   constructor(private db: Database.Database) {}
 
   list(): Action[] {
-    return this.db.prepare('SELECT * FROM actions ORDER BY name ASC').all() as Action[];
+    const rows = this.db.prepare('SELECT * FROM actions ORDER BY name ASC').all() as ActionRow[];
+    return rows.map(this.mapRow);
   }
 
   getById(id: string): Action | undefined {
-    return this.db.prepare('SELECT * FROM actions WHERE id = ?').get(id) as Action | undefined;
+    const row = this.db.prepare('SELECT * FROM actions WHERE id = ?').get(id) as ActionRow | undefined;
+    return row ? this.mapRow(row) : undefined;
   }
 
-  create(input: ActionCreateInput): Action {
+  create(input: ActionCreateInput & { id?: string }): Action {
     const now = new Date().toISOString();
-    const id = uuidv4();
+    const id = input.id ?? uuidv4();
     const action: Action = {
       id,
       name: input.name,
@@ -42,6 +53,16 @@ export class ActionRepository {
       'UPDATE actions SET name = ?, type = ?, config_json = ? WHERE id = ?'
     ).run(updated.name, updated.type, updated.config_json, updated.id);
     return updated;
+  }
+
+  private mapRow(row: ActionRow): Action {
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type as Action['type'],
+      config_json: row.config_json,
+      created_at: row.created_at,
+    };
   }
 
   delete(id: string): void {
