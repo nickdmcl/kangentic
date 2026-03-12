@@ -276,7 +276,7 @@ export function App() {
                 const project = useProjectStore.getState().projects.find((p) => p.id === session.projectId);
                 const projectName = project?.name ?? 'A project';
                 const label = taskTitle ?? 'A task';
-                const body = isPermission ? `Needs permission -- ${projectName}` : projectName;
+                const body = isPermission ? `Needs permission: ${projectName}` : projectName;
                 sendNotification(sessionId, label, body, session.projectId, taskId ?? '');
               });
             }
@@ -338,7 +338,7 @@ export function App() {
         const notifyConfig = useConfigStore.getState().config.notifications;
         if (notifyConfig.toasts.onPlanComplete) {
           useToastStore.getState().addToast({
-            message: `Plan complete -- moved "${taskTitle}" to next column`,
+            message: `Plan complete. Moved "${taskTitle}" to next column`,
             variant: 'success',
           });
         }

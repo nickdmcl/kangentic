@@ -323,7 +323,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
       return <BadgeLine {...common} badge={`${event.tool || 'Tool'} interrupted`} detail={event.detail} variant="warn" />;
 
     case EventType.Idle:
-      return <DimLine {...common} text="Idle -- waiting for input" />;
+      return <DimLine {...common} text={event.detail === 'timeout' ? 'Idle (no activity detected)' : 'Idle (waiting for input)'} />;
 
     case EventType.Prompt:
       return (

@@ -542,7 +542,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                   ? 'text-green-400 hover:bg-green-400/10'
                   : 'text-fg-faint hover:bg-surface-hover hover:text-fg-tertiary'
             }`}
-            title={isQueued ? 'Queued -- click to pause' : isSessionActive ? 'Pause session' : 'Resume session'}
+            title={isQueued ? 'Queued (click to pause)' : isSessionActive ? 'Pause session' : 'Resume session'}
           >
             {isQueued ? (
               <Clock size={18} />

@@ -155,18 +155,27 @@ When idle is caused by a `PermissionRequest` (detail='permission'), a `permissio
 - During any true idle, the model is blocked and token counts are frozen -- no false recovery is possible
 - The 1-second grace period prevents race conditions from status updates arriving slightly after an idle event
 
+**Stale thinking safety timer:**
+- A background interval (every 15s) checks all sessions in the `thinking` state
+- If no signal (hook event or status.json update) has arrived for 45 seconds, the session transitions to idle
+- This catches cases where hooks fail to fire (e.g. Ctrl+C during model inference, not during a tool call, so no `PostToolUseFailure` hook fires)
+- A synthetic `idle` event with `detail: 'timeout'` is emitted to the activity log so the user can see why it went idle
+- Any subsequent event or usage update resets the 45-second timer
+- The timer only checks running sessions in the `thinking` state; idle sessions are ignored
+
 ### Scenarios
 
 1. **Permission prompt + subagents running:** Permission idle bypasses Guard 2 → card shows idle immediately. `permissionIdle` flag is set. Subagent tool events remain suppressed (permission idle is sticky at depth > 0). When subagents finish (depth 0), next `tool_start` transitions to thinking (correct)
 2. **Permission approved + no subagents:** Next `tool_start` at depth 0 transitions to thinking via Guard 1 (correct)
 3. **Permission approved + subagents still running:** Card stays idle while subagents work (tool_starts suppressed at depth > 0). Recovery happens when depth returns to 0 (correct)
 4. **False idle with no event recovery:** Heartbeat detects token increase after 1s idle → card transitions to thinking (correct)
-5. **User sends new message:** `prompt` always transitions regardless of depth (correct)
-6. **Main agent spawns subagent then fires Stop:** Idle suppressed, card stays thinking while subagent works (correct)
-7. **Last subagent finishes after deferred idle:** Card transitions to idle when depth reaches 0 (correct)
-8. **User presses Escape while subagents run:** `interrupted` always goes through, card shows idle immediately (correct)
-9. **Prompt fires while idle is deferred:** Pending flag cleared, no stale idle emitted when subagents finish (correct)
-10. **Nested subagents with deferred idle:** Idle only emits when ALL subagents finish (depth 0), not on intermediate stops (correct)
+5. **Ctrl+C during model inference (no tool running):** No hook fires; stale thinking timer detects 45s without signals → card transitions to idle with `detail: 'timeout'` (correct)
+6. **User sends new message:** `prompt` always transitions regardless of depth (correct)
+7. **Main agent spawns subagent then fires Stop:** Idle suppressed, card stays thinking while subagent works (correct)
+8. **Last subagent finishes after deferred idle:** Card transitions to idle when depth reaches 0 (correct)
+9. **User presses Escape while subagents run:** `interrupted` always goes through, card shows idle immediately (correct)
+10. **Prompt fires while idle is deferred:** Pending flag cleared, no stale idle emitted when subagents finish (correct)
+11. **Nested subagents with deferred idle:** Idle only emits when ALL subagents finish (depth 0), not on intermediate stops (correct)
 
 ## Hook Configuration
 

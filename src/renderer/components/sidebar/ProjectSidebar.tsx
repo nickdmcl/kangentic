@@ -81,7 +81,7 @@ function SortableProjectItem({
               {idleCount > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs tabular-nums flex-shrink-0 text-amber-400"
-                  title={`${idleCount} idle -- needs attention`}
+                  title={`${idleCount} idle. Needs attention`}
                 >
                   <Mail size={12} />
                   {idleCount}

@@ -250,7 +250,7 @@ function AgentTab({ globalConfig, claudeInfo }: { globalConfig: AppConfig; claud
             type="text"
             value={globalConfig.claude.cliPath || ''}
             onChange={(event) => updateGlobal({ claude: { cliPath: event.target.value || null } })}
-            placeholder={claudeInfo?.found ? (claudeInfo.path ?? undefined) : 'Not found -- enter path manually'}
+            placeholder={claudeInfo?.found ? (claudeInfo.path ?? undefined) : 'Not found. Enter path manually'}
             className={`${INPUT_CLASS} pr-8 ${claudeInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
           />
           {claudeInfo && (

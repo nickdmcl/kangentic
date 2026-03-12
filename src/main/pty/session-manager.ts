@@ -12,6 +12,8 @@ import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent,
 
 const MAX_SCROLLBACK = 512 * 1024; // 512KB per session
 const MAX_EVENTS_PER_SESSION = 500; // Cap rendered events in renderer
+const STALE_THINKING_THRESHOLD_MS = 45_000;
+const STALE_THINKING_CHECK_MS = 15_000;
 
 interface ManagedSession {
   id: string;
@@ -46,10 +48,12 @@ export class SessionManager extends EventEmitter {
   private pendingIdleWhileSubagent = new Map<string, boolean>();
   private permissionIdle = new Map<string, boolean>();
   private idleTimestamp = new Map<string, number>();
+  private lastThinkingSignal = new Map<string, number>();
 
   private eventCache = new Map<string, SessionEvent[]>();
   private idleTimeoutMinutes = 0;
   private idleTimeoutInterval: ReturnType<typeof setInterval> | null = null;
+  private staleThinkingInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     super();
@@ -58,6 +62,11 @@ export class SessionManager extends EventEmitter {
       getActiveCount: () => this.activeCount,
       maxConcurrent: 5,
     });
+    this.staleThinkingInterval = setInterval(
+      () => this.checkStaleThinking(),
+      STALE_THINKING_CHECK_MS,
+    );
+    this.staleThinkingInterval.unref();
   }
 
   setMaxConcurrent(max: number): void {
@@ -100,10 +109,43 @@ export class SessionManager extends EventEmitter {
     }
   }
 
+  private checkStaleThinking(): void {
+    const now = Date.now();
+    for (const [sessionId, activity] of this.activityCache) {
+      if (activity !== 'thinking') continue;
+      const session = this.sessions.get(sessionId);
+      if (!session || session.status !== 'running') continue;
+
+      const lastSignal = this.lastThinkingSignal.get(sessionId);
+      if (lastSignal && (now - lastSignal) > STALE_THINKING_THRESHOLD_MS) {
+        this.activityCache.set(sessionId, 'idle');
+        this.permissionIdle.set(sessionId, false);
+        this.idleTimestamp.set(sessionId, Date.now());
+        this.lastThinkingSignal.delete(sessionId);
+
+        // Emit a synthetic idle event so the activity log shows why it went idle
+        const timeoutEvent: SessionEvent = { ts: Date.now(), type: EventType.Idle, detail: 'timeout' };
+        let events = this.eventCache.get(sessionId);
+        if (!events) {
+          events = [];
+          this.eventCache.set(sessionId, events);
+        }
+        events.push(timeoutEvent);
+        this.emit('event', sessionId, timeoutEvent);
+
+        this.emit('activity', sessionId, 'idle', false);
+      }
+    }
+  }
+
   dispose(): void {
     if (this.idleTimeoutInterval) {
       clearInterval(this.idleTimeoutInterval);
       this.idleTimeoutInterval = null;
+    }
+    if (this.staleThinkingInterval) {
+      clearInterval(this.staleThinkingInterval);
+      this.staleThinkingInterval = null;
     }
   }
 
@@ -338,6 +380,7 @@ export class SessionManager extends EventEmitter {
     this.pendingIdleWhileSubagent.delete(id);
     this.permissionIdle.delete(id);
     this.idleTimestamp.set(id, Date.now());
+    this.lastThinkingSignal.delete(id);
 
     this.emit('activity', id, 'idle', false);
 
@@ -430,6 +473,7 @@ export class SessionManager extends EventEmitter {
     this.pendingIdleWhileSubagent.delete(sessionId);
     this.permissionIdle.delete(sessionId);
     this.idleTimestamp.delete(sessionId);
+    this.lastThinkingSignal.delete(sessionId);
 
     this.eventCache.delete(sessionId);
   }
@@ -481,6 +525,7 @@ export class SessionManager extends EventEmitter {
     this.pendingIdleWhileSubagent.delete(sessionId);
     this.permissionIdle.delete(sessionId);
     this.idleTimestamp.delete(sessionId);
+    this.lastThinkingSignal.delete(sessionId);
 
 
     // Mark suspended BEFORE killing so the async onExit handler preserves it
@@ -653,6 +698,11 @@ export class SessionManager extends EventEmitter {
       this.usageCache.set(session.id, usage);
       this.emit('usage', session.id, usage);
 
+      // Usage update proves the agent is working. Reset stale thinking timer.
+      if (this.activityCache.get(session.id) === 'thinking') {
+        this.lastThinkingSignal.set(session.id, Date.now());
+      }
+
       // Heartbeat recovery: if tokens increased while idle for >1s, agent resumed work.
       // During any true idle, the model is blocked and token counts are frozen.
       // Only when work genuinely resumes do tokens climb. The 1-second grace period
@@ -665,6 +715,7 @@ export class SessionManager extends EventEmitter {
         const idleStart = this.idleTimestamp.get(session.id);
         if (currentTokens > previousTokens && idleStart && (Date.now() - idleStart) > 1000) {
           this.activityCache.set(session.id, 'thinking');
+          this.lastThinkingSignal.set(session.id, Date.now());
           this.idleTimestamp.delete(session.id);
           this.permissionIdle.delete(session.id);
           this.emit('activity', session.id, 'thinking', false);
@@ -720,6 +771,11 @@ export class SessionManager extends EventEmitter {
       for (const line of lines) {
         const event = ClaudeStatusParser.parseEvent(line);
         if (event) {
+          // Any event proves the agent is alive. Reset stale thinking timer.
+          if (this.activityCache.get(session.id) === 'thinking') {
+            this.lastThinkingSignal.set(session.id, Date.now());
+          }
+
           events.push(event);
           this.emit('event', session.id, event);
 
@@ -812,9 +868,11 @@ export class SessionManager extends EventEmitter {
 
             // Track permission-idle flag and idle timestamp for recovery
             if (newActivity === 'idle') {
+              this.lastThinkingSignal.delete(session.id);
               this.permissionIdle.set(session.id, event.detail === 'permission');
               this.idleTimestamp.set(session.id, Date.now());
             } else if (newActivity === 'thinking') {
+              this.lastThinkingSignal.set(session.id, Date.now());
               this.permissionIdle.delete(session.id);
               this.idleTimestamp.delete(session.id);
             }

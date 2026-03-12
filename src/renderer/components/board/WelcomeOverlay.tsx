@@ -92,7 +92,7 @@ export function WelcomeOverlay() {
   const steps = [
     { icon: ListPlus, label: 'Create a task', description: 'Add a card with a title and prompt' },
     { icon: ArrowRightLeft, label: 'Drag to run', description: 'Drag the card to any active column to spawn an agent' },
-    { icon: Eye, label: 'Watch it code', description: 'Follow along in the live terminal -- see diffs, tests, and tool calls' },
+    { icon: Eye, label: 'Watch it code', description: 'Follow along in the live terminal. See diffs, tests, and tool calls' },
   ];
 
   return (

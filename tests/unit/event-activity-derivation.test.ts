@@ -1303,4 +1303,186 @@ describe('Event-derived activity state', () => {
     expect(manager.getActivityCache()[session.id]).toBe('idle');
     expect(states).toEqual(['thinking', 'idle']);
   });
+
+  describe('stale thinking safety timer', () => {
+    // These tests use fake timers to control the stale thinking check interval.
+    // The SessionManager constructor starts a setInterval(checkStaleThinking, 15_000).
+    // We use vi.useFakeTimers() so we can advance time precisely.
+
+    let fakeManager: SessionManager;
+    let fakeSpawnedSessionId: string | null = null;
+
+    async function spawnWithEventsFake(taskId = 'task-stale') {
+      const eventsPath = path.join(tmpDir, `${taskId}-events.jsonl`);
+      const statusPath = path.join(tmpDir, `${taskId}-status.json`);
+      const mock = createMockPty();
+      vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
+
+      const session = await fakeManager.spawn({
+        taskId,
+        command: '',
+        cwd: tmpDir,
+        eventsOutputPath: eventsPath,
+        statusOutputPath: statusPath,
+      });
+
+      fakeSpawnedSessionId = session.id;
+      return { session, eventsPath, statusPath, ...mock };
+    }
+
+    /** Create a valid status.json string with specified total token counts. */
+    function makeStatus(totalInputTokens: number, totalOutputTokens: number): string {
+      return JSON.stringify({
+        context_window: {
+          context_window_size: 200000,
+          used_percentage: 5,
+          total_input_tokens: totalInputTokens,
+          total_output_tokens: totalOutputTokens,
+          current_usage: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+          },
+        },
+        cost: { total_cost_usd: 0.01 },
+        model: { model_id: 'claude-sonnet-4-20250514' },
+      });
+    }
+
+    function triggerUsageUpdate(
+      sessionManager: SessionManager,
+      sessionId: string,
+      statusPath: string,
+      inputTokens: number,
+      outputTokens: number,
+    ): void {
+      fs.writeFileSync(statusPath, makeStatus(inputTokens, outputTokens));
+      const internals = sessionManager as unknown as {
+        sessions: Map<string, { id: string; statusOutputPath: string | null }>;
+        readAndEmitUsage: (session: { id: string; statusOutputPath: string | null }) => void;
+      };
+      const session = internals.sessions.get(sessionId);
+      if (session) internals.readAndEmitUsage(session);
+    }
+
+    function triggerEventRead(sessionManager: SessionManager, sessionId: string): void {
+      const internals = sessionManager as unknown as {
+        sessions: Map<string, { id: string; eventsOutputPath: string | null }>;
+        readAndProcessEvents: (session: { id: string; eventsOutputPath: string | null; eventsFileOffset: number }) => void;
+      };
+      const session = internals.sessions.get(sessionId);
+      if (session) internals.readAndProcessEvents(session as Parameters<typeof internals.readAndProcessEvents>[0]);
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+      fakeManager = new SessionManager();
+    });
+
+    afterEach(async () => {
+      if (fakeSpawnedSessionId) {
+        fakeManager.suspend(fakeSpawnedSessionId);
+        fakeSpawnedSessionId = null;
+      }
+      fakeManager.dispose();
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    it('thinking with no signals for >45s transitions to idle', async () => {
+      const { session, eventsPath } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Transition to thinking via event
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+      triggerEventRead(fakeManager, session.id);
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+
+      // Advance past threshold (45s) + check interval (15s)
+      vi.advanceTimersByTime(60_000);
+
+      expect(fakeManager.getActivityCache()[session.id]).toBe('idle');
+      expect(states).toEqual(['thinking', 'idle']);
+    });
+
+    it('event resets the stale thinking timer', async () => {
+      const { session, eventsPath } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Transition to thinking
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+      triggerEventRead(fakeManager, session.id);
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+
+      // Advance 40s (within threshold)
+      vi.advanceTimersByTime(40_000);
+
+      // Fire another event, resetting the timer
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Write' });
+      triggerEventRead(fakeManager, session.id);
+
+      // Advance another 40s (80s total, but only 40s since last signal)
+      vi.advanceTimersByTime(40_000);
+
+      // Should still be thinking since the timer was reset
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+      expect(states).toEqual(['thinking']);
+    });
+
+    it('usage update resets the stale thinking timer', async () => {
+      const { session, eventsPath, statusPath } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Transition to thinking
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+      triggerEventRead(fakeManager, session.id);
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+
+      // Advance 40s
+      vi.advanceTimersByTime(40_000);
+
+      // Fire a usage update, resetting the timer
+      triggerUsageUpdate(fakeManager, session.id, statusPath, 200, 100);
+
+      // Advance another 40s
+      vi.advanceTimersByTime(40_000);
+
+      // Should still be thinking since usage update reset the timer
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+      expect(states).toEqual(['thinking']);
+    });
+
+    it('timer ignores idle sessions', async () => {
+      const { session } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Session starts idle (default). Advance well past the threshold.
+      vi.advanceTimersByTime(120_000);
+
+      // Should still be idle, no extra emissions
+      expect(fakeManager.getActivityCache()[session.id]).toBe('idle');
+      expect(states).toEqual([]);
+    });
+
+    it('normal thinking with steady signals stays thinking', async () => {
+      const { session, eventsPath } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Transition to thinking
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+      triggerEventRead(fakeManager, session.id);
+
+      // Fire events every 10s for 2 minutes
+      for (let elapsed = 0; elapsed < 120_000; elapsed += 10_000) {
+        vi.advanceTimersByTime(10_000);
+        appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
+        triggerEventRead(fakeManager, session.id);
+      }
+
+      // Should have stayed thinking throughout, no idle transitions
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+      expect(states).toEqual(['thinking']);
+    });
+  });
 });
