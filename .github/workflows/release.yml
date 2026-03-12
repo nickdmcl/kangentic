@@ -142,9 +142,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release edit "${{ steps.version.outputs.tag }}" --notes-file RELEASE_NOTES.md
 
-  publish-launcher:
-    needs: [create-tag]
-    if: always() && (needs.create-tag.result == 'success' || needs.create-tag.result == 'skipped')
+  publish-npm:
+    needs: [release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -161,4 +160,3 @@ jobs:
         run: npm publish --access public -w packages/launcher
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
