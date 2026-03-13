@@ -147,25 +147,16 @@ export async function handleTaskMove(
   }
 
   // --- Priority 3: TASK HAS ACTIVE SESSION ---
-  // Permission mode is set at launch and cannot change at runtime. If the
-  // target column requires a different mode or has an auto_command, we must
-  // suspend and resume with the correct flags. Otherwise keep alive.
+  // If the target column has an auto_command, we must suspend and resume so
+  // the command can be injected as the resume prompt. Otherwise keep alive.
+  // Permission mode differences alone do NOT trigger a suspend/resume cycle.
+  // Moves without auto_command keep the session alive.
   if (task.session_id) {
     context.commandInjector.cancel(task.id);
 
-    // Resolve effective permission modes to detect mismatches
-    const sessionRecord = sessionRepo.getLatestForTask(task.id);
-    const effectiveConfig = context.configManager.getEffectiveConfig(
-      resolvedProjectPath || undefined,
-    );
-    const currentPermissionMode =
-      sessionRecord?.permission_mode ?? effectiveConfig.claude.permissionMode;
-    const targetPermissionMode =
-      toLane?.permission_strategy ?? effectiveConfig.claude.permissionMode;
-    const permissionModeChanged = currentPermissionMode !== targetPermissionMode;
-
-    if (permissionModeChanged || toLane?.auto_command?.trim()) {
-      // Suspend session. Will resume with correct mode + preloaded command.
+    if (toLane?.auto_command?.trim()) {
+      // Suspend session. Will resume with preloaded command.
+      const sessionRecord = sessionRepo.getLatestForTask(task.id);
       if (sessionRecord && sessionRecord.claude_session_id
           && (sessionRecord.status === 'running' || sessionRecord.status === 'exited')) {
         sessionRepo.updateStatus(sessionRecord.id, 'suspended', {
@@ -176,16 +167,15 @@ export async function handleTaskMove(
       tasks.update({ id: task.id, session_id: null });
       console.log(
         `[TASK_MOVE] Suspending session for task ${task.id.slice(0, 8)}`
-        + ` (permission: ${currentPermissionMode} -> ${targetPermissionMode},`
-        + ` auto_command: ${toLane?.auto_command ? 'yes' : 'no'}).`
-        + ` Will resume with correct mode.`,
+        + ` (auto_command: ${toLane.auto_command}).`
+        + ` Will resume with preloaded command.`,
       );
-      // Fall through to Priority 4 (resume with new permissions + preloaded command)
+      // Fall through to Priority 4 (resume with preloaded command)
     } else {
-      // Same permission mode, no auto_command. Keep session alive.
+      // No auto_command. Keep session alive.
       console.log(
         `[TASK_MOVE] Task ${task.id.slice(0, 8)} already has active session`
-        + ` (same permission mode, no auto_command). Skipping transitions.`,
+        + ` (no auto_command). Keeping session alive.`,
       );
       return;
     }

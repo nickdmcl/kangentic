@@ -48,7 +48,7 @@ Drag a task from Backlog to any active column (Planning, Executing, etc.). Kange
 
 ### Move Between Active Columns
 
-Dragging between active columns (e.g., Executing to Code Review) keeps the session alive when the permission mode is the same and the target has no `auto_command`. If the target column requires a different permission mode or has an `auto_command`, the session is suspended and resumed with the correct configuration. The `auto_command` is delivered as the resume prompt.
+Dragging between active columns (e.g., Executing to Code Review) keeps the session alive when the target has no `auto_command`. If the target column has an `auto_command` configured (e.g., `/code-review`), the session is suspended and resumed with the command as the resume prompt. Permission mode differences alone do not cause a suspend/resume cycle.
 
 ### Complete a Task
 

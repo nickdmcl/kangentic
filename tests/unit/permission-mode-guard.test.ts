@@ -2,8 +2,11 @@
  * Unit tests for the permission mode guard logic in handleTaskMove Priority 3.
  *
  * Tests the decision: when a task with an active session moves to a new column,
- * should the session be suspended + resumed (for permission mode changes or
- * auto_command injection), or kept alive?
+ * should the session be suspended + resumed (for auto_command injection), or
+ * kept alive?
+ *
+ * Permission mode differences alone do NOT trigger suspend/resume. Moves
+ * without auto_command keep the session alive.
  *
  * Also tests resumePrompt derivation: suspended sessions get auto_command
  * preloaded as the resume prompt; fresh spawns use deferred injection instead.
@@ -14,14 +17,16 @@ import type { PermissionMode } from '../../src/shared/types';
 /**
  * Replicates the Priority 3 suspend decision from handleTaskMove.
  * Returns true when the session should be suspended + resumed.
+ *
+ * Only auto_command triggers a suspend. Permission mode changes alone
+ * never trigger suspend/resume.
  */
 function shouldSuspendSession(
-  currentPermissionMode: PermissionMode,
-  targetPermissionMode: PermissionMode,
+  _currentPermissionMode: PermissionMode,
+  _targetPermissionMode: PermissionMode,
   autoCommand: string | null,
 ): boolean {
-  const permissionModeChanged = currentPermissionMode !== targetPermissionMode;
-  return permissionModeChanged || !!autoCommand;
+  return !!autoCommand;
 }
 
 /**
@@ -49,16 +54,10 @@ describe('Permission mode guard', () => {
       expect(shouldSuspendSession('manual', 'manual', null)).toBe(false);
     });
 
-    it('suspends when permission mode changes (plan to default)', () => {
-      expect(shouldSuspendSession('plan', 'default', null)).toBe(true);
-    });
-
-    it('suspends when permission mode changes (default to plan)', () => {
-      expect(shouldSuspendSession('default', 'plan', null)).toBe(true);
-    });
-
-    it('suspends when permission mode changes (default to bypass-permissions)', () => {
-      expect(shouldSuspendSession('default', 'bypass-permissions', null)).toBe(true);
+    it('keeps session alive when permission mode changes without auto_command', () => {
+      expect(shouldSuspendSession('plan', 'default', null)).toBe(false);
+      expect(shouldSuspendSession('default', 'plan', null)).toBe(false);
+      expect(shouldSuspendSession('default', 'bypass-permissions', null)).toBe(false);
     });
 
     it('suspends when auto_command is set even with same permission mode', () => {
@@ -143,10 +142,10 @@ describe('Permission mode guard', () => {
       expect(resolveTargetMode(null, 'default')).toBe('default');
     });
 
-    it('detects mismatch when session was plan but target uses config default', () => {
+    it('does not suspend for permission mismatch without auto_command', () => {
       const current = resolveCurrentMode('plan', 'default');
       const target = resolveTargetMode(null, 'default');
-      expect(shouldSuspendSession(current, target, null)).toBe(true);
+      expect(shouldSuspendSession(current, target, null)).toBe(false);
     });
 
     it('detects no mismatch when both resolve to config default', () => {
@@ -155,13 +154,13 @@ describe('Permission mode guard', () => {
       expect(shouldSuspendSession(current, target, null)).toBe(false);
     });
 
-    it('detects mismatch when config default changed after spawn', () => {
+    it('does not suspend for config default change without auto_command', () => {
       // Session was spawned with 'default', but config was later changed to 'plan'.
       // The session record still says 'default', target lane has no override,
-      // so target resolves to config default 'plan'.
+      // so target resolves to config default 'plan'. Without auto_command, no suspend.
       const current = resolveCurrentMode('default', 'plan');
       const target = resolveTargetMode(null, 'plan');
-      expect(shouldSuspendSession(current, target, null)).toBe(true);
+      expect(shouldSuspendSession(current, target, null)).toBe(false);
     });
   });
 });

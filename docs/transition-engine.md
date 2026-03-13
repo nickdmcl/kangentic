@@ -13,14 +13,14 @@ When a task moves from one column to another, the IPC handler (`task:move`) chec
 | 1 | Target is **Backlog** (role=`backlog`) | Kill session, preserve worktree |
 | 2 | Target is **Done** (role=`done`) | Suspend session (resumable), archive task |
 | 2.5 | Target has `auto_spawn=false` (non-backlog, non-done) | Suspend session |
-| 3 | Task has **active session** | If target requires a different permission mode or has `auto_command`, suspend and respawn with correct flags. Otherwise keep alive. |
+| 3 | Task has **active session** | If target has `auto_command`, suspend and respawn with command as resume prompt. Otherwise keep alive (permission mode differences alone do not trigger suspend/resume). |
 | 4 | Task has **no session** | Resume suspended session (with `auto_command` preloaded as resume prompt) OR create worktree (if enabled) + execute transition action chain |
 
 ### Priority 3: Permission Mode Guard
 
-When a task with an active session moves to a column with a different `permission_strategy`, the session is suspended and a new session is resumed with the correct CLI flags. The same suspend-and-respawn occurs when the target column has an `auto_command`, even if the permission mode matches. During this transition, a shimmer overlay appears in the terminal UI while the new session starts.
+When a task with an active session moves to a column that has an `auto_command` configured, the session is suspended and resumed with the command as the resume prompt. During this transition, a shimmer overlay appears in the terminal UI while the new session starts.
 
-If the target column's permission mode matches the running session's mode and there is no `auto_command`, the session stays alive with no interruption.
+Permission mode differences alone do not trigger suspend/resume. If the target column has no `auto_command`, the session stays alive with no interruption regardless of permission mode.
 
 Transition action chains (priority 4) only fire when a task has no active session.
 

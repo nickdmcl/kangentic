@@ -36,7 +36,7 @@ spawn() called
 2. **Target is Backlog** (role=`backlog`, lines 50-55) -- Cancel pending commands, kill session (hard stop), preserve worktree. Return.
 3. **Target is Done** (role=`done`, lines 58-83) -- Cancel pending commands, suspend session (resumable), auto-archive task. Accepts both `running` AND `exited` sessions.
 4. **Target has `auto_spawn=false`** (lines 87-100) -- Cancel pending commands, suspend if session exists, do NOT respawn. Return.
-5. **Task has active session** (lines 105-114) -- Session still running. Skip transitions, inject auto-command only.
+5. **Task has active session** (lines 105-114) -- If target has `auto_command`, suspend and respawn with command as resume prompt. Otherwise keep session alive (permission mode differences alone do not trigger suspend/resume).
 6. **No active session** (lines 117-148) -- Create worktree, execute transitions (which may spawn), attempt resume of suspended session.
 
 **Critical invariant:** Steps 2-4 always call `commandInjector.cancel(taskId)` BEFORE any session state change. This prevents a pending auto-command from firing after the session is killed/suspended.
