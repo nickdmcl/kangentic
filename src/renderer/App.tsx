@@ -371,7 +371,7 @@ export function App() {
       cleanups.forEach((fn) => fn());
       if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
     };
-  }, []);
+  }, [updateSessionStatus, updateUsage, updateActivity, addEvent]);
 
   return <AppLayout />;
 }
