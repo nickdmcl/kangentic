@@ -1,3 +1,4 @@
+// git test change
 export const IPC = {
   // Projects
   PROJECT_LIST: 'project:list',
@@ -63,6 +64,8 @@ export const IPC = {
   SESSION_SUSPEND: 'session:suspend',
   SESSION_RESUME: 'session:resume',
   SESSION_IDLE_TIMEOUT: 'session:idleTimeout',
+  SESSION_GET_SUMMARY: 'session:getSummary',
+  SESSION_LIST_SUMMARIES: 'session:listSummaries',
 
   // Config
   CONFIG_GET: 'config:get',

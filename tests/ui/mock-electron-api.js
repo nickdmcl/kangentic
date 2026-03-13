@@ -14,6 +14,7 @@
   let attachments = [];
   let activityCache = {};
   let eventCache = {};
+  let summaryCache = {};
   let currentProjectId = null;
   let projectConfigs = {};
 
@@ -629,6 +630,12 @@
       onIdleTimeout: function () {
         return noop;
       },
+      getSummary: async function (taskId) {
+        return summaryCache[taskId] || null;
+      },
+      listSummaries: async function () {
+        return Object.assign({}, summaryCache);
+      },
     },
 
     config: {
@@ -761,10 +768,12 @@
     var result = fn({
       projects: projects,
       tasks: tasks,
+      archivedTasks: archivedTasks,
       swimlanes: swimlanes,
       sessions: sessions,
       activityCache: activityCache,
       eventCache: eventCache,
+      summaryCache: summaryCache,
       projectConfigs: projectConfigs,
       uuid: uuid,
       now: now,

@@ -6,6 +6,7 @@ import { getProjectDb } from '../../db/database';
 import { getProjectRepos, ensureTaskWorktree, createTransitionEngine } from '../helpers';
 import { handleTaskMove } from './tasks';
 import { trackEvent } from '../../analytics/analytics';
+import { captureSessionMetrics } from './session-metrics';
 import type { IpcContext } from '../ipc-context';
 
 // Track session start times for duration calculation on exit
@@ -48,6 +49,8 @@ export function registerSessionHandlers(context: IpcContext): void {
     const record = sessionRepo.getLatestForTask(task.id);
     if (record && record.claude_session_id
         && (record.status === 'running' || record.status === 'exited')) {
+      // Capture metrics before suspend (caches are still populated)
+      captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id!, record.id);
       sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'user' });
     }
 
@@ -89,6 +92,21 @@ export function registerSessionHandlers(context: IpcContext): void {
     const newSession = context.sessionManager.getSession(updated.session_id);
     if (!newSession) throw new Error('Session resume failed -- session not in manager');
     return newSession;
+  });
+
+  // === Session Summaries ===
+  ipcMain.handle(IPC.SESSION_GET_SUMMARY, (_, taskId: string) => {
+    if (!context.currentProjectId) return null;
+    const db = getProjectDb(context.currentProjectId);
+    const sessionRepo = new SessionRepository(db);
+    return sessionRepo.getSummaryForTask(taskId);
+  });
+
+  ipcMain.handle(IPC.SESSION_LIST_SUMMARIES, () => {
+    if (!context.currentProjectId) return {};
+    const db = getProjectDb(context.currentProjectId);
+    const sessionRepo = new SessionRepository(db);
+    return sessionRepo.listAllSummaries();
   });
 
   // Forward PTY events to renderer (guard against destroyed window during shutdown)
@@ -197,6 +215,18 @@ export function registerSessionHandlers(context: IpcContext): void {
               exited_at: new Date().toISOString(),
             });
           }
+        }
+
+        // Capture session metrics (usage/event caches are still populated at this point).
+        // Determine the DB record ID from whichever lookup path succeeded above.
+        const metricsRecordId = session
+          ? sessionRepo.getLatestForTask(session.taskId)?.id
+          : (updated ? undefined : (db.prepare(
+              `SELECT id FROM sessions WHERE claude_session_id = ? ORDER BY started_at DESC LIMIT 1`
+            ).get(sessionId) as { id: string } | undefined)?.id);
+
+        if (metricsRecordId) {
+          captureSessionMetrics(context.sessionManager, sessionRepo, sessionId, metricsRecordId);
         }
       } catch {
         // DB may be closed during shutdown

@@ -110,6 +110,8 @@ const api: ElectronAPI = {
       ipcRenderer.on(IPC.SESSION_IDLE_TIMEOUT, handler);
       return () => ipcRenderer.removeListener(IPC.SESSION_IDLE_TIMEOUT, handler);
     },
+    getSummary: (taskId: string) => ipcRenderer.invoke(IPC.SESSION_GET_SUMMARY, taskId),
+    listSummaries: () => ipcRenderer.invoke(IPC.SESSION_LIST_SUMMARIES),
   },
 
   config: {

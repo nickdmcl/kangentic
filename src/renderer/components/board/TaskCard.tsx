@@ -7,16 +7,17 @@ import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { useSessionStore } from '../../stores/session-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { getProgressColor } from '../../utils/color-lerp';
-import type { Task } from '../../../shared/types';
+import type { Task, SessionSummary } from '../../../shared/types';
 
 interface TaskCardProps {
   task: Task;
   isDragOverlay?: boolean;
   compact?: boolean;
   onDelete?: (taskId: string) => void;
+  summary?: SessionSummary;
 }
 
-const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardProps) {
+const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete, summary }: TaskCardProps) {
   const [showDetail, setShowDetail] = useState(false);
   const isHighlighted = useSessionStore((s) => {
     const matched = s.sessions.find((sess) => sess.taskId === task.id);
@@ -76,6 +77,11 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-fg-tertiary truncate flex-1">{task.title}</span>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {summary && summary.totalCostUsd > 0 && (
+                <span className="text-xs text-fg-disabled tabular-nums" data-testid="cost-badge">
+                  ${summary.totalCostUsd < 0.01 ? '<0.01' : summary.totalCostUsd.toFixed(2)}
+                </span>
+              )}
               <span className="text-xs text-fg-disabled">
                 {task.archived_at ? formatDistanceToNow(new Date(task.archived_at), { addSuffix: true }) : ''}
               </span>

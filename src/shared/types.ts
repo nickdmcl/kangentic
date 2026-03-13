@@ -149,6 +149,32 @@ export interface SessionRecord {
   suspended_at: string | null;
   exited_at: string | null;
   suspended_by: SuspendedBy | null;
+  total_cost_usd: number | null;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  model_id: string | null;
+  model_display_name: string | null;
+  total_duration_ms: number | null;
+  tool_call_count: number | null;
+  lines_added: number | null;
+  lines_removed: number | null;
+  files_changed: number | null;
+}
+
+export interface SessionSummary {
+  sessionId: string;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  modelDisplayName: string;
+  durationMs: number;
+  toolCallCount: number;
+  linesAdded: number;
+  linesRemoved: number;
+  filesChanged: number;
+  startedAt: string;
+  exitedAt: string | null;
+  exitCode: number | null;
 }
 
 // === Session Activity (Claude Code Hooks) ===
@@ -680,6 +706,8 @@ export interface ElectronAPI {
     getEventsCache: (projectId?: string) => Promise<Record<string, SessionEvent[]>>;
     onEvent: (callback: (sessionId: string, event: SessionEvent, projectId?: string) => void) => () => void;
     onIdleTimeout: (callback: (sessionId: string, taskId: string, timeoutMinutes: number, projectId?: string) => void) => () => void;
+    getSummary: (taskId: string) => Promise<SessionSummary | null>;
+    listSummaries: () => Promise<Record<string, SessionSummary>>;
   };
 
   // Config

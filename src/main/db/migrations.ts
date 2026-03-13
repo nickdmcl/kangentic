@@ -312,6 +312,28 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec('ALTER TABLE swimlanes ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0');
   }
 
+  // Migration: add session metrics columns for completed task summaries
+  const sessionColumns = new Set(
+    (db.pragma('table_info(sessions)') as Array<{ name: string }>).map((col) => col.name),
+  );
+  const metricsColumns: Array<[string, string]> = [
+    ['total_cost_usd', 'REAL DEFAULT NULL'],
+    ['total_input_tokens', 'INTEGER DEFAULT NULL'],
+    ['total_output_tokens', 'INTEGER DEFAULT NULL'],
+    ['model_id', 'TEXT DEFAULT NULL'],
+    ['model_display_name', 'TEXT DEFAULT NULL'],
+    ['total_duration_ms', 'INTEGER DEFAULT NULL'],
+    ['tool_call_count', 'INTEGER DEFAULT NULL'],
+    ['lines_added', 'INTEGER DEFAULT NULL'],
+    ['lines_removed', 'INTEGER DEFAULT NULL'],
+    ['files_changed', 'INTEGER DEFAULT NULL'],
+  ];
+  for (const [columnName, columnDef] of metricsColumns) {
+    if (!sessionColumns.has(columnName)) {
+      db.exec(`ALTER TABLE sessions ADD COLUMN ${columnName} ${columnDef}`);
+    }
+  }
+
   // Data migration: rename legacy permission_strategy values in swimlanes
   db.prepare("UPDATE swimlanes SET permission_strategy = 'default' WHERE permission_strategy = 'project-settings'").run();
   db.prepare("UPDATE swimlanes SET permission_strategy = 'bypass-permissions' WHERE permission_strategy = 'dangerously-skip'").run();

@@ -1,5 +1,6 @@
 import React, { useState, useLayoutEffect, useRef, useEffect, useCallback, useMemo } from 'react';
 import { X, Trash2, Pencil, Loader2, FolderGit2, FolderOpen, GitPullRequest, ArrowRightLeft, ChevronRight, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock } from 'lucide-react';
+import { SessionSummaryPanel } from './SessionSummaryPanel';
 import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
@@ -317,8 +318,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   // Track whether mouse is inside the dialog content (for Escape key behavior)
   const mouseInsideDialog = useRef(false);
 
-  // Use large dialog when there's an active session OR a suspended one
-  const hasSessionContext = (displayState.kind !== 'none' && displayState.kind !== 'exited') || toggling;
+  // Use large dialog when there's an active session OR a suspended one (but not for archived tasks)
+  const hasSessionContext = !isArchived && ((displayState.kind !== 'none' && displayState.kind !== 'exited') || toggling);
   const dialogSizeClass = isEditing || !hasSessionContext
     ? (isQueued ? 'w-[520px] h-[320px]' : 'w-[640px] max-h-[80vh]')
     : 'w-[90vw] h-[85vh]';
@@ -839,8 +840,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           </div>
         )}
 
-        {/* Description view mode with attachment thumbnails */}
-        {!isEditing && (task.description || savedAttachments.length > 0) && !hasSessionContext && (
+        {/* Description view mode with attachment thumbnails (non-archived, non-session) */}
+        {!isEditing && !isArchived && (task.description || savedAttachments.length > 0) && !hasSessionContext && (
           <div className="px-4 py-3 border-b border-edge flex-shrink-0 space-y-2">
             {task.description && (
               <p className="text-sm text-fg-muted whitespace-pre-wrap">{task.description}</p>
@@ -849,8 +850,26 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           </div>
         )}
 
-        {/* Terminal, queued placeholder, suspended placeholder, or empty state -- hidden during edit mode */}
-        {!isEditing && session && displayState.kind !== 'queued' && displayState.kind !== 'suspended' ? (
+        {/* Archived task: description + attachments as scrollable body, summary bar as footer */}
+        {!isEditing && isArchived ? (
+          <>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {(task.description || savedAttachments.length > 0) ? (
+                <div className="px-4 py-4 space-y-3">
+                  {task.description && (
+                    <p className="text-sm text-fg-muted whitespace-pre-wrap leading-relaxed">{task.description}</p>
+                  )}
+                  {thumbnailStrip}
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-fg-disabled text-sm p-8 h-full">
+                  No description
+                </div>
+              )}
+            </div>
+            <SessionSummaryPanel taskId={task.id} />
+          </>
+        ) : !isEditing && !isArchived && session && displayState.kind !== 'queued' && displayState.kind !== 'suspended' ? (
           <>
             <div className="flex-1 min-h-0 relative">
               <div className="absolute inset-0">
@@ -865,7 +884,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           </>
         ) : !isEditing && displayState.kind === 'queued' ? (
           <QueuedPlaceholder sessionId={session?.id ?? null} />
-        ) : !isEditing && (isSuspended || toggling) ? (
+        ) : !isEditing && (isSuspended || toggling) && !isArchived ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-surface/50">
             <button
               onClick={handleToggle}

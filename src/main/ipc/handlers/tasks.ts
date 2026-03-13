@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { ipcMain } from 'electron';
+import { simpleGit } from 'simple-git';
 import { IPC } from '../../../shared/ipc-channels';
 import { SessionRepository } from '../../db/repositories/session-repository';
 import { WorktreeManager } from '../../git/worktree-manager';
@@ -13,7 +14,35 @@ import {
   cleanupTaskResources,
 } from '../helpers';
 import { trackEvent } from '../../analytics/analytics';
+import { captureSessionMetrics } from './session-metrics';
 import type { IpcContext } from '../ipc-context';
+import type { Task } from '../../../shared/types';
+
+/**
+ * Capture git diff stats (lines added/removed, files changed) by comparing
+ * the task's branch against its base branch. Best-effort, never throws.
+ */
+async function captureGitStats(
+  task: Task,
+  sessionRepo: SessionRepository,
+  recordId: string,
+  projectPath: string | null | undefined,
+): Promise<void> {
+  const gitDir = task.worktree_path ?? projectPath;
+  if (!gitDir) return;
+
+  const baseBranch = task.base_branch ?? 'main';
+  const git = simpleGit(gitDir);
+
+  // Compare all changes (committed + uncommitted) against the base branch
+  const diffResult = await git.diffSummary([baseBranch]);
+
+  sessionRepo.updateGitStats(recordId, {
+    linesAdded: diffResult.insertions,
+    linesRemoved: diffResult.deletions,
+    filesChanged: diffResult.changed,
+  });
+}
 
 /**
  * Core task-move logic shared by the TASK_MOVE IPC handler and the
@@ -68,6 +97,8 @@ export async function handleTaskMove(
       // Accept 'running' AND 'exited' -- exited covers Claude natural exit
       if (record && record.claude_session_id
           && (record.status === 'running' || record.status === 'exited')) {
+        // Capture metrics before suspend (caches are still populated)
+        captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, record.id);
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
         console.log(`[TASK_MOVE] Suspended session record ${record.id.slice(0, 8)} for task ${task.id.slice(0, 8)}`);
       }
@@ -83,6 +114,16 @@ export async function handleTaskMove(
         console.log(`[TASK_MOVE] Preserved exited session ${record.id.slice(0, 8)} for future resume`);
       }
     }
+    // Capture git diff stats (best-effort, async)
+    const latestRecord = sessionRepo.getLatestForTask(task.id);
+    if (latestRecord) {
+      try {
+        await captureGitStats(task, sessionRepo, latestRecord.id, resolvedProjectPath);
+      } catch {
+        // Git stats capture is best-effort
+      }
+    }
+
     tasks.archive(input.taskId);
     console.log(`[TASK_MOVE] Auto-archived task ${input.taskId.slice(0, 8)} (moved to Done)`);
     return;
