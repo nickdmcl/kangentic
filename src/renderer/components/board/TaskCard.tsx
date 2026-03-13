@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Loader2, Trash2, CirclePause, Mail, Image, Images } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { useSessionStore } from '../../stores/session-store';
+import { useBoardStore } from '../../stores/board-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { getProgressColor } from '../../utils/color-lerp';
 import type { Task, SessionSummary } from '../../../shared/types';
@@ -26,6 +27,28 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
   const openTaskId = useSessionStore((s) => s.openTaskId);
   const setOpenTaskId = useSessionStore((s) => s.setOpenTaskId);
   const displayState = useSessionDisplayState(task);
+
+  // Derive contextual label for the initializing state (mirrors TerminalTab logic)
+  const pendingCommandLabel = useSessionStore((s) => s.pendingCommandLabel[task.id] ?? null);
+  const autoCommand = useBoardStore(
+    useCallback(
+      (s: ReturnType<typeof useBoardStore.getState>) => {
+        const swimlane = s.swimlanes.find((l) => l.id === task.swimlane_id);
+        return swimlane?.auto_command ?? null;
+      },
+      [task.swimlane_id],
+    ),
+  );
+  const isResuming = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        s.sessions.find((session) => session.taskId === task.id)?.resuming ?? false,
+      [task.id],
+    ),
+  );
+  const hasCommand = !!(pendingCommandLabel ?? autoCommand);
+  const initializingLabel = hasCommand ? 'Running command...'
+    : isResuming ? 'Resuming...' : 'Initializing...';
 
   useEffect(() => {
     if (openTaskId === task.id) {
@@ -184,7 +207,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
                 <div className="mt-2 pt-2 border-t border-edge" data-testid="status-bar">
                   <span className="text-xs text-fg-faint flex items-center gap-1">
                     <Loader2 size={12} className="animate-spin" />
-                    Initializing...
+                    {initializingLabel}
                   </span>
                 </div>
               );
