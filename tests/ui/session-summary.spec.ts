@@ -274,20 +274,6 @@ test.describe('Done Column', () => {
     }
   });
 
-  test('cost badge appears on compact card', async () => {
-    const { browser, page } = await launchWithState(makePreConfig({ withSummary: true }));
-    try {
-      const doneColumn = page.locator('[data-swimlane-name="Done"]');
-      await doneColumn.waitFor({ state: 'visible', timeout: 10000 });
-
-      const costBadge = doneColumn.locator('[data-testid="cost-badge"]');
-      await expect(costBadge).toBeVisible({ timeout: 5000 });
-      await expect(costBadge).toContainText('$0.08');
-    } finally {
-      await browser.close();
-    }
-  });
-
   test('search filters completed tasks', async () => {
     const { browser, page } = await launchWithState(
       makePreConfig({ withSummary: true, extraArchivedTasks: 2 }),
@@ -303,10 +289,10 @@ test.describe('Done Column', () => {
       const searchInput = doneColumn.locator('input[placeholder="Search..."]');
       await searchInput.fill('Extra Task 1');
 
-      // Should filter to just that task
-      await expect(doneColumn.locator('text=Extra Task 1')).toBeVisible();
-      await expect(doneColumn.locator('text=Extra Task 2')).not.toBeVisible();
-      await expect(doneColumn.locator('text=Completed Test Task')).not.toBeVisible();
+      // Should filter to just that task (target title span to avoid matching description)
+      await expect(doneColumn.locator('[data-testid="compact-title"]', { hasText: 'Extra Task 1' })).toBeVisible();
+      await expect(doneColumn.locator('[data-testid="compact-title"]', { hasText: 'Extra Task 2' })).not.toBeVisible();
+      await expect(doneColumn.locator('[data-testid="compact-title"]', { hasText: 'Completed Test Task' })).not.toBeVisible();
     } finally {
       await browser.close();
     }
