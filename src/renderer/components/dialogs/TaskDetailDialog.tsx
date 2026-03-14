@@ -793,9 +793,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
 
       {/* Open folder pill */}
       {(task.worktree_path || projectPath) && (
-        <button
+        <Pill
+          shape="square"
           onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
-          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-hover/50 text-xs text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
+          className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
           title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
           data-testid="branch-pill"
         >
@@ -810,21 +811,22 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
               Project
             </>
           )}
-        </button>
+        </Pill>
       )}
 
       {/* Commands button */}
       {!isEditing && (
         <div className="relative flex-shrink-0" ref={commandButtonRef}>
-          <button
+          <Pill
+            shape="square"
             onClick={() => setShowCommandPalette(!showCommandPalette)}
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-hover/50 text-xs text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
+            className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
             title="Run a command"
             data-testid="commands-button"
           >
             <SquareChevronRight size={14} />
             Commands
-          </button>
+          </Pill>
           {showCommandPalette && (
             <CommandPalettePopover
               triggerRef={commandButtonRef}

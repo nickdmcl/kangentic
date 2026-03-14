@@ -7,6 +7,7 @@ import { useBoardStore } from '../../stores/board-store';
 import { IconPickerDialog } from '../dialogs/IconPickerDialog';
 import { ICON_REGISTRY } from '../../utils/swimlane-icons';
 import { SectionHeader, Select, INPUT_CLASS } from './shared';
+import { Pill } from '../Pill';
 import type { ShortcutConfig, ShortcutDisplay } from '../../../shared/types';
 
 interface ShortcutEditState extends ShortcutConfig {
@@ -419,24 +420,28 @@ export function ShortcutsTab() {
 
       {/* Add action button + presets */}
       <div className="flex items-center gap-2">
-        <button
+        <Pill
+          size="lg"
+          shape="square"
           onClick={() => addAction()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-fg-muted bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-secondary rounded-lg transition-colors"
+          className="text-fg-muted bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-secondary transition-colors"
           data-testid="add-shortcut"
         >
           <Plus size={14} />
           Add Shortcut
-        </button>
+        </Pill>
 
         <div className="relative" ref={presetsRef}>
-          <button
+          <Pill
+            size="lg"
+            shape="square"
             onClick={() => setShowPresets(!showPresets)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-fg-muted bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-secondary rounded-lg transition-colors"
+            className="text-fg-muted bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-secondary transition-colors"
             data-testid="shortcut-presets"
           >
             Presets
             <ChevronDown size={12} />
-          </button>
+          </Pill>
           {showPresets && (
             <div className="absolute top-full left-0 mt-1 min-w-[200px] max-h-[320px] overflow-y-auto bg-surface-raised border border-edge-input rounded-md shadow-xl z-50 py-1">
               {(() => {

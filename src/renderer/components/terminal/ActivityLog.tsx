@@ -301,7 +301,7 @@ function BadgeLine({ ts, label, colorClass, showLabel, badge, detail, variant = 
     <div className="flex items-baseline gap-1.5 min-w-0">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
-      <span className={`${badgeClass} px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0`}>
+      <span className={`${badgeClass} px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none`}>
         {badge}
       </span>
       {detail && <span className="text-fg-faint truncate min-w-0">{detail}</span>}
