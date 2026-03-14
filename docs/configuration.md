@@ -237,9 +237,12 @@ Ghost columns are invisible on the board but still exist in the database. Once a
       "actions": ["uuid"],
       "executionOrder": [0]
     }
-  ]
+  ],
+  "_modifiedBy": "device-id"
 }
 ```
+
+The `_modifiedBy` field is auto-set by Kangentic to identify which device last wrote the file. It is used internally for change detection and should not be edited manually.
 
 ### Hand-Written Configs
 

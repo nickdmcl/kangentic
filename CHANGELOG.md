@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.5.0] - 2026-03-14
+
+### Features
+- Add configurable shortcuts to task detail dialog (ea4597d)
+- Show contextual status labels on task card during command invocation (2f3d176)
+- Add quick-access Claude commands popover (3352590)
+- Add session summary panel and metrics to completed tasks (247cc99)
+- Add mechanical doc-auditor agent and anchor-based verification (6777b8a)
+
+### Fixes
+- Preserve scroll position when fit() reflows during user scroll (e5c51c4)
+- Skip fit() when user is scrolled up to prevent viewport jump (ad41dad)
+- Distinguish manual resume from auto_command transition in overlay label (13c2e9e)
+- Show auto_command label instead of generic "Resuming agent" on transition (920520b)
+- Prevent "Rendered more hooks" crash when archiving from detail dialog (337b83a)
+- Prevent false idle during Claude Code nucleation (0390d5e)
+- Use bare file paths for image attachments instead of bracketed format (843f31c)
+- Prevent false idle during long-running tool executions (dddd2ee)
+- Only suspend/resume session when target column has auto_command (eb25839)
+- Prevent viewport from snapping to top on fit/resize (c302061)
+- Show resume label instead of auto-command when resuming a paused session (e6e74e6)
+- Eliminate flaky Electron launch failures on Windows (484e58c)
+- Re-register IPC listeners after store replacement (d2077bb)
+- Suppress false "config changed" dialog with content hashing (f24dade)
+- Keep skills and agents in worktree checkout (7157a3c)
+- Gate npm publish on build success and remove duplicate workflow (174cfea)
+- Use correct Lucide icon name for TortoiseGit Commit preset (b592e94)
+
+### Other
+- Align permission modes with Claude Code CLI (b9c938b)
+- Remove Global/Project scope toggle, unify settings panel (089b2b4)
+- Stack compact done card into two rows (096fb67)
+- Show title + description on compact done cards, remove cost badge (d586aaa)
+- Reduce animation overhead when launching multiple agents (b1db038)
+- Reduce visual noise in terminal loading shimmer (37c6c0c)
+- Upgrade vite 7, electron-builder 26, fix all vulnerabilities (2df94ae)
+- Add auto-commands to Code Review and Tests columns (98dd6b1)
+- Update project settings and code review conventions (52fff39)
+- Add argument-hint to /preview command frontmatter (c683225)
+- Add shared Pill component for consistent pill/badge styling (3fb5e4b)
+- Migrate remaining pill buttons to shared Pill component (e22cc55)
+
 ## [v0.4.0] - 2026-03-12
 
 ### Features

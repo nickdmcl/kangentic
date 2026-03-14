@@ -63,7 +63,6 @@ Anchors are enumerable source-code structures that must be exhaustively listed i
 | `HookEvent` | Object keys | claude-integration.md |
 | `EventTypeActivity` | Mapping entries | activity-detection.md |
 | `AppConfig` / `DEFAULT_CONFIG` | Flattened dot-paths + defaults | configuration.md |
-| `GLOBAL_ONLY_PATHS` | Array entries | configuration.md |
 | `BoardConfig` | Interface fields | configuration.md |
 | `BoardColumnConfig` | Interface fields | configuration.md |
 

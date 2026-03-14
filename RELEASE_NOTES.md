@@ -1,15 +1,18 @@
 ## What's New
-- **Shareable board configuration**: Teams can commit `kangentic.json` to share column layout, colors, icons, actions, and transitions. Personal overrides via `kangentic.local.json` (auto-gitignored). Live file watching detects teammate changes and offers to reconcile.
-- **Permission mode guard**: Moving a task to a column with a different permission mode automatically suspends and resumes the session with the correct CLI flags. A shimmer overlay indicates the transition.
-- **Settings search**: Filter any setting instantly with a search bar. Multi-token matching, grouped results by tab, match count badges.
-- **User-paused session persistence**: Sessions paused manually via the pause button stay paused across app restarts, respecting user intent.
-- **Configurable context bar**: Toggle individual elements (shell, version, model, cost, tokens, context usage, progress bar) on or off in settings.
-- **Unified settings panel**: VS Code-style layout with Global and Project scope tabs in a single panel.
-- **Custom Claude Code agents**: 5 built-in agents for proactive validation (HMR integrity, IPC audit, migration safety, cross-platform guard, session debugging).
+- **Configurable shortcuts**: Add custom command buttons to the task detail dialog header and menu. Launch VS Code, TortoiseGit, terminals, or any tool with one click. Template variables (`{{cwd}}`, `{{branchName}}`, etc.) resolve at runtime. Presets for 16+ popular tools included. Team and personal scopes via board config files.
+- **Claude commands popover**: Browse and run project-specific Claude Code commands directly from the task detail dialog. Search by name, navigate with keyboard.
+- **Session summary for completed tasks**: View cost, duration, token usage, tool calls, and lines changed for finished sessions. Sort and search completed tasks in the Done column.
+- **Task card status indicators**: Cards now show contextual status at a glance: model name with context percentage while running, idle icon when waiting for input, "Queued...", "Paused", or "Initializing..." during transitions.
+- **Mechanical documentation audit**: New doc-auditor agent mechanically verifies that docs enumerate all source-code structures (IPC channels, DB columns, config keys, type unions). Integrated into the release, commit, and doc-update workflows.
 
 ## Bug Fixes
-- Fixed stale thinking state detection after Ctrl+C interruption
-- Fixed task detail dialog not closing on notification click when another dialog was open
-- Fixed shell-aware quoting to prevent `$variable` expansion in non-PowerShell environments
-- Fixed toast error display when deleting a column that still has tasks
-- Fixed intermittent UI test failures from Vite dev server startup race
+- Fixed terminal viewport snapping to top on resize or fit
+- Fixed scroll position lost when terminal reflows during user scroll
+- Fixed false idle detection during Claude Code nucleation and long-running tool executions
+- Fixed "Rendered more hooks" crash when archiving a task from the detail dialog
+- Fixed false "config changed" dialog appearing when no actual changes occurred
+- Fixed generic "Resuming agent" label showing instead of the auto_command name during transitions
+- Fixed session suspend/resume triggering unnecessarily when only permission mode differs
+- Fixed IPC listeners not re-registering after HMR store replacement
+- Fixed worktree checkout not including `.claude/skills/` and `.claude/agents/`
+- Fixed shortcut preset using wrong Lucide icon name for TortoiseGit Commit

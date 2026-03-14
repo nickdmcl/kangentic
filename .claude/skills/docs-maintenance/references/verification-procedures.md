@@ -41,14 +41,6 @@ When an anchor maps to multiple target docs, one doc is the **canonical** locati
 6. Find the config keys table
 7. Compare: report missing dot-paths and any default values that differ
 
-### GLOBAL_ONLY_PATHS
-1. Read `src/shared/types.ts`
-2. Find the `GLOBAL_ONLY_PATHS` array
-3. Extract each string entry
-4. Read `docs/configuration.md`
-5. Verify each path is listed in the global-only section
-6. Compare: report missing entries
-
 ### BoardConfig / BoardColumnConfig
 1. Read `src/shared/types.ts`
 2. Find the `BoardConfig` and `BoardColumnConfig` interfaces
