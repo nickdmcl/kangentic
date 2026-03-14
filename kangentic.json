@@ -89,7 +89,6 @@
       ]
     }
   ],
-  "_modifiedBy": "7ef4fd0cb484",
   "shortcuts": [
     {
       "label": "TortoiseGit Commit",
@@ -98,5 +97,6 @@
       "display": "both",
       "id": "460b4921-4c86-45c3-be7a-b9397e98be02"
     }
-  ]
+  ],
+  "_modifiedBy": "7ef4fd0cb484"
 }

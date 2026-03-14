@@ -76,6 +76,8 @@ This produces prompts like:
 - `Fix auth bug: Users can't login after password reset` followed by `/path/to/screenshot.png` on the next line
 - `Add dark mode` (no description, no attachments)
 
+Shortcut commands use a separate set of template variables. See [Configuration](configuration.md#shortcuts) for the full list.
+
 ## Settings Merge
 
 For every session, a merged settings file is built at `.kangentic/sessions/<claudeSessionId>/settings.json` and passed via `--settings`:

@@ -43,8 +43,13 @@ Drag a task from Backlog to any active column (Planning, Executing, etc.). Kange
 - **Terminal panel** at the bottom shows the active session's terminal output
 - **Activity tab** shows structured events (tool calls, idle state) instead of raw terminal output
 - **Context bar** below the terminal shows session metadata (shell, model, cost, tokens, context usage). Each element is configurable.
-- **Thinking/idle indicator** on task cards shows whether the agent is actively working
-- **Shimmer overlay** -- when a session is starting or resuming (e.g., after a column move that triggers a permission mode change), a shimmer loading overlay appears over the terminal. It shows a context-aware label such as the auto_command name, "Resuming agent...", or "Starting agent...". Terminal output is suppressed behind the overlay until the session is ready.
+- **Task card status** -- each card shows a contextual status bar at the bottom:
+  - A spinning indicator and model name with context percentage when the agent is actively working
+  - An idle icon (amber) when the agent is waiting for input
+  - "Initializing..." or "Resuming..." during session startup
+  - "Queued..." when waiting for a concurrency slot
+  - "Paused" when manually suspended
+- **Shimmer overlay** -- when a session is starting or resuming (e.g., after a column move that triggers an auto_command), a shimmer loading overlay appears over the terminal. It shows a context-aware label such as the auto_command name, "Resuming agent...", or "Starting agent...". Terminal output is suppressed behind the overlay until the session is ready.
 
 ### Move Between Active Columns
 
@@ -53,6 +58,8 @@ Dragging between active columns (e.g., Executing to Code Review) keeps the sessi
 ### Complete a Task
 
 Drag to Done. The session is suspended (not destroyed), the task is archived, and the conversation ID is preserved. If you later unarchive the task and drag it to an active column, the agent resumes with full conversation context.
+
+Clicking a completed task opens a session summary showing: duration, model, cost, token usage, tool call count, files changed, and lines added/removed. The Done column also supports searching completed tasks by title and sorting by date, cost, tokens, or duration.
 
 ### Return to Backlog
 
@@ -84,10 +91,13 @@ Click a task card to open the detail dialog. From here you can:
 - See the full terminal output (takes ownership from the bottom panel while open)
 - View session status, usage stats, and model info
 - Pause or resume the agent session using the circular play/pause button in the header
+- Run shortcuts from the header bar (configurable pills that launch external tools)
+- Open the **Commands** popover to browse and run Claude Code commands from the project's `.claude/` directory. Search by name, navigate with arrow keys, press Enter to invoke.
 - Access the kebab menu (three-dot icon) for additional actions:
   - **Edit** -- switch to edit mode for title and description
   - **Open folder** -- open the worktree or project directory in your file manager
   - **View PR** -- open the associated pull request (if one exists)
+  - **Commands** -- submenu of available Claude Code commands (same as the header popover)
   - **Pause / Resume session** -- manually suspend or resume the agent
   - **Move to** -- submenu listing all other columns as move targets
   - **Archive** -- move the task to Done and archive it
@@ -188,6 +198,14 @@ All five permission modes are available in both the global App Settings dropdown
 | Default Base Branch | Branch to create worktrees from (default: main) |
 | Copy Files | Files to copy from repo root into worktrees |
 | Init Script | Shell script to run after worktree creation |
+
+### Shortcuts
+
+The Shortcuts tab lets you add custom command buttons to the task detail dialog. Each shortcut has a label, icon, shell command, and display location (header bar, kebab menu, or both).
+
+Commands support template variables: `{{cwd}}`, `{{branchName}}`, `{{taskTitle}}`, `{{projectPath}}`. These are resolved at runtime using the active task's context.
+
+Shortcuts can be scoped as **Team** (saved in `kangentic.json`, shared via git) or **Personal** (saved in `kangentic.local.json`, local-only). Presets are available for common tools (VS Code, Cursor, GitHub Desktop, terminal emulators, file managers).
 
 ### Scope
 

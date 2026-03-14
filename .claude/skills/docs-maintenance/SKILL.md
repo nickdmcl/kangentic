@@ -44,15 +44,68 @@ Each doc file and the source files that are its authority:
 - Its content has been fully merged into another doc
 - Always update `docs/README.md` and `README.md` when adding/removing
 
+## Anchor Points
+
+Anchors are enumerable source-code structures that must be exhaustively listed in docs. A mechanical audit counts items in source, counts items in docs, and reports the diff.
+
+### Type System Anchors (src/shared/types.ts)
+
+| Anchor | What to extract | Target doc |
+|--------|----------------|------------|
+| `PermissionMode` | Union variants | configuration.md, database.md |
+| `ActionType` | Union variants | transition-engine.md |
+| `SessionStatus` | Union variants | session-lifecycle.md |
+| `SessionRecordStatus` | Union variants | session-lifecycle.md, database.md |
+| `SwimlaneRole` | Union variants | database.md |
+| `SuspendedBy` | Union variants | database.md |
+| `ThemeMode` | Union variants | configuration.md |
+| `EventType` | Object keys | activity-detection.md |
+| `HookEvent` | Object keys | claude-integration.md |
+| `EventTypeActivity` | Mapping entries | activity-detection.md |
+| `AppConfig` / `DEFAULT_CONFIG` | Flattened dot-paths + defaults | configuration.md |
+| `GLOBAL_ONLY_PATHS` | Array entries | configuration.md |
+| `BoardConfig` | Interface fields | configuration.md |
+| `BoardColumnConfig` | Interface fields | configuration.md |
+
+### IPC Anchors (src/shared/ipc-channels.ts)
+
+| Anchor | What to extract | Target doc |
+|--------|----------------|------------|
+| IPC channels | All string values from `IPC` object | architecture.md (per-group tables) |
+| IPC group counts | Count per section header | architecture.md (section headers) |
+
+### Database Anchors (src/main/db/migrations.ts)
+
+| Anchor | What to extract | Target doc |
+|--------|----------------|------------|
+| Table schemas | All `CREATE TABLE` columns + `ALTER TABLE ADD COLUMN` | database.md (schema tables) |
+| Seed data | Default swimlanes, actions, transitions | database.md |
+| Migration list | Numbered migrations with descriptions | database.md (migration history) |
+
+### UI Anchors
+
+| Anchor | Source file | Target doc |
+|--------|-----------|------------|
+| Settings tabs | `src/renderer/components/settings/AppSettingsPanel.tsx` tab array | user-guide.md, configuration.md |
+| Settings registry | `src/renderer/components/settings/settings-registry.ts` entries | configuration.md |
+
+### Template Anchors
+
+| Anchor | Source file | Target doc |
+|--------|-----------|------------|
+| Template variables | `src/shared/template-vars.ts` | configuration.md (canonical), transition-engine.md and claude-integration.md (cross-reference only) |
+
+### Verification Procedures
+
+See `references/verification-procedures.md` for step-by-step extraction instructions per anchor type.
+
 ## Categories of Drift
 
-When auditing docs, check for these types of staleness:
+Anchors catch ~70% of drift (missing enumerable items). The remaining ~30% is prose drift that requires reading and comparing:
 
-- Schema changes (new/removed/renamed columns in migrations)
-- New or removed config keys (DEFAULT_CONFIG, GLOBAL_ONLY_PATHS)
-- Changed constants (action types, event types, IPC channels)
-- Renamed types or interfaces
-- Changed hook events or bridge script behavior
-- Altered shell detection order or platform-specific logic
-- Updated IPC channels or preload bridge methods
+- Changed behavior or algorithm descriptions
+- Stale default value explanations
+- Feature interaction descriptions
+- Renamed parameters or function signatures
 - New or removed CLI flags in command builder
+- Altered shell detection order or platform-specific logic

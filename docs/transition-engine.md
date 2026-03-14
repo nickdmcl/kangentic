@@ -138,6 +138,8 @@ All action types that accept templates can use these placeholders:
 | `{{branchName}}` | Git branch name (empty if none) |
 | `{{attachments}}` | Bare file paths (one per line) when present |
 
+Shortcut commands use a separate set of template variables. See [Configuration](configuration.md#shortcuts) for the full list.
+
 ## Command Injection
 
 When a task moves to a column with `auto_command` set, the command delivery depends on how the session was started:

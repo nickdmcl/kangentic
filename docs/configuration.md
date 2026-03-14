@@ -20,7 +20,7 @@ The config directory (`<configDir>`) is platform-specific:
 
 Both panels use a VS Code-style layout: a sidebar with tab navigation on the left and the active settings pane on the right. A search bar at the top filters settings by keyword. Search uses multi-token matching (all tokens must appear in the setting name or description). Results are grouped by tab with match count badges on the sidebar; tabs with zero matches are dimmed. Press Ctrl+F (Cmd+F on macOS) to focus the search bar, Escape to clear the filter.
 
-- **Settings Panel** -- opened via the titlebar gear icon or the gear icon on each project row in the sidebar. A project switcher dropdown in the header allows switching between projects. Sidebar tabs: Appearance, Terminal, Agent, Git, Behavior, Notifications, Privacy. The first four tabs (above the separator) are per-project settings saved to `.kangentic/config.json`. The last three (Behavior, Notifications, Privacy) are shared settings that apply across all projects, saved to the global config. When no project is open, only the 3 shared tabs appear. Changes save immediately. New projects clone settings from the most recently configured project (falling back to defaults if none exist).
+- **Settings Panel** -- opened via the titlebar gear icon or the gear icon on each project row in the sidebar. A project switcher dropdown in the header allows switching between projects. Sidebar tabs: Appearance, Terminal, Agent, Git, Shortcuts, Behavior, Notifications, Privacy. The first four tabs (above the separator) are per-project settings saved to `.kangentic/config.json`. The fifth tab (Shortcuts) saves to the board config files (`kangentic.json` and `kangentic.local.json`). The last three (Behavior, Notifications, Privacy) are shared settings that apply across all projects, saved to the global config. When no project is open, only the 3 shared tabs appear. Changes save immediately. New projects clone settings from the most recently configured project (falling back to defaults if none exist).
 
 ### App-Only Settings
 
@@ -56,6 +56,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `autoFocusIdleSession` | boolean | `true` | Auto-switch to session tab when agent goes idle |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
 | `restoreWindowPosition` | boolean | `true` | Remember window size and position between launches. Global-only. |
+| `hasCompletedFirstRun` | boolean | `false` | Whether the user has completed first-run onboarding. Auto-set, not shown in UI. |
 | `windowBounds` | object \| null | `null` | Persisted window bounds `{x, y, width, height}`. Auto-saved, not shown in UI. |
 
 ### terminal.*
@@ -99,6 +100,26 @@ All five modes are available in both the global App Settings "Permissions" dropd
 | `git.defaultBaseBranch` | string | `'main'` | Default base branch for worktrees |
 | `git.copyFiles` | string[] | `[]` | Files to copy from repo root into worktrees |
 | `git.initScript` | string \| null | `null` | Shell script to run after worktree creation |
+
+### Shortcuts
+
+Shortcuts are custom command buttons displayed in the task detail dialog header and kebab menu. They are configured in the Shortcuts settings tab (not stored in `AppConfig`). Shortcut definitions are saved in the board config files:
+
+- **Team shortcuts** in `kangentic.json` (committed, shared)
+- **Personal shortcuts** in `kangentic.local.json` (gitignored, local-only)
+
+Each shortcut has a label, Lucide icon name, shell command, and display location (header, menu, or both).
+
+Template variables available in shortcut commands (defined in `src/shared/template-vars.ts`):
+
+| Variable | Value |
+|----------|-------|
+| `{{cwd}}` | Working directory (worktree path or project path) |
+| `{{branchName}}` | Git branch name |
+| `{{taskTitle}}` | Task title (shell-sanitized to prevent injection) |
+| `{{projectPath}}` | Project root directory path |
+
+IPC channels for shortcuts are in the Board Config group: `boardConfig:getShortcuts`, `boardConfig:setShortcuts`, `boardConfig:shortcutsChanged`.
 
 ### notifications.*
 
@@ -195,9 +216,12 @@ Ghost columns are invisible on the board but still exist in the database. Once a
       "color": "#10b981",
       "autoSpawn": true,
       "permissionMode": "default",
-      "autoCommand": null
+      "autoCommand": null,
+      "planExitTarget": null,
+      "archived": false
     }
   ],
+  "shortcuts": [],
   "actions": [
     {
       "id": "uuid",

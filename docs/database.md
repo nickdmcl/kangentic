@@ -142,6 +142,16 @@ Index: `idx_transitions_from_to` on (from_swimlane_id, to_swimlane_id).
 | suspended_at | TEXT | | NULL |
 | exited_at | TEXT | | NULL |
 | suspended_by | TEXT | | NULL |
+| total_cost_usd | REAL | | NULL |
+| total_input_tokens | INTEGER | | NULL |
+| total_output_tokens | INTEGER | | NULL |
+| model_id | TEXT | | NULL |
+| model_display_name | TEXT | | NULL |
+| total_duration_ms | INTEGER | | NULL |
+| tool_call_count | INTEGER | | NULL |
+| lines_added | INTEGER | | NULL |
+| lines_removed | INTEGER | | NULL |
+| files_changed | INTEGER | | NULL |
 
 Valid session_type values: `claude_agent`, `run_script`.
 
@@ -194,9 +204,11 @@ Listed in execution order within `runProjectMigrations()`:
 11. **`auto_command` column on swimlanes** -- per-column auto-command support.
 12. **`is_terminal` renamed to `is_archived`** -- uses `ALTER TABLE RENAME COLUMN`.
 13. **`plan_exit_target_id` column on swimlanes** -- adds plan exit target and removes the `planning` system role. Sets icon to `map` for former planning-role columns, clears the role, and auto-sets `plan_exit_target_id` to the next column by position.
-14. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes. (Values later migrated again in migration 16.)
-15. **`is_ghost` column on swimlanes** -- adds ghost column support for board config reconciliation. Ghost columns are columns removed from `kangentic.json` but still holding tasks.
-16. **`permission_strategy` column renamed to `permission_mode`** -- renames the `permission_strategy` column to `permission_mode` on swimlanes. Migrates old values: `bypass-permissions` to `bypassPermissions`, removes `manual` (alias for `default`). Adds `dontAsk` as a new valid mode. Also removes `permissionMode` from action `config_json` (action-level override removed; resolution is now swimlane override then global setting).
+14. **`suspended_by` column on sessions** -- tracks who suspended the session (`user` or `system`). Used by session recovery to skip user-paused sessions on relaunch.
+15. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes. (Values later migrated again in migration 18.)
+16. **`is_ghost` column on swimlanes** -- adds ghost column support for board config reconciliation. Ghost columns are columns removed from `kangentic.json` but still holding tasks.
+17. **Session metrics columns** -- adds `total_cost_usd`, `total_input_tokens`, `total_output_tokens`, `model_id`, `model_display_name`, `total_duration_ms`, `tool_call_count`, `lines_added`, `lines_removed`, `files_changed` to sessions for completed task summaries.
+18. **`permission_strategy` column renamed to `permission_mode`** -- renames the `permission_strategy` column to `permission_mode` on swimlanes. Migrates old values: `bypass-permissions` to `bypassPermissions`, removes `manual` (alias for `default`). Adds `dontAsk` as a new valid mode. Also removes `permissionMode` from action `config_json` (action-level override removed; resolution is now swimlane override then global setting).
 
 ### Key Migrations (Global DB)
 
@@ -320,3 +332,8 @@ Two default actions are created:
 
 - **Start Planning Agent** (`spawn_agent`) -- wired to transitions into the Planning column.
 - **Kill Session** (`kill_session`) -- wired to transitions into the Done column.
+
+Default transitions:
+
+- **`* → Planning`** -- Kill Session (execution_order 0), Start Planning Agent (execution_order 1)
+- **`* → Done`** -- Kill Session (execution_order 0)

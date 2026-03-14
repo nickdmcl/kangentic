@@ -26,7 +26,7 @@ export const APP_TABS: SettingsTabDefinition[] = [
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'agent', label: 'Agent', icon: Bot },
   { id: 'git', label: 'Git', icon: GitBranch },
-  { id: 'quickActions', label: 'Shortcuts', icon: Zap },
+  { id: 'shortcuts', label: 'Shortcuts', icon: Zap },
   // -- Shared settings (separator marks the boundary) --
   { id: 'behavior', label: 'Behavior', icon: SlidersHorizontal, separator: true, tooltip: 'Applies to all projects' },
   { id: 'notifications', label: 'Notifications', icon: Bell, tooltip: 'Applies to all projects' },
@@ -127,7 +127,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
                 {tab.id === 'terminal' && <TerminalTab config={effectiveConfig} globalConfig={globalConfig} shells={shells} />}
                 {tab.id === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
                 {tab.id === 'git' && <GitTab config={effectiveConfig} />}
-                {tab.id === 'quickActions' && <ShortcutsTab />}
+                {tab.id === 'shortcuts' && <ShortcutsTab />}
                 {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
                 {tab.id === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
                 {tab.id === 'privacy' && <PrivacyTab />}
@@ -147,7 +147,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
           {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
           {activeTab === 'privacy' && <PrivacyTab />}
           {activeTab === 'git' && <GitTab config={effectiveConfig} />}
-          {activeTab === 'quickActions' && <ShortcutsTab />}
+          {activeTab === 'shortcuts' && <ShortcutsTab />}
         </>
       )}
     </SettingsPanelProvider>

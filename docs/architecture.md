@@ -84,7 +84,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `transition:set` | invoke | Set action chain for lane A→B |
 | `transition:getFor` | invoke | Get transitions for lane pair (exact match, then wildcard) |
 
-### Sessions (19 channels)
+### Sessions (21 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `session:spawn` | invoke | Spawn PTY session (may queue) |
@@ -106,8 +106,10 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `session:activity` | on | Activity state changed (includes `projectId`, `taskId`, `taskTitle`) |
 | `session:event` | on | Structured event (includes `projectId`) |
 | `session:idleTimeout` | on | Session idle timeout fired |
+| `session:getSummary` | invoke | Get summary of a single session |
+| `session:listSummaries` | invoke | Get summaries of multiple sessions |
 
-### Config (7 channels)
+### Config (8 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `config:get` | invoke | Fetch effective AppConfig (global merged with project overrides) |
@@ -119,13 +121,16 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `config:setProjectByPath` | invoke | Update project overrides by filesystem path |
 | `config:syncDefaultToProjects` | invoke | Sync default config values to all project configs |
 
-### Board Config (4 channels)
+### Board Config (7 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `boardConfig:exists` | invoke | Check if `kangentic.json` exists for the active project |
 | `boardConfig:export` | invoke | Export current board state to `kangentic.json` (auto-runs on project open) |
 | `boardConfig:apply` | invoke | Apply pending config file changes (reconcile file into DB) |
 | `boardConfig:changed` | on | Event: `kangentic.json` or `kangentic.local.json` changed on disk |
+| `boardConfig:getShortcuts` | invoke | Get task detail dialog shortcuts |
+| `boardConfig:setShortcuts` | invoke | Update task detail dialog shortcuts |
+| `boardConfig:shortcutsChanged` | on | Event: shortcuts file changed |
 
 ### Notifications (2 channels)
 | Channel | Pattern | Purpose |
@@ -133,18 +138,20 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `notification:show` | send | Show native OS notification (task name + project name) |
 | `notification:clicked` | on | User clicked a notification (includes projectId, taskId) |
 
-### Claude (1 channel)
+### Claude (2 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `claude:detect` | invoke | Detect Claude CLI (path, version) |
+| `claude:listCommands` | invoke | List available Claude Code commands |
 
-### Shell (4 channels)
+### Shell (5 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `shell:getAvailable` | invoke | List available shells |
 | `shell:getDefault` | invoke | Get default shell |
 | `shell:openPath` | invoke | Open directory in file explorer |
 | `shell:openExternal` | invoke | Open URL in default browser |
+| `shell:exec` | invoke | Execute shell command |
 
 ### Git (2 channels)
 | Channel | Pattern | Purpose |

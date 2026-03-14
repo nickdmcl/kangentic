@@ -1,6 +1,6 @@
 ---
 description: Commit, rebase, and push changes to source branch
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git:*), Bash(npm:*)
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git:*), Bash(npm:*), Agent
 argument-hint: [commit message]
 ---
 
@@ -62,12 +62,16 @@ If there are uncommitted changes (non-empty `git status --porcelain` output):
        - `build:` -- build system changes
      - If the change is breaking, add `!` after the type (e.g., `feat!:`)
      - Scope is optional but encouraged for multi-area changes (e.g., `feat(pty):`, `fix(db):`)
-3. **Update documentation before staging** — review docs inline (do NOT invoke `/update-docs` as a skill call):
+3. **Update documentation before staging** — targeted anchor check (do NOT invoke `/update-docs` as a skill call):
    a. Identify changed source files (exclude `docs/`, `.claude/`, `tests/`).
    b. If no source files changed, skip to step 4.
-   c. Search `docs/` for references to changed code (function names, types, descriptions that may be stale).
-   d. Read relevant doc sections and compare against the updated source.
-   e. Edit any stale docs inline using the `Edit` tool.
+   c. Check if any changed file is an anchor source (see `.claude/skills/docs-maintenance/SKILL.md` Anchor Points):
+      - `src/shared/types.ts`, `src/shared/ipc-channels.ts`, `src/main/db/migrations.ts`
+      - `src/renderer/components/settings/AppSettingsPanel.tsx`, `src/renderer/components/settings/settings-registry.ts`
+      - `src/shared/template-vars.ts`
+   d. If anchor source files changed: spawn a `doc-auditor` agent with those files.
+   e. If the agent reports gaps, fix them inline using the `Edit` tool.
+   f. No general prose review here (that is `/update-docs`'s job).
 4. Stage changes: `git add -A`
 5. Write the commit message using the **Write tool** to the relative path `.kangentic/COMMIT_MSG.tmp` (resolved from CWD — do NOT resolve an absolute path, do NOT use the system temp directory, do NOT use `os.tmpdir()`).
 

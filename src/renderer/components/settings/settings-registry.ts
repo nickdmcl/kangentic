@@ -53,7 +53,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { id: 'git.initScript', tabId: 'git', label: 'Post-Worktree Script', description: 'Shell script to run after worktree creation', scope: 'project', keywords: ['install', 'setup', 'hook'] },
 
   // ── Shortcuts ──
-  { id: 'quickActions', tabId: 'quickActions', label: 'Shortcuts', description: 'Custom commands accessible from the task detail dialog', scope: 'project', keywords: ['command', 'shortcut', 'tool', 'open', 'launch', 'tortoisegit', 'vscode', 'terminal', 'explorer', 'quick action'] },
+  { id: 'shortcuts', tabId: 'shortcuts', label: 'Shortcuts', description: 'Custom commands accessible from the task detail dialog', scope: 'project', keywords: ['command', 'shortcut', 'tool', 'open', 'launch', 'tortoisegit', 'vscode', 'terminal', 'explorer', 'quick action'] },
 
   // ── Behavior ──
   { id: 'skipDeleteConfirm', tabId: 'behavior', label: 'Skip Task Delete Confirmation', description: 'Delete tasks immediately without a confirmation dialog', scope: 'global', keywords: ['confirm', 'dialog'] },
@@ -82,7 +82,7 @@ export const TAB_LABELS: Record<string, string> = {
   terminal: 'Terminal',
   agent: 'Agent',
   git: 'Git',
-  quickActions: 'Shortcuts',
+  shortcuts: 'Shortcuts',
   behavior: 'Behavior',
   notifications: 'Notifications',
   privacy: 'Privacy',

@@ -49,7 +49,7 @@ async function start() {
     // We can't reuse vite.config.mts because its **/.kangentic/** pattern
     // matches every file in the worktree. Use absolute paths instead.
     const ignorePatterns = [
-      ...(['.kangentic', '.claude', '.vite'].map(
+      ...(['.kangentic', '.claude', '.vite', 'docs', 'tests'].map(
         d => path.join(projectDir, d).replace(/\\/g, '/') + '/**'
       )),
       path.join(projectDir, 'kangentic.json').replace(/\\/g, '/'),

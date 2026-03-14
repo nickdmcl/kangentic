@@ -1,6 +1,6 @@
 ---
 description: Version bump, changelog, tag, and push release
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git:*), Bash(npm:*), Bash(npx:*)
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git:*), Bash(npm:*), Bash(npx:*), Agent
 argument-hint: [patch|minor|major]
 ---
 
@@ -55,6 +55,18 @@ Run these checks sequentially. Stop on the first failure.
 
 1. Run `npm run typecheck`. If it fails, report type errors and stop.
 2. Run `npx playwright test --project=ui`. If it fails, report test failures and stop.
+
+## Step 1.5 -- Documentation Audit
+
+Full anchor point verification before release:
+
+1. Spawn a `doc-auditor` agent with scope "all" (verify every anchor)
+2. If gaps are found:
+   - List each gap with source file, target doc, and missing items
+   - Ask the user: "N documentation gaps found. Fix before release, or skip?"
+   - If the user wants to fix: run the update pass (add missing items to docs, remove extras), stage the doc changes, and continue
+   - If the user skips: proceed without fixing (soft gate)
+3. Scan for undocumented `feat:` commits since the previous tag. If any features are not covered in `docs/`, list them and ask the user whether to document them now or skip.
 
 ## Step 2 -- Version Bump
 
