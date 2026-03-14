@@ -6,6 +6,7 @@ import { useBoardStore } from '../../stores/board-store';
 import { useProjectStore } from '../../stores/project-store';
 import { formatTokenCount } from '../../utils/format-tokens';
 import { useValuePulse } from '../../hooks/useValuePulse';
+import { Pill } from '../Pill';
 
 export function StatusBar() {
   const allSessions = useSessionStore((s) => s.sessions);
@@ -85,7 +86,7 @@ export function StatusBar() {
           <span className="text-red-400">claude not found</span>
         )}
         {appVersion && (
-          <span className="border border-edge rounded-full text-fg-muted px-2.5 py-0.5">v{appVersion}</span>
+          <Pill className="border border-edge text-fg-muted">v{appVersion}</Pill>
         )}
       </div>
     </div>

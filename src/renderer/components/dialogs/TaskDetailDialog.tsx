@@ -21,6 +21,7 @@ import type { Task, TaskAttachment, ClaudeCommand, ShortcutConfig } from '../../
 import { resolveShortcutCommand } from '../../../shared/template-vars';
 import { ICON_REGISTRY } from '../../utils/swimlane-icons';
 import { Zap } from 'lucide-react';
+import { Pill } from '../Pill';
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
 
@@ -75,13 +76,10 @@ function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
         </div>
       </div>
       <div className="px-4 py-2.5 border-t border-edge">
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs text-fg-faint bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-tertiary transition-colors"
-        >
+        <Pill onClick={() => setSettingsOpen(true)} className="text-fg-faint bg-surface-hover/50 hover:bg-surface-hover hover:text-fg-tertiary transition-colors">
           {runningCount} / {maxConcurrent} agent slots in use
           <ChevronRight size={12} />
-        </button>
+        </Pill>
       </div>
     </div>
   );
@@ -842,16 +840,17 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       {headerShortcuts.map((action) => {
         const ActionIcon = ICON_REGISTRY.get(action.icon ?? 'zap') ?? Zap;
         return (
-          <button
+          <Pill
             key={action.id ?? action.label}
+            shape="square"
             onClick={() => executeShortcut(action)}
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-hover/50 text-xs text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
+            className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
             title={action.command}
             data-testid={`shortcut-pill-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
             <ActionIcon size={14} />
             {action.label}
-          </button>
+          </Pill>
         );
       })}
 

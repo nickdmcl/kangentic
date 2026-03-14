@@ -12,7 +12,7 @@ interface ContextBarProps {
   compact?: boolean; // hide version label -- used in the bottom panel
 }
 
-const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap';
+const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap select-none';
 
 /**
  * Visual context window usage bar displayed below terminal areas.

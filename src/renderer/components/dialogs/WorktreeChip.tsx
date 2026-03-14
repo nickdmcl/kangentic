@@ -1,4 +1,5 @@
 import { FolderGit2 } from 'lucide-react';
+import { Pill } from '../Pill';
 
 interface WorktreeChipProps {
   enabled: boolean;
@@ -7,10 +8,9 @@ interface WorktreeChipProps {
 
 export function WorktreeChip({ enabled, onToggle }: WorktreeChipProps) {
   return (
-    <button
-      type="button"
+    <Pill
       onClick={onToggle}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+      className={`border transition-colors ${
         enabled
           ? 'border-edge-input text-fg-muted hover:text-fg-secondary hover:border-fg-faint'
           : 'border-edge-input text-fg-disabled hover:border-fg-faint'
@@ -20,6 +20,6 @@ export function WorktreeChip({ enabled, onToggle }: WorktreeChipProps) {
     >
       <FolderGit2 size={16} className={enabled ? '' : 'opacity-40'} />
       <span className={enabled ? '' : 'line-through opacity-60'}>Worktree</span>
-    </button>
+    </Pill>
   );
 }

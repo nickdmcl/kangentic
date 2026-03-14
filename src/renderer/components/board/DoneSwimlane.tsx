@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
+import { Pill } from '../Pill';
 import type { Swimlane as SwimlaneType, Task, SessionSummary } from '../../../shared/types';
 
 type SortKey = 'date' | 'cost' | 'tokens' | 'duration';
@@ -154,7 +155,7 @@ export function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
           </span>
         </button>
 
-        <span className="bg-surface-hover/40 rounded-full px-1.5 text-xs text-fg-faint tabular-nums leading-5">{tasks.length}</span>
+        <Pill size="sm" className="bg-surface-hover/40 text-fg-faint tabular-nums leading-5">{tasks.length}</Pill>
 
         <button
           type="button"

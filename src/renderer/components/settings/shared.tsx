@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { useSettingVisible, useSettingsSearch } from './settings-search';
+import { Pill } from '../Pill';
 
 // Re-export scope primitives so consumers can import everything from './shared'.
 export { SettingsPanelProvider, useScopedUpdate } from './setting-scope';
@@ -180,9 +181,9 @@ export function SettingsPanelShell({ onClose, children, projectSwitcher, tabs, a
                       <Icon size={16} className={isActive && !hasNoMatches ? 'text-accent' : ''} />
                       <span className="flex-1 text-left">{tab.label}</span>
                       {isSearching && matchCount !== undefined && matchCount > 0 && (
-                        <span className="text-xs text-fg-faint bg-surface-hover rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
+                        <Pill size="sm" className="bg-surface-hover text-fg-faint min-w-[1.25rem] text-center">
                           {matchCount}
-                        </span>
+                        </Pill>
                       )}
                     </button>
                   </React.Fragment>
@@ -213,13 +214,10 @@ export function SearchTabGroupHeader({ tab, first, onNavigate }: { tab: Settings
   const Icon = tab.icon;
   return (
     <div className={first ? 'pb-3' : 'pt-4 pb-3 mt-4 -mx-6 px-6 border-t border-edge'}>
-      <button
-        onClick={() => onNavigate?.(tab.id)}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 hover:bg-accent/20 transition-colors cursor-pointer"
-      >
+      <Pill size="lg" onClick={() => onNavigate?.(tab.id)} className="bg-accent/10 hover:bg-accent/20 transition-colors">
         <Icon size={16} className="text-accent" />
         <span className="text-sm font-semibold text-accent">{tab.label}</span>
-      </button>
+      </Pill>
     </div>
   );
 }

@@ -140,15 +140,16 @@ export function WelcomeOverlay() {
           </div>
 
           <button
+            type="button"
             onClick={dismiss}
-            className="px-8 py-2.5 rounded-full bg-accent text-white font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-md text-sm"
+            className="inline-flex items-center select-none cursor-pointer px-8 py-2.5 rounded-full bg-accent text-white font-medium hover:opacity-90 transition-opacity shadow-md text-sm"
             data-testid="welcome-overlay-dismiss"
           >
             Get Started
           </button>
 
           {/* Tip pill */}
-          <div className="mt-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-hover/50 text-xs text-fg-faint">
+          <div className="mt-6 inline-flex items-center select-none gap-1.5 px-3 py-1.5 rounded-full bg-surface-hover/50 text-xs text-fg-faint">
             <Lightbulb size={12} className="flex-shrink-0" />
             <span>Customize columns and apply a theme from Settings</span>
           </div>

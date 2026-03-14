@@ -3,6 +3,7 @@ import { Bell, Bot, Check, CircleAlert, GitBranch, Palette, ShieldAlert, ShieldC
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
 import { SettingsPanelProvider, SectionHeader, SettingRow, Select, ToggleSwitch, CompactToggleList, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
+import { Pill } from '../Pill';
 import type { SettingsTabDefinition, SettingScope, SettingsContentProps } from './shared';
 import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode } from '../../../shared/types';
 import { NAMED_THEMES } from '../../../shared/types';
@@ -402,10 +403,10 @@ function NotificationsTab({ globalConfig }: { globalConfig: AppConfig }) {
 function PrivacyTab() {
   return (
     <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-full bg-surface-hover px-3.5 py-1.5">
+      <Pill as="div" size="lg" className="bg-surface-hover">
         <ShieldAlert className="size-5 text-fg-muted shrink-0" />
         <span className="text-[1em] text-fg-secondary">Anonymous analytics only. No personal data collected.</span>
-      </div>
+      </Pill>
 
       <SectionHeader label="What We Collect" />
       <ul className="list-disc list-inside text-sm text-fg-muted space-y-1 ml-1">

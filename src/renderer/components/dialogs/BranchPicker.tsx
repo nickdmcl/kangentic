@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { GitBranch, Search, Loader2, ChevronDown } from 'lucide-react';
 import { usePopoverPosition } from '../../hooks/usePopoverPosition';
+import { Pill } from '../Pill';
 
 interface BranchPickerProps {
   value: string;
@@ -98,10 +99,9 @@ export function BranchPicker({ value, defaultBranch, onChange, variant = 'chip',
   };
 
   const chipButton = (
-    <button
-      type="button"
+    <Pill
       onClick={open ? () => setOpen(false) : handleOpen}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+      className={`border transition-colors ${
         open
           ? 'border-accent text-accent-fg bg-accent/10'
           : 'border-edge-input text-fg-muted hover:text-fg-secondary hover:border-fg-faint'
@@ -110,7 +110,7 @@ export function BranchPicker({ value, defaultBranch, onChange, variant = 'chip',
     >
       <GitBranch size={16} />
       {displayBranch}
-    </button>
+    </Pill>
   );
 
   const inputButton = (
