@@ -14,7 +14,7 @@
       "icon": "map",
       "color": "#8b5cf6",
       "autoSpawn": true,
-      "permissionStrategy": "plan",
+      "permissionMode": "plan",
       "planExitTarget": "Executing"
     },
     {
@@ -87,6 +87,16 @@
       "actions": [
         "Kill Session"
       ]
+    }
+  ],
+  "_modifiedBy": "7ef4fd0cb484",
+  "shortcuts": [
+    {
+      "label": "TortoiseGit Commit",
+      "icon": "git-commit",
+      "command": "TortoiseGitProc /command:commit /path:\"{{cwd}}\"",
+      "display": "both",
+      "id": "460b4921-4c86-45c3-be7a-b9397e98be02"
     }
   ]
 }

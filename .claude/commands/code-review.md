@@ -36,6 +36,7 @@ All commands below run from the **current working directory** — never use `cd 
 
 ### Best Practices
 - TypeScript strict mode compliance — **no `any` in new code**. Use proper types from `src/shared/types.ts`, `unknown` with type guards, or generic constraints. Flag any new `any` or `as any` cast as a finding.
+- **No shorthand variable names** in new or changed code. Use full, descriptive names: `session` not `sess`, `currentIndex` not `curIdx`, `previousValue` not `prev`. Applies to variables, parameters, callback args, refs.
 - Security: injection risks, unsanitized input
 - Proper error handling at system boundaries
 
