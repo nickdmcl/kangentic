@@ -32,7 +32,7 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     ),
   );
 
-  // Derive overlay label: pending command (manual invoke) > resume state > swimlane auto_command > generic fallback.
+  // Derive overlay label: pending command (manual invoke) > swimlane auto_command > resume state > generic fallback.
   // pendingCommandLabel is keyed by taskId (a prop), so it resolves on the very first render
   // without waiting for syncSessions IPC. This prevents flicker during command invocations.
   const pendingCommandLabel = useSessionStore((s) => s.pendingCommandLabel[taskId] ?? null);
@@ -48,8 +48,8 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     ),
   );
   const overlayLabel = pendingCommandLabel
-    ?? (isResuming ? 'Resuming agent...' : null)
     ?? autoCommand
+    ?? (isResuming ? 'Resuming agent...' : null)
     ?? 'Starting agent...';
 
   // Terminal is "ready" once startup noise has been cleared. Until then,
