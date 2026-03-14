@@ -219,10 +219,24 @@ export function useTerminal(options: UseTerminalOptions) {
   // forwards dimensions to the PTY automatically when cols/rows change.
   const fit = useCallback(() => {
     if (!fitAddonRef.current || !xtermRef.current) return;
+    const terminal = xtermRef.current;
     const wasAtBottom = isAtBottomRef.current;
+
+    // Capture distance from bottom before reflow so we can restore position.
+    // Distance-from-bottom is reflow-stable: baseY may change when lines
+    // wrap/unwrap at a new column count, but the relative offset from the
+    // latest output remains semantically correct.
+    const buffer = terminal.buffer.active;
+    const distanceFromBottom = buffer.baseY - buffer.viewportY;
+
     fitAddonRef.current.fit();
+
     if (wasAtBottom) {
-      xtermRef.current.scrollToBottom();
+      terminal.scrollToBottom();
+    } else if (distanceFromBottom > 0) {
+      const newBaseY = terminal.buffer.active.baseY;
+      const targetLine = Math.max(0, newBaseY - distanceFromBottom);
+      terminal.scrollToLine(targetLine);
     }
   }, []);
 
