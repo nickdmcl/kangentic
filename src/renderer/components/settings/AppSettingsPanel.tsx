@@ -313,9 +313,11 @@ function AgentTab({ config, globalConfig, claudeInfo }: { config: AppConfig; glo
           value={config.claude.permissionMode}
           onChange={(event) => updateProject({ claude: { permissionMode: event.target.value as PermissionMode } })}
         >
+          <option value="plan">Plan</option>
+          <option value="dontAsk">Don&apos;t Ask (Deny Unless Allowed)</option>
           <option value="default">Default (Allowlist)</option>
           <option value="acceptEdits">Accept Edits</option>
-          <option value="bypass-permissions">Bypass (Unsafe)</option>
+          <option value="bypassPermissions">Bypass (Unsafe)</option>
         </Select>
       </SettingRow>
     </>

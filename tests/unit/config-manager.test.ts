@@ -33,7 +33,7 @@ async function createConfigManager() {
 }
 
 describe('Config Manager -- Permission Mode Migration', () => {
-  it("migrates 'dangerously-skip' → 'bypass-permissions'", async () => {
+  it("migrates 'dangerously-skip' → 'bypassPermissions'", async () => {
     fs.writeFileSync(configPath, JSON.stringify({
       claude: { permissionMode: 'dangerously-skip' },
     }));
@@ -41,11 +41,11 @@ describe('Config Manager -- Permission Mode Migration', () => {
     const cm = await createConfigManager();
     const config = cm.load();
 
-    expect(config.claude.permissionMode).toBe('bypass-permissions');
+    expect(config.claude.permissionMode).toBe('bypassPermissions');
 
     // Verify persisted to disk
     const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    expect(raw.claude.permissionMode).toBe('bypass-permissions');
+    expect(raw.claude.permissionMode).toBe('bypassPermissions');
   });
 
   it("migrates 'project-settings' → 'default'", async () => {
@@ -74,8 +74,36 @@ describe('Config Manager -- Permission Mode Migration', () => {
     expect(config.claude.maxConcurrentSessions).toBe(4);
   });
 
-  it("preserves valid modes: plan, acceptEdits, manual", async () => {
-    for (const mode of ['plan', 'acceptEdits', 'manual'] as const) {
+  it("migrates 'bypass-permissions' → 'bypassPermissions'", async () => {
+    fs.writeFileSync(configPath, JSON.stringify({
+      claude: { permissionMode: 'bypass-permissions' },
+    }));
+
+    const cm = await createConfigManager();
+    const config = cm.load();
+
+    expect(config.claude.permissionMode).toBe('bypassPermissions');
+
+    const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    expect(raw.claude.permissionMode).toBe('bypassPermissions');
+  });
+
+  it("migrates 'manual' → 'default'", async () => {
+    fs.writeFileSync(configPath, JSON.stringify({
+      claude: { permissionMode: 'manual' },
+    }));
+
+    const cm = await createConfigManager();
+    const config = cm.load();
+
+    expect(config.claude.permissionMode).toBe('default');
+
+    const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    expect(raw.claude.permissionMode).toBe('default');
+  });
+
+  it("preserves valid modes: plan, acceptEdits, dontAsk, bypassPermissions", async () => {
+    for (const mode of ['plan', 'acceptEdits', 'dontAsk', 'bypassPermissions'] as const) {
       // Reset modules for each sub-case so PATHS re-reads env
       vi.resetModules();
       fs.writeFileSync(configPath, JSON.stringify({

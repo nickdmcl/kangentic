@@ -143,7 +143,7 @@ test.describe('Settings Panel', () => {
     await closeSettings();
   });
 
-  test('permission strategy dropdown has correct options (no Plan)', async () => {
+  test('permission mode dropdown has all five Claude Code modes', async () => {
     await openSettings();
     await page.getByRole('button', { name: 'Agent' }).click();
 
@@ -156,11 +156,13 @@ test.describe('Settings Panel', () => {
     const options = permSelect.locator('option');
     const texts = await options.allTextContents();
 
-    expect(texts).toContain('Default (Allowlist)');
-    expect(texts).toContain('Accept Edits');
-    expect(texts).toContain('Bypass (Unsafe)');
-    expect(texts).not.toContain('Manual Approval');
-    expect(texts).not.toContain('Plan');
+    expect(texts).toEqual([
+      'Plan',
+      "Don't Ask (Deny Unless Allowed)",
+      'Default (Allowlist)',
+      'Accept Edits',
+      'Bypass (Unsafe)',
+    ]);
 
     await closeSettings();
   });

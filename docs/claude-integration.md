@@ -42,17 +42,16 @@ claude --settings <mergedSettingsPath> --resume <uuid>
 
 | Mode | CLI Flag |
 |------|----------|
-| `bypass-permissions` | `--dangerously-skip-permissions` |
 | `default` | `--settings <path>` (uses project-settings) |
 | `plan` | `--permission-mode plan` |
 | `acceptEdits` | `--permission-mode acceptEdits` |
-| `manual` | (none -- interactive prompts) |
+| `dontAsk` | `--permission-mode dontAsk` |
+| `bypassPermissions` | `--dangerously-skip-permissions` |
 
 ### Permission Mode Resolution (Priority Order)
 
-1. Swimlane's `permission_strategy` (if set)
-2. Action's `permissionMode` config (if set)
-3. Global `config.claude.permissionMode`
+1. Swimlane's `permission_mode` (if set)
+2. Global `config.claude.permissionMode`
 
 ### Non-Interactive Mode
 

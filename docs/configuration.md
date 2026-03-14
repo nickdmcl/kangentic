@@ -82,13 +82,13 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 
 PermissionMode values:
 
-- `bypass-permissions` -- `--dangerously-skip-permissions` (no prompts)
 - `default` -- uses `--settings` (project-settings behavior)
 - `plan` -- `--permission-mode plan` (read-only tools auto-approved)
 - `acceptEdits` -- `--permission-mode acceptEdits` (edits auto-approved)
-- `manual` -- no flags, interactive prompts (defined in types but not exposed in any UI)
+- `dontAsk` -- `--permission-mode dontAsk` (all tools auto-approved except dangerous ones)
+- `bypassPermissions` -- `--dangerously-skip-permissions` (no prompts at all)
 
-The global App Settings "Permissions" dropdown only offers three choices: `default`, `acceptEdits`, and `bypass-permissions`. The `plan` mode is only available as a per-column override in the Edit Column dialog. The `manual` mode is defined in types but is not exposed in any settings UI.
+All five modes are available in both the global App Settings "Permissions" dropdown and the per-column Edit Column dialog.
 
 ### git.*
 
@@ -141,7 +141,7 @@ Each swimlane has its own overrides (stored in the per-project DB):
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `permission_strategy` | PermissionMode \| null | null | Permission mode override for this column |
+| `permission_mode` | PermissionMode \| null | null | Permission mode override for this column |
 | `auto_spawn` | boolean | true | Whether moving a task here spawns an agent |
 | `auto_command` | string \| null | null | Command injected into running session on task arrival |
 | `plan_exit_target_id` | string \| null | null | Target column when plan-mode agent exits |
@@ -194,7 +194,7 @@ Ghost columns are invisible on the board but still exist in the database. Once a
       "icon": "square-terminal",
       "color": "#10b981",
       "autoSpawn": true,
-      "permissionStrategy": "default",
+      "permissionMode": "default",
       "autoCommand": null
     }
   ],
@@ -223,9 +223,8 @@ Config files written by hand (without `id` fields on columns) are treated as add
 
 ## Permission Mode Resolution (Priority Order)
 
-1. Swimlane's `permission_strategy` (if set)
-2. Action's `permissionMode` config (if set)
-3. Global `config.claude.permissionMode`
+1. Swimlane's `permission_mode` (if set)
+2. Global `config.claude.permissionMode`
 
 ## IPC
 
@@ -254,7 +253,9 @@ Config files written by hand (without `id` fields on columns) are treated as add
 
 On load, the ConfigManager auto-migrates legacy permission mode values:
 
-- `dangerously-skip` → `bypass-permissions`
+- `dangerously-skip` → `bypassPermissions`
+- `bypass-permissions` → `bypassPermissions`
+- `manual` → `default` (removed as a separate mode)
 - `project-settings` → `default`
 
 Same migration runs on swimlane records in the DB.

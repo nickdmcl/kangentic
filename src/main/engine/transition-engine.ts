@@ -122,8 +122,8 @@ export class TransitionEngine {
       throw new Error('Claude CLI not found on PATH');
     }
 
-    // Resolution order: swimlane override → action config → global setting
-    const permissionMode = permissionOverride ?? config.permissionMode ?? appConfig.permissionMode;
+    // Resolution order: swimlane override → global setting
+    const permissionMode = permissionOverride ?? appConfig.permissionMode;
     const cwd = task.worktree_path || appConfig.projectPath || process.cwd();
 
     // Pre-populate trust so the agent doesn't block on the trust dialog

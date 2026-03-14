@@ -58,7 +58,6 @@ Config:
 |-------|------|-------------|
 | `agent` | string | Agent identifier (default: `'claude'`) |
 | `promptTemplate` | string | Template with `{{placeholders}}` |
-| `permissionMode` | PermissionMode | Override permission mode for this action |
 | `nonInteractive` | boolean | Use `--print` mode (run and exit) |
 
 ### `send_command`
@@ -163,7 +162,7 @@ Two special roles affect behavior:
 | `backlog` | Task moves here → session killed (not suspended), worktree preserved |
 | `done` | Task moves here → session suspended (resumable), task archived |
 
-All other columns (including Planning, Running, Code Review, etc.) are custom columns with no special role. Their behavior is controlled by `auto_spawn`, `auto_command`, `permission_strategy`, and `plan_exit_target_id`.
+All other columns (including Planning, Running, Code Review, etc.) are custom columns with no special role. Their behavior is controlled by `auto_spawn`, `auto_command`, `permission_mode`, and `plan_exit_target_id`.
 
 ## auto_spawn Flag
 
@@ -175,7 +174,7 @@ Backlog and Done columns have `auto_spawn=false` by default.
 
 ## plan_exit_target_id
 
-When a column has `permission_strategy='plan'`, Claude runs in plan mode. When the agent completes planning and fires `ExitPlanMode`, Kangentic detects this via the event bridge and automatically moves the task to the column specified by `plan_exit_target_id`.
+When a column has `permission_mode='plan'`, Claude runs in plan mode. When the agent completes planning and fires `ExitPlanMode`, Kangentic detects this via the event bridge and automatically moves the task to the column specified by `plan_exit_target_id`.
 
 Default setup: Planning column has `plan_exit_target_id` pointing to the Executing column.
 

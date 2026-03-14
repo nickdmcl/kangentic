@@ -205,7 +205,7 @@ Stores the project list. Tables:
 
 Created on project open. Stored in the global config directory (not inside the project). Tables:
 
-- **swimlanes** -- Kanban columns. Fields: id, name, role (`backlog`/`done`/null), position, color, icon, is_archived, permission_strategy, auto_spawn, auto_command, plan_exit_target_id, is_ghost, created_at
+- **swimlanes** -- Kanban columns. Fields: id, name, role (`backlog`/`done`/null), position, color, icon, is_archived, permission_mode, auto_spawn, auto_command, plan_exit_target_id, is_ghost, created_at
 - **tasks** -- Kanban cards. Fields: id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, use_worktree, archived_at, created_at, updated_at
 - **actions** -- Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `webhook`. Config stored as JSON.
 - **swimlane_transitions** -- Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
@@ -374,17 +374,16 @@ Constructs the `claude` CLI invocation:
 
 | Mode | Flag |
 |------|------|
-| `bypass-permissions` | `--dangerously-skip-permissions` |
 | `default` | `--settings <path>` (uses project-settings) |
 | `plan` | `--permission-mode plan` |
 | `acceptEdits` | `--permission-mode acceptEdits` |
-| `manual` | (none -- interactive prompts) |
+| `dontAsk` | `--permission-mode dontAsk` |
+| `bypassPermissions` | `--dangerously-skip-permissions` |
 
 ### Permission Mode Resolution (priority order)
 
-1. Swimlane's `permission_strategy` (if set)
-2. Action's `permissionMode` config (if set)
-3. Global `config.claude.permissionMode`
+1. Swimlane's `permission_mode` (if set)
+2. Global `config.claude.permissionMode`
 
 ### Settings Merge
 

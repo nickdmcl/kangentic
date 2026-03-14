@@ -52,7 +52,7 @@ export interface Swimlane {
   icon: string | null;
   is_archived: boolean;
   is_ghost: boolean;
-  permission_strategy: PermissionMode | null;
+  permission_mode: PermissionMode | null;
   auto_spawn: boolean;
   auto_command: string | null;
   plan_exit_target_id: string | null;
@@ -85,7 +85,6 @@ export interface ActionConfig {
   // spawn_agent
   agent?: string;
   promptTemplate?: string;
-  permissionMode?: PermissionMode;
   nonInteractive?: boolean;
 
   // send_command
@@ -315,7 +314,7 @@ export const ACTIVITY_TAB = '__all__';
 
 // === Configuration ===
 
-export type PermissionMode = 'bypass-permissions' | 'default' | 'manual' | 'plan' | 'acceptEdits';
+export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'dontAsk' | 'bypassPermissions';
 
 export type ThemeMode = 'dark' | 'light'
   | 'moon' | 'forest' | 'ocean' | 'ember'
@@ -542,7 +541,7 @@ export interface SwimlaneCreateInput {
   color?: string;
   icon?: string | null;
   is_archived?: boolean;
-  permission_strategy?: PermissionMode | null;
+  permission_mode?: PermissionMode | null;
   auto_spawn?: boolean;
   auto_command?: string | null;
   plan_exit_target_id?: string | null;
@@ -556,7 +555,7 @@ export interface SwimlaneUpdateInput {
   position?: number;
   is_archived?: boolean;
   is_ghost?: boolean;
-  permission_strategy?: PermissionMode | null;
+  permission_mode?: PermissionMode | null;
   auto_spawn?: boolean;
   auto_command?: string | null;
   plan_exit_target_id?: string | null;
@@ -609,7 +608,7 @@ export interface BoardColumnConfig {
   icon?: string;
   color?: string;
   autoSpawn?: boolean;
-  permissionStrategy?: PermissionMode | null;
+  permissionMode?: PermissionMode | null;
   planExitTarget?: string; // name of target column
   archived?: boolean;
   autoCommand?: string | null;

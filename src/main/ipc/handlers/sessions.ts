@@ -82,7 +82,7 @@ export function registerSessionHandlers(context: IpcContext): void {
     const sessionRepo = new SessionRepository(db);
     const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachmentRepo, resolvedProjectId, resolvedProjectPath);
 
-    await engine.resumeSuspendedSession(task, lane?.permission_strategy, resumePrompt);
+    await engine.resumeSuspendedSession(task, lane?.permission_mode, resumePrompt);
 
     // Re-read task to get the new session_id
     const updated = tasks.getById(taskId);

@@ -363,7 +363,7 @@ export async function recoverSessions(
       // Resolution order: lane override → global config.
       // Use the task's current swimlane to resolve permission mode.
       const taskLane = swimlaneRepo.getById(task.swimlane_id);
-      const permissionMode = taskLane?.permission_strategy ?? config.claude.permissionMode;
+      const permissionMode = taskLane?.permission_mode ?? config.claude.permissionMode;
 
       // Decide whether to resume or start fresh.
       const canResume = (record.status === 'suspended' || record.status === 'orphaned')
@@ -628,9 +628,9 @@ export async function reconcileSessions(
           }
         }
 
-        // Resolution order: lane override → action config → global setting
+        // Resolution order: lane override → global setting
         const permissionMode =
-          lane.permission_strategy ?? actionConfig?.permissionMode ?? config.claude.permissionMode;
+          lane.permission_mode ?? config.claude.permissionMode;
         let cwd = task.worktree_path || projectPath;
 
         // Guard: CWD must still exist -- fall back to projectPath if worktree was deleted

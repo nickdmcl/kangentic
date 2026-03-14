@@ -1,7 +1,7 @@
 /**
  * UI tests for the EditColumnDialog:
  * - Agent section divider
- * - Permission Strategy dropdown (per-column override)
+ * - Permission Mode dropdown (per-column override)
  * - Auto-spawn toggle (per-column agent auto-start)
  * - Plan exit target dropdown (for plan-mode columns)
  * - Locked state for system columns (Backlog, Done)
@@ -153,7 +153,7 @@ test.describe('EditColumnDialog', () => {
     await closeDialog();
   });
 
-  test('save persists permission_strategy and auto_spawn changes', async () => {
+  test('save persists permission_mode and auto_spawn changes', async () => {
     await openEditDialog('Code Review');
 
     // Change permissions to Plan (first select is the permissions dropdown)

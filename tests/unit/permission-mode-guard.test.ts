@@ -50,14 +50,14 @@ describe('Permission mode guard', () => {
 
     it('keeps session alive for identical explicit modes without auto_command', () => {
       expect(shouldSuspendSession('plan', 'plan', null)).toBe(false);
-      expect(shouldSuspendSession('bypass-permissions', 'bypass-permissions', null)).toBe(false);
-      expect(shouldSuspendSession('manual', 'manual', null)).toBe(false);
+      expect(shouldSuspendSession('bypassPermissions', 'bypassPermissions', null)).toBe(false);
+      expect(shouldSuspendSession('dontAsk', 'dontAsk', null)).toBe(false);
     });
 
     it('keeps session alive when permission mode changes without auto_command', () => {
       expect(shouldSuspendSession('plan', 'default', null)).toBe(false);
       expect(shouldSuspendSession('default', 'plan', null)).toBe(false);
-      expect(shouldSuspendSession('default', 'bypass-permissions', null)).toBe(false);
+      expect(shouldSuspendSession('default', 'bypassPermissions', null)).toBe(false);
     });
 
     it('suspends when auto_command is set even with same permission mode', () => {

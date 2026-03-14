@@ -66,7 +66,7 @@ All queries are synchronous via **better-sqlite3** -- they block the Node.js eve
 | color | TEXT | NOT NULL | '#3b82f6' |
 | icon | TEXT | | NULL |
 | is_archived | INTEGER | NOT NULL | 0 |
-| permission_strategy | TEXT | | NULL |
+| permission_mode | TEXT | | NULL |
 | auto_spawn | INTEGER | NOT NULL | 1 |
 | auto_command | TEXT | | NULL |
 | plan_exit_target_id | TEXT | | NULL |
@@ -149,7 +149,7 @@ Valid status values: `running`, `suspended`, `exited`, `orphaned`.
 
 Valid suspended_by values: `user` (explicit pause button), `system` (shutdown, task move, idle timeout), or `NULL` (legacy records, treated as `system`).
 
-Valid permission_mode values: `bypass-permissions`, `default`, `manual`, `plan`, `acceptEdits` (see `PermissionMode` type in `src/shared/types.ts`).
+Valid permission_mode values: `default`, `plan`, `acceptEdits`, `dontAsk`, `bypassPermissions` (see `PermissionMode` type in `src/shared/types.ts`).
 
 ### task_attachments table
 
@@ -188,14 +188,15 @@ Listed in execution order within `runProjectMigrations()`:
 8. **`task_attachments` table** -- creates the table with `ON DELETE CASCADE` on `task_id` and an index on `task_id`.
 9. **`spawn_agent` config data migrations** (single pass over all spawn_agent actions):
    - Appends `{{attachments}}` to prompt templates that lack it
-   - Removes legacy permission modes (`dangerously-skip`, `bypass-permissions`) from action config
+   - Removes legacy permission modes (`dangerously-skip`, `bypass-permissions`) from action config (action-level permissionMode was removed in a later migration)
    - Updates old `Task: {{title}}...` prompt template to `{{title}}{{description}}{{attachments}}`
-10. **`permission_strategy` and `auto_spawn` columns on swimlanes** -- adds per-column permission strategy and auto-spawn toggle. Backfills: backlog/done get `auto_spawn = 0`, planning gets `permission_strategy = 'plan'`, running role is converted to a custom column.
+10. **`permission_strategy` and `auto_spawn` columns on swimlanes** -- adds per-column permission strategy and auto-spawn toggle. Backfills: backlog/done get `auto_spawn = 0`, planning gets `permission_strategy = 'plan'`, running role is converted to a custom column. (Column later renamed to `permission_mode` in migration 16.)
 11. **`auto_command` column on swimlanes** -- per-column auto-command support.
 12. **`is_terminal` renamed to `is_archived`** -- uses `ALTER TABLE RENAME COLUMN`.
 13. **`plan_exit_target_id` column on swimlanes** -- adds plan exit target and removes the `planning` system role. Sets icon to `map` for former planning-role columns, clears the role, and auto-sets `plan_exit_target_id` to the next column by position.
-14. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes.
+14. **Legacy `permission_strategy` rename** -- converts `project-settings` to `default` and `dangerously-skip` to `bypass-permissions` in swimlanes. (Values later migrated again in migration 16.)
 15. **`is_ghost` column on swimlanes** -- adds ghost column support for board config reconciliation. Ghost columns are columns removed from `kangentic.json` but still holding tasks.
+16. **`permission_strategy` column renamed to `permission_mode`** -- renames the `permission_strategy` column to `permission_mode` on swimlanes. Migrates old values: `bypass-permissions` to `bypassPermissions`, removes `manual` (alias for `default`). Adds `dontAsk` as a new valid mode. Also removes `permissionMode` from action `config_json` (action-level override removed; resolution is now swimlane override then global setting).
 
 ### Key Migrations (Global DB)
 

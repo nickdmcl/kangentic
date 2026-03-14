@@ -175,9 +175,9 @@ The context bar is a status line displayed below the terminal showing session me
 | Max Concurrent Sessions | Limit how many agents can run at the same time (1--20) |
 | When Max Sessions Reached | How new agent requests are handled when all slots are in use (Queue or Reject) |
 | Idle Timeout (minutes) | Auto-suspend sessions after N minutes idle; 0 to disable |
-| Permissions | Default permission mode for all sessions (Default, Accept Edits, or Bypass) |
+| Permissions | Default permission mode for all sessions (Default, Plan, Accept Edits, Don't Ask, or Bypass) |
 
-Note: Plan mode is not available as a global default -- it can only be set per-column in the column settings dialog.
+All five permission modes are available in both the global App Settings dropdown and the per-column Edit Column dialog.
 
 ### Git Settings
 
@@ -297,7 +297,7 @@ Sessions paused manually by the user (via the pause button in the task detail di
 
 ## Tips
 
-- **Plan mode workflow:** Use a Planning column with `permission_strategy='plan'` and `plan_exit_target_id` pointing to your Executing column. The agent plans first, then auto-moves to execution.
+- **Plan mode workflow:** Use a Planning column with `permission_mode='plan'` and `plan_exit_target_id` pointing to your Executing column. The agent plans first, then auto-moves to execution.
 - **Auto commands:** Set `auto_command` on a Code Review column to automatically ask the agent to review its own code when tasks arrive.
 - **Concurrent agents:** Increase `maxConcurrentSessions` to run more agents in parallel. Each needs its own worktree to avoid conflicts.
 - **Resume from Done:** Unarchive a completed task and drag it back to an active column. The agent picks up exactly where it left off.

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATHS, ensureDirs } from './paths';
-import type { AppConfig } from '../../shared/types';
+import type { AppConfig, PermissionMode } from '../../shared/types';
 import { DEFAULT_CONFIG } from '../../shared/types';
 import { deepMerge } from '../../shared/object-utils';
 
@@ -23,8 +23,14 @@ export class ConfigManager {
 
     // One-time migration: legacy permission mode values → new names
     const pm = this.config.claude.permissionMode as string;
-    if (pm === 'dangerously-skip' || pm === 'project-settings') {
-      this.config.claude.permissionMode = pm === 'dangerously-skip' ? 'bypass-permissions' : 'default';
+    const migrationMap: Record<string, string> = {
+      'dangerously-skip': 'bypassPermissions',
+      'project-settings': 'default',
+      'bypass-permissions': 'bypassPermissions',
+      'manual': 'default',
+    };
+    if (pm in migrationMap) {
+      this.config.claude.permissionMode = migrationMap[pm] as PermissionMode;
       this.save(this.config);
     }
 

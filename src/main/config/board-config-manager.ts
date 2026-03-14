@@ -12,6 +12,7 @@ import { IPC } from '../../shared/ipc-channels';
 import type {
   BoardConfig,
   BoardColumnConfig,
+  PermissionMode,
   SwimlaneRole,
 } from '../../shared/types';
 
@@ -112,7 +113,9 @@ export class BoardConfigManager {
     const filePath = path.join(projectPath, TEAM_FILE);
     try {
       const raw = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(raw) as BoardConfig;
+      const config = JSON.parse(raw) as BoardConfig;
+      migrateBoardColumnFields(config);
+      return config;
     } catch {
       return null;
     }
@@ -127,7 +130,9 @@ export class BoardConfigManager {
     const filePath = path.join(projectPath, LOCAL_FILE);
     try {
       const raw = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(raw) as Partial<BoardConfig>;
+      const config = JSON.parse(raw) as Partial<BoardConfig>;
+      if (config.columns) migrateBoardColumnFields(config as BoardConfig);
+      return config;
     } catch {
       return null;
     }
@@ -252,7 +257,7 @@ export class BoardConfigManager {
             position: index,
             is_archived: isDone ? true : (isBacklog ? false : (columnConfig.archived ?? existing.is_archived)),
             is_ghost: false,
-            permission_strategy: (isBacklog || isDone) ? null : (columnConfig.permissionStrategy ?? existing.permission_strategy),
+            permission_mode: (isBacklog || isDone) ? null : (columnConfig.permissionMode ?? existing.permission_mode),
             auto_spawn: (isBacklog || isDone) ? false : (columnConfig.autoSpawn ?? existing.auto_spawn),
             auto_command: columnConfig.autoCommand ?? existing.auto_command,
           });
@@ -266,7 +271,7 @@ export class BoardConfigManager {
             icon: columnConfig.icon ?? null,
             is_archived: isDone ? true : (isBacklog ? false : (columnConfig.archived ?? false)),
             is_ghost: false,
-            permission_strategy: (isBacklog || isDone) ? null : (columnConfig.permissionStrategy ?? null),
+            permission_mode: (isBacklog || isDone) ? null : (columnConfig.permissionMode ?? null),
             auto_spawn: (isBacklog || isDone) ? false : (columnConfig.autoSpawn ?? true),
             auto_command: columnConfig.autoCommand ?? null,
             position: index,
@@ -448,7 +453,7 @@ export class BoardConfigManager {
           if (lane.color && lane.color !== '#3b82f6') column.color = lane.color;
           if (lane.auto_spawn) column.autoSpawn = true;
           if (!lane.auto_spawn && !lane.role) column.autoSpawn = false;
-          if (lane.permission_strategy) column.permissionStrategy = lane.permission_strategy;
+          if (lane.permission_mode) column.permissionMode = lane.permission_mode;
           if (lane.is_archived && lane.role !== 'done') column.archived = true;
           if (lane.auto_command) column.autoCommand = lane.auto_command;
 
@@ -585,6 +590,34 @@ export class BoardConfigManager {
       path.join(this.activeProjectPath, LOCAL_FILE),
     );
     return result.warnings;
+  }
+}
+
+// --- Backward-compat migration for old kangentic.json field names ---
+
+const PERMISSION_VALUE_MIGRATION: Record<string, PermissionMode> = {
+  'bypass-permissions': 'bypassPermissions',
+  'manual': 'default',
+  'dangerously-skip': 'bypassPermissions',
+};
+
+/**
+ * Migrate old field names in BoardColumnConfig:
+ * - `permissionStrategy` → `permissionMode` (renamed field)
+ * - Old permission mode values (e.g. 'bypass-permissions') → new values
+ */
+function migrateBoardColumnFields(config: BoardConfig): void {
+  for (const column of config.columns) {
+    // Backward-compat: read old field name if new one isn't set
+    const legacy = column as unknown as Record<string, unknown>;
+    if (!column.permissionMode && legacy.permissionStrategy) {
+      column.permissionMode = legacy.permissionStrategy as PermissionMode;
+      delete legacy.permissionStrategy;
+    }
+    // Migrate old permission mode values
+    if (column.permissionMode && column.permissionMode in PERMISSION_VALUE_MIGRATION) {
+      column.permissionMode = PERMISSION_VALUE_MIGRATION[column.permissionMode as string];
+    }
   }
 }
 

@@ -11,11 +11,11 @@ import { ICON_REGISTRY, ROLE_DEFAULTS, getUsedIcons } from '../../utils/swimlane
 import type { Swimlane, PermissionMode } from '../../../shared/types';
 
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  'default': 'Default (Allowlist)',
-  'bypass-permissions': 'Bypass (Unsafe)',
+  default: 'Default (Allowlist)',
   plan: 'Plan',
-  manual: 'Manual',
   acceptEdits: 'Accept Edits',
+  dontAsk: "Don't Ask (Deny Unless Allowed)",
+  bypassPermissions: 'Bypass (Unsafe)',
 };
 
 const PRESET_COLORS = [
@@ -43,7 +43,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [hexInput, setHexInput] = useState(swimlane.color.toLowerCase());
-  const [permissionStrategy, setPermissionStrategy] = useState<PermissionMode | null>(swimlane.permission_strategy);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode | null>(swimlane.permission_mode);
   const [autoSpawn, setAutoSpawn] = useState(swimlane.auto_spawn);
   const [autoCommand, setAutoCommand] = useState(swimlane.auto_command || '');
   const [planExitTargetId, setPlanExitTargetId] = useState<string | null>(swimlane.plan_exit_target_id);
@@ -56,7 +56,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const isBacklogOrDone = swimlane.role === 'backlog' || swimlane.role === 'done';
   const permissionLocked = isBacklogOrDone;
   const autoSpawnLocked = isBacklogOrDone;
-  const isPlanMode = permissionStrategy === 'plan';
+  const isPlanMode = permissionMode === 'plan';
 
   const isCustomColor = !PRESET_COLORS.includes(color);
   const usedIcons = getUsedIcons(swimlanes, swimlane.id);
@@ -72,7 +72,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
       name: name.trim(),
       color,
       icon,
-      permission_strategy: permissionLocked ? undefined : permissionStrategy,
+      permission_mode: permissionLocked ? undefined : permissionMode,
       auto_spawn: autoSpawnLocked ? undefined : autoSpawn,
       auto_command: isBacklogOrDone ? undefined : (autoCommand.trim() || null),
       plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
@@ -330,19 +330,20 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
           <div>
             <label className="text-xs text-fg-muted mb-1.5 block">Permissions</label>
             <select
-              value={permissionStrategy ?? ''}
-              onChange={(e) => setPermissionStrategy(e.target.value ? e.target.value as PermissionMode : null)}
+              value={permissionMode ?? ''}
+              onChange={(e) => setPermissionMode(e.target.value ? e.target.value as PermissionMode : null)}
               disabled={permissionLocked}
               className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">{PERMISSION_LABELS[globalPermissionMode]}</option>
               {globalPermissionMode !== 'plan' && <option value="plan">Plan</option>}
-              {globalPermissionMode !== 'acceptEdits' && <option value="acceptEdits">Accept Edits</option>}
+              {globalPermissionMode !== 'dontAsk' && <option value="dontAsk">Don&apos;t Ask (Deny Unless Allowed)</option>}
               {globalPermissionMode !== 'default' && <option value="default">Default (Allowlist)</option>}
-              {globalPermissionMode !== 'bypass-permissions' && <option value="bypass-permissions">Bypass (Unsafe)</option>}
+              {globalPermissionMode !== 'acceptEdits' && <option value="acceptEdits">Accept Edits</option>}
+              {globalPermissionMode !== 'bypassPermissions' && <option value="bypassPermissions">Bypass (Unsafe)</option>}
             </select>
             <p className="text-[11px] text-fg-faint mt-1">
-              Override the global permission setting for agents in this column.
+              Override the global permission mode for new agents spawned in this column.
             </p>
           </div>
 

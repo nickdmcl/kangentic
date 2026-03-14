@@ -150,7 +150,9 @@ export async function handleTaskMove(
   // If the target column has an auto_command, we must suspend and resume so
   // the command can be injected as the resume prompt. Otherwise keep alive.
   // Permission mode differences alone do NOT trigger a suspend/resume cycle.
-  // Moves without auto_command keep the session alive.
+  // Claude CLI handles permission transitions internally (e.g. plan -> default
+  // on ExitPlanMode), so column-level permission changes don't require a
+  // session restart. Moves without auto_command keep the session alive.
   if (task.session_id) {
     context.commandInjector.cancel(task.id);
 
@@ -189,7 +191,7 @@ export async function handleTaskMove(
   const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, resolvedProjectId, resolvedProjectPath);
 
   try {
-    await engine.executeTransition(task, fromSwimlaneId, input.targetSwimlaneId, toLane?.permission_strategy);
+    await engine.executeTransition(task, fromSwimlaneId, input.targetSwimlaneId, toLane?.permission_mode);
   } catch (err) {
     console.error('[TASK_MOVE] Transition engine error:', err);
   }
@@ -214,7 +216,7 @@ export async function handleTaskMove(
       : undefined;
 
     try {
-      await engine.resumeSuspendedSession(finalTask, toLane.permission_strategy, resumePrompt);
+      await engine.resumeSuspendedSession(finalTask, toLane.permission_mode, resumePrompt);
       finalTask = tasks.getById(task.id);
     } catch (err) {
       console.error('[TASK_MOVE] Failed to start session:', err);
@@ -259,7 +261,7 @@ export function registerTaskHandlers(context: IpcContext): void {
 
       try {
         // Use '*' as fromSwimlaneId -- no source column on creation, matches wildcard transitions
-        await engine.executeTransition(task, '*', toLane.id, toLane.permission_strategy);
+        await engine.executeTransition(task, '*', toLane.id, toLane.permission_mode);
       } catch (err) {
         console.error('[TASK_CREATE] Transition engine error:', err);
       }
@@ -269,7 +271,7 @@ export function registerTaskHandlers(context: IpcContext): void {
       if (finalTask && !finalTask.session_id && toLane.auto_spawn) {
         console.log(`[TASK_CREATE] Ensuring agent for task ${task.id.slice(0, 8)}`);
         try {
-          await engine.resumeSuspendedSession(finalTask, toLane.permission_strategy);
+          await engine.resumeSuspendedSession(finalTask, toLane.permission_mode);
           finalTask = tasks.getById(task.id);
         } catch (err) {
           console.error('[TASK_CREATE] Failed to start session:', err);
@@ -375,7 +377,7 @@ export function registerTaskHandlers(context: IpcContext): void {
         const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachmentRepo, resolvedProjectId, resolvedProjectPath);
 
         try {
-          await engine.executeTransition(task, doneLane.id, input.targetSwimlaneId, toLane?.permission_strategy);
+          await engine.executeTransition(task, doneLane.id, input.targetSwimlaneId, toLane?.permission_mode);
         } catch (err) {
           console.error('[TASK_UNARCHIVE] Transition engine error:', err);
         }
@@ -385,7 +387,7 @@ export function registerTaskHandlers(context: IpcContext): void {
         if (finalTask && !finalTask.session_id && toLane?.auto_spawn) {
           console.log(`[TASK_UNARCHIVE] Ensuring agent for task ${task.id.slice(0, 8)}`);
           try {
-            await engine.resumeSuspendedSession(finalTask, toLane.permission_strategy);
+            await engine.resumeSuspendedSession(finalTask, toLane.permission_mode);
             finalTask = tasks.getById(task.id);
           } catch (err) {
             console.error('[TASK_UNARCHIVE] Failed to start session:', err);

@@ -112,7 +112,7 @@ export class CommandBuilder {
 
     // Permission mode flags
     switch (options.permissionMode) {
-      case 'bypass-permissions':
+      case 'bypassPermissions':
         parts.push('--dangerously-skip-permissions');
         break;
       case 'plan':
@@ -121,8 +121,10 @@ export class CommandBuilder {
       case 'acceptEdits':
         parts.push('--permission-mode', 'acceptEdits');
         break;
+      case 'dontAsk':
+        parts.push('--permission-mode', 'dontAsk');
+        break;
       case 'default':
-      case 'manual':
         break;
     }
 
