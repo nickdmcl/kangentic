@@ -96,6 +96,9 @@ export function SettingsPanelShell({ onClose, children, projectSwitcher, tabs, a
       ? 'settings-panel-out 150ms ease-in forwards'
       : 'none';
 
+  const sectionHeaderClass = 'text-[10px] uppercase tracking-widest text-fg-faint font-semibold px-4';
+  const hasProjectTabs = tabs && !tabs[0]?.separator;
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50"
@@ -159,14 +162,19 @@ export function SettingsPanelShell({ onClose, children, projectSwitcher, tabs, a
           <div className="flex-1 flex overflow-hidden">
             {/* Tab sidebar */}
             <div className="w-44 flex-shrink-0 border-r border-edge py-3 space-y-0.5 overflow-y-auto">
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
                 const matchCount = isSearching && tabMatchCounts ? tabMatchCounts.get(tab.id) : undefined;
                 const hasNoMatches = isSearching && (matchCount === undefined || matchCount === 0);
                 return (
                   <React.Fragment key={tab.id}>
-                    {tab.separator && <div className="my-1.5 mx-4 border-t border-edge" />}
+                    {index === 0 && hasProjectTabs && (
+                      <div className={`${sectionHeaderClass} pt-1 pb-1`}>Project</div>
+                    )}
+                    {tab.separator && (
+                      <div className={`${sectionHeaderClass} pt-3 pb-1`}>System</div>
+                    )}
                     <button
                       onClick={() => { if (!hasNoMatches) onTabChange(tab.id); }}
                       title={tab.tooltip}
