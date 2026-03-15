@@ -82,15 +82,15 @@ export async function createProject(
   await waitForBoard(page);
 }
 
-// Create a task via the UI
+// Create a task via the UI in the Backlog column (the only column with an "Add task" button).
+// To place a task in a different column, create it in Backlog first, then drag it.
 export async function createTask(
   page: Page,
   title: string,
   description: string = '',
-  columnName: string = 'Backlog',
 ): Promise<void> {
-  const column = page.locator(`[data-swimlane-name="${columnName}"]`);
-  const addButton = column.locator('text=Add task');
+  const backlog = page.locator('[data-swimlane-name="Backlog"]');
+  const addButton = backlog.locator('text=Add task');
   await addButton.click();
 
   const titleInput = page.locator('input[placeholder="Task title"]');

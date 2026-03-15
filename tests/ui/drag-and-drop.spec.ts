@@ -153,10 +153,11 @@ test.describe('Drag and Drop', () => {
 
   test('drag task from Planning to Code Review', async () => {
     const taskName = `DnD PtoR ${runId}`;
-    await createTask(page, taskName, 'Test drag to Code Review', 'Planning');
+    await createTask(page, taskName, 'Test drag to Code Review');
+    await dragTaskToColumn(taskName, 'Planning');
 
     const planning = page.locator('[data-swimlane-name="Planning"]');
-    await expect(planning.locator(`text=${taskName}`).first()).toBeVisible();
+    await expect(planning.locator(`text=${taskName}`).first()).toBeVisible({ timeout: 5000 });
 
     await dragTaskToColumn(taskName, 'Code Review');
     const review = page.locator('[data-swimlane-name="Code Review"]');
@@ -218,24 +219,24 @@ test.describe('Drag and Drop', () => {
     const task1 = `DnD Up1 ${runId}`;
     const task2 = `DnD Up2 ${runId}`;
     const task3 = `DnD Up3 ${runId}`;
-    await createTask(page, task1, 'First task', 'Planning');
-    await createTask(page, task2, 'Second task', 'Planning');
-    await createTask(page, task3, 'Third task', 'Planning');
+    await createTask(page, task1, 'First task');
+    await createTask(page, task2, 'Second task');
+    await createTask(page, task3, 'Third task');
 
-    const planning = page.locator('[data-swimlane-name="Planning"]');
-    await expect(planning.locator(`text=${task3}`).first()).toBeVisible();
+    const backlog = page.locator('[data-swimlane-name="Backlog"]');
+    await expect(backlog.locator(`text=${task3}`).first()).toBeVisible();
 
     // Drag task3 onto task1 (bottom to top)
     await dragTaskWithinColumn(task3, task1);
 
-    // Verify all tasks remain in Planning
-    await expect(planning.locator(`text=${task1}`).first()).toBeVisible({ timeout: 5000 });
-    await expect(planning.locator(`text=${task2}`).first()).toBeVisible();
-    await expect(planning.locator(`text=${task3}`).first()).toBeVisible();
+    // Verify all tasks remain in Backlog
+    await expect(backlog.locator(`text=${task1}`).first()).toBeVisible({ timeout: 5000 });
+    await expect(backlog.locator(`text=${task2}`).first()).toBeVisible();
+    await expect(backlog.locator(`text=${task3}`).first()).toBeVisible();
 
     // Verify order: task3 should appear above task2 after dragging task3 up
-    const box3 = await planning.locator(`text=${task3}`).first().boundingBox();
-    const box2 = await planning.locator(`text=${task2}`).first().boundingBox();
+    const box3 = await backlog.locator(`text=${task3}`).first().boundingBox();
+    const box2 = await backlog.locator(`text=${task2}`).first().boundingBox();
     expect(box3).toBeTruthy();
     expect(box2).toBeTruthy();
     expect(box3!.y).toBeLessThan(box2!.y);

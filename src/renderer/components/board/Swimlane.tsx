@@ -134,8 +134,8 @@ export const Swimlane = React.memo(function Swimlane({ swimlane, tasks, dragHand
         )}
       </div>
 
-      {/* Add task button (hidden for ghost columns) */}
-      {!isGhost && (
+      {/* Add task button (backlog only, hidden for ghost columns) */}
+      {!isGhost && swimlane.role === 'backlog' && (
         <button
           type="button"
           onClick={() => setShowNewTask(true)}
