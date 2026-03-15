@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -27,6 +27,7 @@ import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
 import { AddColumnButton } from './AddColumnButton';
+import { BoardSearchBar } from './BoardSearchBar';
 import { WelcomeOverlay } from './WelcomeOverlay';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { useBoardStore } from '../../stores/board-store';
@@ -246,7 +247,46 @@ export function KanbanBoard() {
   const applyConfigChange = useBoardStore((s) => s.applyConfigChange);
   const dismissConfigChange = useBoardStore((s) => s.dismissConfigChange);
   const updateConfig = useConfigStore((s) => s.updateConfig);
+  const showBoardSearch = useConfigStore((s) => s.config.showBoardSearch);
+  const searchQuery = useBoardStore((s) => s.searchQuery);
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
+
+  // Ctrl+F / Cmd+F keybinding: show search bar and focus input
+  useEffect(() => {
+    const modifierKey = window.electronAPI.platform === 'darwin' ? '⌘' : 'Ctrl';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        if (showBoardSearch) {
+          // Toggle off if visible and query is empty
+          const currentQuery = useBoardStore.getState().searchQuery;
+          if (!currentQuery) {
+            useBoardStore.getState().setSearchQuery('');
+            updateConfig({ showBoardSearch: false });
+            useToastStore.getState().addToast({
+              message: `Press ${modifierKey}+F to search`,
+              variant: 'info',
+            });
+            return;
+          }
+          // If query is active, just focus and select
+          const input = document.querySelector('[data-testid="board-search-input"]') as HTMLInputElement | null;
+          input?.focus();
+          input?.select();
+        } else {
+          updateConfig({ showBoardSearch: true });
+          // Focus input on next tick (after render when bar appears)
+          requestAnimationFrame(() => {
+            const input = document.querySelector('[data-testid="board-search-input"]') as HTMLInputElement | null;
+            input?.focus();
+            input?.select();
+          });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showBoardSearch, updateConfig]);
 
   // Ref-based drop highlight: avoids React re-renders during drag
   const hoveringSwimlaneIdRef = useRef<string | null>(null);
@@ -281,15 +321,25 @@ export function KanbanBoard() {
   );
 
   const tasksPerLane = useMemo(() => {
+    const normalizedQuery = searchQuery ? searchQuery.toLowerCase() : '';
     const map = new Map<string, Task[]>();
     for (const lane of swimlanes) map.set(lane.id, []);
     for (const task of tasks) {
+      if (normalizedQuery && !task.title.toLowerCase().includes(normalizedQuery) && !task.description.toLowerCase().includes(normalizedQuery)) continue;
       const arr = map.get(task.swimlane_id);
       if (arr) arr.push(task);
     }
     for (const arr of map.values()) arr.sort((a, b) => a.position - b.position);
     return map;
-  }, [swimlanes, tasks]);
+  }, [swimlanes, tasks, searchQuery]);
+
+  /** Total visible task count (matching search filter) for the search bar. */
+  const searchMatchCount = useMemo(() => {
+    if (!searchQuery) return tasks.length;
+    let count = 0;
+    for (const arr of tasksPerLane.values()) count += arr.length;
+    return count;
+  }, [searchQuery, tasks.length, tasksPerLane]);
 
   /** O(1) taskId → swimlaneId lookup covering both active and archived tasks. */
   const taskToSwimlane = useMemo(() => {
@@ -564,6 +614,12 @@ export function KanbanBoard() {
   return (
     <div className="relative h-full overflow-x-auto overflow-y-hidden flex flex-col">
       <ConfigWarningBanner />
+      {showBoardSearch && (
+        <BoardSearchBar
+          totalCount={tasks.length}
+          matchCount={searchMatchCount}
+        />
+      )}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
       <WelcomeOverlay />
       <DndContext

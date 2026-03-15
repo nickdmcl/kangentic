@@ -73,6 +73,7 @@
       cooldownSeconds: 10,
     },
     hasCompletedFirstRun: true,
+    showBoardSearch: true,
     skipDeleteConfirm: false,
     skipBoardConfigConfirm: false,
     autoFocusIdleSession: true,

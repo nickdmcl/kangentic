@@ -21,6 +21,8 @@ interface BoardStore {
   archivedTasks: Task[];
   shortcuts: (ShortcutConfig & { source: 'team' | 'local' })[];
   loading: boolean;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 
   // Board config warnings (shown as banner when kangentic.json has errors)
   configWarnings: string[];
@@ -86,6 +88,8 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
   archivedTasks: [],
   shortcuts: [],
   loading: false,
+  searchQuery: '',
+  setSearchQuery: (query) => set({ searchQuery: query }),
   configWarnings: [],
   pendingConfigChange: null,
   completingTask: null,

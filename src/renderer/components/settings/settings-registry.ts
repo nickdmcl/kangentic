@@ -56,6 +56,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { id: 'shortcuts', tabId: 'shortcuts', label: 'Shortcuts', description: 'Custom commands accessible from the task detail dialog', scope: 'project', keywords: ['command', 'shortcut', 'tool', 'open', 'launch', 'tortoisegit', 'vscode', 'terminal', 'explorer', 'quick action'] },
 
   // ── Behavior ──
+  { id: 'showBoardSearch', tabId: 'behavior', label: 'Show Board Search Bar', description: 'Display the search bar above board columns. Press Ctrl+F (Cmd+F on Mac) to toggle.', scope: 'global', keywords: ['search', 'filter', 'find', 'board'] },
   { id: 'skipDeleteConfirm', tabId: 'behavior', label: 'Skip Task Delete Confirmation', description: 'Delete tasks immediately without a confirmation dialog', scope: 'global', keywords: ['confirm', 'dialog'] },
   { id: 'autoFocusIdleSession', tabId: 'behavior', label: 'Auto-Focus Idle Sessions', description: 'Automatically switch the bottom panel to the most recently idle session', scope: 'global', keywords: ['switch', 'panel', 'attention'] },
   { id: 'activateAllProjectsOnStartup', tabId: 'behavior', label: 'Launch All Projects on Startup', description: 'Start agents across all projects on launch, not just the current open one', scope: 'global', keywords: ['boot', 'open', 'activate'] },

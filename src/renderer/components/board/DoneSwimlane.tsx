@@ -56,11 +56,21 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
     data: { type: 'swimlane' },
   });
 
+  const searchQuery = useBoardStore((state) => state.searchQuery);
+
+  const filteredArchivedTasks = useMemo(() => {
+    if (!searchQuery) return archivedTasks;
+    const query = searchQuery.toLowerCase();
+    return archivedTasks.filter(
+      (task) => task.title.toLowerCase().includes(query) || task.description.toLowerCase().includes(query),
+    );
+  }, [archivedTasks, searchQuery]);
+
   const previewTasks = useMemo(
-    () => archivedTasks.slice(0, MAX_INLINE_PREVIEW),
-    [archivedTasks],
+    () => filteredArchivedTasks.slice(0, MAX_INLINE_PREVIEW),
+    [filteredArchivedTasks],
   );
-  const hasMore = archivedTasks.length > MAX_INLINE_PREVIEW;
+  const hasMore = filteredArchivedTasks.length > MAX_INLINE_PREVIEW;
 
   return (
     <div
@@ -150,16 +160,16 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
         {/* Section header */}
         <button
           type="button"
-          onClick={archivedTasks.length > 0 ? () => setShowCompletedDialog(true) : undefined}
-          disabled={archivedTasks.length === 0}
-          className={`py-2 px-2.5 flex-shrink-0 flex items-center justify-between rounded-md transition-colors w-full text-left border ${archivedTasks.length > 0 ? 'border-edge/30 bg-surface-hover/20 hover:bg-surface-hover/40 hover:border-edge/50 cursor-pointer group' : 'border-transparent'}`}
+          onClick={filteredArchivedTasks.length > 0 ? () => setShowCompletedDialog(true) : undefined}
+          disabled={filteredArchivedTasks.length === 0}
+          className={`py-2 px-2.5 flex-shrink-0 flex items-center justify-between rounded-md transition-colors w-full text-left border ${filteredArchivedTasks.length > 0 ? 'border-edge/30 bg-surface-hover/20 hover:bg-surface-hover/40 hover:border-edge/50 cursor-pointer group' : 'border-transparent'}`}
           data-testid="expand-completed-btn"
         >
           <span className="flex items-center gap-1.5 text-sm font-medium text-fg-muted">
             <ClipboardList size={14} />
-            Completed ({archivedTasks.length})
+            Completed ({filteredArchivedTasks.length})
           </span>
-          {archivedTasks.length > 0 && (
+          {filteredArchivedTasks.length > 0 && (
             <Maximize2 size={14} className="text-fg-disabled group-hover:text-fg-muted transition-colors" />
           )}
         </button>
@@ -192,11 +202,11 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
               className="w-full text-xs text-fg-muted hover:text-fg-secondary py-1.5 transition-colors"
               data-testid="view-all-completed"
             >
-              View all {archivedTasks.length} completed tasks
+              View all {filteredArchivedTasks.length} completed tasks
             </button>
           )}
-          {archivedTasks.length === 0 && (
-            <div className="text-xs text-fg-disabled text-center py-3">No completed tasks yet</div>
+          {filteredArchivedTasks.length === 0 && (
+            <div className="text-xs text-fg-disabled text-center py-3">{searchQuery ? 'No matching completed tasks' : 'No completed tasks yet'}</div>
           )}
         </div>
       </div>

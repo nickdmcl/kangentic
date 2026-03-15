@@ -225,6 +225,7 @@ These are global-only settings that apply to the entire app.
 | Auto-Focus Idle Sessions | Automatically switch the bottom panel to the most recently idle session |
 | Launch All Projects on Startup | Start agents across all projects on launch, not just the current one |
 | Restore Window Position | Remember window size and position between launches |
+| Show Board Search Bar | Display the search bar above board columns. Press Ctrl+F / Cmd+F to toggle. |
 
 ## Board Configuration
 

@@ -83,6 +83,7 @@ export function App() {
 
       loadBoard();
       loadConfig(); // Re-fetch effective config (global + project overrides)
+      useBoardStore.getState().setSearchQuery(''); // Clear search on project switch
 
       // Invalidate any in-flight syncSessions() calls from the previous project
       useSessionStore.getState()._bumpSyncGeneration();

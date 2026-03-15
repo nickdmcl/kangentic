@@ -29,7 +29,7 @@ These settings appear only in App Settings and cannot be overridden per-project:
 - `sidebarVisible`, `boardLayout`, `sidebar.width`
 - `claude.cliPath`, `claude.maxConcurrentSessions`, `claude.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
-- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`, `restoreWindowPosition`
+- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`, `restoreWindowPosition`, `showBoardSearch`
 - `contextBar.*` (all context bar visibility toggles)
 - `notifications.*` (all notification settings)
 - `claude.idleTimeoutMinutes`
@@ -56,6 +56,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `autoFocusIdleSession` | boolean | `true` | Auto-switch to session tab when agent goes idle |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
 | `restoreWindowPosition` | boolean | `true` | Remember window size and position between launches. Global-only. |
+| `showBoardSearch` | boolean | `true` | Display the search bar above board columns. Toggle with Ctrl+F / Cmd+F. Global-only. |
 | `hasCompletedFirstRun` | boolean | `false` | Whether the user has completed first-run onboarding. Auto-set, not shown in UI. |
 | `windowBounds` | object \| null | `null` | Persisted window bounds `{x, y, width, height}`. Auto-saved, not shown in UI. |
 

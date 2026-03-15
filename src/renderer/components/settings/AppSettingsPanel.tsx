@@ -333,6 +333,12 @@ function BehaviorTab({ globalConfig }: { globalConfig: AppConfig }) {
   const updateGlobal = useScopedUpdate('global');
   return (
     <>
+      <SettingRow {...settingProps('showBoardSearch')}>
+        <ToggleSwitch
+          checked={globalConfig.showBoardSearch}
+          onChange={(value) => updateGlobal({ showBoardSearch: value })}
+        />
+      </SettingRow>
       <SettingRow {...settingProps('skipDeleteConfirm')}>
         <ToggleSwitch
           checked={globalConfig.skipDeleteConfirm}

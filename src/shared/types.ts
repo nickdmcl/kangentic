@@ -409,6 +409,7 @@ export interface AppConfig {
   notifications: NotificationConfig;
 
   hasCompletedFirstRun: boolean;
+  showBoardSearch: boolean;
   skipDeleteConfirm: boolean;
   skipBoardConfigConfirm: boolean;
   autoFocusIdleSession: boolean;
@@ -472,6 +473,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     cooldownSeconds: 10,
   },
   hasCompletedFirstRun: false,
+  showBoardSearch: true,
   skipDeleteConfirm: false,
   skipBoardConfigConfirm: false,
   autoFocusIdleSession: true,
