@@ -105,6 +105,8 @@ Run: `git rebase origin/<sourceBranch>`
 
 ## Step 4 — Push to Source Branch
 
+**Worktree mode:** Push to the **source branch** (e.g., `main`), NOT the worktree branch name. The worktree branch is a local working branch only. The goal is to land commits directly on the source branch.
+
 Run: `git push origin HEAD:<sourceBranch>`
 
 This pushes the rebased commits directly to the remote source branch. After a successful rebase, this is guaranteed to be a fast-forward push.

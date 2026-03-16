@@ -176,7 +176,7 @@ Three test tiers — prefer **unit tests** for pure logic, **UI tests** for anyt
 - All dialogs use global `useEffect` Escape key listener
 - When adding or updating tests, use the `/test` command to ensure correct tier classification
 - **No `any` types** — never use `any` in new code. Use proper types from `src/shared/types.ts`, `unknown` with type guards, or generic constraints. The `/code-review` command will flag `any` usage. Existing `any` casts should be replaced when touching the file.
-- **Git commit/push workflow:** When asked to "commit and push", "commit changes", or similar — use `/merge-back`. It handles commit, typecheck, rebase, and push safely. Works from both worktrees and the main repo.
+- **Git commit/push workflow:** When asked to "commit and push", "commit changes", or similar — use `/merge-back`. It handles commit, typecheck, rebase, and push safely. Works from both worktrees and the main repo. Use `/pull-request` instead when a PR audit trail is desired — it shares the same commit/rebase flow but creates a PR and admin-merges it instead of pushing directly.
 - **No shorthand variable names** — use full, descriptive names. `currentIndex` not `curIdx`, `previousValue` not `prev`, `session` not `sess`. Applies to all code: variables, refs, parameters, callback args, etc.
 - **Confirmation dialogs:** Use `ConfirmDialog` for all yes/no prompts. Set `showDontAskAgain` when the confirmation should be suppressible. Never create one-off modal components for simple confirmations.
 - **Documentation maintenance:** `/update-docs` reviews and updates `docs/` to match source code. Runs automatically during `/merge-back`. See `.claude/skills/docs-maintenance/SKILL.md` for the source-to-doc mapping.
