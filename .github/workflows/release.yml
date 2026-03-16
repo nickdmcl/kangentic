@@ -144,6 +144,7 @@ jobs:
 
   publish-npm:
     needs: [release]
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
