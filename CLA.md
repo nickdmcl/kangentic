@@ -1,5 +1,7 @@
 # Kangentic Individual Contributor License Agreement
 
+**Version 1.0, March 2026**
+
 Thank you for your interest in contributing to Kangentic, a project maintained by VORPAHL LLC ("We" or "Us").
 
 This Contributor License Agreement ("Agreement") documents the rights granted by contributors to Us. This is a legally binding document, so please read it carefully before agreeing to it.
@@ -8,7 +10,7 @@ This Contributor License Agreement ("Agreement") documents the rights granted by
 
 **"You"** means the individual who submits a Contribution to Us.
 
-**"Contribution"** means any work of authorship, including any modifications or additions to an existing work, that is submitted by You to Us for inclusion in Kangentic. "Submitted" means any form of electronic communication sent to Us, including but not limited to pull requests, issues, and comments on GitHub.
+**"Contribution"** means any work of authorship, including any modifications or additions to an existing work, that is intentionally submitted by You to Us for inclusion in Kangentic. "Submitted" means code, documentation, or configuration sent via pull requests or patches on GitHub. For the avoidance of doubt, issues, comments, discussion posts, and other communications that do not contain code or documentation intended for inclusion are not Contributions under this Agreement.
 
 ## 2. Grant of Copyright License
 
@@ -27,14 +29,22 @@ You retain copyright and all other rights in Your Contributions. You are free to
 You represent that:
 
 - (a) You are legally entitled to grant the above licenses.
-- (b) Each of Your Contributions is Your original creation.
+- (b) Each of Your Contributions is Your original creation (see Section 6 for submissions containing third-party work).
 - (c) If Your employer has rights to intellectual property that You create, You have received permission to make Contributions on behalf of that employer, or Your employer has waived such rights for Your Contributions.
 - (d) You are not aware of any third-party claims, liens, or encumbrances on Your Contributions.
 
-## 6. No Support Obligation
+## 6. Third-Party Work
+
+If any part of Your Contribution is not Your original creation, You must clearly identify it in the pull request description, including the original author, source, and license. You represent that such third-party work is licensed under terms that permit its inclusion in Kangentic, and You must not submit third-party work under this Agreement without such identification.
+
+## 7. No Support Obligation
 
 You are not expected to provide support for Your Contributions, except to the extent You desire to provide support. You may provide support for free, for a fee, or not at all.
 
-## 7. Agreement
+## 8. Governing Law
+
+This Agreement is governed by the laws of the State of Washington, United States, without regard to its conflict-of-laws provisions.
+
+## 9. Agreement
 
 By signing this Agreement (via the CLA Assistant bot on GitHub), You accept and agree to the terms and conditions of this Agreement for Your present and future Contributions submitted to Kangentic.

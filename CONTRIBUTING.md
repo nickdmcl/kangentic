@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Kangentic! This guide covers ever
 
 **All contributors must sign a CLA before their first pull request can be merged.**
 
-When you open your first PR, the CLA Assistant bot will post a comment asking you to sign. You sign by adding a comment to the PR -- it takes about 30 seconds and only needs to be done once.
+When you open your first PR, the CLA Assistant bot will post a comment asking you to sign. You sign by adding a comment to the PR. It takes about 30 seconds and only needs to be done once.
 
 ### Why we require a CLA
 
@@ -15,10 +15,11 @@ Kangentic is dual-licensed. The public open-source version uses the [AGPLv3 lice
 **What the CLA says (in plain language):**
 
 - You grant VORPAHL LLC a perpetual, worldwide, non-exclusive, royalty-free license to use, modify, sublicense, and distribute your contribution under any license
-- You retain full copyright to your contribution -- you can use it however you want
+- You retain full copyright to your contribution. You can use it however you want
 - You confirm you have the right to make this grant (i.e., you wrote the code yourself or have permission)
+- If your contribution includes third-party code, you must identify it and its license in the PR description
 
-The CLA is modeled after the [Apache Individual Contributor License Agreement](https://www.apache.org/licenses/icla.pdf), which is widely used and well-understood in the open-source community.
+The CLA is modeled after the [Apache Individual Contributor License Agreement](https://www.apache.org/licenses/icla.pdf), which is widely used and well-understood in the open-source community. The full text is in [CLA.md](CLA.md).
 
 ## Getting Started
 
