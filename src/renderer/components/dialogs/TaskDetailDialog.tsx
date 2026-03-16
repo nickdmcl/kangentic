@@ -846,29 +846,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       {/* Title */}
       <h2 className="text-base font-semibold text-fg truncate min-w-0">{task.title}</h2>
 
-      {/* Open folder pill */}
-      {(task.worktree_path || projectPath) && (
-        <Pill
-          shape="square"
-          onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
-          className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
-          title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
-          data-testid="branch-pill"
-        >
-          {task.worktree_path ? (
-            <>
-              <FolderGit2 size={14} />
-              Worktree
-            </>
-          ) : (
-            <>
-              <FolderOpen size={14} />
-              Project
-            </>
-          )}
-        </Pill>
-      )}
-
       {/* Commands button */}
       {!isEditing && (
         <div className="relative flex-shrink-0" ref={commandButtonRef}>
@@ -891,6 +868,29 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             />
           )}
         </div>
+      )}
+
+      {/* Open folder pill */}
+      {(task.worktree_path || projectPath) && (
+        <Pill
+          shape="square"
+          onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
+          className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
+          title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
+          data-testid="branch-pill"
+        >
+          {task.worktree_path ? (
+            <>
+              <FolderGit2 size={14} />
+              Worktree
+            </>
+          ) : (
+            <>
+              <FolderOpen size={14} />
+              Project
+            </>
+          )}
+        </Pill>
       )}
 
       {/* Shortcut header pills */}
