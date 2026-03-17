@@ -240,6 +240,7 @@ export function useTerminal(options: UseTerminalOptions) {
   const reloadScrollback = useCallback(() => {
     if (!options.sessionId || !xtermRef.current) return;
     scrollbackPendingRef.current = true;
+    xtermRef.current.reset();
     window.electronAPI.sessions.getScrollback(options.sessionId).then((scrollback) => {
       if (scrollback && xtermRef.current) {
         xtermRef.current.write(scrollback, () => {

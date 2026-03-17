@@ -167,7 +167,7 @@ describe('Session respawn (column transition)', () => {
     expect(scrollback).toContain('previous output');
   });
 
-  it('scrollback is NOT carried over when resuming (Claude CLI replays history)', async () => {
+  it('scrollback is carried over when resuming (history preserved for scroll-back)', async () => {
     const { session: first, feedData } = await spawnForTask('task-6b');
 
     feedData('previous output');
@@ -175,10 +175,10 @@ describe('Session respawn (column transition)', () => {
     manager.suspend(first.id);
     const { session: second } = await spawnForTask('task-6b', { resuming: true });
 
-    // Resume spawns start empty because Claude CLI replays conversation
-    // history via --resume. Carrying over raw ANSI causes duplication.
+    // Resume spawns preserve scrollback so terminal scroll history is
+    // available. Claude CLI's TUI overwrites the viewport without corrupting it.
     const scrollback = manager.getScrollback(second.id);
-    expect(scrollback).toBe('');
+    expect(scrollback).toContain('previous output');
   });
 
   it('old session scrollback is no longer accessible after respawn', async () => {
