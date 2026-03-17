@@ -114,7 +114,12 @@ describe('Scrollback', () => {
     const chunk = 'x'.repeat(600 * 1024);
     feedData(chunk);
 
-    expect(manager.getScrollback(session.id).length).toBe(512 * 1024);
+    const scrollback = manager.getScrollback(session.id);
+    // getScrollback() prepends \x1b[0m (4 bytes) and findSafeStartIndex
+    // may trim up to 32 bytes at the truncation boundary
+    expect(scrollback.startsWith('\x1b[0m')).toBe(true);
+    expect(scrollback.length).toBeLessThanOrEqual(512 * 1024 + 4);
+    expect(scrollback.length).toBeGreaterThan(512 * 1024 - 32);
   });
 
   it('preserves scrollback under the limit', async () => {
@@ -123,19 +128,25 @@ describe('Scrollback', () => {
     const chunk = 'y'.repeat(100 * 1024);
     feedData(chunk);
 
-    expect(manager.getScrollback(session.id).length).toBe(100 * 1024);
+    const scrollback = manager.getScrollback(session.id);
+    // No truncation, so only the 4-byte SGR reset prefix is added
+    expect(scrollback.startsWith('\x1b[0m')).toBe(true);
+    expect(scrollback.length).toBe(100 * 1024 + 4);
   });
 
   it('accumulates scrollback across multiple onData calls', async () => {
     const { session, feedData } = await spawnSession();
 
-    // 3 x 200KB = 600KB total → should truncate to 512KB
+    // 3 x 200KB = 600KB total -> should truncate to ~512KB
     const chunk = 'z'.repeat(200 * 1024);
     feedData(chunk);
     feedData(chunk);
     feedData(chunk);
 
-    expect(manager.getScrollback(session.id).length).toBe(512 * 1024);
+    const scrollback = manager.getScrollback(session.id);
+    expect(scrollback.startsWith('\x1b[0m')).toBe(true);
+    expect(scrollback.length).toBeLessThanOrEqual(512 * 1024 + 4);
+    expect(scrollback.length).toBeGreaterThan(512 * 1024 - 32);
   });
 });
 

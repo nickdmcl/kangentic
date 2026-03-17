@@ -10,6 +10,7 @@ import { ClaudeStatusParser } from '../agent/claude-status-parser';
 import { adaptCommandForShell } from '../../shared/paths';
 import { EventType, EventTypeActivity, ClaudeTool } from '../../shared/types';
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
+import { findSafeStartIndex } from './scrollback-utils';
 import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent, SpawnSessionInput } from '../../shared/types';
 
 const MAX_SCROLLBACK = 512 * 1024; // 512KB per session
@@ -445,6 +446,10 @@ export class SessionManager extends EventEmitter {
       session.scrollback += data;
       if (session.scrollback.length > MAX_SCROLLBACK) {
         session.scrollback = session.scrollback.slice(-MAX_SCROLLBACK);
+        const safeStart = findSafeStartIndex(session.scrollback);
+        if (safeStart > 0) {
+          session.scrollback = session.scrollback.slice(safeStart);
+        }
       }
       if (!session.flushScheduled) {
         session.flushScheduled = true;
@@ -602,7 +607,8 @@ export class SessionManager extends EventEmitter {
 
   getScrollback(sessionId: string): string {
     const session = this.sessions.get(sessionId);
-    return session?.scrollback || '';
+    if (!session?.scrollback) return '';
+    return '\x1b[0m' + session.scrollback;
   }
 
   getSession(sessionId: string): Session | undefined {
