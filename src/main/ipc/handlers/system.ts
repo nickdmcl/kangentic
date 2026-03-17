@@ -13,7 +13,16 @@ export function registerSystemHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.APP_GET_VERSION, () => app.getVersion());
 
   // === Config ===
-  ipcMain.handle(IPC.CONFIG_GET, () => context.configManager.getEffectiveConfig(context.currentProjectPath || undefined));
+  ipcMain.handle(IPC.CONFIG_GET, () => {
+    const config = context.configManager.getEffectiveConfig(context.currentProjectPath || undefined);
+    // Overlay board config's defaultBaseBranch (team-shared) onto the effective config.
+    // Spread to avoid mutating the cached config object from ConfigManager.
+    const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
+    if (boardDefaultBranch) {
+      return { ...config, git: { ...config.git, defaultBaseBranch: boardDefaultBranch } };
+    }
+    return config;
+  });
   ipcMain.handle(IPC.CONFIG_GET_GLOBAL, () => context.configManager.load());
 
   ipcMain.handle(IPC.CONFIG_SET, (_, config) => {

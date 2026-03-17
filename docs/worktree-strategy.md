@@ -23,7 +23,8 @@ Checked in priority order:
 
 1. Task's `base_branch` field (per-task override)
 2. Action config's `baseBranch` (per-transition override)
-3. `config.git.defaultBaseBranch` (global, defaults to `main`)
+3. `kangentic.json` `defaultBaseBranch` (team-shared, overridable via `kangentic.local.json`)
+4. `config.git.defaultBaseBranch` (per-user fallback, defaults to `main`)
 
 If the remote branch exists, the worktree branches from `origin/<baseBranch>`. Otherwise falls back to the local branch.
 

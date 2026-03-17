@@ -262,7 +262,8 @@ Branches follow the pattern `kanban/{slug}-{taskId8}` (e.g., `kanban/fix-auth-bu
 Priority order:
 1. Task's base branch (per-task override)
 2. Action config's base branch (per-transition override)
-3. Global `git.defaultBaseBranch` (default: `main`)
+3. `kangentic.json` `defaultBaseBranch` (team-shared, overridable via `kangentic.local.json`)
+4. Per-user `git.defaultBaseBranch` (default: `main`)
 
 ## Session Queue
 

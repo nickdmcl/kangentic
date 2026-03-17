@@ -412,6 +412,54 @@ export class BoardConfigManager {
     return { warnings };
   }
 
+  // --- Default Base Branch ---
+
+  getDefaultBaseBranch(): string | undefined {
+    const config = this.getEffectiveConfig();
+    return config?.defaultBaseBranch;
+  }
+
+  setDefaultBaseBranch(value: string): void {
+    if (!this.activeProjectPath) return;
+
+    const filePath = path.join(this.activeProjectPath, TEAM_FILE);
+
+    let existing: Partial<BoardConfig> = {};
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      existing = JSON.parse(raw) as Partial<BoardConfig>;
+    } catch {
+      // File doesn't exist yet, start fresh
+      existing = { version: CURRENT_VERSION, columns: [], actions: [], transitions: [] };
+    }
+
+    existing.defaultBaseBranch = value;
+    (existing as BoardConfig)._modifiedBy = this.fingerprint;
+
+    // Skip write if content hasn't meaningfully changed
+    const fileCheck = this.contentMatchesFile(filePath, existing);
+    if (fileCheck.matches) {
+      this.lastTeamContentHash = fileCheck.contentHash;
+      return;
+    }
+
+    this.isWritingBack = true;
+    try {
+      const tmpPath = filePath + '.tmp.' + process.pid;
+      const content = JSON.stringify(existing, null, 2) + os.EOL;
+      fs.writeFileSync(tmpPath, content);
+      fs.renameSync(tmpPath, filePath);
+
+      this.lastTeamContentHash = crypto.createHash('sha256').update(content).digest('hex');
+    } catch (error) {
+      console.warn('[BOARD_CONFIG] setDefaultBaseBranch failed:', error);
+    } finally {
+      setTimeout(() => {
+        this.isWritingBack = false;
+      }, 1000);
+    }
+  }
+
   // --- Shortcuts ---
 
   getShortcuts(): (ShortcutConfig & { source: 'team' | 'local' })[] {
@@ -613,6 +661,11 @@ export class BoardConfigManager {
       const existingTeam = this.loadTeamConfig();
       if (existingTeam?.shortcuts && existingTeam.shortcuts.length > 0) {
         boardConfig.shortcuts = existingTeam.shortcuts;
+      }
+
+      // Preserve defaultBaseBranch from the existing team file (not stored in DB)
+      if (existingTeam?.defaultBaseBranch) {
+        boardConfig.defaultBaseBranch = existingTeam.defaultBaseBranch;
       }
 
       // Stamp fingerprint so the file watcher knows we wrote this
@@ -887,6 +940,11 @@ export function mergeBoardConfigs(team: BoardConfig, local: Partial<BoardConfig>
       }
     }
     result.transitions = mergedTransitions;
+  }
+
+  // Merge defaultBaseBranch (local overrides team)
+  if (local.defaultBaseBranch !== undefined) {
+    result.defaultBaseBranch = local.defaultBaseBranch;
   }
 
   // Merge shortcuts by id

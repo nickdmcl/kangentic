@@ -135,7 +135,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `config:setProjectByPath` | invoke | Update project overrides by filesystem path |
 | `config:syncDefaultToProjects` | invoke | Sync default config values to all project configs |
 
-### Board Config (7 channels)
+### Board Config (8 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `boardConfig:exists` | invoke | Check if `kangentic.json` exists for the active project |
@@ -145,6 +145,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `boardConfig:getShortcuts` | invoke | Get task detail dialog shortcuts |
 | `boardConfig:setShortcuts` | invoke | Update task detail dialog shortcuts |
 | `boardConfig:shortcutsChanged` | on | Event: shortcuts file changed |
+| `boardConfig:setDefaultBaseBranch` | invoke | Set the team-shared default base branch in `kangentic.json` |
 
 ### Notifications (2 channels)
 | Channel | Pattern | Purpose |

@@ -131,12 +131,18 @@ export function createTransitionEngine(
     context.sessionManager, actions, tasks, context.claudeDetector, context.commandBuilder,
     () => {
       const config = context.configManager.getEffectiveConfig(projectPath || undefined);
+      const gitConfig = { ...config.git };
+      // Overlay board config's defaultBaseBranch (team-shared) onto gitConfig
+      const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
+      if (boardDefaultBranch) {
+        gitConfig.defaultBaseBranch = boardDefaultBranch;
+      }
       return {
         permissionMode: config.claude.permissionMode,
         claudePath: config.claude.cliPath,
         projectPath,
         projectId,
-        gitConfig: config.git,
+        gitConfig,
       };
     },
     sessionRepo,

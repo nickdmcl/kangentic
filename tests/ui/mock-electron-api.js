@@ -848,6 +848,7 @@
       onShortcutsChanged: function (/* callback(projectId) */) { return noop; },
       getShortcuts: async function () { return []; },
       setShortcuts: async function (/* actions, target */) {},
+      setDefaultBaseBranch: async function (/* branch */) {},
     },
 
     updater: {

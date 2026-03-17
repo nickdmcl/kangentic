@@ -465,7 +465,10 @@ function GitTab({ config }: { config: AppConfig }) {
           variant="input"
           value={config.git.defaultBaseBranch}
           defaultBranch="main"
-          onChange={(branch) => updateProject({ git: { defaultBaseBranch: branch } })}
+          onChange={(branch) => {
+            updateProject({ git: { defaultBaseBranch: branch } });
+            window.electronAPI.boardConfig.setDefaultBaseBranch(branch);
+          }}
         />
       </SettingRow>
       <SettingRow {...settingProps('git.copyFiles')}>

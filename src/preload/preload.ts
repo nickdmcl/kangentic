@@ -211,6 +211,7 @@ const api: ElectronAPI = {
     },
     getShortcuts: () => ipcRenderer.invoke(IPC.BOARD_CONFIG_GET_SHORTCUTS),
     setShortcuts: (actions, target) => ipcRenderer.invoke(IPC.BOARD_CONFIG_SET_SHORTCUTS, actions, target),
+    setDefaultBaseBranch: (branch: string) => ipcRenderer.invoke(IPC.BOARD_CONFIG_SET_DEFAULT_BASE_BRANCH, branch),
   },
 
   platform: process.platform,

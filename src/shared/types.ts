@@ -666,6 +666,7 @@ export interface BoardConfig {
   actions: BoardActionConfig[];
   transitions: BoardTransitionConfig[];
   shortcuts?: ShortcutConfig[];
+  defaultBaseBranch?: string;
   _modifiedBy?: string;
 }
 
@@ -846,6 +847,7 @@ export interface ElectronAPI {
     onShortcutsChanged: (callback: (projectId: string) => void) => () => void;
     getShortcuts: () => Promise<(ShortcutConfig & { source: 'team' | 'local' })[]>;
     setShortcuts: (actions: ShortcutConfig[], target: 'team' | 'local') => Promise<void>;
+    setDefaultBaseBranch: (branch: string) => Promise<void>;
   };
 
   // Platform

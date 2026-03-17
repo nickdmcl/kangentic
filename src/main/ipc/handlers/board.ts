@@ -137,4 +137,8 @@ export function registerBoardHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.BOARD_CONFIG_SET_SHORTCUTS, (_, actions: ShortcutConfig[], target: 'team' | 'local') => {
     context.boardConfigManager.setShortcuts(actions, target);
   });
+
+  ipcMain.handle(IPC.BOARD_CONFIG_SET_DEFAULT_BASE_BRANCH, (_, branch: string) => {
+    context.boardConfigManager.setDefaultBaseBranch(branch);
+  });
 }

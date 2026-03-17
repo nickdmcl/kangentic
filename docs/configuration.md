@@ -223,6 +223,7 @@ Ghost columns are invisible on the board but still exist in the database. Once a
       "archived": false
     }
   ],
+  "defaultBaseBranch": "main",
   "shortcuts": [],
   "actions": [
     {
@@ -243,6 +244,8 @@ Ghost columns are invisible on the board but still exist in the database. Once a
   "_modifiedBy": "device-id"
 }
 ```
+
+The `defaultBaseBranch` field sets the team-shared default base branch for worktree creation. When present, it takes precedence over the per-user `git.defaultBaseBranch` in `AppConfig`. Individual users can override it via `kangentic.local.json`.
 
 The `_modifiedBy` field is auto-set by Kangentic to identify which device last wrote the file. It is used internally for change detection and should not be edited manually.
 
