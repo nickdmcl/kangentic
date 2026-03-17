@@ -99,6 +99,24 @@ export async function ensureTaskWorktree(context: IpcContext, task: Task, tasks:
   }
 }
 
+/**
+ * Checkout the task's base_branch in the main repo for non-worktree tasks.
+ * No-ops when: no project path, task uses a worktree, no branch preference, not a git repo.
+ * Throws on dirty repo or checkout failure so the caller can block agent spawn.
+ */
+export async function ensureTaskBranchCheckout(
+  task: Task,
+  projectPath?: string | null,
+): Promise<void> {
+  if (!projectPath) return;
+  if (task.worktree_path) return;
+  if (!task.base_branch) return;
+  if (!isGitRepo(projectPath)) return;
+
+  const worktreeManager = new WorktreeManager(projectPath);
+  await worktreeManager.checkoutBranch(task.base_branch);
+}
+
 /** Create a TransitionEngine wired to explicit project context (not singletons). */
 export function createTransitionEngine(
   context: IpcContext,

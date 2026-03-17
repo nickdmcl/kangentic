@@ -11,6 +11,7 @@ import {
   getProjectRepos,
   buildAutoCommandVars,
   ensureTaskWorktree,
+  ensureTaskBranchCheckout,
   createTransitionEngine,
   cleanupTaskSession,
   cleanupTaskResources,
@@ -264,6 +265,12 @@ export async function handleTaskMove(
   // Create worktree if worktrees are enabled and task doesn't have one yet.
   await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
 
+  // Checkout the task's branch in the main repo (non-worktree tasks only).
+  // Intentionally unguarded: if checkout fails, the error propagates to
+  // board-store's catch block which reverts the optimistic move and shows a toast.
+  guardActiveNonWorktreeSessions(context, task, tasks);
+  await ensureTaskBranchCheckout(task, resolvedProjectPath);
+
   // Execute transition actions (may fire spawn_agent which handles resume internally)
   const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, resolvedProjectId, resolvedProjectPath);
 
@@ -309,6 +316,34 @@ export async function handleTaskMove(
   }
 }
 
+/**
+ * Guard: before checking out a branch in the main repo, verify no other
+ * non-worktree task has an active PTY session. Checking out would change
+ * the filesystem under a running agent.
+ */
+function guardActiveNonWorktreeSessions(
+  context: IpcContext,
+  task: Task,
+  tasks: ReturnType<typeof getProjectRepos>['tasks'],
+): void {
+  if (!task.base_branch || task.worktree_path) return;
+
+  const activeSessions = context.sessionManager.listSessions()
+    .filter(session => session.taskId !== task.id && (session.status === 'running' || session.status === 'queued'));
+
+  const otherNonWorktreeSessions = activeSessions.filter(session => {
+    const otherTask = tasks.getById(session.taskId);
+    return otherTask && !otherTask.worktree_path;
+  });
+
+  if (otherNonWorktreeSessions.length > 0) {
+    throw new Error(
+      `Cannot switch to branch '${task.base_branch}': another task is running in the main repo. `
+      + `Enable worktree mode for branch isolation.`
+    );
+  }
+}
+
 export function registerTaskHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.TASK_LIST, (_, swimlaneId?) => {
     const { tasks } = getProjectRepos(context);
@@ -331,6 +366,16 @@ export function registerTaskHandlers(context: IpcContext): void {
     const toLane = swimlanes.getById(task.swimlane_id);
     if (toLane?.auto_spawn && context.currentProjectPath && context.currentProjectId) {
       await ensureTaskWorktree(context, task, tasks, context.currentProjectPath);
+
+      // Checkout the task's branch in the main repo (non-worktree tasks only).
+      // If checkout fails, the task is still created but no agent is spawned.
+      try {
+        guardActiveNonWorktreeSessions(context, task, tasks);
+        await ensureTaskBranchCheckout(task, context.currentProjectPath);
+      } catch (checkoutError) {
+        console.error('[TASK_CREATE] Branch checkout failed:', checkoutError);
+        return tasks.getById(task.id) ?? task;
+      }
 
       const db = getProjectDb(context.currentProjectId);
       const sessionRepo = new SessionRepository(db);
@@ -445,6 +490,16 @@ export function registerTaskHandlers(context: IpcContext): void {
     // Create worktree if needed (any non-backlog column gets an agent)
     await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
 
+    // Checkout the task's branch in the main repo (non-worktree tasks only).
+    // If checkout fails, the task is still unarchived but no agent is spawned.
+    try {
+      guardActiveNonWorktreeSessions(context, task, tasks);
+      await ensureTaskBranchCheckout(task, resolvedProjectPath);
+    } catch (checkoutError) {
+      console.error('[TASK_UNARCHIVE] Branch checkout failed:', checkoutError);
+      return tasks.getById(input.id);
+    }
+
     // Execute transition actions (from Done → target) for ALL non-kill columns
     if (resolvedProjectPath) {
       const doneLane = swimlanes.list().find((l) => l.role === 'done');
@@ -513,6 +568,16 @@ export function registerTaskHandlers(context: IpcContext): void {
       if (!toLane?.auto_spawn) continue;
 
       await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
+
+      // Checkout the task's branch in the main repo (non-worktree tasks only).
+      // Catch per-task so one failure doesn't block the entire batch.
+      try {
+        guardActiveNonWorktreeSessions(context, task, tasks);
+        await ensureTaskBranchCheckout(task, resolvedProjectPath);
+      } catch (checkoutError) {
+        console.error(`[TASK_BULK_UNARCHIVE] Branch checkout failed for task ${id.slice(0, 8)}:`, checkoutError);
+        continue;
+      }
 
       if (resolvedProjectPath) {
         const doneLane = swimlanes.list().find((lane) => lane.role === 'done');

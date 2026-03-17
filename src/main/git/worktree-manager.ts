@@ -246,6 +246,28 @@ export class WorktreeManager {
       });
   }
 
+  /**
+   * Checkout a branch in the main repo for non-worktree tasks.
+   * Throws if the working tree is dirty or the branch doesn't exist.
+   */
+  async checkoutBranch(branchName: string): Promise<void> {
+    const currentBranch = (await this.git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+    if (currentBranch === branchName) return;
+
+    const status = await this.git.status();
+    const trackedChanges = status.files.filter(
+      file => file.index !== '?' && file.working_dir !== '?',
+    );
+    if (trackedChanges.length > 0) {
+      throw new Error(
+        `Cannot switch to branch '${branchName}': you have uncommitted changes. `
+        + `Commit or stash your changes, or enable worktree mode for this task.`
+      );
+    }
+
+    await this.git.checkout(branchName);
+  }
+
   async listWorktrees(): Promise<string[]> {
     const result = await this.git.raw(['worktree', 'list', '--porcelain']);
     const worktrees: string[] = [];
