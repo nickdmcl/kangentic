@@ -163,11 +163,11 @@ export async function handleTaskMove(
   const db = getProjectDb(resolvedProjectId);
   const sessionRepo = new SessionRepository(db);
 
-  // --- Priority 1: TARGET IS BACKLOG → kill session, preserve worktree ---
+  // --- Priority 1: TARGET IS BACKLOG → full reset (kill session, remove worktree, delete branch) ---
   if (toLane?.role === 'backlog') {
     context.commandInjector.cancel(task.id);
-    await cleanupTaskSession(context, task, tasks, resolvedProjectId, resolvedProjectPath);
-    console.log(`[TASK_MOVE] Killed session for task ${task.id.slice(0, 8)} (moved to Backlog, worktree preserved)`);
+    await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
+    console.log(`[TASK_MOVE] Full cleanup for task ${task.id.slice(0, 8)} (moved to Backlog, session + worktree + branch removed)`);
     return;
   }
 

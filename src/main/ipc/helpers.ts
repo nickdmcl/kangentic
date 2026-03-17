@@ -262,7 +262,7 @@ export async function cleanupTaskSession(
 /**
  * Full cleanup: kill session, remove worktree + branch, wipe session records.
  *
- * Used by TASK_DELETE (permanent removal).
+ * Used by TASK_DELETE (permanent removal) and TASK_MOVE → Backlog (full reset).
  */
 export async function cleanupTaskResources(
   context: IpcContext,

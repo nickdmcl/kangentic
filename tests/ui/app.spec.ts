@@ -20,7 +20,7 @@ test.afterAll(async () => {
 /** Dismiss any open dialogs, then ensure the board is visible */
 async function ensureBoardVisible() {
   await page.keyboard.press('Escape');
-  await page.locator('.fixed input[type="text"], .fixed textarea, [data-testid="task-detail-dialog"]')
+  await page.locator('.fixed input[placeholder="Task title"], .fixed textarea, [data-testid="task-detail-dialog"]')
     .waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
 
   const backlog = page.locator('[data-swimlane-name="Backlog"]');
@@ -142,10 +142,10 @@ test.describe('Task CRUD', () => {
 
   test('can open task detail dialog', async () => {
     await taskCard('Test Task Alpha').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     // Backlog tasks open directly in edit mode -- title shows as input
-    const titleInput = page.locator('.fixed input[type="text"]');
+    const titleInput = page.locator('.fixed input[placeholder="Task title"]');
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toHaveValue('Test Task Alpha');
 
@@ -156,10 +156,10 @@ test.describe('Task CRUD', () => {
 
   test('can edit task title and description', async () => {
     await taskCard('Test Task Alpha').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     // Backlog tasks open directly in edit mode -- no need to click kebab -> Edit
-    const titleInput = page.locator('.fixed input[type="text"]');
+    const titleInput = page.locator('.fixed input[placeholder="Task title"]');
     await titleInput.fill('Updated Task Alpha');
 
     await page.locator('button:has-text("Save")').click();
@@ -234,7 +234,7 @@ test.describe('Task CRUD', () => {
 
     // Open the task (backlog tasks open in edit mode with Delete in footer)
     await taskCard('Task To Delete').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     await page.locator('button:has-text("Delete")').click();
 
@@ -256,7 +256,7 @@ test.describe('Task CRUD', () => {
 
     // Open the task detail dialog
     await taskCard('Test Task Gamma').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     // Backlog tasks open in edit mode with Delete in footer
     const dialog = page.locator('[data-testid="task-detail-dialog"]');
@@ -268,7 +268,7 @@ test.describe('Task CRUD', () => {
   test('can delete a non-archived task directly', async () => {
     // "Test Task Gamma" was created above and is still in Backlog
     await taskCard('Test Task Gamma').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     // Backlog tasks open in edit mode -- Delete is in the footer
     await page.locator('button:has-text("Delete")').click();
@@ -320,7 +320,7 @@ test.describe('Session & Column Details', () => {
 
   test('task detail dialog shows no session state', async () => {
     await taskCard('Updated Task Alpha').click();
-    await page.locator('.fixed input[type="text"], .fixed textarea').first().waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"], .fixed textarea').first().waitFor({ state: 'visible' });
 
     // Backlog tasks open in edit mode -- the edit textarea is visible instead of "No active session"
     const textarea = page.locator('.fixed textarea');
@@ -352,12 +352,12 @@ test.describe('Session & Column Details', () => {
 
   test('tasks in Backlog have no branch info', async () => {
     await taskCard('Updated Task Alpha').click();
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     await expect(page.locator('text=Branch:')).not.toBeVisible();
 
     await page.keyboard.press('Escape');
-    await page.locator('.fixed input[type="text"]').waitFor({ state: 'hidden', timeout: 2000 });
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 2000 });
   });
 });
 

@@ -275,7 +275,7 @@ test.describe('Task Activity Indicators', () => {
 
       const heading = page.locator('.fixed h2:has-text("Test Initializing Task")');
       await expect(heading).toBeVisible();
-      const titleInput = page.locator('.fixed input[type="text"]');
+      const titleInput = page.locator('.fixed input[placeholder="Task title"]');
       await expect(titleInput).not.toBeVisible();
 
       // Click the backdrop overlay to close (Escape may be captured by terminal in view mode)
@@ -302,7 +302,7 @@ test.describe('Task Activity Indicators', () => {
         await expect(editButton).toBeEnabled();
 
         await editButton.click();
-        const titleInput = thinkPage.locator('.fixed input[type="text"]');
+        const titleInput = thinkPage.locator('.fixed input[placeholder="Task title"]');
         await expect(titleInput).toBeVisible();
       } finally {
         await thinkBrowser.close();
@@ -500,9 +500,9 @@ test.describe('Task Activity Indicators', () => {
         await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
 
         await page.locator('text=Test Initializing Task').first().click();
-        await page.locator('.fixed input[type="text"]').waitFor({ state: 'visible' });
+        await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
-        const titleInput = page.locator('.fixed input[type="text"]');
+        const titleInput = page.locator('.fixed input[placeholder="Task title"]');
         await expect(titleInput).toBeVisible();
 
         await titleInput.fill('Updated Title');

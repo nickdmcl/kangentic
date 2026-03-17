@@ -1,6 +1,6 @@
 import React, { useState, useLayoutEffect, useRef, useEffect, useCallback, useMemo, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
-import { X, Trash2, Pencil, Loader2, FolderGit2, FolderOpen, GitPullRequest, ArrowRightLeft, ChevronRight, ChevronLeft, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock, SquareChevronRight, Search } from 'lucide-react';
+import { X, Trash2, Pencil, Loader2, FolderGit2, FolderOpen, GitPullRequest, ArrowRightLeft, ChevronRight, ChevronLeft, MoreHorizontal, Archive, CirclePause, CirclePlay, Play, Image, Clock, SquareChevronRight, Search, Info } from 'lucide-react';
 import { usePopoverPosition } from '../../hooks/usePopoverPosition';
 import { SessionSummaryPanel } from './SessionSummaryPanel';
 import { useBoardStore } from '../../stores/board-store';
@@ -19,6 +19,8 @@ import { BranchPicker } from './BranchPicker';
 import { WorktreeChip } from './WorktreeChip';
 import type { Task, TaskAttachment, ClaudeCommand, ShortcutConfig } from '../../../shared/types';
 import { resolveShortcutCommand } from '../../../shared/template-vars';
+import { isValidGitBranchName } from '../../../shared/git-utils';
+import { slugify } from '../../../shared/slugify';
 import { ICON_REGISTRY } from '../../utils/swimlane-icons';
 import { Zap } from 'lucide-react';
 import { Pill } from '../Pill';
@@ -286,6 +288,57 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const isArchived = task.archived_at !== null;
   const currentSwimlane = swimlanes.find((s) => s.id === task.swimlane_id);
   const isInBacklog = currentSwimlane?.role === 'backlog';
+
+  // Branch configuration state for backlog tasks
+  const [customBranchName, setCustomBranchName] = useState(task.branch_name || '');
+  const [knownBranches, setKnownBranches] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (isInBacklog) {
+      window.electronAPI.git.listBranches()
+        .then(branches => setKnownBranches(new Set(branches)))
+        .catch(() => setKnownBranches(new Set()));
+    }
+  }, [isInBacklog]);
+  const branchExists = useMemo(
+    () => customBranchName.trim() ? knownBranches.has(customBranchName.trim()) : false,
+    [customBranchName, knownBranches],
+  );
+  const branchNameError = useMemo(
+    () => customBranchName.trim() && !isValidGitBranchName(customBranchName.trim())
+      ? 'Invalid git branch name'
+      : '',
+    [customBranchName],
+  );
+  const effectiveBaseBranch = baseBranch.trim() || defaultBaseBranch || 'main';
+  const branchPlaceholder = useMemo(() => {
+    if (effectiveWorktree) {
+      const slug = slugify(title.trim()) || 'task-title';
+      return `${slug}-ab12cd34`;
+    }
+    return effectiveBaseBranch;
+  }, [effectiveWorktree, title, effectiveBaseBranch]);
+  const branchHint = useMemo(() => {
+    const pill = (text: string) => (
+      <span className="font-mono text-fg-faint">{text}</span>
+    );
+    const branch = customBranchName.trim();
+    if (branch) {
+      if (branchExists) {
+        if (effectiveWorktree) {
+          return <>{pill(branch)} exists and will be checked out in a new worktree</>;
+        }
+        return <>{pill(branch)} exists and will be checked out</>;
+      }
+      if (effectiveWorktree) {
+        return <>{pill(branch)} will be created from {pill(effectiveBaseBranch)} in a new worktree</>;
+      }
+      return <>{pill(branch)} will be created from {pill(effectiveBaseBranch)}</>;
+    }
+    if (effectiveWorktree) {
+      return <>Auto-generated branch will be created from {pill(effectiveBaseBranch)} in a new worktree</>;
+    }
+    return <>Agent will work directly on {pill(effectiveBaseBranch)}</>;
+  }, [customBranchName, branchExists, effectiveWorktree, effectiveBaseBranch]);
 
   // Smart popover positioning
   const { style: kebabStyle } = usePopoverPosition(kebabMenuRef, kebabPopoverRef, showKebabMenu, { mode: 'dropdown' });
@@ -660,6 +713,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     setDescription(task.description);
     setBaseBranch(task.base_branch || '');
     setUseWorktree(task.use_worktree != null ? Boolean(task.use_worktree) : null);
+    setCustomBranchName(task.branch_name || '');
     setIsEditing(false);
   };
 
@@ -727,6 +781,10 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         }
         if (worktreeChanged) {
           payload.use_worktree = useWorktree != null ? (useWorktree ? 1 : 0) : null;
+        }
+        if (isInBacklog) {
+          const trimmedCustomBranch = customBranchName.trim();
+          payload.branch_name = trimmedCustomBranch || null;
         }
       }
       await updateTask(payload);
@@ -1167,7 +1225,12 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
               </button>
               <button
                 onClick={handleSave}
-                className="px-3 py-1.5 text-xs bg-accent-emphasis hover:bg-accent text-accent-on rounded transition-colors"
+                disabled={!!branchNameError}
+                className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                  branchNameError
+                    ? 'bg-accent-emphasis/50 text-accent-on/50 cursor-not-allowed'
+                    : 'bg-accent-emphasis hover:bg-accent text-accent-on'
+                }`}
               >
                 Save
               </button>
@@ -1215,7 +1278,35 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
               )}
             </div>
             {thumbnailStrip}
-            {!isSessionActive && !isArchived && (
+            {!isSessionActive && !isArchived && isInBacklog && (
+              <div>
+                <label className="text-[10px] text-fg-muted mb-1 block">Branch</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    data-testid="custom-branch-name-input"
+                    type="text"
+                    placeholder={branchPlaceholder}
+                    value={customBranchName}
+                    onChange={(e) => setCustomBranchName(e.target.value)}
+                    className={`flex-1 min-w-0 bg-surface border rounded px-3 py-1.5 text-xs text-fg placeholder-fg-faint focus:outline-none ${
+                      branchNameError
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-edge-input focus:border-accent'
+                    }`}
+                  />
+                  <span className="text-xs text-fg-disabled shrink-0">from</span>
+                  <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
+                  <div className="w-px h-5 bg-edge-input shrink-0" />
+                  <WorktreeChip enabled={effectiveWorktree} onToggle={() => setUseWorktree(effectiveWorktree ? false : true)} />
+                </div>
+                {branchNameError ? (
+                  <p className="text-xs text-red-500 mt-0.5">{branchNameError}</p>
+                ) : (
+                  <span className="text-xs text-fg-disabled mt-1 flex items-center gap-1"><Info size={12} className="shrink-0" />{branchHint}</span>
+                )}
+              </div>
+            )}
+            {!isSessionActive && !isArchived && !isInBacklog && (
               <div className="flex items-center gap-2">
                 <BranchPicker value={baseBranch} defaultBranch={defaultBaseBranch || 'main'} onChange={setBaseBranch} />
                 {!task.worktree_path && (

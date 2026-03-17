@@ -214,3 +214,142 @@ test.describe('Worktree Toggle', () => {
     await page.keyboard.press('Escape');
   });
 });
+
+test.describe('Backlog Edit Branch Config', () => {
+  test('backlog edit shows full branch config UI', async () => {
+    await createTask(page, 'Branch Config Task');
+
+    // Backlog tasks open directly in edit mode
+    const taskCard = page.locator('[data-testid="swimlane"]').locator('text=Branch Config Task').first();
+    await taskCard.click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'visible' });
+
+    // Custom branch name input should be visible
+    const branchInput = page.locator('[data-testid="custom-branch-name-input"]');
+    await expect(branchInput).toBeVisible();
+
+    // BranchPicker chip should be visible
+    const branchChip = page.locator('[data-testid="branch-picker-chip"]');
+    await expect(branchChip).toBeVisible();
+
+    // WorktreeChip should be visible
+    const worktreeToggle = page.locator('[data-testid="worktree-toggle"]');
+    await expect(worktreeToggle).toBeVisible();
+
+    // Branch hint text should be visible
+    const branchHint = page.locator('text=Auto-generated branch will be created from');
+    await expect(branchHint).toBeVisible();
+
+    await page.keyboard.press('Escape');
+  });
+
+  test('custom branch name is saved to task', async () => {
+    await createTask(page, 'Custom Branch Save Task');
+
+    const taskCard = page.locator('[data-testid="swimlane"]').locator('text=Custom Branch Save Task').first();
+    await taskCard.click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'visible' });
+
+    // Type a custom branch name
+    const branchInput = page.locator('[data-testid="custom-branch-name-input"]');
+    await branchInput.fill('feature/my-custom-branch');
+
+    // Save
+    await page.locator('button:has-text("Save")').click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Verify branch_name was saved
+    const taskData = await page.evaluate(() => {
+      return window.electronAPI.tasks.list();
+    });
+    const task = taskData.find((t: { title: string }) => t.title === 'Custom Branch Save Task');
+    expect(task).toBeDefined();
+    expect(task.branch_name).toBe('feature/my-custom-branch');
+  });
+
+  test('invalid branch name shows error and disables Save', async () => {
+    await createTask(page, 'Invalid Branch Task');
+
+    const taskCard = page.locator('[data-testid="swimlane"]').locator('text=Invalid Branch Task').first();
+    await taskCard.click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'visible' });
+
+    // Type an invalid branch name (leading dots)
+    const branchInput = page.locator('[data-testid="custom-branch-name-input"]');
+    await branchInput.fill('..bad-branch');
+
+    // Error message should appear
+    await expect(page.locator('text=Invalid git branch name')).toBeVisible();
+
+    // Save button should be disabled
+    const saveButton = page.locator('button:has-text("Save")');
+    await expect(saveButton).toBeDisabled();
+
+    await page.keyboard.press('Escape');
+  });
+
+  test('cancel resets custom branch name', async () => {
+    await createTask(page, 'Cancel Branch Task');
+
+    const taskCard = page.locator('[data-testid="swimlane"]').locator('text=Cancel Branch Task').first();
+    await taskCard.click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'visible' });
+
+    // Type a custom branch name
+    const branchInput = page.locator('[data-testid="custom-branch-name-input"]');
+    await branchInput.fill('feature/will-be-cancelled');
+
+    // Cancel
+    await page.locator('button:has-text("Cancel")').click();
+
+    // Re-open the task
+    await taskCard.click();
+    await page.locator('[data-testid="task-detail-dialog"]').waitFor({ state: 'visible' });
+
+    // Branch input should be empty (reset to original null value)
+    const branchInputAgain = page.locator('[data-testid="custom-branch-name-input"]');
+    await expect(branchInputAgain).toHaveValue('');
+
+    await page.keyboard.press('Escape');
+  });
+
+  test('non-backlog task edit hides custom branch input', async () => {
+    await createTask(page, 'Planning Branch Task');
+
+    // Move the task to Planning via mock API and reload the board store
+    await page.evaluate(async () => {
+      const api = (window as any).electronAPI;
+      const stores = (window as any).__zustandStores;
+      const tasks = await api.tasks.list();
+      const task = tasks.find((t: { title: string }) => t.title === 'Planning Branch Task');
+      const swimlanes = await api.swimlanes.list();
+      const planning = swimlanes.find((s: { name: string }) => s.name === 'Planning');
+      if (task && planning) {
+        await api.tasks.move({
+          taskId: task.id,
+          targetSwimlaneId: planning.id,
+          targetPosition: 0,
+        });
+        await stores.board.getState().loadBoard();
+      }
+    });
+
+    // Wait for the task to appear in Planning
+    const taskCard = page.locator('[data-swimlane-name="Planning"]').locator('text=Planning Branch Task').first();
+    await expect(taskCard).toBeVisible({ timeout: 5000 });
+
+    // Open the task in Planning (non-backlog tasks without sessions open in edit mode)
+    await taskCard.click();
+    await page.locator('.fixed input[placeholder="Task title"]').waitFor({ state: 'visible' });
+
+    // Custom branch name input should NOT be visible (non-backlog task)
+    const branchInput = page.locator('[data-testid="custom-branch-name-input"]');
+    await expect(branchInput).not.toBeVisible();
+
+    // But BranchPicker should still be visible (simple chip mode for non-backlog)
+    const branchChip = page.locator('[data-testid="branch-picker-chip"]');
+    await expect(branchChip).toBeVisible();
+
+    await page.keyboard.press('Escape');
+  });
+});
