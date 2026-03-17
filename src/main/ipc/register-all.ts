@@ -34,6 +34,14 @@ function requireContext(): IpcContext {
 }
 
 export function registerAllIpc(mainWindow: BrowserWindow): void {
+  // Idempotent: on macOS, activate → createWindow() may call this again.
+  // Just update the window reference and return. ipcMain.handle calls
+  // must NOT run twice (throws "Attempted to register a second handler").
+  if (context) {
+    context.mainWindow = mainWindow;
+    return;
+  }
+
   // Eagerly create SessionManager + CommandInjector + BoardConfigManager (lightweight, needed early)
   const sessionManager = new SessionManager();
   const commandInjector = new CommandInjector(sessionManager);
@@ -100,16 +108,6 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
       message: sanitizeErrorMessage(message),
     });
   });
-}
-
-/**
- * Update the mainWindow reference in the IPC context. Called when macOS
- * recreates the window after all windows were closed (dock icon click).
- * IPC handlers remain registered from the initial registerAllIpc() call.
- */
-export function updateMainWindow(mainWindow: BrowserWindow): void {
-  if (!context) throw new Error('IPC not initialized. Call registerAllIpc first');
-  context.mainWindow = mainWindow;
 }
 
 // Thin wrappers -- same signatures as before, zero changes in index.ts

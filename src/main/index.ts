@@ -4,7 +4,7 @@ import { app, BrowserWindow, Menu, nativeImage, screen, session } from 'electron
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { registerAllIpc, updateMainWindow, getSessionManager, getCommandInjector, getBoardConfigManager, getCurrentProjectId, openProjectByPath, deleteProjectFromIndex, pruneStaleWorktreeProjects, activateAllProjects, getLastOpenedProject } from './ipc/register-all';
+import { registerAllIpc, getSessionManager, getCommandInjector, getBoardConfigManager, getCurrentProjectId, openProjectByPath, deleteProjectFromIndex, pruneStaleWorktreeProjects, activateAllProjects, getLastOpenedProject } from './ipc/register-all';
 import { closeAll, getProjectDb } from './db/database';
 import { SessionRepository } from './db/repositories/session-repository';
 import { IPC } from '../shared/ipc-channels';
@@ -224,6 +224,11 @@ const createWindow = () => {
   mainWindow.on('move', saveBounds);
   mainWindow.on('resize', saveBounds);
 
+  // Register IPC handlers early so speculative preloading (below) can use them.
+  // Idempotent: on macOS dock re-activation, the guard in registerAllIpc()
+  // updates the window reference without re-registering handlers.
+  registerAllIpc(mainWindow);
+
   // Native right-click context menu (Copy / Paste / Select All).
   // xterm.js renders to canvas/WebGL -- standard DOM copy/selectAll don't
   // reach its content.  We use the right-click coordinates (captured before
@@ -301,8 +306,8 @@ const createWindow = () => {
   // Speculative preloading: start project opening immediately after createWindow()
   // instead of waiting for did-finish-load (~2s later). DB init, session recovery,
   // and Claude CLI detection all overlap with the renderer loading phase.
-  // IPC handlers are already registered (registerAllIpc above), and Electron queues
-  // any webContents.send() calls until the renderer is ready.
+  // IPC handlers were registered earlier in this function (registerAllIpc),
+  // and Electron queues any webContents.send() calls until the renderer is ready.
   const cwd = getCwdArg();
   const projectPath = cwd || getLastOpenedProject()?.path || null;
   const preloadPromise = projectPath
@@ -377,13 +382,6 @@ app.whenReady().then(async () => {
   );
 
   createWindow();
-
-  // Register all IPC handlers exactly once. On macOS, closing all windows
-  // doesn't quit the app (dock behavior). Re-clicking the dock icon fires
-  // `activate` which recreates the window, but must NOT re-register handlers
-  // (ipcMain.handle throws on duplicate registration). The activate handler
-  // below calls updateMainWindow() instead.
-  registerAllIpc(mainWindow!);
   initUpdater(mainWindow!);
 
   // Fire app_launch event (analytics initialized before app.whenReady above).
@@ -415,10 +413,6 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-    // Update the IPC context and updater window references to the newly created
-    // window. IPC handlers are already registered from app.whenReady() and must
-    // not be re-registered (ipcMain.handle throws on duplicate registration).
-    updateMainWindow(mainWindow!);
     updateUpdaterWindow(mainWindow!);
   }
 });
