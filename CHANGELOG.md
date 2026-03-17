@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.7.1] - 2026-03-17
+
+### Fixes
+- Restore IPC init order and add idempotency guard (a204b9b)
+
 ## [v0.7.0] - 2026-03-16
 
 ### Features

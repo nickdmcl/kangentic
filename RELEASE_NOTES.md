@@ -1,10 +1,2 @@
-## What's New
-- Project grouping in the sidebar. Organize projects into collapsible groups for better navigation.
-- Visual Studio keyboard shortcut preset for Windows users.
-- Session duration tracking via heartbeat analytics events.
-
 ## Bug Fixes
-- Fixed branch checkout not applying for non-worktree tasks.
-- Fixed IPC double-registration crash on macOS and hardened cross-platform support.
-- Fixed sessions incorrectly resuming for tasks moved back to the backlog.
-- Fixed agent trust not being pre-populated for the working directory in demo mode.
+- Fixed app showing the welcome screen instead of the last-opened project on startup. This was a regression in v0.7.0 caused by IPC handlers initializing after the project preload. Also fixes a pre-existing macOS crash when re-clicking the dock icon after closing all windows.

@@ -59,6 +59,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `showBoardSearch` | boolean | `true` | Display the search bar above board columns. Toggle with Ctrl+F / Cmd+F. Global-only. |
 | `hasCompletedFirstRun` | boolean | `false` | Whether the user has completed first-run onboarding. Auto-set, not shown in UI. |
 | `windowBounds` | object \| null | `null` | Persisted window bounds `{x, y, width, height}`. Auto-saved, not shown in UI. |
+| `skipBoardConfigConfirm` | boolean | `false` | Auto-apply board config changes without confirmation dialog |
 
 ### terminal.*
 
@@ -156,7 +157,6 @@ All context bar settings are global-only and cannot be overridden per-project.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `sidebar.width` | number | `400` | Sidebar width (px). Global-only. |
-| `skipBoardConfigConfirm` | boolean | `false` | Auto-apply board config changes without confirmation dialog |
 
 ## Swimlane-Level Configuration
 
