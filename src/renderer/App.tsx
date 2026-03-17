@@ -32,6 +32,7 @@ export function App() {
     detectClaude();
     detectGit();
     loadProjects();
+    useProjectStore.getState().loadGroups();
     // Restore the current project after a page reload (e.g. Vite HMR).
     // The main process retains currentProjectId across renderer reloads.
     loadCurrent();
@@ -397,6 +398,7 @@ if (import.meta.hot) {
   // @ts-expect-error
   import.meta.hot.on('vite:afterUpdate', () => {
     useProjectStore.getState().loadProjects();
+    useProjectStore.getState().loadGroups();
     useProjectStore.getState().loadCurrent();
     useConfigStore.getState().loadConfig();
     useBoardStore.getState().loadBoard();

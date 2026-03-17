@@ -372,7 +372,13 @@ test.describe('Worktree Title Bar', () => {
     await page.evaluate(() => {
       (window as any).__mockFolderPath = '/mock/project/.kangentic/worktrees/my-feature-abc12345';
     });
-    await page.locator('button[title="Open folder as project"]').click();
+    // Use the welcome button if sidebar is not visible, otherwise use the dropdown
+    const welcomeButton = page.locator('[data-testid="welcome-open-project"]');
+    if (await welcomeButton.isVisible()) {
+      await welcomeButton.click();
+    } else {
+      await page.locator('button[title="Open folder as project"]').click();
+    }
     await waitForBoard(page);
 
     await expect(page.locator('text=(worktree)')).toBeVisible();

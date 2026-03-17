@@ -23,6 +23,7 @@ export class ProjectRepository {
       path: input.path,
       github_url: input.github_url || null,
       default_agent: 'claude',
+      group_id: null,
       position: 0,
       last_opened: now,
       created_at: now,
@@ -31,8 +32,8 @@ export class ProjectRepository {
       // Shift all existing projects down to make room at position 0
       db.prepare('UPDATE projects SET position = position + 1').run();
       db.prepare(
-        'INSERT INTO projects (id, name, path, github_url, default_agent, position, last_opened, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(project.id, project.name, project.path, project.github_url, project.default_agent, project.position, project.last_opened, project.created_at);
+        'INSERT INTO projects (id, name, path, github_url, default_agent, group_id, position, last_opened, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(project.id, project.name, project.path, project.github_url, project.default_agent, project.group_id, project.position, project.last_opened, project.created_at);
     });
     tx();
     return project;
@@ -73,5 +74,10 @@ export class ProjectRepository {
       });
     });
     tx();
+  }
+
+  setGroup(projectId: string, groupId: string | null): void {
+    const db = getGlobalDb();
+    db.prepare('UPDATE projects SET group_id = ? WHERE id = ?').run(groupId, projectId);
   }
 }

@@ -388,7 +388,34 @@ export function registerProjectHandlers(context: IpcContext): void {
     context.projectRepo.reorder(ids);
   });
 
+  ipcMain.handle(IPC.PROJECT_SET_GROUP, (_, projectId: string, groupId: string | null) => {
+    context.projectRepo.setGroup(projectId, groupId);
+  });
+
   ipcMain.handle(IPC.PROJECT_OPEN_BY_PATH, async (_, projectPath: string) => {
     return openProjectByPath(context, projectPath);
+  });
+
+  // Project Groups
+  ipcMain.handle(IPC.PROJECT_GROUP_LIST, () => context.projectGroupRepo.list());
+
+  ipcMain.handle(IPC.PROJECT_GROUP_CREATE, (_, input: { name: string }) => {
+    return context.projectGroupRepo.create(input);
+  });
+
+  ipcMain.handle(IPC.PROJECT_GROUP_UPDATE, (_, id: string, name: string) => {
+    return context.projectGroupRepo.update(id, name);
+  });
+
+  ipcMain.handle(IPC.PROJECT_GROUP_DELETE, (_, id: string) => {
+    context.projectGroupRepo.delete(id);
+  });
+
+  ipcMain.handle(IPC.PROJECT_GROUP_REORDER, (_, ids: string[]) => {
+    context.projectGroupRepo.reorder(ids);
+  });
+
+  ipcMain.handle(IPC.PROJECT_GROUP_SET_COLLAPSED, (_, id: string, collapsed: boolean) => {
+    context.projectGroupRepo.setCollapsed(id, collapsed);
   });
 }

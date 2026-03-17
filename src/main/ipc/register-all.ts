@@ -2,6 +2,7 @@ import { type BrowserWindow, ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { ProjectRepository } from '../db/repositories/project-repository';
+import { ProjectGroupRepository } from '../db/repositories/project-group-repository';
 import { SessionManager } from '../pty/session-manager';
 import { ConfigManager } from '../config/config-manager';
 import { BoardConfigManager } from '../config/board-config-manager';
@@ -42,6 +43,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
 
   // Lazy-initialize heavy objects on first access
   let projectRepo: ProjectRepository | null = null;
+  let projectGroupRepo: ProjectGroupRepository | null = null;
   let configManager: ConfigManager | null = null;
   let claudeDetector: ClaudeDetector | null = null;
   let gitDetector: GitDetector | null = null;
@@ -53,6 +55,10 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     get projectRepo() {
       if (!projectRepo) projectRepo = new ProjectRepository();
       return projectRepo;
+    },
+    get projectGroupRepo() {
+      if (!projectGroupRepo) projectGroupRepo = new ProjectGroupRepository();
+      return projectGroupRepo;
     },
     sessionManager,
     boardConfigManager,

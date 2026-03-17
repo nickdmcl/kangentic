@@ -42,9 +42,19 @@ All queries are synchronous via **better-sqlite3** -- they block the Node.js eve
 | path | TEXT | NOT NULL | |
 | github_url | TEXT | | NULL |
 | default_agent | TEXT | NOT NULL | 'claude' |
+| group_id | TEXT | | NULL |
 | position | INTEGER | NOT NULL | 0 |
 | last_opened | TEXT | NOT NULL | |
 | created_at | TEXT | NOT NULL | |
+
+### project_groups table
+
+| Column | Type | Constraints | Default |
+|--------|------|-------------|---------|
+| id | TEXT | PRIMARY KEY | |
+| name | TEXT | NOT NULL | |
+| position | INTEGER | NOT NULL | |
+| is_collapsed | INTEGER | NOT NULL | 0 |
 
 ### global_config table
 
@@ -213,6 +223,8 @@ Listed in execution order within `runProjectMigrations()`:
 ### Key Migrations (Global DB)
 
 1. **`position` column on projects** -- adds explicit project ordering. Backfills positions based on `last_opened DESC` order to preserve the original visual order.
+2. **`project_groups` table** -- creates the project groups table for organizing projects into named, collapsible sections.
+3. **`group_id` column on projects** -- adds nullable foreign key linking projects to their group.
 
 ## Repository Pattern
 

@@ -7,7 +7,16 @@ export const IPC = {
   PROJECT_GET_CURRENT: 'project:getCurrent',
   PROJECT_OPEN_BY_PATH: 'project:openByPath',
   PROJECT_REORDER: 'project:reorder',
+  PROJECT_SET_GROUP: 'project:setGroup',
   PROJECT_AUTO_OPENED: 'project:autoOpened',
+
+  // Project Groups
+  PROJECT_GROUP_LIST: 'projectGroup:list',
+  PROJECT_GROUP_CREATE: 'projectGroup:create',
+  PROJECT_GROUP_UPDATE: 'projectGroup:update',
+  PROJECT_GROUP_DELETE: 'projectGroup:delete',
+  PROJECT_GROUP_REORDER: 'projectGroup:reorder',
+  PROJECT_GROUP_SET_COLLAPSED: 'projectGroup:setCollapsed',
 
   // Tasks
   TASK_LIST: 'task:list',

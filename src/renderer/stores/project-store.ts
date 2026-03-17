@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import type { Project, ProjectCreateInput } from '../../shared/types';
+import type { Project, ProjectCreateInput, ProjectGroup, ProjectGroupCreateInput } from '../../shared/types';
 import { useSessionStore } from './session-store';
 
 interface ProjectStore {
   projects: Project[];
+  groups: ProjectGroup[];
   currentProject: Project | null;
   loading: boolean;
 
@@ -13,11 +14,21 @@ interface ProjectStore {
   openProject: (id: string) => Promise<void>;
   openProjectByPath: (folderPath: string) => Promise<Project>;
   reorderProjects: (ids: string[]) => Promise<void>;
+  setProjectGroup: (projectId: string, groupId: string | null) => Promise<void>;
   loadCurrent: () => Promise<void>;
+
+  // Group actions
+  loadGroups: () => Promise<void>;
+  createGroup: (input: ProjectGroupCreateInput) => Promise<ProjectGroup>;
+  updateGroup: (id: string, name: string) => Promise<ProjectGroup>;
+  deleteGroup: (id: string) => Promise<void>;
+  reorderGroups: (ids: string[]) => Promise<void>;
+  toggleGroupCollapsed: (id: string) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projects: [],
+  groups: [],
   currentProject: null,
   loading: false,
 
@@ -67,10 +78,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   reorderProjects: async (ids) => {
-    // Optimistic update: reorder projects array to match ids order
+    // Optimistic update: reorder projects array and update position fields
     const { projects } = get();
     const projectById = new Map(projects.map((p) => [p.id, p]));
-    const reordered = ids.map((id) => projectById.get(id)).filter((p): p is Project => p !== undefined);
+    const reordered = ids
+      .map((id, index) => {
+        const project = projectById.get(id);
+        return project ? { ...project, position: index } : undefined;
+      })
+      .filter((p): p is Project => p !== undefined);
     set({ projects: reordered });
     try {
       await window.electronAPI.projects.reorder(ids);
@@ -80,8 +96,88 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
   },
 
+  setProjectGroup: async (projectId, groupId) => {
+    // Optimistic update
+    set((s) => ({
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, group_id: groupId } : p,
+      ),
+    }));
+    try {
+      await window.electronAPI.projects.setGroup(projectId, groupId);
+    } catch {
+      await get().loadProjects();
+    }
+  },
+
   loadCurrent: async () => {
     const project = await window.electronAPI.projects.getCurrent();
     set({ currentProject: project });
+  },
+
+  // Group actions
+  loadGroups: async () => {
+    const groups = await window.electronAPI.projectGroups.list();
+    set({ groups });
+  },
+
+  createGroup: async (input) => {
+    const group = await window.electronAPI.projectGroups.create(input);
+    set((s) => ({ groups: [...s.groups, group] }));
+    return group;
+  },
+
+  updateGroup: async (id, name) => {
+    const group = await window.electronAPI.projectGroups.update(id, name);
+    set((s) => ({
+      groups: s.groups.map((g) => (g.id === id ? group : g)),
+    }));
+    return group;
+  },
+
+  deleteGroup: async (id) => {
+    await window.electronAPI.projectGroups.delete(id);
+    set((s) => ({
+      groups: s.groups.filter((g) => g.id !== id),
+      // Ungroup any projects that were in this group
+      projects: s.projects.map((p) =>
+        p.group_id === id ? { ...p, group_id: null } : p,
+      ),
+    }));
+  },
+
+  reorderGroups: async (ids) => {
+    // Optimistic update
+    const { groups } = get();
+    const groupById = new Map(groups.map((g) => [g.id, g]));
+    const reordered = ids
+      .map((id, index) => {
+        const group = groupById.get(id);
+        return group ? { ...group, position: index } : undefined;
+      })
+      .filter((g): g is ProjectGroup => g !== undefined);
+    set({ groups: reordered });
+    try {
+      await window.electronAPI.projectGroups.reorder(ids);
+    } catch {
+      await get().loadGroups();
+    }
+  },
+
+  toggleGroupCollapsed: async (id) => {
+    const group = get().groups.find((g) => g.id === id);
+    if (!group) return;
+    const newCollapsed = !group.is_collapsed;
+    // Optimistic update
+    set((s) => ({
+      groups: s.groups.map((g) =>
+        g.id === id ? { ...g, is_collapsed: newCollapsed } : g,
+      ),
+    }));
+    try {
+      await window.electronAPI.projectGroups.setCollapsed(id, newCollapsed);
+    } catch {
+      await get().loadGroups();
+    }
   },
 }));

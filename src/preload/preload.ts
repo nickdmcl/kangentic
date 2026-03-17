@@ -11,11 +11,21 @@ const api: ElectronAPI = {
     getCurrent: () => ipcRenderer.invoke(IPC.PROJECT_GET_CURRENT),
     openByPath: (path: string) => ipcRenderer.invoke(IPC.PROJECT_OPEN_BY_PATH, path),
     reorder: (ids: string[]) => ipcRenderer.invoke(IPC.PROJECT_REORDER, ids),
+    setGroup: (projectId: string, groupId: string | null) => ipcRenderer.invoke(IPC.PROJECT_SET_GROUP, projectId, groupId),
     onAutoOpened: (callback) => {
       const handler = (_event: Electron.IpcRendererEvent, project: Project) => callback(project);
       ipcRenderer.on(IPC.PROJECT_AUTO_OPENED, handler);
       return () => ipcRenderer.removeListener(IPC.PROJECT_AUTO_OPENED, handler);
     },
+  },
+
+  projectGroups: {
+    list: () => ipcRenderer.invoke(IPC.PROJECT_GROUP_LIST),
+    create: (input: { name: string }) => ipcRenderer.invoke(IPC.PROJECT_GROUP_CREATE, input),
+    update: (id: string, name: string) => ipcRenderer.invoke(IPC.PROJECT_GROUP_UPDATE, id, name),
+    delete: (id: string) => ipcRenderer.invoke(IPC.PROJECT_GROUP_DELETE, id),
+    reorder: (ids: string[]) => ipcRenderer.invoke(IPC.PROJECT_GROUP_REORDER, ids),
+    setCollapsed: (id: string, collapsed: boolean) => ipcRenderer.invoke(IPC.PROJECT_GROUP_SET_COLLAPSED, id, collapsed),
   },
 
   tasks: {

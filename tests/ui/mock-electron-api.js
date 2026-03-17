@@ -6,6 +6,7 @@
  */
 (function () {
   let projects = [];
+  let projectGroups = [];
   let tasks = [];
   let swimlanes = [];
   let archivedTasks = [];
@@ -193,6 +194,7 @@
           path: input.path,
           github_url: input.github_url || null,
           default_agent: 'claude',
+          group_id: null,
           position: 0,
           last_opened: now(),
           created_at: now(),
@@ -267,6 +269,7 @@
           path: projectPath,
           github_url: null,
           default_agent: 'claude',
+          group_id: null,
           position: 0,
           last_opened: now(),
           created_at: now(),
@@ -296,8 +299,55 @@
           if (idx >= 0) projects[idx].position = i;
         });
       },
+      setGroup: async function (projectId, groupId) {
+        var idx = projects.findIndex(function (p) { return p.id === projectId; });
+        if (idx >= 0) projects[idx].group_id = groupId;
+      },
       onAutoOpened: function () {
         return noop;
+      },
+    },
+
+    projectGroups: {
+      list: async function () {
+        return projectGroups.slice().sort(function (a, b) { return a.position - b.position; });
+      },
+      create: async function (input) {
+        var maxPos = projectGroups.reduce(function (max, g) { return Math.max(max, g.position); }, -1);
+        var group = {
+          id: uuid(),
+          name: input.name,
+          position: maxPos + 1,
+          is_collapsed: false,
+        };
+        projectGroups.push(group);
+        return group;
+      },
+      update: async function (id, name) {
+        var idx = projectGroups.findIndex(function (g) { return g.id === id; });
+        if (idx < 0) throw new Error('Project group not found: ' + id);
+        projectGroups[idx] = Object.assign({}, projectGroups[idx], { name: name });
+        return projectGroups[idx];
+      },
+      delete: async function (id) {
+        // Ungroup projects
+        projects.forEach(function (p) {
+          if (p.group_id === id) p.group_id = null;
+        });
+        projectGroups = projectGroups.filter(function (g) { return g.id !== id; });
+        // Reindex positions
+        projectGroups.sort(function (a, b) { return a.position - b.position; });
+        projectGroups.forEach(function (g, i) { g.position = i; });
+      },
+      reorder: async function (ids) {
+        ids.forEach(function (id, i) {
+          var idx = projectGroups.findIndex(function (g) { return g.id === id; });
+          if (idx >= 0) projectGroups[idx].position = i;
+        });
+      },
+      setCollapsed: async function (id, collapsed) {
+        var idx = projectGroups.findIndex(function (g) { return g.id === id; });
+        if (idx >= 0) projectGroups[idx].is_collapsed = collapsed;
       },
     },
 
@@ -832,6 +882,7 @@
   window.__mockPreConfigure = function (fn) {
     var result = fn({
       projects: projects,
+      projectGroups: projectGroups,
       tasks: tasks,
       archivedTasks: archivedTasks,
       swimlanes: swimlanes,

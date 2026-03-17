@@ -19,6 +19,28 @@ export function runGlobalMigrations(db: Database.Database): void {
     );
   `);
 
+  // Migration: create project_groups table
+  const hasGroupsTable = (db.prepare(
+    "SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name='project_groups'"
+  ).get() as { c: number }).c > 0;
+  if (!hasGroupsTable) {
+    db.exec(`
+      CREATE TABLE project_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        is_collapsed INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+  }
+
+  // Migration: add 'group_id' column to projects for group assignment
+  const hasGroupIdColumn = (db.pragma('table_info(projects)') as Array<{ name: string }>)
+    .some((col) => col.name === 'group_id');
+  if (!hasGroupIdColumn) {
+    db.exec('ALTER TABLE projects ADD COLUMN group_id TEXT DEFAULT NULL');
+  }
+
   // Migration: add 'position' column for explicit project ordering
   const hasPositionColumn = (db.pragma('table_info(projects)') as Array<{ name: string }>)
     .some((col) => col.name === 'position');

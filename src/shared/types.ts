@@ -1,11 +1,23 @@
 // === Database Models ===
 
+export interface ProjectGroup {
+  id: string;
+  name: string;
+  position: number;
+  is_collapsed: boolean;
+}
+
+export interface ProjectGroupCreateInput {
+  name: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   path: string;
   github_url: string | null;
   default_agent: string;
+  group_id: string | null;
   position: number;
   last_opened: string;
   created_at: string;
@@ -669,7 +681,18 @@ export interface ElectronAPI {
     getCurrent: () => Promise<Project | null>;
     openByPath: (path: string) => Promise<Project>;
     reorder: (ids: string[]) => Promise<void>;
+    setGroup: (projectId: string, groupId: string | null) => Promise<void>;
     onAutoOpened: (callback: (project: Project) => void) => () => void;
+  };
+
+  // Project Groups
+  projectGroups: {
+    list: () => Promise<ProjectGroup[]>;
+    create: (input: ProjectGroupCreateInput) => Promise<ProjectGroup>;
+    update: (id: string, name: string) => Promise<ProjectGroup>;
+    delete: (id: string) => Promise<void>;
+    reorder: (ids: string[]) => Promise<void>;
+    setCollapsed: (id: string, collapsed: boolean) => Promise<void>;
   };
 
   // Tasks
