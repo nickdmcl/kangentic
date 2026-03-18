@@ -54,7 +54,8 @@ beforeEach(() => {
 
   writeFile('.claude/commands/review.md', '# Review command');
   writeFile('.claude/commands/merge-back.md', '# Merge-back command');
-  writeFile('.claude/skills/deploy.md', '# Deploy skill');
+  writeFile('.claude/skills/code-review/SKILL.md', '# Code Review skill');
+  writeFile('.claude/skills/merge-back/SKILL.md', '# Merge-back skill');
   writeFile('.claude/agents/ipc-auditor.md', '# IPC auditor agent');
   writeFile('.claude/settings.local.json', JSON.stringify({ userKey: 'userValue' }));
 

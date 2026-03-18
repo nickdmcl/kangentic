@@ -1,3 +1,7 @@
+---
+description: Source-to-doc mapping and conventions for keeping docs/ in sync
+---
+
 # Documentation Maintenance
 
 Contextual knowledge for keeping `docs/` in sync with source code.

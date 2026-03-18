@@ -157,7 +157,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `claude:detect` | invoke | Detect Claude CLI (path, version) |
-| `claude:listCommands` | invoke | List available Claude Code commands |
+| `claude:listCommands` | invoke | List available Claude Code commands and skills |
 
 ### Shell (5 channels)
 | Channel | Pattern | Purpose |

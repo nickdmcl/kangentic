@@ -92,12 +92,12 @@ Click a task card to open the detail dialog. From here you can:
 - View session status, usage stats, and model info
 - Pause or resume the agent session using the circular play/pause button in the header
 - Run shortcuts from the header bar (configurable pills that launch external tools)
-- Open the **Commands** popover to browse and run Claude Code commands from the project's `.claude/` directory. Search by name, navigate with arrow keys, press Enter to invoke.
+- Open the **Commands & Skills** popover to browse and run Claude Code commands (`.claude/commands/`) and skills (`.claude/skills/`) from the project directory. Search by name, navigate with arrow keys, press Enter to invoke.
 - Access the kebab menu (three-dot icon) for additional actions:
   - **Edit** -- switch to edit mode for title and description
   - **Open folder** -- open the worktree or project directory in your file manager
   - **View PR** -- open the associated pull request (if one exists)
-  - **Commands** -- submenu of available Claude Code commands (same as the header popover)
+  - **Commands & Skills** -- submenu of available Claude Code commands and skills (same as the header popover)
   - **Pause / Resume session** -- manually suspend or resume the agent
   - **Move to** -- submenu listing all other columns as move targets
   - **Archive** -- move the task to Done and archive it

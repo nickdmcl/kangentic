@@ -193,7 +193,7 @@ function CommandPalettePopover({ triggerRef, cwd, onSelect, onClose }: CommandPa
         <input
           ref={searchInputRef}
           type="text"
-          placeholder="Search commands..."
+          placeholder="Search commands & skills..."
           value={searchFilter}
           onChange={(event) => setSearchFilter(event.target.value)}
           className="flex-1 bg-transparent text-sm text-fg placeholder-fg-faint outline-none"
@@ -207,7 +207,7 @@ function CommandPalettePopover({ triggerRef, cwd, onSelect, onClose }: CommandPa
           </div>
         ) : filteredCommands.length === 0 ? (
           <div className="px-3 py-6 text-center text-xs text-fg-faint">
-            No commands found
+            No commands or skills found
           </div>
         ) : (
           filteredCommands.map((command, index) => (
@@ -911,11 +911,11 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             shape="square"
             onClick={() => setShowCommandPalette(!showCommandPalette)}
             className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
-            title="Run a command"
+            title="Run a command or skill"
             data-testid="commands-button"
           >
             <SquareChevronRight size={14} />
-            Commands
+            Commands & Skills
           </Pill>
           {showCommandPalette && (
             <CommandPalettePopover
@@ -1049,7 +1049,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                   data-testid="kebab-commands-button"
                 >
                   <SquareChevronRight size={14} />
-                  <span className="flex-1">Commands</span>
+                  <span className="flex-1">Commands & Skills</span>
                   {commandsFlyoutPlacement.horizontal === 'left' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                 </button>
                 {showCommandsSubmenu && (

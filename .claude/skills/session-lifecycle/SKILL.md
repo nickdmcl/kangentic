@@ -1,3 +1,7 @@
+---
+description: Session state machine, PTY lifecycle, and terminal ownership patterns
+---
+
 # Session Lifecycle
 
 Contextual knowledge for session state management, PTY lifecycle, and terminal ownership. Reference this skill when working on session-related code to avoid the recurring bug patterns documented here.

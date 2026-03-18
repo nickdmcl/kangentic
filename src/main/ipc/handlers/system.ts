@@ -78,27 +78,52 @@ export function registerSystemHandlers(context: IpcContext): void {
     const projectPath = context.currentProjectPath;
     if (!projectPath) return [];
 
-    // Collect candidate .claude/commands/ directories from cwd upward,
-    // similar to how Claude Code discovers commands. Closest dirs first
-    // so nearer commands win on dedup.
-    const searchRoots: string[] = [];
     const startDir = cwd || projectPath;
-    let current = path.resolve(startDir);
-    const root = path.parse(current).root;
-    while (current !== root) {
-      searchRoots.push(path.join(current, '.claude', 'commands'));
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-    // Also include ~/.claude/commands/ (user-level commands)
     const homeDir = app.getPath('home');
-    searchRoots.push(path.join(homeDir, '.claude', 'commands'));
 
-    const seen = new Set<string>(); // command names already collected (closest wins)
+    // Walk from startDir upward to filesystem root, collecting .claude/<subdirectory>
+    // paths. Closest directories come first so nearer entries win on dedup.
+    function collectSearchRoots(subdirectory: string): string[] {
+      const roots: string[] = [];
+      let directory = path.resolve(startDir);
+      const fsRoot = path.parse(directory).root;
+      while (directory !== fsRoot) {
+        roots.push(path.join(directory, '.claude', subdirectory));
+        const parentDirectory = path.dirname(directory);
+        if (parentDirectory === directory) break;
+        directory = parentDirectory;
+      }
+      roots.push(path.join(homeDir, '.claude', subdirectory));
+      return roots;
+    }
+
+    // Parse YAML frontmatter from a markdown file's content.
+    // Returns extracted description and argument-hint values.
+    function parseFrontmatter(content: string): { description: string; argumentHint: string } {
+      let description = '';
+      let argumentHint = '';
+      if (content.startsWith('---')) {
+        const endIndex = content.indexOf('---', 3);
+        if (endIndex !== -1) {
+          const frontmatter = content.slice(3, endIndex);
+          for (const line of frontmatter.split('\n')) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('description:')) {
+              description = trimmed.slice('description:'.length).trim().replace(/^['"]|['"]$/g, '');
+            } else if (trimmed.startsWith('argument-hint:')) {
+              argumentHint = trimmed.slice('argument-hint:'.length).trim().replace(/^['"]|['"]$/g, '');
+            }
+          }
+        }
+      }
+      return { description, argumentHint };
+    }
+
+    const seen = new Set<string>(); // names already collected (closest wins)
     const commands: ClaudeCommand[] = [];
 
-    function walkDirectory(directory: string, prefix: string): void {
+    // Scan .claude/commands/ directories (legacy format: flat .md files)
+    function walkCommandsDirectory(directory: string, prefix: string): void {
       let entries: fs.Dirent[];
       try {
         entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -108,44 +133,85 @@ export function registerSystemHandlers(context: IpcContext): void {
       for (const entry of entries) {
         const fullPath = path.join(directory, entry.name);
         if (entry.isDirectory()) {
-          walkDirectory(fullPath, prefix ? `${prefix}${entry.name}:` : `${entry.name}:`);
+          walkCommandsDirectory(fullPath, prefix ? `${prefix}${entry.name}:` : `${entry.name}:`);
         } else if (entry.isFile() && entry.name.endsWith('.md')) {
           const baseName = entry.name.slice(0, -3);
           const commandName = prefix + baseName;
-          if (seen.has(commandName)) continue; // closer directory already provided this command
+          if (seen.has(commandName)) continue;
           seen.add(commandName);
 
-          const displayName = `/${commandName}`;
           let description = '';
           let argumentHint = '';
-
           try {
             const content = fs.readFileSync(fullPath, 'utf-8');
-            if (content.startsWith('---')) {
-              const endIndex = content.indexOf('---', 3);
-              if (endIndex !== -1) {
-                const frontmatter = content.slice(3, endIndex);
-                for (const line of frontmatter.split('\n')) {
-                  const trimmed = line.trim();
-                  if (trimmed.startsWith('description:')) {
-                    description = trimmed.slice('description:'.length).trim().replace(/^['"]|['"]$/g, '');
-                  } else if (trimmed.startsWith('argument-hint:')) {
-                    argumentHint = trimmed.slice('argument-hint:'.length).trim().replace(/^['"]|['"]$/g, '');
-                  }
-                }
-              }
-            }
+            ({ description, argumentHint } = parseFrontmatter(content));
           } catch {
             // Skip files that can't be read
           }
 
-          commands.push({ name: commandName, displayName, description, argumentHint });
+          commands.push({ name: commandName, displayName: `/${commandName}`, description, argumentHint, source: 'command' });
         }
       }
     }
 
-    for (const commandsDir of searchRoots) {
-      walkDirectory(commandsDir, '');
+    for (const commandsDir of collectSearchRoots('commands')) {
+      walkCommandsDirectory(commandsDir, '');
+    }
+
+    // Scan .claude/skills/ directories (new format: subdirectory with SKILL.md)
+    for (const skillsDir of collectSearchRoots('skills')) {
+      let entries: fs.Dirent[];
+      try {
+        entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const skillName = entry.name;
+        if (seen.has(skillName)) continue;
+
+        const skillMdPath = path.join(skillsDir, skillName, 'SKILL.md');
+        try {
+          fs.accessSync(skillMdPath, fs.constants.R_OK);
+        } catch {
+          continue; // no SKILL.md in this directory
+        }
+
+        seen.add(skillName);
+        let description = '';
+        let argumentHint = '';
+
+        try {
+          const content = fs.readFileSync(skillMdPath, 'utf-8');
+          ({ description, argumentHint } = parseFrontmatter(content));
+          // Fall back to first paragraph after heading if no frontmatter description
+          if (!description) {
+            const lines = content.split('\n');
+            let pastHeading = false;
+            for (const line of lines) {
+              if (line.startsWith('#')) {
+                pastHeading = true;
+                continue;
+              }
+              if (pastHeading && line.trim()) {
+                description = line.trim();
+                break;
+              }
+            }
+          }
+        } catch {
+          // Skip files that can't be read
+        }
+
+        commands.push({
+          name: skillName,
+          displayName: `/${skillName}`,
+          description,
+          argumentHint,
+          source: 'skill',
+        });
+      }
     }
 
     commands.sort((a, b) => a.name.localeCompare(b.name));

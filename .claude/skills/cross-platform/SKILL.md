@@ -1,3 +1,7 @@
+---
+description: Cross-platform pitfalls for shell handling, paths, and file operations
+---
+
 # Cross-Platform Pitfalls
 
 Contextual knowledge for platform-specific issues across Windows, macOS, and Linux. Reference this skill when working on shell handling, path utilities, terminal rendering, or file operations.
@@ -117,7 +121,7 @@ Checks `parent=worktrees` and `grandparent=.kangentic` to verify a path is insid
 
 **IMPORTANT:** Never use `path.normalize()`, `path.dirname()`, or `path.basename()` on paths that may contain Windows backslashes when the code runs on Linux. Node's `path` module is platform-dependent -- on Linux, `\` is a valid filename character, not a separator. Always normalize slashes manually first.
 
-Sparse-checkout excludes `.claude/commands/`, `.claude/skills/`, and `.claude/agents/` from worktrees to prevent duplicate slash commands, skills, and agents.
+Sparse-checkout excludes `.claude/commands/` from worktrees (commands walk up the directory tree, so including them would cause duplicate discovery). Skills and agents do NOT walk up, so they must be present in the worktree checkout.
 
 ## Key Source Files
 

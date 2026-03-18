@@ -1,3 +1,7 @@
+---
+description: IPC bridge checklist for adding or modifying endpoints across all 7 layers
+---
+
 # IPC Bridge Checklist
 
 Contextual knowledge for adding or modifying IPC endpoints. Every IPC endpoint spans 7 layers that must stay in sync. Missing a layer causes silent failures or test crashes.

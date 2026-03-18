@@ -56,7 +56,7 @@ describe('WorktreeManager -- sparse-checkout', () => {
     vi.clearAllMocks();
   });
 
-  it('initializes sparse-checkout with --no-cone and excludes .claude/commands/, .claude/skills/, and .claude/agents/', async () => {
+  it('initializes sparse-checkout with --no-cone and excludes .claude/commands/', async () => {
     setupCreateWorktreeMocks();
 
     const mgr = new WorktreeManager('/project');

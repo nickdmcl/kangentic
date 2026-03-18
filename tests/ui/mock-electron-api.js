@@ -785,9 +785,9 @@
       },
       listCommands: async function (/* cwd */) {
         return [
-          { name: 'code-review', displayName: '/code-review', description: 'Review code for quality and conventions', argumentHint: '' },
-          { name: 'test', displayName: '/test', description: 'Run tests and audit coverage', argumentHint: '' },
-          { name: 'ci:build', displayName: '/ci:build', description: 'Run CI build pipeline', argumentHint: '[fast|full]' },
+          { name: 'code-review', displayName: '/code-review', description: 'Review code for quality and conventions', argumentHint: '', source: 'command' },
+          { name: 'test', displayName: '/test', description: 'Run tests and audit coverage', argumentHint: '', source: 'command' },
+          { name: 'ci:build', displayName: '/ci:build', description: 'Run CI build pipeline', argumentHint: '[fast|full]', source: 'command' },
         ];
       },
     },

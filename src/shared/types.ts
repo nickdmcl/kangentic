@@ -503,6 +503,7 @@ export interface ClaudeCommand {
   displayName: string;  // "/code-review"
   description: string;  // from frontmatter, or empty
   argumentHint: string; // from frontmatter, or empty (e.g. "[all|audit|write]")
+  source: 'command' | 'skill';
 }
 
 // === Updater ===
