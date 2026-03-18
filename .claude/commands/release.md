@@ -180,7 +180,7 @@ Summarize the release:
 - Changelog entry: show the generated entry
 - **Release notes:** Read `RELEASE_NOTES.md` and display the contents. Tell the user: "These release notes will be applied to the draft GitHub Release automatically by CI."
 - GitHub Actions: link to `https://github.com/Kangentic/kangentic/actions` -- the tag push triggers the Release workflow which builds platform artifacts and creates a draft GitHub Release.
-- **Remind the user:** "Review and publish the draft release at https://github.com/Kangentic/kangentic/releases once the workflow completes. The release description will already be populated from RELEASE_NOTES.md."
+- **Open the releases page** in the user's browser: run `start https://github.com/Kangentic/kangentic/releases` so the user can review and publish the draft once the workflow completes.
 
 ## Allowed Tools
 
