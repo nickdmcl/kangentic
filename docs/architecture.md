@@ -260,6 +260,7 @@ Transitions only fire for case 5. The action chain runs in `execution_order`: ty
 | `kill_session` | Suspend session, clear task.session_id |
 | `create_worktree` | Create git worktree with sparse-checkout |
 | `cleanup_worktree` | Remove worktree directory and optionally branch |
+| `create_pr` | Reserved. Not yet implemented. |
 | `webhook` | POST to URL with interpolated body |
 
 Template variables available: `{{title}}`, `{{description}}`, `{{taskId}}`, `{{worktreePath}}`, `{{branchName}}`, `{{attachments}}`.

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.8.0] - 2026-03-18
+
+### Features
+- Make backlog move destructive and add full branch config to edit (c63c6fe)
+- Add custom branch name support for tasks (00e8b38)
+- Add defaultBaseBranch to team-shared kangentic.json (12b66b0)
+
+### Fixes
+- Skip prompt template when starting tasks from non-backlog columns (2f7d58e)
+- Prevent terminal color corruption from scrollback replay (03103f7)
+- Add CWD validation and enhanced diagnostics for posix_spawnp failures (ee34e07)
+- Preserve task detail dialog across board reloads (6dca5c4)
+- Preserve scrollback on resume and fix garbled terminal handoff (fba13e8)
+- Replace platform-specific version checks with cross-platform version marker (abc7863)
+
+### Other
+- Remove confirmation prompt from /test write mode (785cdc7)
+
 ## [v0.7.1] - 2026-03-17
 
 ### Fixes
