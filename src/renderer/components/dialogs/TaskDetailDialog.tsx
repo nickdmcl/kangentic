@@ -193,7 +193,7 @@ function CommandPalettePopover({ triggerRef, cwd, onSelect, onClose }: CommandPa
         <input
           ref={searchInputRef}
           type="text"
-          placeholder="Search commands & skills..."
+          placeholder="Search commands..."
           value={searchFilter}
           onChange={(event) => setSearchFilter(event.target.value)}
           className="flex-1 bg-transparent text-sm text-fg placeholder-fg-faint outline-none"
@@ -911,11 +911,11 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             shape="square"
             onClick={() => setShowCommandPalette(!showCommandPalette)}
             className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
-            title="Run a command or skill"
+            title="Run a command"
             data-testid="commands-button"
           >
             <SquareChevronRight size={14} />
-            Commands & Skills
+            Commands
           </Pill>
           {showCommandPalette && (
             <CommandPalettePopover
@@ -982,7 +982,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
           <MoreHorizontal size={16} />
         </button>
         {showKebabMenu && (
-          <div ref={kebabPopoverRef} style={kebabStyle} className="absolute min-w-[170px] bg-surface-raised border border-edge-input rounded-md shadow-xl z-50 py-1">
+          <div ref={kebabPopoverRef} style={kebabStyle} className="absolute w-max bg-surface-raised border border-edge-input rounded-md shadow-xl z-50 py-1">
             {/* Edit */}
             <button
               onClick={() => { setShowKebabMenu(false); setShowMoveSubmenu(false); setShowCommandsSubmenu(false); setIsEditing(true); }}
@@ -1049,7 +1049,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
                   data-testid="kebab-commands-button"
                 >
                   <SquareChevronRight size={14} />
-                  <span className="flex-1">Commands & Skills</span>
+                  <span className="flex-1">Commands</span>
                   {commandsFlyoutPlacement.horizontal === 'left' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                 </button>
                 {showCommandsSubmenu && (
