@@ -1,6 +1,6 @@
 const PROCESS_START = performance.now();
 
-import { app, BrowserWindow, Menu, nativeImage, screen, session } from 'electron';
+import { app, BrowserWindow, clipboard, Menu, nativeImage, screen, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -239,6 +239,37 @@ const createWindow = () => {
   const wc = mainWindow.webContents;
   mainWindow.webContents.on('context-menu', (_event, params) => {
     const { x, y } = params;
+
+    if (params.mediaType === 'image' && params.hasImageContents) {
+      const imageMenu = Menu.buildFromTemplate([
+        {
+          label: 'Copy Image',
+          click: () => {
+            try {
+              const image = nativeImage.createFromDataURL(params.srcURL);
+              clipboard.writeImage(image);
+            } catch {
+              // srcURL wasn't a valid data URL - silently ignore
+            }
+          },
+        },
+        {
+          label: 'Copy',
+          accelerator: 'CmdOrCtrl+C',
+          enabled: params.editFlags.canCopy || true,
+          click: () => { wc.executeJavaScript(`document.execCommand('copy')`); },
+        },
+        { type: 'separator' },
+        {
+          label: 'Select All',
+          accelerator: 'CmdOrCtrl+A',
+          click: () => { wc.executeJavaScript(`document.execCommand('selectAll')`); },
+        },
+      ]);
+      imageMenu.popup();
+      return;
+    }
+
     const menu = Menu.buildFromTemplate([
       {
         label: 'Copy',

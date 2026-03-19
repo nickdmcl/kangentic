@@ -86,6 +86,8 @@ scripts/          # Build and dev scripts
 - `npm run package` — Package for distribution (unpacked directory)
 - `npm run make` — Build installer (NSIS on Windows, DMG on macOS, deb/rpm on Linux)
 
+**Worktrees need `npm install`:** Git worktrees do not share `node_modules/` with the main repo. Always run `npm install` in a worktree before running any npm scripts (`npm run typecheck`, `npm run build`, `npx playwright test`, etc.). Without it, binaries like `tsc` won't be found.
+
 ## Architecture
 
 ### Data Flow
