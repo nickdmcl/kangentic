@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.9.1] - 2026-03-18
+
+### Fixes
+- Bundle @aptabase/electron via esbuild alias to fix packaged builds (59f1d84)
+- Ensure spawn-helper has execute permissions on macOS (5e579be)
+- Prevent garbled TUI output on scrollback replay at wrong width (e2e4102)
+
+### Other
+- Allow start command in project permissions (e300ade)
+
 ## [v0.9.0] - 2026-03-18
 
 ### Features
