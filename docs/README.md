@@ -28,6 +28,7 @@ Kangentic is a cross-platform desktop Kanban for Claude Code agents. Drag tasks 
 
 ### Integration
 - [Claude Integration](claude-integration.md) -- CLI detection, command building, settings merge, hooks, trust
+- [MCP Server](mcp-server.md) -- Board management tools for agents, file-based command queue, .mcp.json safety
 - [Activity Detection](activity-detection.md) -- Event pipeline, thinking/idle state, subagent-aware transitions
 - [Worktree Strategy](worktree-strategy.md) -- Branch naming, sparse-checkout, hook delivery, cleanup
 
