@@ -348,8 +348,36 @@ export function App() {
       }));
     }
 
-    // Task auto-moved (plan exit → next column)
+    // Task created by agent (MCP server)
     const tasks = window.electronAPI?.tasks;
+    if (tasks?.onCreatedByAgent) {
+      cleanups.push(tasks.onCreatedByAgent((_taskId, taskTitle, columnName, createdByAgentProjectId) => {
+        const activeProjectId = useProjectStore.getState().currentProject?.id;
+        if (!createdByAgentProjectId || createdByAgentProjectId === activeProjectId) {
+          useBoardStore.getState().loadBoard();
+        }
+        useToastStore.getState().addToast({
+          message: `Task created by agent: "${taskTitle}" in ${columnName}`,
+          variant: 'success',
+        });
+      }));
+    }
+
+    // Task updated by agent (MCP server)
+    if (tasks?.onUpdatedByAgent) {
+      cleanups.push(tasks.onUpdatedByAgent((_taskId, taskTitle, updatedByAgentProjectId) => {
+        const activeProjectId = useProjectStore.getState().currentProject?.id;
+        if (!updatedByAgentProjectId || updatedByAgentProjectId === activeProjectId) {
+          useBoardStore.getState().loadBoard();
+        }
+        useToastStore.getState().addToast({
+          message: `Task updated by agent: "${taskTitle}"`,
+          variant: 'info',
+        });
+      }));
+    }
+
+    // Task auto-moved (plan exit → next column)
     if (tasks?.onAutoMoved) {
       cleanups.push(tasks.onAutoMoved((autoMovedTaskId, _targetSwimlaneId, taskTitle, autoMoveProjectId) => {
         useBoardStore.getState().loadBoard();

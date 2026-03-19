@@ -16,7 +16,7 @@ import {
   convertWindowsExePath,
   sanitizeForPty,
 } from '../../src/shared/paths';
-import { interpolateTemplate, CommandBuilder } from '../../src/main/agent/command-builder';
+import { interpolateTemplate, CommandBuilder, injectKangenticMcpServer, cleanupMcpJson } from '../../src/main/agent/command-builder';
 import { slugify } from '../../src/shared/slugify';
 
 // ── Inline test-only helper (deliberately simplified, omits merged settings / hooks) ──
@@ -977,5 +977,294 @@ describe('Shell Detection', () => {
         expect(fs.existsSync(shell.path)).toBeTruthy();
       }
     }
+  });
+});
+
+describe('Merged Settings -- MCP Server Injection', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-inject-'));
+    // Create .claude directory with empty settings
+    fs.mkdirSync(path.join(tmpDir, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.claude', 'settings.json'), '{}');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes kangentic MCP server to .mcp.json in CWD by default', () => {
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'mcp-test', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'mcp-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'mcp-test',
+      statusOutputPath: statusOutput,
+    });
+
+    // Claude Code reads MCP servers from .mcp.json, not settings.json
+    const mcpJsonPath = path.join(tmpDir, '.mcp.json');
+    expect(fs.existsSync(mcpJsonPath)).toBe(true);
+    const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+
+    expect(mcpConfig.mcpServers.kangentic).toBeDefined();
+    expect(mcpConfig.mcpServers.kangentic.command).toBe('node');
+    expect(mcpConfig.mcpServers.kangentic.args).toHaveLength(3);
+    expect(mcpConfig.mcpServers.kangentic.args[0]).toContain('mcp-server');
+    expect(mcpConfig.mcpServers.kangentic.args[1]).toContain('commands.jsonl');
+    expect(mcpConfig.mcpServers.kangentic.args[2]).toContain('responses');
+  });
+
+  it('skips .mcp.json write when mcpServerEnabled is false', () => {
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'no-mcp', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'no-mcp-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'no-mcp',
+      statusOutputPath: statusOutput,
+      mcpServerEnabled: false,
+    });
+
+    // .mcp.json should not exist (or not contain kangentic)
+    const mcpJsonPath = path.join(tmpDir, '.mcp.json');
+    if (fs.existsSync(mcpJsonPath)) {
+      const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+      expect(mcpConfig.mcpServers?.kangentic).toBeUndefined();
+    }
+  });
+
+  it('preserves existing user MCP servers in .mcp.json when injecting kangentic', () => {
+    // User has their own MCP server in .mcp.json
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: {
+        'context7': {
+          command: 'npx',
+          args: ['-y', '@upstash/context7-mcp'],
+        },
+      },
+    }));
+
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'merge-mcp', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'merge-mcp-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'merge-mcp',
+      statusOutputPath: statusOutput,
+    });
+
+    const mcpJsonPath = path.join(tmpDir, '.mcp.json');
+    const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+
+    // Both servers should be present
+    expect(mcpConfig.mcpServers.kangentic).toBeDefined();
+    expect(mcpConfig.mcpServers.context7).toBeDefined();
+    expect(mcpConfig.mcpServers.context7.command).toBe('npx');
+  });
+
+  it('skips injection when .mcp.json contains malformed JSON', () => {
+    const mcpJsonPath = path.join(tmpDir, '.mcp.json');
+    const malformedContent = '{ this is not valid JSON !!!';
+    fs.writeFileSync(mcpJsonPath, malformedContent);
+
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'bad-json', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'bad-json-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'bad-json',
+      statusOutputPath: statusOutput,
+    });
+
+    // File should be untouched (not overwritten)
+    expect(fs.readFileSync(mcpJsonPath, 'utf-8')).toBe(malformedContent);
+  });
+
+  it('disabled setting triggers cleanup of stale kangentic entry', () => {
+    // Simulate a prior session that left kangentic in .mcp.json
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: {
+        kangentic: { command: 'node', args: ['old-path'] },
+        context7: { command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
+      },
+    }));
+
+    const builder = new CommandBuilder();
+    const statusOutput = path.join(tmpDir, '.kangentic', 'sessions', 'disabled-mcp', 'status.json');
+    fs.mkdirSync(path.dirname(statusOutput), { recursive: true });
+
+    builder.buildClaudeCommand({
+      claudePath: '/usr/bin/claude',
+      taskId: 'disabled-task',
+      cwd: tmpDir,
+      permissionMode: 'default',
+      sessionId: 'disabled-mcp',
+      statusOutputPath: statusOutput,
+      mcpServerEnabled: false,
+    });
+
+    // kangentic should be removed, context7 preserved
+    const mcpConfig = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(mcpConfig.mcpServers.kangentic).toBeUndefined();
+    expect(mcpConfig.mcpServers.context7).toBeDefined();
+  });
+});
+
+describe('MCP .mcp.json Helpers -- injectKangenticMcpServer', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-helpers-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('creates .mcp.json when file does not exist', () => {
+    injectKangenticMcpServer(tmpDir, { command: 'node', args: ['server.js'] });
+
+    const mcpJsonPath = path.join(tmpDir, '.mcp.json');
+    expect(fs.existsSync(mcpJsonPath)).toBe(true);
+    const content = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+    expect(content.mcpServers.kangentic.command).toBe('node');
+    expect(content.mcpServers.kangentic.args).toEqual(['server.js']);
+  });
+
+  it('updates kangentic entry when already present (no duplication)', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: { kangentic: { command: 'node', args: ['old.js'] } },
+    }));
+
+    injectKangenticMcpServer(tmpDir, { command: 'node', args: ['new.js'] });
+
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(content.mcpServers.kangentic.args).toEqual(['new.js']);
+    // Only one kangentic key
+    expect(Object.keys(content.mcpServers)).toEqual(['kangentic']);
+  });
+
+  it('skips injection with malformed JSON (file untouched)', () => {
+    const malformed = '{ bad json';
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), malformed);
+
+    injectKangenticMcpServer(tmpDir, { command: 'node', args: ['x'] });
+
+    expect(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8')).toBe(malformed);
+  });
+});
+
+describe('MCP .mcp.json Helpers -- cleanupMcpJson', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-cleanup-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('removes kangentic entry, preserves user servers', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: {
+        kangentic: { command: 'node', args: ['x'] },
+        context7: { command: 'npx', args: ['-y', 'ctx7'] },
+      },
+    }));
+
+    cleanupMcpJson(tmpDir);
+
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(content.mcpServers.kangentic).toBeUndefined();
+    expect(content.mcpServers.context7).toBeDefined();
+  });
+
+  it('no-op when .mcp.json does not exist', () => {
+    // Should not throw
+    cleanupMcpJson(tmpDir);
+    expect(fs.existsSync(path.join(tmpDir, '.mcp.json'))).toBe(false);
+  });
+
+  it('no-op when .mcp.json has no kangentic entry', () => {
+    const original = JSON.stringify({ mcpServers: { context7: { command: 'npx' } } });
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), original);
+
+    cleanupMcpJson(tmpDir);
+
+    // File should be unchanged (not rewritten)
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(content.mcpServers.context7).toBeDefined();
+  });
+
+  it('deletes .mcp.json when kangentic is the only server and no other keys', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: { kangentic: { command: 'node', args: ['x'] } },
+    }));
+
+    cleanupMcpJson(tmpDir);
+
+    expect(fs.existsSync(path.join(tmpDir, '.mcp.json'))).toBe(false);
+  });
+
+  it('preserves .mcp.json when it has other top-level keys', () => {
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify({
+      mcpServers: { kangentic: { command: 'node', args: ['x'] } },
+      customKey: 'keep-me',
+    }));
+
+    cleanupMcpJson(tmpDir);
+
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(content.customKey).toBe('keep-me');
+    expect(content.mcpServers).toBeUndefined();
+  });
+
+  it('skips cleanup with malformed JSON (file untouched)', () => {
+    const malformed = '{ bad json';
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), malformed);
+
+    cleanupMcpJson(tmpDir);
+
+    expect(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8')).toBe(malformed);
+  });
+
+  it('round-trip: inject then cleanup returns file to original state', () => {
+    const original = {
+      mcpServers: { context7: { command: 'npx', args: ['-y', 'ctx7'] } },
+    };
+    fs.writeFileSync(path.join(tmpDir, '.mcp.json'), JSON.stringify(original, null, 2));
+
+    injectKangenticMcpServer(tmpDir, { command: 'node', args: ['server.js'] });
+
+    // kangentic should be present after injection
+    const afterInject = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(afterInject.mcpServers.kangentic).toBeDefined();
+
+    cleanupMcpJson(tmpDir);
+
+    // File should be back to just context7
+    const afterCleanup = JSON.parse(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8'));
+    expect(afterCleanup.mcpServers.kangentic).toBeUndefined();
+    expect(afterCleanup.mcpServers.context7).toBeDefined();
   });
 });

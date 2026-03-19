@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import * as pty from 'node-pty';
 import { EventEmitter } from 'node:events';
 import { v4 as uuidv4 } from 'uuid';
 import { ShellResolver } from './shell-resolver';
 import { SessionQueue } from './session-queue';
 import { FileWatcher } from './file-watcher';
+import { CommandBridge } from '../agent/command-bridge';
+import { cleanupMcpJson } from '../agent/command-builder';
+import { getProjectDb } from '../db/database';
 import { ClaudeStatusParser } from '../agent/claude-status-parser';
 import { adaptCommandForShell } from '../../shared/paths';
 import { EventType, EventTypeActivity, ClaudeTool } from '../../shared/types';
@@ -40,6 +44,7 @@ interface ManagedSession {
   eventsFileWatcher: FileWatcher | null;
   resuming: boolean;
   lastCols: number;
+  commandBridge: CommandBridge | null;
 }
 
 export class SessionManager extends EventEmitter {
@@ -218,6 +223,7 @@ export class SessionManager extends EventEmitter {
         eventsFileWatcher: null,
         resuming: false,
         lastCols: 120,
+        commandBridge: null,
       };
       this.sessions.set(id, session);
       this.sessionQueue.enqueue(input, id);
@@ -255,6 +261,8 @@ export class SessionManager extends EventEmitter {
       existing.statusFileWatcher = null;
       existing.eventsFileWatcher?.close();
       existing.eventsFileWatcher = null;
+      existing.commandBridge?.stop();
+      existing.commandBridge = null;
     }
 
     // Null out file paths on the old session object to prevent its
@@ -406,6 +414,7 @@ export class SessionManager extends EventEmitter {
         eventsFileWatcher: null,
         resuming: input.resuming ?? false,
         lastCols: 120,
+        commandBridge: null,
       };
       this.sessions.set(id, failedSession);
       this.emit('exit', id, -1);
@@ -442,6 +451,7 @@ export class SessionManager extends EventEmitter {
       eventsFileWatcher: null,
       resuming: input.resuming ?? false,
       lastCols: 120,
+      commandBridge: null,
     };
 
     this.sessions.set(id, session);
@@ -461,6 +471,11 @@ export class SessionManager extends EventEmitter {
     // Start watching the events JSONL file for activity log
     if (input.eventsOutputPath) {
       this.startEventWatcher(session);
+    }
+
+    // Start command bridge for MCP server communication (if session dir exists)
+    if (input.statusOutputPath) {
+      this.startCommandBridge(session);
     }
 
     // Default activity to 'idle'. The 'thinking' state is only set when
@@ -521,6 +536,16 @@ export class SessionManager extends EventEmitter {
       session.statusFileWatcher = null;
       session.eventsFileWatcher?.close();
       session.eventsFileWatcher = null;
+      session.commandBridge?.stop();
+      session.commandBridge = null;
+
+      // Clean up kangentic entry from .mcp.json on normal exit
+      // (skip for suspended sessions -- suspend() already cleaned up,
+      //  and skip for worktree sessions -- ephemeral dir)
+      if (session.status !== 'suspended'
+          && !session.cwd.replace(/\\/g, '/').includes('.kangentic/worktrees/')) {
+        cleanupMcpJson(session.cwd);
+      }
 
       this.emit('exit', id, exitCode);
       this.sessionQueue.notifySlotFreed();
@@ -627,6 +652,14 @@ export class SessionManager extends EventEmitter {
     session.statusFileWatcher = null;
     session.eventsFileWatcher?.close();
     session.eventsFileWatcher = null;
+    session.commandBridge?.stop();
+    session.commandBridge = null;
+
+    // Clean up kangentic entry from .mcp.json (only for non-worktree sessions;
+    // worktree .mcp.json lives inside the ephemeral worktree dir)
+    if (!session.cwd.replace(/\\/g, '/').includes('.kangentic/worktrees/')) {
+      cleanupMcpJson(session.cwd);
+    }
 
     // Null out file paths BEFORE killing so the onExit handler's
     // cleanupSessionFiles() skips file deletion -- files persist for resume
@@ -1055,6 +1088,35 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
+   * Start a CommandBridge for MCP server communication.
+   * The bridge watches a commands.jsonl file written by the MCP server process
+   * and processes commands using the project DB.
+   */
+  private startCommandBridge(session: ManagedSession): void {
+    if (!session.statusOutputPath) return;
+
+    // Derive session directory from status output path
+    const sessionDir = session.statusOutputPath.replace(/[/\\][^/\\]+$/, '');
+    const commandsPath = path.join(sessionDir, 'commands.jsonl');
+    const responsesDir = path.join(sessionDir, 'responses');
+
+    session.commandBridge = new CommandBridge({
+      commandsPath,
+      responsesDir,
+      projectId: session.projectId,
+      getProjectDb: () => getProjectDb(session.projectId),
+      onTaskCreated: (task, columnName, swimlaneId) => {
+        this.emit('task-created', session.id, task, columnName, swimlaneId);
+      },
+      onTaskUpdated: (task) => {
+        this.emit('task-updated', session.id, task);
+      },
+    });
+
+    session.commandBridge.start();
+  }
+
+  /**
    * Stop watchers and clean up status + events + merged settings files.
    */
   private cleanupSessionFiles(session: ManagedSession): void {
@@ -1062,6 +1124,14 @@ export class SessionManager extends EventEmitter {
     session.statusFileWatcher = null;
     session.eventsFileWatcher?.close();
     session.eventsFileWatcher = null;
+    session.commandBridge?.stop();
+    session.commandBridge = null;
+
+    // NOTE: No .mcp.json cleanup here. This method is called by remove() and
+    // killAll(). The suspend() and onExit() paths handle their own cleanup.
+    // killAll() (app shutdown) should NOT clean up -- the entry will be
+    // re-injected on next session spawn.
+
     // Clean up status JSON file
     if (session.statusOutputPath) {
       try { fs.unlinkSync(session.statusOutputPath); } catch { /* may not exist */ }
@@ -1148,6 +1218,8 @@ export class SessionManager extends EventEmitter {
       session.statusFileWatcher = null;
       session.eventsFileWatcher?.close();
       session.eventsFileWatcher = null;
+      session.commandBridge?.stop();
+      session.commandBridge = null;
 
       if (session.pty) {
         const ptyRef = session.pty;

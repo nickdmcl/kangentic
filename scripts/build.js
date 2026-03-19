@@ -65,6 +65,20 @@ async function build() {
   );
   console.log('[build] Copied status-bridge.js + event-bridge.js');
 
+  // Bundle MCP server (TypeScript, must be bundled -- runs in external node process)
+  console.log('[build] Bundling mcp-server.ts...');
+  await esbuild.build({
+    bundle: true,
+    platform: 'node',
+    target: 'node20',
+    format: 'cjs',
+    entryPoints: [path.join(projectDir, 'src/main/agent/mcp-server.ts')],
+    outfile: path.join(projectDir, '.vite/build/mcp-server.js'),
+    sourcemap: false,
+    minify: true,
+  });
+  console.log('[build] MCP server bundled');
+
   console.log('[build] Done! Output in .vite/build/');
 }
 

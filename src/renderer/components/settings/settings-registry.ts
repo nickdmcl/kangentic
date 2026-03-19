@@ -55,6 +55,9 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   // ── Shortcuts ──
   { id: 'shortcuts', tabId: 'shortcuts', label: 'Shortcuts', description: 'Custom commands accessible from the task detail dialog', scope: 'project', keywords: ['command', 'shortcut', 'tool', 'open', 'launch', 'tortoisegit', 'vscode', 'terminal', 'explorer', 'quick action'] },
 
+  // ── MCP Server ──
+  { id: 'mcpServer.enabled', tabId: 'mcpServer', label: 'Kangentic MCP Server', description: 'Give agents tools to create tasks, query the board, and view session stats', scope: 'global', keywords: ['mcp', 'tools', 'create task', 'agent', 'board', 'query'] },
+
   // ── Behavior ──
   { id: 'showBoardSearch', tabId: 'behavior', label: 'Show Board Search Bar', description: 'Display the search bar above board columns. Press Ctrl+F (Cmd+F on Mac) to toggle.', scope: 'global', keywords: ['search', 'filter', 'find', 'board'] },
   { id: 'skipDeleteConfirm', tabId: 'behavior', label: 'Skip Task Delete Confirmation', description: 'Delete tasks immediately without a confirmation dialog', scope: 'global', keywords: ['confirm', 'dialog'] },
@@ -85,6 +88,7 @@ export const TAB_LABELS: Record<string, string> = {
   git: 'Git',
   shortcuts: 'Shortcuts',
   behavior: 'Behavior',
+  mcpServer: 'MCP Server',
   notifications: 'Notifications',
   privacy: 'Privacy',
 };

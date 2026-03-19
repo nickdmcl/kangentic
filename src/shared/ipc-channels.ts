@@ -30,6 +30,8 @@ export const IPC = {
   TASK_BULK_UNARCHIVE: 'task:bulk-unarchive',
   TASK_SWITCH_BRANCH: 'task:switchBranch',
   TASK_AUTO_MOVED: 'task:autoMoved',
+  TASK_CREATED_BY_AGENT: 'task:createdByAgent',
+  TASK_UPDATED_BY_AGENT: 'task:updatedByAgent',
 
   // Attachments
   ATTACHMENT_LIST: 'attachment:list',

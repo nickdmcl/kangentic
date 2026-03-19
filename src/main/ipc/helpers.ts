@@ -197,6 +197,7 @@ export function createTransitionEngine(
         projectPath,
         projectId,
         gitConfig,
+        mcpServerEnabled: config.mcpServer?.enabled ?? true,
       };
     },
     sessionRepo,

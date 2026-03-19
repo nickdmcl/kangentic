@@ -2,7 +2,20 @@
   "mcpServers": {
     "context7": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "kangentic": {
+      "command": "node",
+      "args": [
+        "C:/Users/tyler/Documents/GitHub/kangentic/.kangentic/worktrees/expose-an-api-or-way-to-converse-with-kangentic-6968a419/.vite/build/mcp-server.js",
+        "C:/Users/tyler/Documents/GitHub/kangentic/.kangentic/worktrees/expose-an-api-or-way-to-converse-with-kangentic-6968a419/.kangentic/sessions/769dc040-c1f8-4adf-b016-9e92506c95b5/commands.jsonl",
+        "C:/Users/tyler/Documents/GitHub/kangentic/.kangentic/worktrees/expose-an-api-or-way-to-converse-with-kangentic-6968a419/.kangentic/sessions/769dc040-c1f8-4adf-b016-9e92506c95b5/responses"
+      ]
     }
   }
 }

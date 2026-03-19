@@ -99,6 +99,16 @@ async function start() {
       entryPoints: [path.join(projectDir, 'src/preload/preload.ts')],
       outfile: path.join(projectDir, '.vite/build/preload.js'),
     }),
+    // MCP server: TypeScript, must be bundled (runs in external node process spawned by Claude Code)
+    esbuild.build({
+      bundle: true,
+      platform: 'node',
+      target: 'node20',
+      format: 'cjs',
+      entryPoints: [path.join(projectDir, 'src/main/agent/mcp-server.ts')],
+      outfile: path.join(projectDir, '.vite/build/mcp-server.js'),
+      sourcemap: true,
+    }),
   ]);
   console.timeEnd('[dev] esbuild');
   console.log('[dev] Main + preload built');

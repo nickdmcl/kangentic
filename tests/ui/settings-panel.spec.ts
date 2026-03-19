@@ -38,16 +38,18 @@ async function closeSettings() {
 }
 
 test.describe('Settings Panel', () => {
-  test('titlebar gear opens Settings panel with all 7 tabs when project is open', async () => {
+  test('titlebar gear opens Settings panel with all 9 tabs when project is open', async () => {
     await openSettings();
     await expect(page.locator('h2:has-text("Settings")')).toBeVisible();
 
-    // All 7 tabs should be visible
+    // All 9 tabs should be visible (5 project + 4 system)
     await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Terminal' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Shortcuts' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Behavior' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'MCP Server' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Privacy' })).toBeVisible();
 
@@ -173,6 +175,25 @@ test.describe('Settings Panel', () => {
     await expect(page.locator('[data-swimlane-name="Planning"]')).toBeAttached();
     await closeSettings();
   });
+
+  test('shows MCP Server tab with toggle, tools list, and how it works', async () => {
+    await openSettings();
+    await page.getByRole('button', { name: 'MCP Server' }).click();
+
+    // Banner with toggle should be visible
+    await expect(page.getByText('Kangentic MCP Server')).toBeVisible();
+    await expect(page.getByText('Give Claude Code agents tools to interact with your board')).toBeVisible();
+
+    // Tools list should be visible (spot-check a few)
+    await expect(page.getByText('Create Task')).toBeVisible();
+    await expect(page.getByText('Board Summary')).toBeVisible();
+    await expect(page.getByText('Session History')).toBeVisible();
+
+    // How It Works section
+    await expect(page.getByText('How It Works')).toBeVisible();
+
+    await closeSettings();
+  });
 });
 
 test.describe('Project Settings via Sidebar', () => {
@@ -202,6 +223,7 @@ test.describe('Project Settings via Sidebar', () => {
     await expect(page.getByRole('button', { name: 'Terminal' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'MCP Server' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Behavior' })).toBeVisible();
 
     // Agent tab should show ALL settings (no more filtering)

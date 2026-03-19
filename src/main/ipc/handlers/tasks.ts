@@ -327,7 +327,7 @@ export async function handleTaskMove(
  * non-worktree task has an active PTY session. Checking out would change
  * the filesystem under a running agent.
  */
-function guardActiveNonWorktreeSessions(
+export function guardActiveNonWorktreeSessions(
   context: IpcContext,
   task: Task,
   tasks: ReturnType<typeof getProjectRepos>['tasks'],

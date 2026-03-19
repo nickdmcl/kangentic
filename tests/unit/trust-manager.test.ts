@@ -24,7 +24,7 @@ vi.mock('node:os', async () => {
   };
 });
 
-import { ensureWorktreeTrust } from '../../src/main/agent/trust-manager';
+import { ensureWorktreeTrust, ensureMcpServerTrust } from '../../src/main/agent/trust-manager';
 
 function claudeJsonPath(): string {
   return path.join(tmpHome, '.claude.json');
@@ -187,5 +187,82 @@ describe('ensureWorktreeTrust', () => {
     const entries = Object.values(projects);
     expect(entries).toHaveLength(1);
     expect(entries[0].hasTrustDialogAccepted).toBe(true);
+  });
+});
+
+describe('ensureMcpServerTrust', () => {
+  it('adds kangentic to enabledMcpjsonServers when file does not exist', () => {
+    const projectPath = '/projects/myrepo';
+    ensureMcpServerTrust(projectPath);
+
+    const data = readClaudeJson();
+    const projects = data.projects as Record<string, Record<string, unknown>>;
+    const entries = Object.values(projects);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].enabledMcpjsonServers).toContain('kangentic');
+  });
+
+  it('adds kangentic to existing enabledMcpjsonServers without duplicating', () => {
+    const projectPath = '/projects/myrepo';
+    const resolvedKey = path.resolve(projectPath).replace(/\\/g, '/');
+
+    // Pre-populate with existing MCP servers
+    const existing = {
+      projects: {
+        [resolvedKey]: {
+          enabledMcpjsonServers: ['server-a', 'server-b'],
+          hasTrustDialogAccepted: true,
+        },
+      },
+    };
+    fs.writeFileSync(claudeJsonPath(), JSON.stringify(existing));
+
+    ensureMcpServerTrust(projectPath);
+
+    const data = readClaudeJson();
+    const projects = data.projects as Record<string, Record<string, unknown>>;
+    const entry = projects[resolvedKey];
+    const servers = entry.enabledMcpjsonServers as string[];
+    expect(servers).toContain('kangentic');
+    expect(servers).toContain('server-a');
+    expect(servers).toContain('server-b');
+    expect(servers.filter((server) => server === 'kangentic')).toHaveLength(1);
+  });
+
+  it('is idempotent -- skips write if kangentic already present', () => {
+    const projectPath = '/projects/myrepo';
+    const resolvedKey = path.resolve(projectPath).replace(/\\/g, '/');
+
+    const existing = {
+      projects: {
+        [resolvedKey]: {
+          enabledMcpjsonServers: ['kangentic'],
+        },
+      },
+    };
+    fs.writeFileSync(claudeJsonPath(), JSON.stringify(existing));
+
+    // Record mtime before second call
+    const statBefore = fs.statSync(claudeJsonPath()).mtimeMs;
+
+    ensureMcpServerTrust(projectPath);
+
+    // Content should be unchanged
+    const data = readClaudeJson();
+    const projects = data.projects as Record<string, Record<string, unknown>>;
+    const servers = projects[resolvedKey].enabledMcpjsonServers as string[];
+    expect(servers).toEqual(['kangentic']);
+  });
+
+  it('creates project entry when none exists', () => {
+    fs.writeFileSync(claudeJsonPath(), JSON.stringify({ projects: {} }));
+
+    const projectPath = '/projects/brand-new';
+    ensureMcpServerTrust(projectPath);
+
+    const data = readClaudeJson();
+    const projects = data.projects as Record<string, Record<string, unknown>>;
+    const resolvedKey = path.resolve(projectPath).replace(/\\/g, '/');
+    expect(projects[resolvedKey].enabledMcpjsonServers).toContain('kangentic');
   });
 });

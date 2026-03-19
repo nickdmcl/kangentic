@@ -11,7 +11,7 @@ import { ClaudeDetector } from '../agent/claude-detector';
 import { CommandBuilder } from '../agent/command-builder';
 import { ConfigManager } from '../config/config-manager';
 import type { SessionRecord, ActionConfig, Task, PermissionMode } from '../../shared/types';
-import { ensureWorktreeTrust } from '../agent/trust-manager';
+import { ensureWorktreeTrust, ensureMcpServerTrust } from '../agent/trust-manager';
 import { isShuttingDown } from '../shutdown-state';
 import { sessionOutputPaths } from './session-paths';
 import { app } from 'electron';
@@ -352,6 +352,7 @@ export async function recoverSessions(
 
       // Pre-populate trust so the agent doesn't block on the trust dialog
       ensureWorktreeTrust(record.cwd);
+      ensureMcpServerTrust(record.cwd);
 
       // Resolution order: lane override → global config.
       // Use the task's current swimlane to resolve permission mode.
@@ -392,6 +393,7 @@ export async function recoverSessions(
         statusOutputPath,
         eventsOutputPath,
         shell: resolvedShell,
+        mcpServerEnabled: config.mcpServer?.enabled ?? true,
       });
 
       spawnInputs.push({
@@ -619,6 +621,7 @@ export async function reconcileSessions(
 
         // Pre-populate trust so the agent doesn't block on the trust dialog
         ensureWorktreeTrust(cwd);
+        ensureMcpServerTrust(cwd);
 
         // Generate a Claude session ID upfront so recovery can resume
         const claudeSessionId = randomUUID();
@@ -642,6 +645,7 @@ export async function reconcileSessions(
           statusOutputPath,
           eventsOutputPath,
           shell: resolvedShell,
+          mcpServerEnabled: config.mcpServer?.enabled ?? true,
         });
 
         spawnInputs.push({

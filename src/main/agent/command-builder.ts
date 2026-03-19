@@ -12,6 +12,119 @@ interface ClaudeSettings {
   [key: string]: unknown; // preserve unknown keys from user's settings
 }
 
+// ---------------------------------------------------------------------------
+// .mcp.json helpers (inject on spawn, clean up on exit)
+// ---------------------------------------------------------------------------
+
+interface McpServerConfig {
+  command: string;
+  args: string[];
+}
+
+/**
+ * Atomically write JSON to a file via temp file + rename.
+ * fs.renameSync is atomic on same-volume (always true here).
+ */
+function safeWriteMcpJson(mcpJsonPath: string, content: object): void {
+  const tmpPath = mcpJsonPath + '.kangentic-tmp';
+  fs.writeFileSync(tmpPath, JSON.stringify(content, null, 2));
+  fs.renameSync(tmpPath, mcpJsonPath);
+}
+
+/**
+ * Read .mcp.json, returning null if the file contains invalid JSON.
+ * Returns undefined if the file doesn't exist or is empty.
+ */
+function readMcpJson(mcpJsonPath: string): Record<string, unknown> | null | undefined {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(mcpJsonPath, 'utf-8');
+  } catch {
+    return undefined; // File doesn't exist
+  }
+  if (!raw.trim()) return undefined; // Empty file
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null; // Malformed JSON -- caller must not overwrite
+  }
+}
+
+/**
+ * Inject the kangentic MCP server into .mcp.json in the given CWD.
+ * Preserves all existing servers and top-level keys. Uses atomic writes.
+ * Skips injection if .mcp.json contains invalid JSON (logs warning).
+ */
+export function injectKangenticMcpServer(cwd: string, serverConfig: McpServerConfig): void {
+  const mcpJsonPath = path.join(cwd, '.mcp.json');
+  const existing = readMcpJson(mcpJsonPath);
+
+  if (existing === null) {
+    console.warn('[mcp] Skipping .mcp.json injection: file contains invalid JSON');
+    return;
+  }
+
+  const data = existing ?? {};
+  const servers = (data.mcpServers ?? {}) as Record<string, unknown>;
+
+  const merged = {
+    ...data,
+    mcpServers: {
+      ...servers,
+      kangentic: serverConfig,
+    },
+  };
+
+  safeWriteMcpJson(mcpJsonPath, merged);
+}
+
+/**
+ * Remove the kangentic entry from .mcp.json in the given CWD.
+ * Preserves all other servers and top-level keys. Uses atomic writes.
+ * If removing kangentic leaves the file effectively empty, deletes it.
+ * Never throws -- all errors are logged as warnings.
+ */
+export function cleanupMcpJson(cwd: string): void {
+  try {
+    const mcpJsonPath = path.join(cwd, '.mcp.json');
+    const existing = readMcpJson(mcpJsonPath);
+
+    if (existing === undefined) return; // File doesn't exist -- no-op
+    if (existing === null) {
+      console.warn('[mcp] Skipping .mcp.json cleanup: file contains invalid JSON');
+      return;
+    }
+
+    const servers = existing.mcpServers as Record<string, unknown> | undefined;
+    if (!servers || !('kangentic' in servers)) return; // Nothing to clean up
+
+    // Remove kangentic entry
+    const { kangentic: _kangenticEntry, ...remainingServers } = servers;
+
+    // Check if there's anything left worth keeping
+    const hasOtherServers = Object.keys(remainingServers).length > 0;
+    const { mcpServers: _mcpServersKey, ...otherTopLevelKeys } = existing;
+    const hasOtherKeys = Object.keys(otherTopLevelKeys).length > 0;
+
+    if (!hasOtherServers && !hasOtherKeys) {
+      // File was effectively just our injection -- delete it
+      try { fs.unlinkSync(mcpJsonPath); } catch { /* already gone */ }
+      // Clean up temp file if it exists
+      try { fs.unlinkSync(mcpJsonPath + '.kangentic-tmp'); } catch { /* not there */ }
+      return;
+    }
+
+    // Write back without kangentic
+    const cleaned: Record<string, unknown> = { ...otherTopLevelKeys };
+    if (hasOtherServers) {
+      cleaned.mcpServers = remainingServers;
+    }
+    safeWriteMcpJson(mcpJsonPath, cleaned);
+  } catch (error) {
+    console.warn('[mcp] Failed to clean up .mcp.json:', error);
+  }
+}
+
 interface CommandOptions {
   claudePath: string;
   taskId: string;
@@ -25,6 +138,7 @@ interface CommandOptions {
   statusOutputPath?: string; // path where the status bridge writes JSON
   eventsOutputPath?: string; // path where the event bridge appends JSONL
   shell?: string; // target shell name -- controls quoting style (single vs double quotes)
+  mcpServerEnabled?: boolean; // whether to inject kangentic MCP server into settings
 }
 
 /**
@@ -271,8 +385,28 @@ export class CommandBuilder {
       merged.hooks = buildEventHooks(eventBridge, eventsPath, baseSettings.hooks || {});
     }
 
-    // Write to .kangentic/sessions/<sessionId>/settings.json (used with --settings flag)
+    // Session directory (used for MCP server paths and merged settings file)
     const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', options.sessionId || options.taskId);
+
+    // Inject kangentic MCP server into .mcp.json in the CWD so Claude Code
+    // auto-discovers it. Claude Code reads MCP servers from .mcp.json, not
+    // from the --settings file. We merge with any existing .mcp.json to
+    // preserve user-configured servers (e.g. context7).
+    if (options.mcpServerEnabled !== false) {
+      const mcpServerScript = toForwardSlash(resolveBridgeScript('mcp-server'));
+      const commandsPath = toForwardSlash(path.join(sessionDir, 'commands.jsonl'));
+      const responsesDir = toForwardSlash(path.join(sessionDir, 'responses'));
+
+      injectKangenticMcpServer(options.cwd, {
+        command: 'node',
+        args: [mcpServerScript, commandsPath, responsesDir],
+      });
+    } else {
+      // When MCP is disabled, clean up any stale kangentic entry from a prior session
+      cleanupMcpJson(options.cwd);
+    }
+
+    // Write to .kangentic/sessions/<sessionId>/settings.json (used with --settings flag)
     try {
       fs.mkdirSync(sessionDir, { recursive: true });
     } catch (err) {

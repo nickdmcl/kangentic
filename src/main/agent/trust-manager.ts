@@ -53,3 +53,42 @@ export function ensureWorktreeTrust(worktreePath: string): void {
 
   fs.writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf-8');
 }
+
+/**
+ * Ensure the "kangentic" MCP server is listed in enabledMcpjsonServers
+ * for a project path so Claude Code auto-enables it without prompting.
+ *
+ * Called for all sessions (main repo and worktrees).
+ */
+export function ensureMcpServerTrust(projectPath: string): void {
+  const claudeJsonPath = path.join(os.homedir(), '.claude.json');
+  const resolvedPath = toForwardSlash(path.resolve(projectPath));
+
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(fs.readFileSync(claudeJsonPath, 'utf-8'));
+  } catch {
+    data = {};
+  }
+
+  if (!data.projects || typeof data.projects !== 'object') {
+    data.projects = {};
+  }
+  const projects = data.projects as Record<string, Record<string, unknown>>;
+
+  if (!projects[resolvedPath]) {
+    projects[resolvedPath] = {};
+  }
+
+  const entry = projects[resolvedPath];
+  const enabledServers = Array.isArray(entry.enabledMcpjsonServers)
+    ? entry.enabledMcpjsonServers as string[]
+    : [];
+
+  if (enabledServers.includes('kangentic')) {
+    return; // Already trusted
+  }
+
+  entry.enabledMcpjsonServers = [...enabledServers, 'kangentic'];
+  fs.writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf-8');
+}

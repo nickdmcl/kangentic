@@ -409,6 +409,10 @@ export interface AppConfig {
     initScript: string | null;
   };
 
+  mcpServer: {
+    enabled: boolean;
+  };
+
   contextBar: {
     showShell: boolean;
     showVersion: boolean;
@@ -461,6 +465,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     defaultBaseBranch: 'main',
     copyFiles: [],
     initScript: null,
+  },
+  mcpServer: {
+    enabled: true,
   },
   contextBar: {
     showShell: true,
@@ -711,6 +718,8 @@ export interface ElectronAPI {
     bulkUnarchive: (ids: string[], targetSwimlaneId: string) => Promise<void>;
     switchBranch: (input: TaskSwitchBranchInput) => Promise<Task>;
     onAutoMoved: (callback: (taskId: string, targetSwimlaneId: string, taskTitle: string, projectId?: string) => void) => () => void;
+    onCreatedByAgent: (callback: (taskId: string, taskTitle: string, columnName: string, projectId?: string) => void) => () => void;
+    onUpdatedByAgent: (callback: (taskId: string, taskTitle: string, projectId?: string) => void) => () => void;
   };
 
   // Attachments

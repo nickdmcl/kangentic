@@ -49,6 +49,9 @@
       copyFiles: [],
       initScript: null,
     },
+    mcpServer: {
+      enabled: true,
+    },
     contextBar: {
       showShell: true,
       showVersion: true,
@@ -479,6 +482,12 @@
         return withAttachmentCounts(archivedTasks);
       },
       onAutoMoved: function () {
+        return noop;
+      },
+      onCreatedByAgent: function () {
+        return noop;
+      },
+      onUpdatedByAgent: function () {
         return noop;
       },
       unarchive: async function (input) {

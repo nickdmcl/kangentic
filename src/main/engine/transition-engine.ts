@@ -7,7 +7,7 @@ import { SessionManager } from '../pty/session-manager';
 import { CommandBuilder } from '../agent/command-builder';
 import { ClaudeDetector } from '../agent/claude-detector';
 import { WorktreeManager } from '../git/worktree-manager';
-import { ensureWorktreeTrust } from '../agent/trust-manager';
+import { ensureWorktreeTrust, ensureMcpServerTrust } from '../agent/trust-manager';
 import { sessionOutputPaths } from './session-paths';
 import type { ActionRepository } from '../db/repositories/action-repository';
 import type { TaskRepository } from '../db/repositories/task-repository';
@@ -21,7 +21,7 @@ export class TransitionEngine {
     private taskRepo: TaskRepository,
     private claudeDetector: ClaudeDetector,
     private commandBuilder: CommandBuilder,
-    private getConfig: () => { permissionMode: string; claudePath: string | null; projectPath: string | null; projectId: string; gitConfig: AppConfig['git'] },
+    private getConfig: () => { permissionMode: string; claudePath: string | null; projectPath: string | null; projectId: string; gitConfig: AppConfig['git']; mcpServerEnabled?: boolean },
     private sessionRepo?: SessionRepository,
     private attachmentRepo?: AttachmentRepository,
   ) {}
@@ -133,6 +133,7 @@ export class TransitionEngine {
     // This covers both worktree paths and the main project path (important
     // for demo mode where the project has never been opened in Claude Code).
     ensureWorktreeTrust(cwd);
+    ensureMcpServerTrust(cwd);
 
     // Check for a previous session to resume (only explicitly suspended sessions)
     const previousSession = this.sessionRepo?.getLatestForTask(task.id);
@@ -188,6 +189,7 @@ export class TransitionEngine {
       statusOutputPath,
       eventsOutputPath,
       shell,
+      mcpServerEnabled: appConfig.mcpServerEnabled,
     });
 
     const session = await this.sessionManager.spawn({
