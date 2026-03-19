@@ -55,6 +55,18 @@ module.exports = async function afterPack(context) {
     }
   }
 
+  // Fix spawn-helper permissions on macOS (node-pty 1.1.0 ships with 644).
+  // asar unpacking may also strip +x. Belt-and-suspenders with the runtime fix.
+  if (platform === 'darwin' && fs.existsSync(prebuildsDir)) {
+    for (const entry of fs.readdirSync(prebuildsDir)) {
+      const spawnHelper = path.join(prebuildsDir, entry, 'spawn-helper');
+      if (fs.existsSync(spawnHelper)) {
+        fs.chmodSync(spawnHelper, 0o755);
+        console.log(`[afterPack] Fixed spawn-helper permissions: ${entry}/spawn-helper`);
+      }
+    }
+  }
+
   await flipFuses(electronBinaryPath, {
     version: FuseVersion.V1,
     [FuseV1Options.RunAsNode]: false,

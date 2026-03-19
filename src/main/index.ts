@@ -42,6 +42,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 import { initUpdater, updateUpdaterWindow, stopUpdaterTimers } from './updater';
+import { ensureSpawnHelperPermissions } from './pty/spawn-helper-permissions';
 
 // Initialize anonymous analytics BEFORE app.whenReady() -- the SDK requires this
 // to register protocol schemes. The analytics module decides whether to activate
@@ -380,6 +381,10 @@ app.whenReady().then(async () => {
   app.setAppUserModelId(
     app.isPackaged ? 'com.kangentic.app' : 'com.kangentic.dev'
   );
+
+  // Fix node-pty spawn-helper permissions on macOS before any PTY spawns.
+  // Must run before createWindow() which triggers session recovery.
+  ensureSpawnHelperPermissions();
 
   createWindow();
   initUpdater(mainWindow!);

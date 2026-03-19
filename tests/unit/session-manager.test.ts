@@ -597,6 +597,44 @@ describe('PTY spawn failure', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
+  it('writes diagnostic scrollback on posix_spawnp failure', async () => {
+    vi.mocked(pty.spawn).mockImplementation(() => {
+      throw new Error('posix_spawnp failed.');
+    });
+
+    const session = await manager.spawn({
+      taskId: 'task-fail-posix',
+      command: '',
+      cwd: tmpDir,
+    });
+
+    const scrollback = manager.getScrollback(session.id);
+    expect(scrollback).toContain('posix_spawnp');
+    expect(scrollback).toContain('spawn-helper');
+
+    manager.killAll();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  it('does not write diagnostic scrollback for non-posix_spawnp errors', async () => {
+    vi.mocked(pty.spawn).mockImplementation(() => {
+      throw new Error('spawn ENOENT');
+    });
+
+    const session = await manager.spawn({
+      taskId: 'task-fail-nodiag',
+      command: '',
+      cwd: tmpDir,
+    });
+
+    const scrollback = manager.getScrollback(session.id);
+    expect(scrollback).not.toContain('posix_spawnp');
+    expect(scrollback).not.toContain('spawn-helper');
+
+    manager.killAll();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
   it('analytics includes errno code when available', async () => {
     const { trackEvent } = await import('../../src/main/analytics/analytics');
     const errnoError = new Error('spawn EACCES') as NodeJS.ErrnoException;
