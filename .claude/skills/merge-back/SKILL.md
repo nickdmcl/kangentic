@@ -32,9 +32,10 @@ All git commands below run from the **current working directory** — never use 
 
 Report the mode, branch name, source branch, and working tree status before proceeding.
 
-## Step 0 — Type Check
+## Step 0 — Install Dependencies and Type Check
 
-Run `npm run typecheck`. If it fails, report the type errors and stop — do not proceed with the merge. Type errors must be fixed before merging back.
+1. Run `npm ci`. This ensures `node_modules` matches the lockfile exactly, preventing typecheck failures from stale or missing packages. If it fails with EBUSY, stop with: "A file in node_modules is locked by a running process. Close the Kangentic dev server (`npm start`) and retry."
+2. Run `npm run typecheck`. If it fails, report the type errors and stop — do not proceed with the merge. Type errors must be fixed before merging back.
 
 ## Step 1 — Commit Changes
 
