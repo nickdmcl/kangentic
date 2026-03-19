@@ -1364,20 +1364,19 @@ describe('Event-derived activity state', () => {
     ): void {
       fs.writeFileSync(statusPath, makeStatus(inputTokens, outputTokens));
       const internals = sessionManager as unknown as {
-        sessions: Map<string, { id: string; statusOutputPath: string | null }>;
-        readAndEmitUsage: (session: { id: string; statusOutputPath: string | null }) => void;
+        usageTracker: { readAndEmitUsage: (sessionId: string, statusOutputPath: string) => void };
       };
-      const session = internals.sessions.get(sessionId);
-      if (session) internals.readAndEmitUsage(session);
+      internals.usageTracker.readAndEmitUsage(sessionId, statusPath);
     }
 
-    function triggerEventRead(sessionManager: SessionManager, sessionId: string): void {
+    function triggerEventRead(sessionManager: SessionManager, sessionId: string, eventsPath: string): void {
       const internals = sessionManager as unknown as {
-        sessions: Map<string, { id: string; eventsOutputPath: string | null }>;
-        readAndProcessEvents: (session: { id: string; eventsOutputPath: string | null; eventsFileOffset: number }) => void;
+        usageTracker: { readAndProcessEvents: (sessionId: string, eventsOutputPath: string, fileOffset: number) => number };
+        fileWatcher: { getEventsFileOffset: (sessionId: string) => number; setEventsFileOffset: (sessionId: string, offset: number) => void };
       };
-      const session = internals.sessions.get(sessionId);
-      if (session) internals.readAndProcessEvents(session as Parameters<typeof internals.readAndProcessEvents>[0]);
+      const offset = internals.fileWatcher.getEventsFileOffset(sessionId);
+      const newOffset = internals.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
+      internals.fileWatcher.setEventsFileOffset(sessionId, newOffset);
     }
 
     beforeEach(() => {
@@ -1405,7 +1404,7 @@ describe('Event-derived activity state', () => {
       // Transition to thinking via a complete tool cycle (start + end)
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Read' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
       // Advance past threshold (45s) + check interval (15s)
@@ -1424,7 +1423,7 @@ describe('Event-derived activity state', () => {
 
       // Start a long-running tool (no ToolEnd yet)
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Bash' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
       // Advance well past threshold -- should NOT transition to idle
@@ -1434,7 +1433,7 @@ describe('Event-derived activity state', () => {
 
       // Tool completes
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolEnd, tool: 'Bash' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
 
       // Now the stale thinking timer should work again
       vi.advanceTimersByTime(60_000);
@@ -1451,7 +1450,7 @@ describe('Event-derived activity state', () => {
 
       // Transition to thinking
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
       // Advance 40s (within threshold)
@@ -1459,7 +1458,7 @@ describe('Event-derived activity state', () => {
 
       // Fire another event, resetting the timer
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Write' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
 
       // Advance another 40s (80s total, but only 40s since last signal)
       vi.advanceTimersByTime(40_000);
@@ -1475,7 +1474,7 @@ describe('Event-derived activity state', () => {
 
       // Transition to thinking
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
       // Advance 40s
@@ -1513,13 +1512,13 @@ describe('Event-derived activity state', () => {
 
       // Transition to thinking
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
 
       // Fire events every 10s for 2 minutes
       for (let elapsed = 0; elapsed < 120_000; elapsed += 10_000) {
         vi.advanceTimersByTime(10_000);
         appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-        triggerEventRead(fakeManager, session.id);
+        triggerEventRead(fakeManager, session.id, eventsPath);
       }
 
       // Should have stayed thinking throughout, no idle transitions
@@ -1533,7 +1532,7 @@ describe('Event-derived activity state', () => {
 
       // Transition to thinking via prompt (simulates UserPromptSubmit during startup)
       appendEvent(eventsPath, { ts: Date.now(), type: EventType.Prompt });
-      triggerEventRead(fakeManager, session.id);
+      triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
       // Advance well past threshold -- should NOT go idle (no usage data yet = nucleating)

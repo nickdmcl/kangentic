@@ -1,36 +1,166 @@
 /**
- * Unit tests for CommandBridge -- the file-based command queue processor
+ * Unit tests for CommandBridge - the file-based command queue processor
  * that bridges the MCP server process to the Electron main process.
  *
- * Uses a real in-memory SQLite database with project migrations to test
- * actual repository interactions.
+ * Mocks the database layer (better-sqlite3 + repositories) so the tests
+ * validate CommandBridge logic without loading the native SQLite module.
+ * This avoids the ABI conflict between Electron (which needs better-sqlite3
+ * compiled for its Node ABI) and vitest (which runs under system Node).
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import Database from 'better-sqlite3';
+import type { Task, Swimlane } from '../../src/shared/types';
+
+// ── In-memory store for mock repositories ────────────────────────────────
+
+let mockSwimlanes: Swimlane[] = [];
+let mockTasks: Task[] = [];
+let mockArchivedTasks: Task[] = [];
+let taskIdCounter = 0;
+
+function resetMockStore(): void {
+  taskIdCounter = 0;
+  mockSwimlanes = [
+    makeSwimlane('sw-backlog', 'Backlog', 'backlog', 0),
+    makeSwimlane('sw-planning', 'Planning', null, 1),
+    makeSwimlane('sw-executing', 'Executing', null, 2),
+    makeSwimlane('sw-codereview', 'Code Review', null, 3),
+    makeSwimlane('sw-tests', 'Tests', null, 4),
+    makeSwimlane('sw-shipit', 'Ship It', null, 5),
+    makeSwimlane('sw-done', 'Done', 'done', 6, true),
+  ];
+  mockTasks = [];
+  mockArchivedTasks = [];
+}
+
+function makeSwimlane(
+  id: string,
+  name: string,
+  role: 'backlog' | 'done' | null,
+  position: number,
+  isArchived = false,
+): Swimlane {
+  return {
+    id,
+    name,
+    role,
+    position,
+    color: '#888888',
+    icon: null,
+    is_archived: isArchived,
+    is_ghost: false,
+    permission_mode: null,
+    auto_spawn: false,
+    auto_command: null,
+    plan_exit_target_id: null,
+    created_at: new Date().toISOString(),
+  };
+}
+
+function makeTask(overrides: Partial<Task> & { title: string; swimlane_id: string }): Task {
+  taskIdCounter++;
+  const now = new Date().toISOString();
+  return {
+    id: `task-${taskIdCounter}`,
+    title: overrides.title,
+    description: overrides.description ?? '',
+    swimlane_id: overrides.swimlane_id,
+    position: mockTasks.filter((task) => task.swimlane_id === overrides.swimlane_id).length,
+    agent: null,
+    session_id: null,
+    worktree_path: overrides.worktree_path ?? null,
+    branch_name: overrides.branch_name ?? null,
+    pr_number: overrides.pr_number ?? null,
+    pr_url: overrides.pr_url ?? null,
+    base_branch: overrides.base_branch ?? null,
+    use_worktree: overrides.use_worktree ?? null,
+    attachment_count: 0,
+    archived_at: overrides.archived_at ?? null,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+// ── Module mocks ─────────────────────────────────────────────────────────
+
+vi.mock('better-sqlite3', () => {
+  return {
+    default: class MockDatabase {
+      prepare() {
+        return {
+          all: () => [],
+          get: () => undefined,
+          run: () => {},
+        };
+      }
+      close() {}
+    },
+  };
+});
+
+vi.mock('../../src/main/db/migrations', () => ({
+  runProjectMigrations: vi.fn(),
+}));
+
+vi.mock('../../src/main/db/repositories/swimlane-repository', () => ({
+  SwimlaneRepository: class MockSwimlaneRepository {
+    list() { return mockSwimlanes; }
+    getById(id: string) { return mockSwimlanes.find((swimlane) => swimlane.id === id); }
+  },
+}));
+
+vi.mock('../../src/main/db/repositories/task-repository', () => ({
+  TaskRepository: class MockTaskRepository {
+    create(input: { title: string; description?: string; swimlane_id: string; customBranchName?: string; baseBranch?: string; useWorktree?: boolean }) {
+      const task = makeTask({
+        title: input.title,
+        description: input.description ?? '',
+        swimlane_id: input.swimlane_id,
+        branch_name: input.customBranchName ?? null,
+        base_branch: input.baseBranch ?? null,
+        use_worktree: input.useWorktree != null ? (input.useWorktree ? 1 : 0) : null,
+      });
+      mockTasks.push(task);
+      return task;
+    }
+    list(swimlaneId?: string) {
+      if (swimlaneId) {
+        return mockTasks.filter((task) => task.swimlane_id === swimlaneId);
+      }
+      return mockTasks;
+    }
+    getById(id: string) { return mockTasks.find((task) => task.id === id); }
+    update(input: { id: string; title?: string; description?: string; branch_name?: string }) {
+      const index = mockTasks.findIndex((task) => task.id === input.id);
+      if (index === -1) throw new Error(`Task ${input.id} not found`);
+      const updated = { ...mockTasks[index] };
+      if (input.title !== undefined) updated.title = input.title;
+      if (input.description !== undefined) updated.description = input.description;
+      if (input.branch_name !== undefined) updated.branch_name = input.branch_name;
+      updated.updated_at = new Date().toISOString();
+      mockTasks[index] = updated;
+      return updated;
+    }
+    listArchived() { return mockArchivedTasks; }
+  },
+}));
+
+vi.mock('../../src/main/db/repositories/session-repository', () => ({
+  SessionRepository: class MockSessionRepository {
+    getSummaryForTask() { return null; }
+    listAllSummaries() { return {}; }
+  },
+}));
+
+// ── Import after mocks are set up ────────────────────────────────────────
+
 import { CommandBridge } from '../../src/main/agent/command-bridge';
-import { runProjectMigrations } from '../../src/main/db/migrations';
-import { SwimlaneRepository } from '../../src/main/db/repositories/swimlane-repository';
-import { TaskRepository } from '../../src/main/db/repositories/task-repository';
-import type { Task } from '../../src/shared/types';
+import Database from 'better-sqlite3';
 
 let tmpDir: string;
-let database: Database.Database;
-let backlogId: string;
-let planningId: string;
-
-/** Read seeded swimlane IDs (runProjectMigrations seeds default columns). */
-function readSeededSwimlaneIds(): void {
-  const swimlaneRepository = new SwimlaneRepository(database);
-  const all = swimlaneRepository.list();
-  const backlog = all.find((swimlane) => swimlane.role === 'backlog');
-  const planning = all.find((swimlane) => swimlane.name === 'Planning');
-  if (!backlog || !planning) throw new Error('Seeded swimlanes not found');
-  backlogId = backlog.id;
-  planningId = planning.id;
-}
+let database: ReturnType<typeof Database>;
 
 function createBridge(overrides?: {
   onTaskCreated?: (task: Task, columnName: string, swimlaneId: string) => void;
@@ -66,21 +196,18 @@ function sendCommand(bridge: CommandBridge, method: string, params: Record<strin
 }
 
 beforeEach(() => {
+  resetMockStore();
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-bridge-'));
   fs.mkdirSync(path.join(tmpDir, 'responses'), { recursive: true });
   fs.writeFileSync(path.join(tmpDir, 'commands.jsonl'), '');
-
   database = new Database(':memory:');
-  runProjectMigrations(database);
-  readSeededSwimlaneIds();
 });
 
 afterEach(() => {
-  database.close();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-describe('CommandBridge -- create_task', () => {
+describe('CommandBridge - create_task', () => {
   it('creates a task in backlog by default', () => {
     const createdTasks: Array<{ task: Task; column: string }> = [];
     const bridge = createBridge({
@@ -99,12 +226,10 @@ describe('CommandBridge -- create_task', () => {
     expect(response.message).toContain('Fix login bug');
     expect(response.message).toContain('Backlog');
 
-    // Verify task was created in DB
-    const taskRepository = new TaskRepository(database);
-    const tasks = taskRepository.list(backlogId);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].title).toBe('Fix login bug');
-    expect(tasks[0].description).toBe('Users cannot log in');
+    // Verify task was stored in mock
+    expect(mockTasks).toHaveLength(1);
+    expect(mockTasks[0].title).toBe('Fix login bug');
+    expect(mockTasks[0].description).toBe('Users cannot log in');
 
     // Verify callback fired
     expect(createdTasks).toHaveLength(1);
@@ -125,10 +250,9 @@ describe('CommandBridge -- create_task', () => {
     expect(response.success).toBe(true);
     expect(response.message).toContain('Planning');
 
-    const taskRepository = new TaskRepository(database);
-    const tasks = taskRepository.list(planningId);
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0].title).toBe('Plan feature');
+    expect(mockTasks).toHaveLength(1);
+    expect(mockTasks[0].title).toBe('Plan feature');
+    expect(mockTasks[0].swimlane_id).toBe('sw-planning');
   });
 
   it('returns error for non-existent column', () => {
@@ -168,18 +292,16 @@ describe('CommandBridge -- create_task', () => {
 
     bridge.stop();
 
-    const taskRepository = new TaskRepository(database);
-    const tasks = taskRepository.list(backlogId);
-    expect(tasks[0].title).toHaveLength(200);
+    expect(mockTasks[0].title).toHaveLength(200);
   });
 });
 
-describe('CommandBridge -- list_columns', () => {
+describe('CommandBridge - list_columns', () => {
   it('returns all non-archived columns with task counts', () => {
-    // Add a task to backlog
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Task 1', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Task 2', description: '', swimlane_id: backlogId });
+    // Seed some tasks
+    const taskA = makeTask({ title: 'Task 1', swimlane_id: 'sw-backlog' });
+    const taskB = makeTask({ title: 'Task 2', swimlane_id: 'sw-backlog' });
+    mockTasks.push(taskA, taskB);
 
     const bridge = createBridge();
     bridge.start();
@@ -190,8 +312,7 @@ describe('CommandBridge -- list_columns', () => {
 
     expect(response.success).toBe(true);
     const columns = response.data as Array<{ name: string; role: string; taskCount: number }>;
-    // Default seed creates 7 columns: Backlog, Planning, Executing, Code Review, Tests, Ship It, Done
-    // Done is archived, so 6 non-archived columns are returned
+    // 6 non-archived columns (Done is archived)
     expect(columns).toHaveLength(6);
 
     const backlogColumn = columns.find((column) => column.name === 'Backlog');
@@ -200,11 +321,12 @@ describe('CommandBridge -- list_columns', () => {
   });
 });
 
-describe('CommandBridge -- list_tasks', () => {
+describe('CommandBridge - list_tasks', () => {
   it('returns all tasks when no column specified', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Task A', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Task B', description: '', swimlane_id: planningId });
+    mockTasks.push(
+      makeTask({ title: 'Task A', swimlane_id: 'sw-backlog' }),
+      makeTask({ title: 'Task B', swimlane_id: 'sw-planning' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -219,9 +341,10 @@ describe('CommandBridge -- list_tasks', () => {
   });
 
   it('filters tasks by column name', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Backlog Task', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Planning Task', description: '', swimlane_id: planningId });
+    mockTasks.push(
+      makeTask({ title: 'Backlog Task', swimlane_id: 'sw-backlog' }),
+      makeTask({ title: 'Planning Task', swimlane_id: 'sw-planning' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -238,10 +361,10 @@ describe('CommandBridge -- list_tasks', () => {
   });
 });
 
-describe('CommandBridge -- update_task', () => {
+describe('CommandBridge - update_task', () => {
   it('updates task title and description', () => {
-    const taskRepository = new TaskRepository(database);
-    const task = taskRepository.create({ title: 'Old Title', swimlane_id: backlogId, description: 'Old desc' });
+    const task = makeTask({ title: 'Old Title', swimlane_id: 'sw-backlog', description: 'Old desc' });
+    mockTasks.push(task);
 
     const updatedTasks: Task[] = [];
     const bridge = createBridge({
@@ -261,10 +384,9 @@ describe('CommandBridge -- update_task', () => {
     expect(response.message).toContain('title');
     expect(response.message).toContain('description');
 
-    // Verify DB was updated
-    const updated = taskRepository.getById(task.id);
-    expect(updated?.title).toBe('New Title');
-    expect(updated?.description).toBe('New description');
+    // Verify mock was updated
+    expect(mockTasks[0].title).toBe('New Title');
+    expect(mockTasks[0].description).toBe('New description');
 
     // Verify callback fired
     expect(updatedTasks).toHaveLength(1);
@@ -287,7 +409,7 @@ describe('CommandBridge -- update_task', () => {
   });
 });
 
-describe('CommandBridge -- unknown command', () => {
+describe('CommandBridge - unknown command', () => {
   it('returns error for unknown method', () => {
     const bridge = createBridge();
     bridge.start();
@@ -301,11 +423,12 @@ describe('CommandBridge -- unknown command', () => {
   });
 });
 
-describe('CommandBridge -- board_summary', () => {
+describe('CommandBridge - board_summary', () => {
   it('returns board summary with column counts and metrics', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Task 1', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Task 2', description: '', swimlane_id: planningId });
+    mockTasks.push(
+      makeTask({ title: 'Task 1', swimlane_id: 'sw-backlog' }),
+      makeTask({ title: 'Task 2', swimlane_id: 'sw-planning' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -324,11 +447,12 @@ describe('CommandBridge -- board_summary', () => {
   });
 });
 
-describe('CommandBridge -- search_tasks', () => {
+describe('CommandBridge - search_tasks', () => {
   it('finds tasks matching query in title', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Fix login bug', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Add signup flow', description: '', swimlane_id: planningId });
+    mockTasks.push(
+      makeTask({ title: 'Fix login bug', swimlane_id: 'sw-backlog' }),
+      makeTask({ title: 'Add signup flow', swimlane_id: 'sw-planning' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -345,8 +469,9 @@ describe('CommandBridge -- search_tasks', () => {
   });
 
   it('finds tasks matching query in description', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Task A', description: 'OAuth integration needed', swimlane_id: backlogId });
+    mockTasks.push(
+      makeTask({ title: 'Task A', swimlane_id: 'sw-backlog', description: 'OAuth integration needed' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -386,11 +511,10 @@ describe('CommandBridge -- search_tasks', () => {
   });
 });
 
-describe('CommandBridge -- find_task', () => {
+describe('CommandBridge - find_task', () => {
   it('finds task by branch name', () => {
-    const taskRepository = new TaskRepository(database);
-    const task = taskRepository.create({ title: 'Feature X', description: '', swimlane_id: backlogId });
-    taskRepository.update({ id: task.id, branch_name: 'feature/x-abc123' });
+    const task = makeTask({ title: 'Feature X', swimlane_id: 'sw-backlog', branch_name: 'feature/x-abc123' });
+    mockTasks.push(task);
 
     const bridge = createBridge();
     bridge.start();
@@ -407,9 +531,10 @@ describe('CommandBridge -- find_task', () => {
   });
 
   it('finds task by title keyword', () => {
-    const taskRepository = new TaskRepository(database);
-    taskRepository.create({ title: 'Refactor auth module', description: '', swimlane_id: backlogId });
-    taskRepository.create({ title: 'Add logging', description: '', swimlane_id: backlogId });
+    mockTasks.push(
+      makeTask({ title: 'Refactor auth module', swimlane_id: 'sw-backlog' }),
+      makeTask({ title: 'Add logging', swimlane_id: 'sw-backlog' }),
+    );
 
     const bridge = createBridge();
     bridge.start();
@@ -437,7 +562,7 @@ describe('CommandBridge -- find_task', () => {
   });
 });
 
-describe('CommandBridge -- get_column_detail', () => {
+describe('CommandBridge - get_column_detail', () => {
   it('returns column configuration details', () => {
     const bridge = createBridge();
     bridge.start();
@@ -469,10 +594,10 @@ describe('CommandBridge -- get_column_detail', () => {
   });
 });
 
-describe('CommandBridge -- get_session_history', () => {
+describe('CommandBridge - get_session_history', () => {
   it('returns empty history for task with no sessions', () => {
-    const taskRepository = new TaskRepository(database);
-    const task = taskRepository.create({ title: 'No sessions', description: '', swimlane_id: backlogId });
+    const task = makeTask({ title: 'No sessions', swimlane_id: 'sw-backlog' });
+    mockTasks.push(task);
 
     const bridge = createBridge();
     bridge.start();
