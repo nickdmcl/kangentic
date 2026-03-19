@@ -10,7 +10,10 @@ const esbuildCommon = {
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  external: ['electron', 'better-sqlite3', 'node-pty', '@aptabase/electron'],
+  external: ['electron', 'better-sqlite3', 'node-pty'],
+  alias: {
+    '@aptabase/electron/main': path.join(projectDir, 'node_modules/@aptabase/electron/dist/main.cjs'),
+  },
   define: {
     'MAIN_WINDOW_VITE_DEV_SERVER_URL': JSON.stringify(''),
     'MAIN_WINDOW_VITE_NAME': JSON.stringify('main_window'),
