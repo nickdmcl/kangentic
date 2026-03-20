@@ -641,8 +641,8 @@ describe('WorktreeManager -- stale branch recovery', () => {
     const mgr = new WorktreeManager('/project');
     await mgr.createWorktree('abcd1234-0000', 'Test task');
 
-    // rmSync should have been called with the stale worktree path
-    expect(fs.rmSync).toHaveBeenCalledWith(stalePath, { recursive: true, force: true });
+    // removeWorktree should have been called via git worktree remove --force
+    expect(mockProjectGit.raw).toHaveBeenCalledWith(['worktree', 'remove', stalePath, '--force']);
   });
 
   it('pruneWorktrees calls git worktree prune', async () => {

@@ -265,8 +265,11 @@ export class WorktreeManager {
 
     // Create worktree: attach to existing branch or create a new one.
     // Callers must wrap with withLock() to serialize concurrent operations.
+    // Use full removeWorktree (git worktree remove --force + EPERM retries)
+    // instead of a single rmSync. On Windows, file handles from a recently
+    // killed PTY may still be held, and rmSync fails with EPERM.
     if (fs.existsSync(worktreePath)) {
-      try { fs.rmSync(worktreePath, { recursive: true, force: true }); } catch { /* best effort */ }
+      await this.removeWorktree(worktreePath);
     }
     if (branchExists) {
       await this.git.raw(['worktree', 'add', worktreePath, branchName]);
