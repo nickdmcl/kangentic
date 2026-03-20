@@ -26,7 +26,6 @@ interface TaskDetailHeaderProps {
   headerShortcuts: ShortcutConfig[];
   menuShortcuts: ShortcutConfig[];
   executeShortcut: (action: ShortcutConfig) => void;
-  skipDeleteConfirm: boolean;
   projectPath: string | null;
 }
 
@@ -49,7 +48,6 @@ export function TaskDetailHeader({
   headerShortcuts,
   menuShortcuts,
   executeShortcut,
-  skipDeleteConfirm,
   projectPath,
 }: TaskDetailHeaderProps) {
   const [showKebabMenu, setShowKebabMenu] = useState(false);

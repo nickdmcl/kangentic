@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Activity, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useSessionStore } from '../../stores/session-store';
 import { useBoardStore } from '../../stores/board-store';

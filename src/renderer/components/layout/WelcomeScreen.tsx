@@ -1,4 +1,3 @@
-import React from 'react';
 import { FolderOpen, FileText, GitBranch, Terminal, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';

@@ -103,7 +103,7 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
     return () => {
       attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Close image preview on Escape (capture phase -- fires before BaseDialog's handler)
   useEffect(() => {

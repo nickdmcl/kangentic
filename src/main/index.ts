@@ -543,6 +543,7 @@ function startHardShutdownFailsafe(): void {
     console.error('[APP] Hard shutdown deadline reached -- forcing exit');
     if (process.platform === 'win32') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         require('child_process').execSync(
           `taskkill /PID ${process.pid} /T /F`,
           { windowsHide: true, stdio: 'ignore' },

@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';

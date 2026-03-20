@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppLayout } from './components/layout/AppLayout';
 import { useProjectStore } from './stores/project-store';
 import { useBoardStore } from './stores/board-store';
@@ -432,7 +432,7 @@ export function App() {
 // (which depend on having a current project), then sessions last.
 // @ts-expect-error -- Vite handles import.meta.hot; tsc's "module": "commonjs" doesn't support it
 if (import.meta.hot) {
-  // @ts-expect-error
+  // @ts-expect-error Vite HMR API not typed under commonjs module resolution
   import.meta.hot.on('vite:afterUpdate', () => {
     useProjectStore.getState().loadProjects();
     useProjectStore.getState().loadGroups();

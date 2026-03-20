@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { FolderTree, Folder } from 'lucide-react';
 import type { Project, ProjectGroup } from '../../../../shared/types';
 

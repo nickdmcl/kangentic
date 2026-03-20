@@ -141,7 +141,7 @@ export function sanitizeForPty(text: string): string {
  *  - Unix:    single-quotes, escaped `'`
  */
 export function quoteArg(arg: string, shell?: string): string {
-  if (/^[a-zA-Z0-9_.\/:-]+$/.test(arg)) {
+  if (/^[a-zA-Z0-9_./:-]+$/.test(arg)) {
     return arg;
   }
   const sanitised = sanitizeForPty(arg);

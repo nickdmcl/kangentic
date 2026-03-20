@@ -1,4 +1,3 @@
-import React from 'react';
 import { PanelLeft } from 'lucide-react';
 import { TitleBar } from './TitleBar';
 import { StatusBar } from './StatusBar';

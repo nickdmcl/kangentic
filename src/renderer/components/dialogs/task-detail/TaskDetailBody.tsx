@@ -16,7 +16,6 @@ interface TaskDetailBodyProps {
   sessionId: string | null;
   displayKind: SessionDisplayState['kind'];
   isSuspended: boolean;
-  isQueued: boolean;
   toggling: boolean;
   pendingCommandLabel: string | null;
   savedAttachments: AttachmentWithPreview[];
@@ -33,7 +32,6 @@ export function TaskDetailBody({
   sessionId,
   displayKind,
   isSuspended,
-  isQueued,
   toggling,
   pendingCommandLabel,
   savedAttachments,

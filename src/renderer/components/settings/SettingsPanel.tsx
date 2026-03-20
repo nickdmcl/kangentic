@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, FolderOpen } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { useProjectStore } from '../../stores/project-store';
@@ -17,7 +17,6 @@ import { SETTINGS_REGISTRY } from './settings-registry';
 export function SettingsPanel() {
   const setSettingsOpen = useConfigStore((state) => state.setSettingsOpen);
   const projectSettingsPath = useConfigStore((state) => state.projectSettingsPath);
-  const projectSettingsProjectName = useConfigStore((state) => state.projectSettingsProjectName);
   const openProjectSettings = useConfigStore((state) => state.openProjectSettings);
   const currentProject = useProjectStore((state) => state.currentProject);
   const projects = useProjectStore((state) => state.projects);

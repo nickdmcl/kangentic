@@ -157,7 +157,7 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
 // the FOUC-prevention script on next load.
 useConfigStore.subscribe((state, prevState) => {
   if (state.config.theme !== prevState.config.theme) {
-    try { localStorage.setItem('kng-resolved-theme', state.config.theme); } catch {}
+    try { localStorage.setItem('kng-resolved-theme', state.config.theme); } catch { /* localStorage may be unavailable */ }
     const classList = document.documentElement.classList;
     classList.forEach(className => { if (className.startsWith('theme-')) classList.remove(className); });
     if (state.config.theme !== 'dark') classList.add(`theme-${state.config.theme}`);

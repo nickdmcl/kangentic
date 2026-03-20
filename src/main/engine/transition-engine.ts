@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Task, Action, ActionConfig, SwimlaneTransition, AppConfig, PermissionMode } from '../../shared/types';
+import type { Task, Action, ActionConfig, AppConfig, PermissionMode } from '../../shared/types';
 import { sanitizeForPty } from '../../shared/paths';
 import { SessionManager } from '../pty/session-manager';
 import { CommandBuilder } from '../agent/command-builder';

@@ -13,7 +13,6 @@ import {
   ensureTaskWorktree,
   ensureTaskBranchCheckout,
   createTransitionEngine,
-  cleanupTaskSession,
   cleanupTaskResources,
 } from '../helpers';
 import { trackEvent } from '../../analytics/analytics';

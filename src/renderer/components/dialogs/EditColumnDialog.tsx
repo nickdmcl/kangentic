@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Pencil, Lock, Trash2, Palette, ChevronRight, Info } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { useBoardStore } from '../../stores/board-store';

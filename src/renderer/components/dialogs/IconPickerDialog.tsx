@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Smile } from 'lucide-react';
 import { BaseDialog } from './BaseDialog';
 import { ALL_ICONS, ICON_REGISTRY } from '../../utils/swimlane-icons';

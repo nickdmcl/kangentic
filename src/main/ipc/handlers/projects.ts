@@ -9,7 +9,7 @@ import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree } fro
 import { stripKangenticHooks } from '../../agent/hook-manager';
 import { getProjectDb, closeProjectDb } from '../../db/database';
 import { PATHS } from '../../config/paths';
-import { ensureGitignore, getProjectRepos } from '../helpers';
+import { ensureGitignore } from '../helpers';
 import { trackEvent } from '../../analytics/analytics';
 import { isShuttingDown } from '../../shutdown-state';
 import type { Project, Task, AppConfig } from '../../../shared/types';

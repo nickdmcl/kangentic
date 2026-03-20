@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Bell, Bot, Check, CircleAlert, GitBranch, Palette, Plug, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal, Zap } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useToastStore } from '../../stores/toast-store';
 import { ToastItem } from './ToastItem';
 

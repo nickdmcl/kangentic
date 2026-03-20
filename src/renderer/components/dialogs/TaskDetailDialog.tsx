@@ -387,7 +387,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       headerShortcuts={headerShortcuts}
       menuShortcuts={menuShortcuts}
       executeShortcut={executeShortcut}
-      skipDeleteConfirm={skipDeleteConfirm}
       projectPath={projectPath}
     />
   );
@@ -462,7 +461,6 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             sessionId={session?.id ?? null}
             displayKind={displayState.kind}
             isSuspended={isSuspended}
-            isQueued={isQueued}
             toggling={toggling}
             pendingCommandLabel={pendingCommandLabel}
             savedAttachments={attachments.savedAttachments}

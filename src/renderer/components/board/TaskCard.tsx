@@ -5,10 +5,9 @@ import { Loader2, Trash2, CirclePause, Mail, Image, Images } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { useSessionStore } from '../../stores/session-store';
-import { useBoardStore } from '../../stores/board-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { getProgressColor } from '../../utils/color-lerp';
-import type { Task, SessionSummary } from '../../../shared/types';
+import type { Task } from '../../../shared/types';
 
 /** Priority: pending command (set by moveTask or manual invoke) > resuming > default. */
 function deriveInitializingLabel(
@@ -25,10 +24,9 @@ interface TaskCardProps {
   isDragOverlay?: boolean;
   compact?: boolean;
   onDelete?: (taskId: string) => void;
-  summary?: SessionSummary;
 }
 
-const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete, summary }: TaskCardProps) {
+const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete }: TaskCardProps) {
   const showDetail = useSessionStore(
     useCallback(
       (s: ReturnType<typeof useSessionStore.getState>) => s.detailTaskId === task.id,
@@ -57,15 +55,6 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
 
   // Derive contextual label for the initializing state (mirrors TerminalTab logic)
   const pendingCommandLabel = useSessionStore((s) => s.pendingCommandLabel[task.id] ?? null);
-  const autoCommand = useBoardStore(
-    useCallback(
-      (s: ReturnType<typeof useBoardStore.getState>) => {
-        const swimlane = s.swimlanes.find((l) => l.id === task.swimlane_id);
-        return swimlane?.auto_command ?? null;
-      },
-      [task.swimlane_id],
-    ),
-  );
   // Lookup by taskId via O(1) Map instead of scanning by sessionId
   const isResuming = useSessionStore(
     useCallback(
@@ -74,7 +63,6 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
       [sessionId, task.id],
     ),
   );
-  const hasCommand = !!pendingCommandLabel;
   const initializingLabel = deriveInitializingLabel(pendingCommandLabel, isResuming);
 
   const {
