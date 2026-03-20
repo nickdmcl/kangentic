@@ -17,6 +17,7 @@
     "make:mac": "npm run rebuild && npm run build && electron-builder --mac",
     "make:linux": "npm run rebuild && npm run build && electron-builder --linux",
     "publish": "npm run rebuild && npm run build && electron-builder --publish always",
+    "postinstall": "node scripts/rebuild-native.js",
     "rebuild": "node scripts/rebuild-native.js",
     "lint": "eslint src/",
     "test": "npx playwright test",

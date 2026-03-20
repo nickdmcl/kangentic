@@ -18,6 +18,15 @@ import('@electron/rebuild').then(({ rebuild }) => {
 }).then(() => {
   console.log('[rebuild] better-sqlite3 rebuilt for Electron', electronVersion);
 }).catch((err) => {
-  console.error('[rebuild] Failed:', err);
-  process.exit(1);
+  // When run via postinstall, don't fail the entire install — the user can
+  // run `npm run rebuild` manually after closing Electron. When run directly
+  // via `npm run rebuild` (used by package/make scripts), fail hard.
+  const isPostInstall = process.env.npm_lifecycle_event === 'postinstall';
+  if (isPostInstall) {
+    console.warn('[rebuild] Warning: could not rebuild better-sqlite3 (file may be locked by a running Electron process).');
+    console.warn('[rebuild] Run `npm run rebuild` manually after closing the app.');
+  } else {
+    console.error('[rebuild] Failed:', err);
+    process.exit(1);
+  }
 });

@@ -46,7 +46,7 @@ This command does NOT use `/merge-back`. The release flow is fundamentally diffe
 2. **Verify clean tree:** Run `git status --porcelain`. Must be empty. If not, stop with an error: "Working tree must be clean before releasing. Commit or stash changes first."
 3. **Fetch latest:** Run `git fetch origin main`
 4. **Verify up-to-date:** Run `git diff HEAD origin/main --stat`. Must be empty. If not, stop with: "Local main is behind origin/main. Run `git pull` first."
-5. **Install dependencies:** Run `npm ci`. This ensures `node_modules` matches the lockfile exactly, preventing typecheck/test failures from stale or missing packages. If it fails with EBUSY, stop with: "A file in node_modules is locked by a running process. Close the Kangentic dev server (`npm start`) and retry."
+5. **Install dependencies:** Run `npm ci`. This ensures `node_modules` matches the lockfile exactly, preventing typecheck/test failures from stale or missing packages. The `postinstall` script automatically rebuilds native modules for Electron. If it fails with EBUSY, stop with: "A file in node_modules is locked by a running process. Close the Kangentic dev server (`npm start`) and retry."
 
 Report the current version (from package.json), the bump type, and what the new version will be before proceeding.
 
