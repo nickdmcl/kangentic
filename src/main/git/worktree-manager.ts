@@ -80,6 +80,26 @@ function isJunction(targetPath: string): boolean {
 }
 
 /**
+ * Remove a junction or symlink without following it into the target directory.
+ *
+ * On Windows, `fs.rmSync(junction, { recursive: true })` traverses the junction
+ * and deletes the TARGET directory's contents (e.g. the main repo's node_modules).
+ * This helper removes just the link itself using non-recursive rmSync.
+ *
+ * Exported so backlog-cleanup can use it before recursive worktree removal.
+ */
+export function removeJunction(junctionPath: string): void {
+  try {
+    const stat = fs.lstatSync(junctionPath);
+    if (stat.isSymbolicLink() || (process.platform === 'win32' && isJunction(junctionPath))) {
+      fs.rmSync(junctionPath, { force: true });
+    }
+  } catch {
+    // ENOENT - already gone, nothing to do
+  }
+}
+
+/**
  * Create a filesystem junction (Windows) or symlink (Unix) from
  * `<worktree>/node_modules` to `<root>/node_modules` so the worktree gets
  * instant access to dependencies without running `npm install`.
@@ -102,8 +122,9 @@ function linkNodeModules(worktreePath: string, rootPath: string): void {
       const target = fs.realpathSync(worktreeModules);
       const rootReal = fs.realpathSync(rootModules);
       if (target === rootReal) return; // Already correct
-      // Points elsewhere. Remove and recreate.
-      fs.rmSync(worktreeModules, { recursive: true, force: true });
+      // Points elsewhere. Remove just the link (not recursive - avoids
+      // traversing into the target and deleting the main repo's modules).
+      removeJunction(worktreeModules);
     } else {
       // Real directory (e.g. from a previous npm install). Remove it.
       fs.rmSync(worktreeModules, { recursive: true, force: true });
@@ -361,6 +382,10 @@ export class WorktreeManager {
     // On Windows the PTY process may still hold file handles for a short time
     // after being killed. Retry rmSync with increasing delays to let handles
     // release before giving up.
+    // Unlink node_modules junction BEFORE recursive removal to prevent
+    // fs.rmSync from traversing into the main repo's node_modules.
+    removeJunction(path.join(worktreePath, 'node_modules'));
+
     const delays = [200, 500, 1500];
     for (const delay of delays) {
       await new Promise(resolve => setTimeout(resolve, delay));

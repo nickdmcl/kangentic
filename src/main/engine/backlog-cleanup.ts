@@ -6,6 +6,7 @@ import { TaskRepository } from '../db/repositories/task-repository';
 import { SwimlaneRepository } from '../db/repositories/swimlane-repository';
 import { SessionManager } from '../pty/session-manager';
 import { slugify } from '../../shared/slugify';
+import { removeJunction } from '../git/worktree-manager';
 
 /**
  * Remove stale worktree directories, branches, and session records for tasks
@@ -126,6 +127,10 @@ function branchExistsSync(branchName: string, cwd: string): boolean {
 
 /** Remove a directory synchronously with EPERM retries for Windows file handle timing. */
 function removeDirectorySync(dirPath: string): boolean {
+  // Unlink node_modules junction BEFORE recursive removal to prevent
+  // fs.rmSync from traversing into the main repo's node_modules on Windows.
+  removeJunction(path.join(dirPath, 'node_modules'));
+
   const delays = [0, 300, 1000];
   for (const delay of delays) {
     if (delay > 0) {
