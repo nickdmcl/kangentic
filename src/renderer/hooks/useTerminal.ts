@@ -48,6 +48,9 @@ export function useTerminal(options: UseTerminalOptions) {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const scrollbackPendingRef = useRef(false);
+  /** Monotonic counter to abandon stale scrollback operations when a newer
+   *  one starts (e.g. initTerminal and reloadScrollback racing). */
+  const scrollbackGenerationRef = useRef(0);
   const isAtBottomRef = useRef(true);
   /** When true, onData writes are suppressed. Controlled by the caller
    *  (e.g. TerminalTab) to gate PTY output while a loading overlay is shown. */
@@ -117,6 +120,7 @@ export function useTerminal(options: UseTerminalOptions) {
       // (TUI escape sequences garble at wrong widths). Claude Code redraws
       // via SIGWINCH within ~50-100ms.
       scrollbackPendingRef.current = true;
+      const scrollbackGeneration = ++scrollbackGenerationRef.current;
       const suppressScrollback = suppressDataRef.current;
 
       // Fit immediately to calculate actual container cols/rows
@@ -127,6 +131,12 @@ export function useTerminal(options: UseTerminalOptions) {
       window.electronAPI.sessions.resize(sid, cols, rows)
         .then(() => window.electronAPI.sessions.getScrollback(sid))
         .then((scrollback) => {
+          // A newer scrollback operation has started; abandon this one.
+          if (scrollbackGenerationRef.current !== scrollbackGeneration) {
+            scrollbackPendingRef.current = false;
+            return;
+          }
+
           const afterWrite = () => {
             // Re-fit to handle any layout shifts during the async gap
             if (fitAddonRef.current) {
@@ -156,6 +166,7 @@ export function useTerminal(options: UseTerminalOptions) {
         .catch(() => {
           // IPC may reject if session was killed during the async gap.
           // Unblock onData so the terminal isn't permanently silenced.
+          if (scrollbackGenerationRef.current !== scrollbackGeneration) return;
           scrollbackPendingRef.current = false;
         });
     } else {
@@ -172,10 +183,9 @@ export function useTerminal(options: UseTerminalOptions) {
       if (sessionId !== options.sessionId || !xtermRef.current) return;
 
       // While scrollback is loading, drop onData -- it's duplicate data
-      // already included in the scrollback replay. Any in-flight buffer
-      // flushes that arrive just after scrollbackPending clears may cause
-      // a brief duplicate write, but xterm handles this gracefully for
-      // TUI apps (absolute cursor positioning rewrites the same cells).
+      // already included in the scrollback replay. The server-side
+      // getScrollback() drains the pending buffer to prevent stale
+      // flushes, so this guard is defense-in-depth only.
       if (scrollbackPendingRef.current) return;
       if (suppressDataRef.current) return;
 
@@ -248,6 +258,7 @@ export function useTerminal(options: UseTerminalOptions) {
   const reloadScrollback = useCallback(() => {
     if (!options.sessionId || !xtermRef.current || !fitAddonRef.current) return;
     scrollbackPendingRef.current = true;
+    const scrollbackGeneration = ++scrollbackGenerationRef.current;
     xtermRef.current.reset();
 
     // Resize-first: fit to container, then sync PTY dimensions before
@@ -259,6 +270,12 @@ export function useTerminal(options: UseTerminalOptions) {
     window.electronAPI.sessions.resize(sessionId, cols, rows)
       .then(() => window.electronAPI.sessions.getScrollback(sessionId))
       .then((scrollback) => {
+        // A newer scrollback operation has started; abandon this one.
+        if (scrollbackGenerationRef.current !== scrollbackGeneration) {
+          scrollbackPendingRef.current = false;
+          return;
+        }
+
         if (scrollback && xtermRef.current) {
           xtermRef.current.write(scrollback, () => {
             if (fitAddonRef.current) fitAddonRef.current.fit();
@@ -281,6 +298,7 @@ export function useTerminal(options: UseTerminalOptions) {
       .catch(() => {
         // IPC may reject if session was killed during the async gap.
         // Unblock onData so the terminal isn't permanently silenced.
+        if (scrollbackGenerationRef.current !== scrollbackGeneration) return;
         scrollbackPendingRef.current = false;
       });
   }, [options.sessionId]);

@@ -74,6 +74,7 @@ export class PtyBufferManager {
     if (!state) return;
     if (cols !== state.lastCols) {
       state.scrollback = '';
+      state.buffer = '';
     }
     state.lastCols = cols;
   }
@@ -81,6 +82,11 @@ export class PtyBufferManager {
   getScrollback(sessionId: string): string {
     const state = this.buffers.get(sessionId);
     if (!state?.scrollback) return '';
+    // Drain the pending buffer so the next 16ms flush fires harmlessly
+    // (empty buffer -> onFlush skipped). Without this, data appended to
+    // both buffer and scrollback by onData() would be delivered twice:
+    // once via the scrollback replay and again by the stale flush.
+    state.buffer = '';
     return '\x1b[0m' + state.scrollback;
   }
 
