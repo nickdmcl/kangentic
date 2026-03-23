@@ -119,7 +119,7 @@ export class CommandInjector {
     // deliver() sets a new pending entry that tracks the submit timers.
     const detachAndDeliver = (): void => {
       this.sessionManager.off('activity', onActivity);
-      this.sessionManager.off('status', onStatus);
+      this.sessionManager.off('session-changed', onSessionChanged);
       this.sessionManager.off('exit', onExit);
       if (fallbackTimer) clearTimeout(fallbackTimer);
       clearTimeout(hardTimer);
@@ -137,11 +137,11 @@ export class CommandInjector {
       }
     };
 
-    const onStatus = (evtSessionId: string, status: string): void => {
+    const onSessionChanged = (evtSessionId: string, session: { status: string }): void => {
       if (evtSessionId !== sessionId) return;
       if (!this.pending.has(taskId)) return;
 
-      if (state === 'queued' && status === 'running') {
+      if (state === 'queued' && session.status === 'running') {
         // Session started -- transition to waiting for CLI startup
         state = 'waiting';
         startFallbackTimer();
@@ -158,7 +158,7 @@ export class CommandInjector {
 
     // --- Attach listeners ---
     this.sessionManager.on('activity', onActivity);
-    this.sessionManager.on('status', onStatus);
+    this.sessionManager.on('session-changed', onSessionChanged);
     this.sessionManager.on('exit', onExit);
 
     // Start fallback timer immediately if not queued (already running)
@@ -168,7 +168,7 @@ export class CommandInjector {
 
     const cleanup = (): void => {
       this.sessionManager.off('activity', onActivity);
-      this.sessionManager.off('status', onStatus);
+      this.sessionManager.off('session-changed', onSessionChanged);
       this.sessionManager.off('exit', onExit);
       if (fallbackTimer) clearTimeout(fallbackTimer);
       clearTimeout(hardTimer);

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '../shared/ipc-channels';
-import type { ElectronAPI, NotificationInput, Project, SessionStatus, SessionUsage, ActivityState, SessionEvent, UpdateDownloadedInfo } from '../shared/types';
+import type { ElectronAPI, NotificationInput, Project, Session, SessionUsage, ActivityState, SessionEvent, UpdateDownloadedInfo } from '../shared/types';
 
 const api: ElectronAPI = {
   projects: {
@@ -108,7 +108,7 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener(IPC.SESSION_EXIT, handler);
     },
     onStatus: (callback) => {
-      const handler = (_event: Electron.IpcRendererEvent, sessionId: string, status: SessionStatus, projectId?: string) => callback(sessionId, status, projectId);
+      const handler = (_event: Electron.IpcRendererEvent, sessionId: string, session: Session, projectId?: string) => callback(sessionId, session, projectId);
       ipcRenderer.on(IPC.SESSION_STATUS, handler);
       return () => ipcRenderer.removeListener(IPC.SESSION_STATUS, handler);
     },

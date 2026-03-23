@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AppLayout } from './components/layout/AppLayout';
 import { useProjectStore } from './stores/project-store';
 import { useBoardStore } from './stores/board-store';
@@ -16,12 +16,11 @@ export function App() {
   const loadAppVersion = useConfigStore((s) => s.loadAppVersion);
   const detectClaude = useConfigStore((s) => s.detectClaude);
   const detectGit = useConfigStore((s) => s.detectGit);
+  const upsertSession = useSessionStore((s) => s.upsertSession);
   const updateSessionStatus = useSessionStore((s) => s.updateSessionStatus);
   const updateUsage = useSessionStore((s) => s.updateUsage);
   const updateActivity = useSessionStore((s) => s.updateActivity);
   const addEvent = useSessionStore((s) => s.addEvent);
-
-  const debouncedSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
@@ -76,12 +75,6 @@ export function App() {
 
   useEffect(() => {
     if (currentProject) {
-      // Cancel any pending debounced sync from the previous project
-      if (debouncedSyncRef.current) {
-        clearTimeout(debouncedSyncRef.current);
-        debouncedSyncRef.current = null;
-      }
-
       loadBoard();
       loadConfig(); // Re-fetch effective config (global + project overrides)
       useBoardStore.getState().setSearchQuery(''); // Clear search on project switch
@@ -137,35 +130,10 @@ export function App() {
     const sessions = window.electronAPI?.sessions;
     if (!sessions) return;
 
-    // Debounced re-sync: coalesces multiple rapid events into a single
-    // syncSessions() call. Used when an IPC event reveals the store is
-    // stale (unknown session, or queued placeholder needs full properties).
-    const scheduleDebouncedSync = () => {
-      if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
-      debouncedSyncRef.current = setTimeout(() => {
-        useSessionStore.getState().syncSessions();
-        debouncedSyncRef.current = null;
-      }, 300);
-    };
-
-    const scheduleSyncIfUnknown = (sessionId: string) => {
-      const exists = useSessionStore.getState().sessions.some((s) => s.id === sessionId);
-      if (exists) return;
-      scheduleDebouncedSync();
-    };
-
-    // Session status transitions (queued → running)
+    // Session changed (queued, running, suspended) - push full Session object
     if (sessions.onStatus) {
-      cleanups.push(sessions.onStatus((sessionId, status) => {
-        // For unknown sessions, sync to pick them up. For known sessions
-        // transitioning queued → running, also sync because the queued
-        // placeholder has stale properties (shell, pid, resuming) that
-        // only the backend can fill in.
-        const existing = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-        if (!existing || (existing.status === 'queued' && status === 'running')) {
-          scheduleDebouncedSync();
-        }
-        updateSessionStatus(sessionId, { status });
+      cleanups.push(sessions.onStatus((sessionId, session) => {
+        upsertSession(session);
       }));
     }
 
@@ -253,8 +221,6 @@ export function App() {
 
         const activeProjectId = useProjectStore.getState().currentProject?.id;
         const isCurrentProject = !projectId || !activeProjectId || projectId === activeProjectId;
-
-        scheduleSyncIfUnknown(sessionId);
 
         const config = useConfigStore.getState().config;
         const sessionStore = useSessionStore.getState();
@@ -390,7 +356,6 @@ export function App() {
     if (tasks?.onAutoMoved) {
       cleanups.push(tasks.onAutoMoved((autoMovedTaskId, _targetSwimlaneId, taskTitle, autoMoveProjectId) => {
         useBoardStore.getState().loadBoard();
-        useSessionStore.getState().syncSessions();
 
         const notifyConfig = useConfigStore.getState().config.notifications;
         if (notifyConfig.toasts.onPlanComplete) {
@@ -413,9 +378,8 @@ export function App() {
 
     return () => {
       cleanups.forEach((fn) => fn());
-      if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
     };
-  }, [updateSessionStatus, updateUsage, updateActivity, addEvent]);
+  }, [upsertSession, updateSessionStatus, updateUsage, updateActivity, addEvent]);
 
   return <AppLayout />;
 }

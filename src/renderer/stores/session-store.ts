@@ -40,6 +40,7 @@ interface SessionStore {
   resumeSession: (taskId: string, resumePrompt?: string) => Promise<Session>;
   setActiveSession: (id: string | null) => void;
   setDialogSessionId: (id: string | null) => void;
+  upsertSession: (session: Session) => void;
   updateSessionStatus: (id: string, updates: Partial<Session>) => void;
   updateUsage: (sessionId: string, data: SessionUsage) => void;
   updateActivity: (sessionId: string, state: ActivityState) => void;
@@ -180,6 +181,22 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setActiveSession: (id) => set({ activeSessionId: id }),
   setDetailTaskId: (id) => set({ detailTaskId: id }),
   setDialogSessionId: (id) => set({ dialogSessionId: id }),
+
+  upsertSession: (session) => {
+    set((state) => {
+      const existingIndex = state.sessions.findIndex((s) => s.id === session.id);
+      let sessions: Session[];
+      if (existingIndex >= 0) {
+        sessions = [...state.sessions];
+        sessions[existingIndex] = session;
+      } else {
+        // New session - also remove any stale session for the same task
+        // (handles respawns where the session ID changes but taskId stays)
+        sessions = [...state.sessions.filter((s) => s.taskId !== session.taskId), session];
+      }
+      return { sessions, _sessionByTaskId: buildSessionByTaskId(sessions) };
+    });
+  },
 
   updateSessionStatus: (id, updates) => {
     set((s) => {

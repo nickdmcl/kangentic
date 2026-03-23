@@ -117,7 +117,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `session:getEventsCache` | invoke | Fetch cached event arrays. Optional `projectId` scopes to one project. |
 | `session:data` | on | Terminal output available (includes `projectId`) |
 | `session:exit` | on | Session exited (includes `projectId`) |
-| `session:status` | on | Session status changed (includes `projectId`) |
+| `session:status` | on | Session changed - pushes full `Session` object (includes `projectId`) |
 | `session:usage` | on | Usage data updated (includes `projectId`) |
 | `session:activity` | on | Activity state changed (includes `projectId`, `taskId`, `taskTitle`) |
 | `session:event` | on | Structured event (includes `projectId`) |

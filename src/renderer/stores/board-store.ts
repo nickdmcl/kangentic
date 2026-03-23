@@ -175,16 +175,14 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
       await window.electronAPI.tasks.move(input);
       if (moveGeneration !== thisGen) return; // Skip stale reload
 
-      // Reload tasks, archived tasks, and sessions (transition engine may have spawned/killed sessions)
-      const [tasks, archivedTasks, sessions] = await Promise.all([
+      // Reload tasks and archived tasks (sessions arrive via push-based session-changed events)
+      const [tasks, archivedTasks] = await Promise.all([
         window.electronAPI.tasks.list(),
         window.electronAPI.tasks.listArchived(),
-        window.electronAPI.sessions.list(),
       ]);
       if (moveGeneration !== thisGen) return; // Skip stale reload
 
       set({ tasks, archivedTasks });
-      useSessionStore.setState({ sessions });
 
       // Detect if the moved task now has a new/different session
       const movedTask = tasks.find((t) => t.id === input.taskId);
@@ -352,11 +350,8 @@ const createArchiveSlice: StateCreator<BoardStore, [], [], ArchiveSlice> = (set,
 
     await window.electronAPI.tasks.unarchive(input);
 
-    // Reload tasks and sessions (transition engine may have spawned sessions)
-    const [tasks, sessions] = await Promise.all([
-      window.electronAPI.tasks.list(),
-      window.electronAPI.sessions.list(),
-    ]);
+    // Reload tasks (sessions arrive via push-based session-changed events)
+    const tasks = await window.electronAPI.tasks.list();
     set({ tasks });
 
     const targetLane = get().swimlanes.find((s) => s.id === input.targetSwimlaneId);
@@ -364,8 +359,6 @@ const createArchiveSlice: StateCreator<BoardStore, [], [], ArchiveSlice> = (set,
       message: `"${taskTitle}" restored to ${targetLane?.name || 'board'}`,
       variant: 'success',
     });
-
-    useSessionStore.setState({ sessions });
 
     // Detect if the unarchived task got a session (transition engine fired)
     const restoredTask = tasks.find((t) => t.id === input.id);
@@ -432,13 +425,9 @@ const createArchiveSlice: StateCreator<BoardStore, [], [], ArchiveSlice> = (set,
     }));
     try {
       await window.electronAPI.tasks.bulkUnarchive(ids, targetSwimlaneId);
-      // Reload tasks and sessions
-      const [tasks, sessions] = await Promise.all([
-        window.electronAPI.tasks.list(),
-        window.electronAPI.sessions.list(),
-      ]);
+      // Reload tasks (sessions arrive via push-based session-changed events)
+      const tasks = await window.electronAPI.tasks.list();
       set({ tasks });
-      useSessionStore.setState({ sessions });
 
       const targetLane = get().swimlanes.find((lane) => lane.id === targetSwimlaneId);
       useToastStore.getState().addToast({

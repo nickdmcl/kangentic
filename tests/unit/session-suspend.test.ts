@@ -144,16 +144,16 @@ describe('SessionManager suspend logic', () => {
     expect(pathsWereNullAtKill).toBe(true);
   });
 
-  it('suspend emits suspended status', async () => {
+  it('suspend emits session-changed with suspended status', async () => {
     const { session } = await spawnSession();
-    const statusEvents: string[] = [];
-    manager.on('status', (id, status) => {
-      if (id === session.id) statusEvents.push(status);
+    const changedStatuses: string[] = [];
+    manager.on('session-changed', (id, changedSession) => {
+      if (id === session.id) changedStatuses.push(changedSession.status);
     });
 
     manager.suspend(session.id);
 
-    expect(statusEvents).toContain('suspended');
+    expect(changedStatuses).toContain('suspended');
   });
 
   it('suspend removes from queue', async () => {

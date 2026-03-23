@@ -133,7 +133,7 @@ export class SessionManager extends EventEmitter {
       };
       this.sessions.set(id, session);
       this.sessionQueue.enqueue(inputWithId);
-      this.emit('status', id, 'queued');
+      this.emit('session-changed', id, this.toSession(session));
       return this.toSession(session);
     }
 
@@ -370,7 +370,7 @@ export class SessionManager extends EventEmitter {
       this.sessionQueue.notifySlotFreed();
     });
 
-    this.emit('status', id, 'running');
+    this.emit('session-changed', id, this.toSession(session));
 
     // If there's a command to run, send it after a brief delay
     if (input.command) {
@@ -507,7 +507,7 @@ export class SessionManager extends EventEmitter {
       ptyRef.kill();
     }
 
-    this.emit('status', sessionId, 'suspended');
+    this.emit('session-changed', sessionId, this.toSession(session));
 
     // Remove from queue (queued sessions have no PTY yet) and promote
     this.sessionQueue.remove(sessionId);

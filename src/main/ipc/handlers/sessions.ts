@@ -8,6 +8,7 @@ import { getProjectRepos, ensureTaskWorktree, ensureTaskBranchCheckout, buildAut
 import { handleTaskMove, guardActiveNonWorktreeSessions } from './tasks';
 import { trackEvent } from '../../analytics/analytics';
 import { captureSessionMetrics } from './session-metrics';
+import type { Session } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
 // Track session start times for duration calculation on exit
@@ -161,8 +162,8 @@ export function registerSessionHandlers(context: IpcContext): void {
     }
   });
 
-  context.sessionManager.on('status', (sessionId: string, status: string) => {
-    if (status === 'running') {
+  context.sessionManager.on('session-changed', (sessionId: string, session: Session) => {
+    if (session.status === 'running') {
       sessionStartTimes.set(sessionId, Date.now());
 
       // Update DB record from 'queued' to 'running' when promoted
@@ -184,8 +185,7 @@ export function registerSessionHandlers(context: IpcContext): void {
       }
     }
     if (!context.mainWindow.isDestroyed()) {
-      const projectId = context.sessionManager.getSessionProjectId(sessionId);
-      context.mainWindow.webContents.send(IPC.SESSION_STATUS, sessionId, status, projectId);
+      context.mainWindow.webContents.send(IPC.SESSION_STATUS, sessionId, session, session.projectId);
     }
   });
 
