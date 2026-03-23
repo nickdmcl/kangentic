@@ -231,11 +231,21 @@ export function useTerminal(options: UseTerminalOptions) {
       if (!isInside(e)) return;
       xtermRef.current!.selectAll();
     };
+    const handlePaste = (e: Event) => {
+      if (!isInside(e)) return;
+      navigator.clipboard.readText().then((text) => {
+        if (text && options.sessionId) {
+          window.electronAPI.sessions.write(options.sessionId, text);
+        }
+      }).catch(() => { /* clipboard access denied */ });
+    };
     window.addEventListener('terminal-copy', handleCopy);
     window.addEventListener('terminal-select-all', handleSelectAll);
+    window.addEventListener('terminal-paste', handlePaste);
     return () => {
       window.removeEventListener('terminal-copy', handleCopy);
       window.removeEventListener('terminal-select-all', handleSelectAll);
+      window.removeEventListener('terminal-paste', handlePaste);
     };
   }, []);
 

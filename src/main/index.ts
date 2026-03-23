@@ -306,7 +306,17 @@ const createWindow = () => {
         label: 'Paste',
         accelerator: 'CmdOrCtrl+V',
         enabled: params.editFlags.canPaste,
-        click: () => { wc.paste(); },
+        click: () => {
+          wc.executeJavaScript(`
+            (function() {
+              var el = document.elementFromPoint(${x}, ${y});
+              if (el && el.closest('.xterm')) {
+                window.dispatchEvent(new CustomEvent('terminal-paste', { detail: { x: ${x}, y: ${y} } }));
+              }
+            })()
+          `);
+          wc.paste();
+        },
       },
       { type: 'separator' },
       {
