@@ -134,10 +134,10 @@ export function sanitizeForPty(text: string): string {
  *
  * When `shell` is provided, quoting style is chosen by shell type:
  *  - Unix-like shells (bash, zsh, fish, WSL): single-quotes (no expansion)
- *  - PowerShell/cmd: double-quotes, escaped `"`
+ *  - PowerShell/cmd: double-quotes with backtick, `$`, and `"` escaping
  *
  * When `shell` is omitted, falls back to platform detection:
- *  - Windows: double-quotes, escaped `"`
+ *  - Windows: double-quotes with backtick, `$`, and `"` escaping
  *  - Unix:    single-quotes, escaped `'`
  */
 export function quoteArg(arg: string, shell?: string): string {
@@ -149,7 +149,10 @@ export function quoteArg(arg: string, shell?: string): string {
     ? !isUnixLikeShell(shell)
     : process.platform === 'win32';
   if (useDoubleQuotes) {
-    return `"${sanitised.replace(/"/g, '\\"')}"`;
+    // PowerShell: ` is escape char, $ triggers variable/subexpression expansion.
+    // Escape backticks first (` → ``), then $ ($ → `$), then quotes (" → \").
+    // cmd.exe: $ is not special, `` and `$ are harmless literal text.
+    return `"${sanitised.replace(/`/g, '``').replace(/\$/g, '`$').replace(/"/g, '\\"')}"`;
   }
   return `'${sanitised.replace(/'/g, "'\\''")}'`;
 }

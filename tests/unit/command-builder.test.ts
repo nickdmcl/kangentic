@@ -253,6 +253,35 @@ describe('Command Builder Logic', () => {
     expect(result).toBe("'check `whoami` output'");
   });
 
+  it('quoteArg escapes backticks for PowerShell', () => {
+    const result = quoteArg('use `code` block', 'powershell');
+    // Each backtick should be doubled for PowerShell (` → ``)
+    expect(result).toBe('"use ``code`` block"');
+  });
+
+  it('quoteArg escapes $ for PowerShell to prevent variable expansion', () => {
+    const result = quoteArg('fix $HOME and $(whoami) issue', 'powershell');
+    // $ should be escaped as `$ for PowerShell
+    expect(result).toContain('`$HOME');
+    expect(result).toContain('`$(whoami)');
+    // Should not contain unescaped $ (every $ should be preceded by `)
+    expect(result).not.toMatch(/[^`]\$|^"\$/);
+  });
+
+  it('quoteArg escapes both backticks and $ in PowerShell prompt with code blocks', () => {
+    const prompt = 'Refactor: ```typescript\nconst $count = items.length;\n```';
+    const result = quoteArg(prompt, 'pwsh');
+    // Backticks doubled, $ escaped - should not hang PowerShell
+    expect(result).toContain('````');
+    expect(result).toContain('`$count');
+  });
+
+  it('quoteArg leaves $ and backticks literal in bash single quotes', () => {
+    const result = quoteArg('use $HOME and `whoami`', 'bash');
+    // Single quotes protect everything - no escaping needed
+    expect(result).toBe("'use $HOME and `whoami`'");
+  });
+
   it('quoteArg with shell omitted falls back to platform detection', () => {
     const result = quoteArg('hello world');
     // Should produce either single or double quotes depending on platform
