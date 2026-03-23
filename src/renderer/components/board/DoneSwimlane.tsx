@@ -169,8 +169,10 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
           )}
         </button>
 
-        {/* Recent archived tasks - fills available space, clips overflow */}
-        <div className="flex-1 min-h-0 overflow-hidden space-y-1">
+        {/* Recent archived tasks - fills available space, clips overflow with fade */}
+        <div className="relative flex-1 min-h-0 overflow-hidden space-y-1">
+          {/* Fade-out gradient so clipped cards don't look broken */}
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-surface-raised/70 to-transparent z-10" />
           {filteredArchivedTasks.slice(0, MAX_RENDERED_PREVIEW).map((task) => {
             const isGrowingIn = recentlyArchivedId === task.id;
             return isGrowingIn ? (
