@@ -226,7 +226,7 @@ export class TransitionEngine {
         cwd,
         permission_mode: permissionMode,
         prompt: prompt ?? null,
-        status: 'running',
+        status: session.status as 'running' | 'queued',
         exit_code: null,
         started_at: new Date().toISOString(),
         suspended_at: null,

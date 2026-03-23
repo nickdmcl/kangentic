@@ -96,7 +96,7 @@ export class SessionRepository {
   /** Mark all currently 'running' sessions as 'orphaned' (crash recovery) */
   markAllRunningAsOrphaned(): void {
     this.db.prepare(
-      `UPDATE sessions SET status = 'orphaned' WHERE status = 'running'`
+      `UPDATE sessions SET status = 'orphaned' WHERE status IN ('running', 'queued')`
     ).run();
   }
 
@@ -113,7 +113,7 @@ export class SessionRepository {
     const ids = Array.from(excludeTaskIds);
     const placeholders = ids.map(() => '?').join(', ');
     this.db.prepare(
-      `UPDATE sessions SET status = 'orphaned' WHERE status = 'running' AND task_id NOT IN (${placeholders})`
+      `UPDATE sessions SET status = 'orphaned' WHERE status IN ('running', 'queued') AND task_id NOT IN (${placeholders})`
     ).run(...ids);
   }
 

@@ -165,7 +165,7 @@ Index: `idx_transitions_from_to` on (from_swimlane_id, to_swimlane_id).
 
 Valid session_type values: `claude_agent`, `run_script`.
 
-Valid status values: `running`, `suspended`, `exited`, `orphaned`.
+Valid status values: `running`, `queued`, `suspended`, `exited`, `orphaned`.
 
 Valid suspended_by values: `user` (explicit pause button), `system` (shutdown, task move, idle timeout), or `NULL` (legacy records, treated as `system`).
 

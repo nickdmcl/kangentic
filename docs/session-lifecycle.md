@@ -7,9 +7,9 @@ This document describes the full session state machine in Kangentic, covering ho
 There are two separate state representations:
 
 - **`SessionStatus`** -- in-memory runtime state of a `ManagedSession` inside `SessionManager`. Values: `running`, `queued`, `exited`, `suspended`.
-- **`SessionRecordStatus`** -- persisted in the SQLite database as a `SessionRecord`. Values: `running`, `suspended`, `exited`, `orphaned`.
+- **`SessionRecordStatus`** -- persisted in the SQLite database as a `SessionRecord`. Values: `running`, `queued`, `suspended`, `exited`, `orphaned`.
 
-The in-memory `SessionStatus` does not include `orphaned` (that is a DB-only concept discovered on next launch). The DB `SessionRecordStatus` does not include `queued` (queued sessions have no DB record yet).
+The in-memory `SessionStatus` does not include `orphaned` (that is a DB-only concept discovered on next launch). Both types include `queued` - the DB record is created with `status: 'queued'` at spawn time and promoted to `running` when a concurrency slot opens.
 
 ```
                   +----------+
@@ -22,19 +22,19 @@ The in-memory `SessionStatus` does not include `orphaned` (that is a DB-only con
 +------------+    +----------+    +-----------+
 | suspended  |<---| running  |--->|  exited   |
 +-----+------+    +----+-----+    +-----------+
-      |                |
-      |                | app crashes
-      |                v
-      |           +----------+
-      +---------->| orphaned |
-   (recovery)    +----------+
+      |                |                ^
+      |                | app crashes    | killed while queued
+      |                v                |
+      |           +----------+    +-----+----+
+      +---------->| orphaned |<---|  queued   |
+   (recovery)    +----------+  (app crashes)
 ```
 
 ### States
 
 | State | Scope | Description |
 |-------|-------|-------------|
-| `queued` | In-memory only | Waiting for a concurrency slot to open |
+| `queued` | Both | Waiting for a concurrency slot to open |
 | `running` | Both | PTY is live, Claude Code CLI process is active |
 | `suspended` | Both | PTY killed, but session ID and files preserved for resume |
 | `exited` | Both | Process exited naturally or was killed; terminal state |
@@ -50,6 +50,7 @@ The in-memory `SessionStatus` does not include `orphaned` (that is a DB-only con
 | `running` | `exited` | Task moved to Backlog (full cleanup via `cleanupTaskSession`) |
 | `running` | `exited` | Process exits naturally or is killed |
 | `running` | `orphaned` | App crashes, leftover `running` DB record found on next launch |
+| `queued` | `orphaned` | App crashes, leftover `queued` DB record found on next launch |
 | `suspended` | `running` | Task moved to active column, resumed via `--resume` |
 | `orphaned` | `running` | Session recovery on project open |
 

@@ -141,7 +141,7 @@ export interface Session {
 
 // === Session Persistence (DB) ===
 
-export type SessionRecordStatus = 'running' | 'suspended' | 'exited' | 'orphaned';
+export type SessionRecordStatus = 'running' | 'queued' | 'suspended' | 'exited' | 'orphaned';
 
 export type SuspendedBy = 'user' | 'system';
 

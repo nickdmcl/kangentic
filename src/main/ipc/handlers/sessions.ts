@@ -164,6 +164,24 @@ export function registerSessionHandlers(context: IpcContext): void {
   context.sessionManager.on('status', (sessionId: string, status: string) => {
     if (status === 'running') {
       sessionStartTimes.set(sessionId, Date.now());
+
+      // Update DB record from 'queued' to 'running' when promoted
+      const resolvedProjectId = context.sessionManager.getSessionProjectId(sessionId);
+      if (resolvedProjectId) {
+        try {
+          const database = getProjectDb(resolvedProjectId);
+          const sessionRepo = new SessionRepository(database);
+          const session = context.sessionManager.getSession(sessionId);
+          if (session) {
+            const record = sessionRepo.getLatestForTask(session.taskId);
+            if (record && record.status === 'queued') {
+              sessionRepo.updateStatus(record.id, 'running');
+            }
+          }
+        } catch {
+          // DB may be closed during shutdown
+        }
+      }
     }
     if (!context.mainWindow.isDestroyed()) {
       const projectId = context.sessionManager.getSessionProjectId(sessionId);
@@ -200,14 +218,14 @@ export function registerSessionHandlers(context: IpcContext): void {
         const db = getProjectDb(resolvedProjectId);
         const sessionRepo = new SessionRepository(db);
         // Look up by task ID from the in-memory session.
-        // Only mark 'running' records as 'exited' -- never overwrite
-        // 'suspended' status, which is set by TASK_MOVE before the
-        // async onExit fires and is needed for resume on re-entry.
+        // Only mark 'running' or 'queued' records as 'exited' -- never
+        // overwrite 'suspended' status, which is set by TASK_MOVE before
+        // the async onExit fires and is needed for resume on re-entry.
         let updated = false;
         const session = context.sessionManager.getSession(sessionId);
         if (session) {
           const record = sessionRepo.getLatestForTask(session.taskId);
-          if (record && record.status === 'running') {
+          if (record && (record.status === 'running' || record.status === 'queued')) {
             sessionRepo.updateStatus(record.id, 'exited', {
               exit_code: exitCode,
               exited_at: new Date().toISOString(),
@@ -218,7 +236,7 @@ export function registerSessionHandlers(context: IpcContext): void {
         // Fallback: try matching by claude_session_id only if taskId lookup didn't find it
         if (!updated) {
           const byClaudeId = db.prepare(
-            `SELECT id FROM sessions WHERE claude_session_id = ? AND status = 'running' LIMIT 1`
+            `SELECT id FROM sessions WHERE claude_session_id = ? AND status IN ('running', 'queued') LIMIT 1`
           ).get(sessionId) as { id: string } | undefined;
           if (byClaudeId) {
             sessionRepo.updateStatus(byClaudeId.id, 'exited', {

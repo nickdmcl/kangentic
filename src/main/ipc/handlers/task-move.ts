@@ -136,13 +136,18 @@ export async function handleTaskMove(
     context.commandInjector.cancel(task.id);
     if (task.session_id) {
       const record = sessionRepo.getLatestForTask(task.id);
-      // Accept 'running' AND 'exited' -- exited covers Claude natural exit
+      // Accept 'running' AND 'exited' -- exited covers Claude natural exit.
+      // Queued sessions never started Claude CLI, so mark exited (not suspended)
+      // to avoid a failed --resume attempt when the task is later moved back.
       if (record && record.claude_session_id
           && (record.status === 'running' || record.status === 'exited')) {
         // Capture metrics before suspend (caches are still populated)
         captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, record.id);
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
         console.log(`[TASK_MOVE] Suspended session record ${record.id.slice(0, 8)} for task ${task.id.slice(0, 8)}`);
+      } else if (record && record.status === 'queued') {
+        sessionRepo.updateStatus(record.id, 'exited', { exited_at: new Date().toISOString() });
+        console.log(`[TASK_MOVE] Exited queued session record ${record.id.slice(0, 8)} for task ${task.id.slice(0, 8)}`);
       }
       context.sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });
@@ -181,6 +186,8 @@ export async function handleTaskMove(
           && (record.status === 'running' || record.status === 'exited')) {
         captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, record.id);
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
+      } else if (record && record.status === 'queued') {
+        sessionRepo.updateStatus(record.id, 'exited', { exited_at: new Date().toISOString() });
       }
       context.sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });
@@ -208,6 +215,8 @@ export async function handleTaskMove(
         sessionRepo.updateStatus(sessionRecord.id, 'suspended', {
           suspended_at: new Date().toISOString(),
         });
+      } else if (sessionRecord && sessionRecord.status === 'queued') {
+        sessionRepo.updateStatus(sessionRecord.id, 'exited', { exited_at: new Date().toISOString() });
       }
       context.sessionManager.suspend(task.session_id);
       tasks.update({ id: task.id, session_id: null });
