@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.11.0] - 2026-03-23
+
+### Features
+- Auto-detect PR URLs from terminal output and link to tasks (ed7ab0f)
+- Add ephemeral Claude Code terminal overlay (8c96252)
+
+### Fixes
+- Remove overflow-x-auto from header pills to unclip command popover (6cddaf1)
+- Fix Done column bleed-through, task detail header layout, and completed task view (8f905f4)
+- Fix summary view overflow, git stats, and Done column layout (6267979)
+- Support right-click paste in xterm terminals (4ec2088)
+- Update session-queued-status test for push-based session sync (5029b85)
+
+### Other
+- Lift shimmer overlay on alternate screen buffer detection (09fcc72)
+- Reduce heartbeat interval from 5min to 60min (6af07c0)
+- Add fade-out gradient to Done column completed tasks (4231cd4)
+
 ## [v0.10.0] - 2026-03-22
 
 ### Features

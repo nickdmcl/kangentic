@@ -68,6 +68,8 @@ Actions of type `spawn_agent` can define a `promptTemplate` with placeholders:
 | `{{taskId}}` | Task UUID |
 | `{{worktreePath}}` | Worktree directory path (empty if no worktree) |
 | `{{branchName}}` | Git branch name (empty if no worktree) |
+| `{{prUrl}}` | Pull request URL (empty if none) |
+| `{{prNumber}}` | Pull request number as string (empty if none) |
 | `{{attachments}}` | Bare file paths (one per line) when attachments exist, empty otherwise |
 
 Default template: `{{title}}{{description}}{{attachments}}`
