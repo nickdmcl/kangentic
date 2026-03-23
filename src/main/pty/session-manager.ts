@@ -118,6 +118,19 @@ export class SessionManager extends EventEmitter {
     return this.sessionQueue.length;
   }
 
+  /** Lightweight session counts without allocating mapped Session objects. */
+  getSessionCounts(): { active: number; suspended: number; total: number } {
+    let active = 0;
+    let suspended = 0;
+    let total = 0;
+    for (const session of this.sessions.values()) {
+      total++;
+      if (session.status === 'running') active++;
+      else if (session.status === 'suspended') suspended++;
+    }
+    return { active, suspended, total };
+  }
+
   async spawn(input: SpawnSessionInput): Promise<Session> {
     if (isShuttingDown()) {
       throw new Error('Cannot spawn session during shutdown');
