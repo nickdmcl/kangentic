@@ -18,8 +18,8 @@ export interface DoneSwimlaneProps {
   dragHandleProps?: Record<string, unknown>;
 }
 
-/** Max number of recent completed tasks to show inline in the Done column. */
-const MAX_INLINE_PREVIEW = 5;
+/** Cap rendered cards to avoid DOM bloat - overflow-hidden clips anything beyond the viewport anyway. */
+const MAX_RENDERED_PREVIEW = 20;
 
 export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }: DoneSwimlaneProps) {
   const [showEditColumn, setShowEditColumn] = useState(false);
@@ -66,11 +66,6 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
     );
   }, [archivedTasks, searchQuery]);
 
-  const previewTasks = useMemo(
-    () => filteredArchivedTasks.slice(0, MAX_INLINE_PREVIEW),
-    [filteredArchivedTasks],
-  );
-  const hasMore = filteredArchivedTasks.length > MAX_INLINE_PREVIEW;
 
   return (
     <div
@@ -174,9 +169,9 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
           )}
         </button>
 
-        {/* Recent archived tasks (max 5) */}
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-          {previewTasks.map((task) => {
+        {/* Recent archived tasks - fills available space, clips overflow */}
+        <div className="flex-1 min-h-0 overflow-hidden space-y-1">
+          {filteredArchivedTasks.slice(0, MAX_RENDERED_PREVIEW).map((task) => {
             const isGrowingIn = recentlyArchivedId === task.id;
             return isGrowingIn ? (
               <div
@@ -195,20 +190,22 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
               />
             );
           })}
-          {hasMore && (
-            <button
-              type="button"
-              onClick={() => setShowCompletedDialog(true)}
-              className="w-full text-xs text-fg-muted hover:text-fg-secondary py-1.5 transition-colors"
-              data-testid="view-all-completed"
-            >
-              View all {filteredArchivedTasks.length} completed tasks
-            </button>
-          )}
           {filteredArchivedTasks.length === 0 && (
             <div className="text-xs text-fg-disabled text-center py-3">{searchQuery ? 'No matching completed tasks' : 'No completed tasks yet'}</div>
           )}
         </div>
+
+        {/* View all button - always visible at bottom */}
+        {filteredArchivedTasks.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowCompletedDialog(true)}
+            className="flex-shrink-0 w-full text-xs text-fg-muted hover:text-fg-secondary hover:bg-surface-hover py-1.5 px-3 rounded-lg bg-surface-hover/30 border border-edge/30 transition-colors"
+            data-testid="view-all-completed"
+          >
+            View all {filteredArchivedTasks.length} completed tasks
+          </button>
+        )}
       </div>
 
       {pendingDeleteId && (

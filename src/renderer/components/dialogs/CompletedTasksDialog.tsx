@@ -409,7 +409,7 @@ export function CompletedTasksDialog({ onClose }: CompletedTasksDialogProps) {
     {
       key: 'title' as SortKey,
       label: 'Title',
-      width: 'min-w-[280px]',
+      width: '',
       sortValue: (row) => row.task.title.toLowerCase(),
       render: (row) => (
         <div className="min-w-0">

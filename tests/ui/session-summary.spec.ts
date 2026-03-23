@@ -276,7 +276,7 @@ test.describe('Done Column', () => {
     }
   });
 
-  test('shows max 5 recent tasks and "View all" link for more', async () => {
+  test('shows completed tasks and "View all" button', async () => {
     const { browser, page } = await launchWithState(
       makePreConfig({ withSummary: true, extraArchivedTasks: 6 }),
     );
@@ -287,11 +287,11 @@ test.describe('Done Column', () => {
       // Should show count of all 7 tasks in header
       await expect(doneColumn).toContainText('Completed (7)');
 
-      // Only 5 compact cards should be visible inline
+      // All tasks are rendered (visible count depends on viewport, but all are in DOM)
       const compactCards = doneColumn.locator('[data-testid="compact-title"]');
-      await expect(compactCards).toHaveCount(5);
+      await expect(compactCards).toHaveCount(7);
 
-      // "View all" link should be visible
+      // "View all" button should always be visible at bottom
       await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toBeVisible();
       await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toContainText('View all 7 completed tasks');
     } finally {

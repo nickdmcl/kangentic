@@ -36,8 +36,11 @@ async function captureGitStats(
   const baseBranch = task.base_branch ?? 'main';
   const git = simpleGit(gitDir);
 
-  // Compare all changes (committed + uncommitted) against the base branch
-  const diffResult = await git.diffSummary([baseBranch]);
+  // Compare all changes (committed + uncommitted) against the merge-base.
+  // Three-dot syntax `main...` means `git diff $(git merge-base main HEAD)`,
+  // which shows only changes introduced on the task branch, excluding any
+  // new commits on the base branch since the fork point.
+  const diffResult = await git.diffSummary([baseBranch + '...']);
 
   sessionRepo.updateGitStats(recordId, {
     linesAdded: diffResult.insertions,

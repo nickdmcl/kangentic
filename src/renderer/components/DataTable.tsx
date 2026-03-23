@@ -118,7 +118,7 @@ export function DataTable<TRow, TKey extends string = string>({
 
     return (
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
           <thead className="sticky top-0 z-10">
             {headerRow}
           </thead>
@@ -150,7 +150,7 @@ export function DataTable<TRow, TKey extends string = string>({
                       {columns.map((column, columnIndex) => (
                         <td
                           key={`${column.key}-${columnIndex}`}
-                          className={`px-3 py-2.5 ${column.width || ''} ${column.align === 'right' ? 'text-right' : ''}`}
+                          className={`px-3 py-2.5 overflow-hidden ${column.width || ''} ${column.align === 'right' ? 'text-right' : ''}`}
                         >
                           {column.render(row)}
                         </td>
@@ -180,7 +180,7 @@ export function DataTable<TRow, TKey extends string = string>({
   // Non-virtualized (default) path
   return (
     <div className="flex-1 min-h-0 overflow-auto">
-      <table className="w-full text-sm">
+      <table className="w-full table-fixed text-sm">
         <thead className="sticky top-0 z-10">
           {headerRow}
         </thead>
@@ -195,7 +195,7 @@ export function DataTable<TRow, TKey extends string = string>({
               {columns.map((column, columnIndex) => (
                 <td
                   key={`${column.key}-${columnIndex}`}
-                  className={`px-3 py-2.5 ${column.width || ''} ${column.align === 'right' ? 'text-right' : ''}`}
+                  className={`px-3 py-2.5 overflow-hidden ${column.width || ''} ${column.align === 'right' ? 'text-right' : ''}`}
                 >
                   {column.render(row)}
                 </td>
