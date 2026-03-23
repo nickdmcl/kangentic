@@ -295,6 +295,7 @@ export async function recoverSessions(
   const spawnResults = await Promise.allSettled(
     spawnInputs.map(async (input) => {
       const newSession = await sessionManager.spawn({
+        id: randomUUID(),
         taskId: input.task.id,
         projectId,
         command: input.command,
@@ -551,6 +552,7 @@ export async function reconcileSessions(
   const spawnResults = await Promise.allSettled(
     spawnInputs.map(async (input) => {
       const newSession = await sessionManager.spawn({
+        id: randomUUID(),
         taskId: input.task.id,
         projectId,
         command: input.command,

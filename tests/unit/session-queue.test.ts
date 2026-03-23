@@ -6,8 +6,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { SessionQueue } from '../../src/main/pty/session-queue';
 import type { SpawnSessionInput } from '../../src/shared/types';
 
-function makeInput(taskId: string): SpawnSessionInput {
-  return { taskId, command: 'mock-claude', cwd: '/tmp' };
+function makeQueueInput(taskId: string, id: string): SpawnSessionInput & { id: string } {
+  return { id, taskId, command: 'mock-claude', cwd: '/tmp' };
 }
 
 describe('SessionQueue', () => {
@@ -17,8 +17,8 @@ describe('SessionQueue', () => {
       getActiveCount: () => 0,
       maxConcurrent: 5,
     });
-    queue.enqueue(makeInput('t1'), 'sess-1');
-    queue.enqueue(makeInput('t2'), 'sess-2');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
+    queue.enqueue(makeQueueInput('t2', 'sess-2'));
     expect(queue.length).toBe(2);
   });
 
@@ -28,7 +28,7 @@ describe('SessionQueue', () => {
       getActiveCount: () => 5, // at limit, so enqueue won't trigger processQueue
       maxConcurrent: 5,
     });
-    queue.enqueue(makeInput('t1'), 'sess-1');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
 
     expect(queue.remove('sess-1')).toBe(true);
     expect(queue.length).toBe(0);
@@ -61,12 +61,12 @@ describe('SessionQueue', () => {
       getActiveCount: () => active,
       maxConcurrent: 2,
     });
-    queue.enqueue(makeInput('t1'), 'sess-1');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
     queue.notifySlotFreed();
 
     // Give the async processQueue a tick to complete
     await vi.waitFor(() => expect(spawner).toHaveBeenCalledTimes(1));
-    expect(spawner).toHaveBeenCalledWith(makeInput('t1'));
+    expect(spawner).toHaveBeenCalledWith(makeQueueInput('t1', 'sess-1'));
     expect(queue.length).toBe(0);
   });
 
@@ -81,9 +81,9 @@ describe('SessionQueue', () => {
     });
     spawner.mockImplementation(async () => { active++; });
 
-    queue.enqueue(makeInput('t1'), 'sess-1');
-    queue.enqueue(makeInput('t2'), 'sess-2');
-    queue.enqueue(makeInput('t3'), 'sess-3');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
+    queue.enqueue(makeQueueInput('t2', 'sess-2'));
+    queue.enqueue(makeQueueInput('t3', 'sess-3'));
     queue.notifySlotFreed();
 
     // Only 1 slot open (active=2, max=3), so only 1 should spawn
@@ -100,7 +100,7 @@ describe('SessionQueue', () => {
       getActiveCount: () => active,
       maxConcurrent: 2,
     });
-    queue.enqueue(makeInput('t1'), 'sess-1');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
 
     // Raise limit -- should trigger promotion
     queue.setMaxConcurrent(3);
@@ -115,9 +115,9 @@ describe('SessionQueue', () => {
       getActiveCount: () => 5,
       maxConcurrent: 5,
     });
-    queue.enqueue(makeInput('t1'), 'sess-1');
-    queue.enqueue(makeInput('t2'), 'sess-2');
-    queue.enqueue(makeInput('t3'), 'sess-3');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
+    queue.enqueue(makeQueueInput('t2', 'sess-2'));
+    queue.enqueue(makeQueueInput('t3', 'sess-3'));
 
     queue.clear();
     expect(queue.length).toBe(0);
@@ -134,13 +134,13 @@ describe('SessionQueue', () => {
     spawner.mockRejectedValueOnce(new Error('spawn failed'));
     spawner.mockResolvedValueOnce(undefined);
 
-    queue.enqueue(makeInput('t-fail'), 'sess-fail');
-    queue.enqueue(makeInput('t-ok'), 'sess-ok');
+    queue.enqueue(makeQueueInput('t-fail', 'sess-fail'));
+    queue.enqueue(makeQueueInput('t-ok', 'sess-ok'));
     queue.notifySlotFreed();
 
     await vi.waitFor(() => expect(spawner).toHaveBeenCalledTimes(2));
-    expect(spawner).toHaveBeenNthCalledWith(1, makeInput('t-fail'));
-    expect(spawner).toHaveBeenNthCalledWith(2, makeInput('t-ok'));
+    expect(spawner).toHaveBeenNthCalledWith(1, makeQueueInput('t-fail', 'sess-fail'));
+    expect(spawner).toHaveBeenNthCalledWith(2, makeQueueInput('t-ok', 'sess-ok'));
     expect(queue.length).toBe(0);
   });
 
@@ -164,9 +164,9 @@ describe('SessionQueue', () => {
       maxConcurrent: 2,
     });
 
-    queue.enqueue(makeInput('t1'), 'sess-1');
-    queue.enqueue(makeInput('t2'), 'sess-2');
-    queue.enqueue(makeInput('t3'), 'sess-3');
+    queue.enqueue(makeQueueInput('t1', 'sess-1'));
+    queue.enqueue(makeQueueInput('t2', 'sess-2'));
+    queue.enqueue(makeQueueInput('t3', 'sess-3'));
 
     // Fire two concurrent notifySlotFreed calls
     queue.notifySlotFreed();

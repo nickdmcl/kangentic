@@ -613,6 +613,8 @@ export interface ProjectCreateInput {
 }
 
 export interface SpawnSessionInput {
+  /** Caller-provided session ID. When omitted, spawn() generates one via uuidv4(). */
+  id?: string;
   taskId: string;
   projectId: string;
   command: string;

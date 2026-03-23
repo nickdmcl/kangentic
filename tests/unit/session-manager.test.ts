@@ -1183,3 +1183,74 @@ describe('Spawning count', () => {
     expect(secondSession.status).toBe('running');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 13. Caller-owned session IDs
+// ---------------------------------------------------------------------------
+
+describe('Caller-owned session IDs', () => {
+  let manager: SessionManager;
+
+  beforeEach(() => {
+    manager = new SessionManager();
+  });
+
+  afterEach(async () => {
+    manager.killAll();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  it('spawn uses caller-provided id when given', async () => {
+    const mock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
+
+    const session = await manager.spawn({
+      id: 'caller-owned-id',
+      taskId: 'task-caller-id',
+      command: '',
+      cwd: tmpDir,
+    });
+
+    expect(session.id).toBe('caller-owned-id');
+    expect(session.status).toBe('running');
+  });
+
+  it('queued session preserves caller-provided id through promotion', async () => {
+    manager.setMaxConcurrent(1);
+
+    const mocks: ReturnType<typeof createMockPty>[] = [];
+    vi.mocked(pty.spawn).mockImplementation(() => {
+      const mock = createMockPty();
+      mocks.push(mock);
+      return mock.mockPty as unknown as pty.IPty;
+    });
+
+    // First spawn fills the only slot
+    const firstSession = await manager.spawn({
+      taskId: 'task-fill-slot',
+      command: '',
+      cwd: tmpDir,
+    });
+    expect(firstSession.status).toBe('running');
+
+    // Second spawn gets queued with a caller-provided ID
+    const queuedSession = await manager.spawn({
+      id: 'stable-queued-id',
+      taskId: 'task-queued',
+      command: '',
+      cwd: tmpDir,
+    });
+    expect(queuedSession.status).toBe('queued');
+    expect(queuedSession.id).toBe('stable-queued-id');
+
+    // Kill first session to free the slot and trigger queue promotion
+    manager.kill(firstSession.id);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Promoted session should still have the same caller-provided ID
+    const promotedSession = manager.getSession('stable-queued-id');
+    expect(promotedSession).toBeDefined();
+    expect(promotedSession!.status).toBe('running');
+    expect(promotedSession!.id).toBe('stable-queued-id');
+  });
+});

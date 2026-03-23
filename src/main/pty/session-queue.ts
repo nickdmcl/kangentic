@@ -2,8 +2,7 @@ import type { SpawnSessionInput } from '../../shared/types';
 import { isShuttingDown } from '../shutdown-state';
 
 interface QueueEntry {
-  input: SpawnSessionInput;
-  sessionId: string;
+  input: SpawnSessionInput & { id: string };
 }
 
 type SpawnFn = (input: SpawnSessionInput) => Promise<void>;
@@ -46,14 +45,14 @@ export class SessionQueue {
     return this.getActiveCount() >= this.maxConcurrent;
   }
 
-  /** Add an entry to the queue. */
-  enqueue(input: SpawnSessionInput, sessionId: string): void {
-    this.queue.push({ input, sessionId });
+  /** Add an entry to the queue. The input must have `id` set by the caller. */
+  enqueue(input: SpawnSessionInput & { id: string }): void {
+    this.queue.push({ input });
   }
 
   /** Remove a specific session from the queue (e.g. on kill/suspend). Returns true if found. */
   remove(sessionId: string): boolean {
-    const idx = this.queue.findIndex((q) => q.sessionId === sessionId);
+    const idx = this.queue.findIndex((q) => q.input.id === sessionId);
     if (idx >= 0) {
       this.queue.splice(idx, 1);
       return true;

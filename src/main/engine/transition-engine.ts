@@ -193,6 +193,7 @@ export class TransitionEngine {
     });
 
     const session = await this.sessionManager.spawn({
+      id: randomUUID(),
       taskId: task.id,
       projectId: appConfig.projectId,
       command,
@@ -258,6 +259,7 @@ export class TransitionEngine {
       : appConfig.projectPath || process.cwd();
 
     await this.sessionManager.spawn({
+      id: randomUUID(),
       taskId: task.id + '-script',
       projectId: appConfig.projectId,
       command: script,

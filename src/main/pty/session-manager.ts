@@ -117,7 +117,8 @@ export class SessionManager extends EventEmitter {
     if (this.sessionQueue.shouldQueue()) {
       // Return a queued placeholder immediately (don't block the caller).
       // SessionQueue will promote it to a running PTY when a slot opens.
-      const id = uuidv4();
+      const id = input.id ?? uuidv4();
+      const inputWithId = { ...input, id };
       const session: ManagedSession = {
         id,
         taskId: input.taskId,
@@ -131,7 +132,7 @@ export class SessionManager extends EventEmitter {
         resuming: input.resuming ?? false,
       };
       this.sessions.set(id, session);
-      this.sessionQueue.enqueue(input, id);
+      this.sessionQueue.enqueue(inputWithId);
       this.emit('status', id, 'queued');
       return this.toSession(session);
     }
@@ -157,12 +158,12 @@ export class SessionManager extends EventEmitter {
     const shell = await this.getShell();
     const existing = input.taskId ? this.findByTaskId(input.taskId) : null;
 
-    // For respawns (replacing a running/exited session), use a fresh UUID
-    // so the renderer treats it as a new session (TerminalTab is keyed by
-    // session ID - a new ID forces a clean remount with the loading overlay).
-    // For queue promotions (queued -> running), reuse the existing ID so the
-    // task DB reference (set when the queued placeholder was created) stays valid.
-    const id = (existing?.status === 'queued') ? existing.id : uuidv4();
+    // Use the caller-provided ID, or generate a fresh one as fallback.
+    // For queue promotions, the ID was set on the input when the placeholder
+    // was created in spawn(), so it matches the task's DB reference.
+    // For respawns without a caller ID, a fresh UUID forces the renderer to
+    // remount (TerminalTab is keyed by session ID).
+    const id = input.id ?? uuidv4();
 
     // Kill any existing PTY for this task to prevent orphaned processes
     // that would emit data with the same session ID (double output).
