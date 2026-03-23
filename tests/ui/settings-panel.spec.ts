@@ -44,7 +44,7 @@ test.describe('Settings Panel', () => {
 
     // All 9 tabs should be visible (5 project + 4 system)
     await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Terminal' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Terminal', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shortcuts' })).toBeVisible();
@@ -97,7 +97,7 @@ test.describe('Settings Panel', () => {
 
   test('shows Terminal tab with shell, font size, font family, scrollback, and cursor style', async () => {
     await openSettings();
-    await page.getByRole('button', { name: 'Terminal' }).click();
+    await page.getByRole('button', { name: 'Terminal', exact: true }).click();
 
     await expect(page.getByText('Terminal shell used for agent sessions')).toBeVisible();
     await expect(page.getByText('Font Size', { exact: true })).toBeVisible();
@@ -220,7 +220,7 @@ test.describe('Project Settings via Sidebar', () => {
 
     // All tabs visible (no separate project panel with fewer tabs)
     await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Terminal' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Terminal', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'MCP Server' })).toBeVisible();
@@ -369,7 +369,7 @@ test.describe('Settings Search', () => {
     await expect(appearanceTab).not.toHaveClass(/opacity-40/);
 
     // Terminal sidebar tab should be dimmed (no matches for "theme")
-    const terminalTab = page.getByRole('button', { name: 'Terminal' }).first();
+    const terminalTab = page.getByRole('button', { name: 'Terminal', exact: true }).first();
     await expect(terminalTab).toHaveClass(/opacity-40/);
 
     await closeSettings();

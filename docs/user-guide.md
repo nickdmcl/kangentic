@@ -313,8 +313,25 @@ Because Claude Code supports `--resume`, conversation context is fully preserved
 
 Sessions paused manually by the user (via the pause button in the task detail dialog or kebab menu) are remembered across restarts. On relaunch, user-paused sessions remain paused instead of auto-resuming. This respects user intent. If you paused an agent, it will not start back up on its own. Only system-suspended sessions (those suspended by shutdown or column moves) auto-resume.
 
+## Command Terminal
+
+The Command Terminal provides quick, ephemeral access to Claude Code without creating a task on the board. Useful for one-off actions like creating releases, running queries, or any ad-hoc interaction.
+
+**Opening:** Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS), or click the terminal icon in the title bar (next to the settings gear).
+
+**Behavior:**
+- Spawns Claude Code at the project root on the configured default base branch
+- The **branch picker** in the header lets you switch branches - selecting a new branch kills the current session and respawns on the selected branch
+- A shimmer overlay shows while Claude Code initializes, then lifts to reveal the clean TUI
+- Transient sessions are fully independent of task sessions - they don't appear in the terminal panel tabs, don't count toward session limits, and produce no toasts on exit
+- If git checkout fails when switching branches (e.g., uncommitted changes), a warning toast explains the issue and the session stays on the current branch
+
+**Closing:** Press `Ctrl+Shift+P` again, or click the backdrop outside the overlay. The PTY is killed and the session directory is cleaned up. Transient sessions are non-resumable by design.
+
 ## Keyboard Shortcuts
 
+- **Ctrl+Shift+P** / **Cmd+Shift+P** -- Toggle the Command Terminal overlay
+- **Ctrl+F** / **Cmd+F** -- Toggle board search
 - **Escape** -- Close any open dialog
 - Standard OS shortcuts for copy, paste, etc. in the terminal
 

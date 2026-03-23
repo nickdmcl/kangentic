@@ -138,6 +138,8 @@ const api: ElectronAPI = {
     },
     getSummary: (taskId: string) => ipcRenderer.invoke(IPC.SESSION_GET_SUMMARY, taskId),
     listSummaries: () => ipcRenderer.invoke(IPC.SESSION_LIST_SUMMARIES),
+    spawnTransient: (input) => ipcRenderer.invoke(IPC.SESSION_SPAWN_TRANSIENT, input),
+    killTransient: (id) => ipcRenderer.invoke(IPC.SESSION_KILL_TRANSIENT, id),
   },
 
   config: {

@@ -157,11 +157,13 @@ export function useTerminal(options: UseTerminalOptions) {
             scrollbackPendingRef.current = false;
             // Force an explicit resize to the PTY even if dimensions haven't
             // changed, so the running process (Claude Code's TUI) re-renders.
+            // Focus the terminal after the full init chain completes.
             requestAnimationFrame(() => {
               if (xtermRef.current && options.sessionId) {
                 const { cols, rows } = xtermRef.current;
                 window.electronAPI.sessions.resize(options.sessionId, cols, rows);
               }
+              xtermRef.current?.focus();
             });
           };
           if (scrollback && xtermRef.current && !suppressScrollback) {
@@ -306,6 +308,7 @@ export function useTerminal(options: UseTerminalOptions) {
                 const { cols, rows } = xtermRef.current;
                 window.electronAPI.sessions.resize(options.sessionId, cols, rows);
               }
+              xtermRef.current?.focus();
             });
           });
         } else {

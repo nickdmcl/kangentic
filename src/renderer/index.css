@@ -375,6 +375,10 @@
 @keyframes dialog-content-in   { from { opacity: 0; transform: scale(0.95) translateY(8px) } }
 @keyframes dialog-content-out  { to   { opacity: 0; transform: scale(0.95) translateY(8px) } }
 
+/* Command bar slide-down/up */
+@keyframes command-bar-in  { from { opacity: 0; transform: translateY(-20px) } }
+@keyframes command-bar-out { to   { opacity: 0; transform: translateY(-20px) } }
+
 /* Settings panel slide-in/out */
 @keyframes settings-panel-in  { from { transform: translateX(100%) } }
 @keyframes settings-panel-out { to   { transform: translateX(100%) } }

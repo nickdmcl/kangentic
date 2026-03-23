@@ -80,6 +80,8 @@ export const IPC = {
   SESSION_IDLE_TIMEOUT: 'session:idleTimeout',
   SESSION_GET_SUMMARY: 'session:getSummary',
   SESSION_LIST_SUMMARIES: 'session:listSummaries',
+  SESSION_SPAWN_TRANSIENT: 'session:spawnTransient',
+  SESSION_KILL_TRANSIENT: 'session:killTransient',
 
   // Config
   CONFIG_GET: 'config:get',

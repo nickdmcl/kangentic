@@ -30,7 +30,7 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
   // Memoized to prevent downstream useMemo hooks (taskLabelMap, activeSessionIds)
   // from being defeated by a new array reference on every render.
   const activeSessions = useMemo(
-    () => allSessions.filter((s) => s.status === 'running' && s.projectId === currentProjectId),
+    () => allSessions.filter((s) => s.status === 'running' && s.projectId === currentProjectId && !s.transient),
     [allSessions, currentProjectId],
   );
 

@@ -167,6 +167,9 @@ export function App() {
         const currentSession = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
         if (currentSession?.status === 'suspended') return;
 
+        // Transient sessions (command terminal) are ephemeral - skip toasts and notifications
+        if (currentSession?.transient) return;
+
         updateSessionStatus(sessionId, { status: 'exited', exitCode });
 
         const notifyConfig = useConfigStore.getState().config.notifications;
@@ -203,10 +206,12 @@ export function App() {
     }
 
     // Session usage data -- only update store for current project sessions
+    // Transient sessions (command terminal) always pass through regardless of projectId
     if (sessions.onUsage) {
       cleanups.push(sessions.onUsage((sessionId, data, projectId) => {
         const activeProjectId = useProjectStore.getState().currentProject?.id;
-        if (!projectId || !activeProjectId || projectId === activeProjectId) {
+        const transientId = useSessionStore.getState().transientSessionId;
+        if (sessionId === transientId || !projectId || !activeProjectId || projectId === activeProjectId) {
           updateUsage(sessionId, data);
         }
       }));

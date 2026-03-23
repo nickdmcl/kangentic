@@ -137,6 +137,8 @@ export interface Session {
   exitCode: number | null;
   /** True when this session was spawned as a resume of a previous session. */
   resuming: boolean;
+  /** True for ephemeral command terminal sessions (no task association, no DB persistence). */
+  transient?: boolean;
 }
 
 // === Session Persistence (DB) ===
@@ -624,6 +626,14 @@ export interface SpawnSessionInput {
   eventsOutputPath?: string; // path for the event bridge JSONL file (activity log)
   /** True when this session is resuming a previous Claude conversation. */
   resuming?: boolean;
+  /** True for ephemeral command terminal sessions. */
+  transient?: boolean;
+}
+
+export interface SpawnTransientSessionInput {
+  projectId: string;
+  /** Branch to checkout before spawning. If omitted, uses the project's default base branch. */
+  branch?: string;
 }
 
 export interface NotificationInput {
@@ -780,6 +790,8 @@ export interface ElectronAPI {
     onIdleTimeout: (callback: (sessionId: string, taskId: string, timeoutMinutes: number, projectId?: string) => void) => () => void;
     getSummary: (taskId: string) => Promise<SessionSummary | null>;
     listSummaries: () => Promise<Record<string, SessionSummary>>;
+    spawnTransient: (input: SpawnTransientSessionInput) => Promise<{ session: Session; branch: string; checkoutError?: string }>;
+    killTransient: (sessionId: string) => Promise<void>;
   };
 
   // Config

@@ -755,6 +755,28 @@
       listSummaries: async function () {
         return Object.assign({}, summaryCache);
       },
+      spawnTransient: async function (input) {
+        var id = crypto.randomUUID();
+        var session = {
+          id: id,
+          taskId: id,
+          projectId: input.projectId,
+          pid: null,
+          status: 'running',
+          shell: '/bin/bash',
+          cwd: '/mock/project',
+          startedAt: new Date().toISOString(),
+          exitCode: null,
+          resuming: false,
+          transient: true,
+        };
+        sessions.push(session);
+        return { session: session, branch: input.branch || 'main' };
+      },
+      killTransient: async function (sessionId) {
+        var index = sessions.findIndex(function (s) { return s.id === sessionId; });
+        if (index !== -1) sessions.splice(index, 1);
+      },
     },
 
     config: {

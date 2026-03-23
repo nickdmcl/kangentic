@@ -5,12 +5,14 @@ import { ProjectSidebar } from '../sidebar/ProjectSidebar';
 import { KanbanBoard } from '../board/KanbanBoard';
 import { TerminalPanel } from '../terminal/TerminalPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import { CommandBarOverlay } from '../command-bar/CommandBarOverlay';
 import { WelcomeScreen } from './WelcomeScreen';
 import { useConfigStore } from '../../stores/config-store';
 import { useProjectStore } from '../../stores/project-store';
 import { ToastContainer } from './ToastContainer';
 import { useSidebarResize, COLLAPSED_STRIP_WIDTH } from '../../hooks/useSidebarResize';
 import { useTerminalResize, COLLAPSED_HEIGHT } from '../../hooks/useTerminalResize';
+import { useCommandBar } from '../../hooks/useCommandBar';
 
 export function AppLayout() {
   const settingsOpen = useConfigStore((s) => s.settingsOpen);
@@ -20,10 +22,11 @@ export function AppLayout() {
 
   const sidebar = useSidebarResize(config);
   const terminal = useTerminalResize(config);
+  const commandBar = useCommandBar();
 
   return (
     <div className="h-screen flex flex-col bg-surface">
-      <TitleBar />
+      <TitleBar onQuickSession={commandBar.open} />
 
       <div className="flex flex-1 min-h-0">
         {/* Hide sidebar entirely when no projects (welcome screen is primary UI) */}
@@ -118,6 +121,7 @@ export function AppLayout() {
 
       <StatusBar />
       {settingsOpen && <SettingsPanel />}
+      {commandBar.isOpen && <CommandBarOverlay onClose={commandBar.close} />}
       <ToastContainer />
     </div>
   );

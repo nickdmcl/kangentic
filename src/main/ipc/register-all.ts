@@ -22,6 +22,7 @@ import {
 } from './handlers/projects';
 import { registerTaskHandlers } from './handlers/tasks';
 import { registerSessionHandlers } from './handlers/sessions';
+import { registerTransientSessionHandlers } from './handlers/transient-sessions';
 import { registerBoardHandlers } from './handlers/board';
 import { registerSystemHandlers } from './handlers/system';
 import type { IpcContext } from './ipc-context';
@@ -98,6 +99,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
   registerProjectHandlers(context);
   registerTaskHandlers(context);
   registerSessionHandlers(context);
+  registerTransientSessionHandlers(context);
   registerBoardHandlers(context);
   registerSystemHandlers(context);
 

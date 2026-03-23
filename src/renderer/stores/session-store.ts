@@ -50,6 +50,11 @@ interface SessionStore {
   clearPendingCommandLabel: (taskId: string) => void;
   markIdleSessionsSeen: (projectId: string) => void;
 
+  // Transient session (command bar)
+  transientSessionId: string | null;
+  spawnTransientSession: (branch?: string) => Promise<{ session: Session; branch: string; checkoutError?: string }>;
+  killTransientSession: () => Promise<void>;
+
   getRunningCount: () => number;
   getQueuedCount: () => number;
   getQueuePosition: (sessionId: string) => { position: number; total: number } | null;
@@ -68,6 +73,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   pendingCommandLabel: {},
   _pendingOpenTaskId: null,
   _syncGeneration: 0,
+  transientSessionId: null,
 
   setPendingOpenTaskId: (id) => set({ _pendingOpenTaskId: id }),
 
@@ -267,6 +273,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       updated[id] = true;
     }
     set({ seenIdleSessions: updated });
+  },
+
+  spawnTransientSession: async (branch?) => {
+    const currentProject = useProjectStore.getState().currentProject;
+    if (!currentProject) throw new Error('No project is currently open');
+    const result = await window.electronAPI.sessions.spawnTransient({
+      projectId: currentProject.id,
+      branch,
+    });
+    set({ transientSessionId: result.session.id });
+    return result;
+  },
+
+  killTransientSession: async () => {
+    const transientSessionId = get().transientSessionId;
+    if (transientSessionId) {
+      await window.electronAPI.sessions.killTransient(transientSessionId);
+      set({ transientSessionId: null });
+    }
   },
 
   getRunningCount: () => get().sessions.filter((s) => s.status === 'running').length,

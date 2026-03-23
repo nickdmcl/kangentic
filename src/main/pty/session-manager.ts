@@ -24,6 +24,7 @@ interface ManagedSession {
   startedAt: string;
   exitCode: number | null;
   resuming: boolean;
+  transient: boolean;
 }
 
 export class SessionManager extends EventEmitter {
@@ -130,6 +131,7 @@ export class SessionManager extends EventEmitter {
         startedAt: new Date().toISOString(),
         exitCode: null,
         resuming: input.resuming ?? false,
+        transient: input.transient ?? false,
       };
       this.sessions.set(id, session);
       this.sessionQueue.enqueue(inputWithId);
@@ -312,6 +314,7 @@ export class SessionManager extends EventEmitter {
         startedAt: new Date().toISOString(),
         exitCode: -1,
         resuming: input.resuming ?? false,
+        transient: input.transient ?? false,
       };
       this.sessions.set(id, failedSession);
       // Initialize buffer manager with diagnostic scrollback for failed sessions
@@ -331,6 +334,7 @@ export class SessionManager extends EventEmitter {
       startedAt: new Date().toISOString(),
       exitCode: null,
       resuming: input.resuming ?? false,
+      transient: input.transient ?? false,
     };
 
     this.sessions.set(id, session);
@@ -617,6 +621,7 @@ export class SessionManager extends EventEmitter {
       startedAt: new Date().toISOString(),
       exitCode: null,
       resuming: false,
+      transient: false,
     };
     this.sessions.set(id, session);
     return this.toSession(session);
@@ -646,6 +651,7 @@ export class SessionManager extends EventEmitter {
       startedAt: session.startedAt,
       exitCode: session.exitCode,
       resuming: session.resuming,
+      transient: session.transient || undefined,
     };
   }
 

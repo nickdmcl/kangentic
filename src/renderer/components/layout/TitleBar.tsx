@@ -1,12 +1,16 @@
 import React from 'react';
-import { Minus, Settings, Square, X } from 'lucide-react';
+import { Minus, Settings, Square, TerminalSquare, X } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';
 import logoSrc from '../../assets/logo-32.png';
 
 const isMac = window.electronAPI.platform === 'darwin';
 
-export function TitleBar() {
+interface TitleBarProps {
+  onQuickSession?: () => void;
+}
+
+export function TitleBar({ onQuickSession }: TitleBarProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const settingsOpen = useConfigStore((s) => s.settingsOpen);
   const setSettingsOpen = useConfigStore((s) => s.setSettingsOpen);
@@ -53,6 +57,17 @@ export function TitleBar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {currentProject && onQuickSession && (
+          <button
+            onClick={onQuickSession}
+            className="p-1.5 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
+            title={`Command Terminal (${isMac ? '⌘' : 'Ctrl'}+Shift+P)`}
+            aria-label="Command Terminal"
+            data-testid="quick-session-button"
+          >
+            <TerminalSquare size={20} />
+          </button>
+        )}
         <button
           onClick={handleGearClick}
           className={`p-1.5 hover:bg-surface-hover rounded transition-colors ${
