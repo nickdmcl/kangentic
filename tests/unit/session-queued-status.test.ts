@@ -3,13 +3,10 @@
  *
  * Verifies that:
  * - spawn() returns status='queued' when at concurrency limit
- * - queued sessions emit 'running' on promotion
+ * - queued sessions emit 'session-changed' with queued status on creation
  * - the session ID is preserved across queue promotion
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(),
@@ -23,7 +20,7 @@ vi.mock('../../src/main/pty/shell-resolver', () => {
 });
 
 vi.mock('../../src/shared/paths', () => ({
-  adaptCommandForShell: (cmd: string) => cmd,
+  adaptCommandForShell: (command: string) => command,
 }));
 
 vi.mock('../../src/main/analytics/analytics', () => ({
@@ -31,17 +28,18 @@ vi.mock('../../src/main/analytics/analytics', () => ({
   sanitizeErrorMessage: (message: string) => message,
 }));
 
+import type { Session } from '../../src/shared/types';
 import * as pty from 'node-pty';
 import { SessionManager } from '../../src/main/pty/session-manager';
 
 function createMockPty() {
-  let exitHandler: ((e: { exitCode: number }) => void) | null = null;
+  let exitHandler: ((event: { exitCode: number }) => void) | null = null;
 
   const mockPty = {
     pid: 12345,
     onData: vi.fn(),
-    onExit: vi.fn((cb: (e: { exitCode: number }) => void) => {
-      exitHandler = cb;
+    onExit: vi.fn((callback: (event: { exitCode: number }) => void) => {
+      exitHandler = callback;
     }),
     write: vi.fn(),
     resize: vi.fn(),
@@ -58,47 +56,41 @@ function createMockPty() {
 
 describe('SessionManager queued status', () => {
   let manager: SessionManager;
-  let tmpDir: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kangentic-queued-'));
-    manager = new SessionManager(tmpDir);
+    manager = new SessionManager();
     manager.setMaxConcurrent(1);
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('spawn returns queued status when at concurrency limit', async () => {
     const firstMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
-    await manager.spawn({ taskId: 'task-1', command: '', cwd: '/tmp/test' });
+    await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
 
     // Second spawn should be queued (max concurrent = 1)
     const secondMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(secondMock.mockPty as unknown as pty.IPty);
-    const queued = await manager.spawn({ taskId: 'task-2', command: '', cwd: '/tmp/test' });
+    const queued = await manager.spawn({ taskId: 'task-2', projectId: 'project-1', command: '', cwd: '/tmp/test' });
 
     expect(queued.status).toBe('queued');
     expect(queued.pid).toBeNull();
     expect(manager.queuedCount).toBe(1);
   });
 
-  it('spawn emits queued status event', async () => {
+  it('spawn emits session-changed event with queued status', async () => {
     const firstMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
-    await manager.spawn({ taskId: 'task-1', command: '', cwd: '/tmp/test' });
+    await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
 
     const statusEvents: Array<{ sessionId: string; status: string }> = [];
-    manager.on('status', (sessionId: string, status: string) => {
-      statusEvents.push({ sessionId, status });
+    manager.on('session-changed', (sessionId: string, session: Session) => {
+      statusEvents.push({ sessionId, status: session.status });
     });
 
     const secondMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(secondMock.mockPty as unknown as pty.IPty);
-    const queued = await manager.spawn({ taskId: 'task-2', command: '', cwd: '/tmp/test' });
+    const queued = await manager.spawn({ taskId: 'task-2', projectId: 'project-1', command: '', cwd: '/tmp/test' });
 
     const queuedEvent = statusEvents.find(
       (event) => event.sessionId === queued.id && event.status === 'queued',
@@ -109,19 +101,19 @@ describe('SessionManager queued status', () => {
   it('queued session transitions to running on promotion and preserves session ID', async () => {
     const firstMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
-    const firstSession = await manager.spawn({ taskId: 'task-1', command: '', cwd: '/tmp/test' });
+    await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
 
     const secondMock = createMockPty();
     vi.mocked(pty.spawn).mockReturnValue(secondMock.mockPty as unknown as pty.IPty);
-    const queued = await manager.spawn({ taskId: 'task-2', command: '', cwd: '/tmp/test' });
+    const queued = await manager.spawn({ taskId: 'task-2', projectId: 'project-1', command: '', cwd: '/tmp/test' });
     const queuedId = queued.id;
 
     expect(queued.status).toBe('queued');
 
     // Collect status events for the queued session
     const statusEvents: string[] = [];
-    manager.on('status', (sessionId: string, status: string) => {
-      if (sessionId === queuedId) statusEvents.push(status);
+    manager.on('session-changed', (sessionId: string, session: Session) => {
+      if (sessionId === queuedId) statusEvents.push(session.status);
     });
 
     // Kill first session to free a slot and trigger promotion
