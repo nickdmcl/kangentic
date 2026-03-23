@@ -64,7 +64,7 @@ export function TaskDetailBody({
       <>
         <div className="flex-1 min-h-0 overflow-y-auto">
           {(task.description || savedAttachments.length > 0) ? (
-            <div className="px-4 py-4 space-y-3">
+            <div className="px-4 py-4 space-y-3 max-h-[40vh] overflow-y-auto">
               {task.description && (
                 <p className="text-sm text-fg-muted whitespace-pre-wrap leading-relaxed">{task.description}</p>
               )}
@@ -75,8 +75,8 @@ export function TaskDetailBody({
               No description
             </div>
           )}
+          <SessionSummaryPanel taskId={task.id} />
         </div>
-        <SessionSummaryPanel taskId={task.id} />
       </>
     );
   }

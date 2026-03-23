@@ -131,76 +131,80 @@ export function TaskDetailHeader({
       {/* Title */}
       <h2 className="text-base font-semibold text-fg truncate min-w-0">{task.title}</h2>
 
-      {/* Scrollable pills container */}
-      <div className="flex items-center gap-3 min-w-0 overflow-x-auto scrollbar-none">
-        {/* Commands button */}
-        {!isEditing && (
-          <div className="relative flex-shrink-0" ref={commandButtonRef}>
+      {/* Scrollable pills container - hidden for archived tasks */}
+      {!isArchived ? (
+        <div className="flex-1 flex items-center gap-3 min-w-0 overflow-x-auto scrollbar-none">
+          {/* Commands button */}
+          {!isEditing && (
+            <div className="relative flex-shrink-0" ref={commandButtonRef}>
+              <Pill
+                shape="square"
+                onClick={() => setShowCommandPalette(!showCommandPalette)}
+                className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
+                title="Run a command or skill"
+                data-testid="commands-button"
+              >
+                <SquareChevronRight size={14} />
+                Commands
+              </Pill>
+              {showCommandPalette && (
+                <CommandPalettePopover
+                  triggerRef={commandButtonRef}
+                  cwd={task.worktree_path ?? projectPath ?? undefined}
+                  onSelect={(command) => {
+                    setShowCommandPalette(false);
+                    onCommandSelect(command);
+                  }}
+                  onClose={() => setShowCommandPalette(false)}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Open folder pill */}
+          {(task.worktree_path || projectPath) && (
             <Pill
               shape="square"
-              onClick={() => setShowCommandPalette(!showCommandPalette)}
-              className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors"
-              title="Run a command or skill"
-              data-testid="commands-button"
-            >
-              <SquareChevronRight size={14} />
-              Commands & Skills
-            </Pill>
-            {showCommandPalette && (
-              <CommandPalettePopover
-                triggerRef={commandButtonRef}
-                cwd={task.worktree_path ?? projectPath ?? undefined}
-                onSelect={(command) => {
-                  setShowCommandPalette(false);
-                  onCommandSelect(command);
-                }}
-                onClose={() => setShowCommandPalette(false)}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Open folder pill */}
-        {(task.worktree_path || projectPath) && (
-          <Pill
-            shape="square"
-            onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
-            className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
-            title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
-            data-testid="branch-pill"
-          >
-            {task.worktree_path ? (
-              <>
-                <FolderGit2 size={14} />
-                Worktree
-              </>
-            ) : (
-              <>
-                <FolderOpen size={14} />
-                Project
-              </>
-            )}
-          </Pill>
-        )}
-
-        {/* Shortcut header pills */}
-        {headerShortcuts.map((action) => {
-          const ActionIcon = ICON_REGISTRY.get(action.icon ?? 'zap') ?? Zap;
-          return (
-            <Pill
-              key={action.id ?? action.label}
-              shape="square"
-              onClick={() => executeShortcut(action)}
+              onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
               className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
-              title={action.command}
-              data-testid={`shortcut-pill-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+              title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
+              data-testid="branch-pill"
             >
-              <ActionIcon size={14} />
-              {action.label}
+              {task.worktree_path ? (
+                <>
+                  <FolderGit2 size={14} />
+                  Worktree
+                </>
+              ) : (
+                <>
+                  <FolderOpen size={14} />
+                  Project
+                </>
+              )}
             </Pill>
-          );
-        })}
-      </div>
+          )}
+
+          {/* Shortcut header pills */}
+          {headerShortcuts.map((action) => {
+            const ActionIcon = ICON_REGISTRY.get(action.icon ?? 'zap') ?? Zap;
+            return (
+              <Pill
+                key={action.id ?? action.label}
+                shape="square"
+                onClick={() => executeShortcut(action)}
+                className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
+                title={action.command}
+                data-testid={`shortcut-pill-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                <ActionIcon size={14} />
+                {action.label}
+              </Pill>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
 
       {/* Actions */}
       <div className="relative flex-shrink-0" ref={kebabMenuRef}>
@@ -279,7 +283,7 @@ export function TaskDetailHeader({
                   data-testid="kebab-commands-button"
                 >
                   <SquareChevronRight size={14} />
-                  <span className="flex-1">Commands & Skills</span>
+                  <span className="flex-1">Commands</span>
                   {commandsFlyoutPlacement.horizontal === 'left' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                 </button>
                 {showCommandsSubmenu && (

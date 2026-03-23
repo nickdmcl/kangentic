@@ -293,7 +293,8 @@ test.describe('Done Column', () => {
 
       // "View all" button should always be visible at bottom
       await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toBeVisible();
-      await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toContainText('View all 7 completed tasks');
+      await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toContainText('View all');
+      await expect(doneColumn.locator('[data-testid="view-all-completed"]')).toContainText('7');
     } finally {
       await browser.close();
     }

@@ -81,7 +81,7 @@ export function DataTable<TRow, TKey extends string = string>({
   });
 
   const headerRow = (
-    <tr className="border-b-2 border-edge bg-surface-inset/40">
+    <tr className="border-b-2 border-edge bg-surface-raised">
       {columns.map((column, columnIndex) => {
         const isSortable = !!column.sortValue;
         const isActive = sortKey === column.key;
