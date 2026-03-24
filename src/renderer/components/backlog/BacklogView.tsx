@@ -8,6 +8,7 @@ import type { DataTableColumn } from '../DataTable';
 import { Pill } from '../Pill';
 import { PriorityBadge } from './PriorityBadge';
 import { PromotePopover } from './PromotePopover';
+import { BacklogContextMenu } from './BacklogContextMenu';
 import { BacklogBulkToolbar } from './BacklogBulkToolbar';
 import { NewBacklogItemDialog } from './NewBacklogItemDialog';
 import { LabelsPopover, PrioritiesPopover } from './ManageLabelsDialog';
@@ -113,6 +114,7 @@ export function BacklogView() {
   const [editingItem, setEditingItem] = useState<BacklogItem | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ position: { x: number; y: number }; item: BacklogItem } | null>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -249,6 +251,10 @@ export function BacklogView() {
     setPendingBulkDelete(false);
   }, [selectedIds, bulkDelete, updateConfig]);
 
+  const handleRowContextMenu = useCallback((item: BacklogItem, event: React.MouseEvent) => {
+    setContextMenu({ position: { x: event.clientX, y: event.clientY }, item });
+  }, []);
+
   // --- Columns ---
 
   const columns: DataTableColumn<BacklogItem, SortKey>[] = useMemo(() => [
@@ -327,7 +333,7 @@ export function BacklogView() {
       key: 'created' as SortKey,
       label: 'Created',
       align: 'right',
-      width: 'w-[120px]',
+      width: 'w-[160px]',
       sortValue: (item) => item.created_at,
       render: (item) => (
         <span className="text-fg-faint text-xs whitespace-nowrap">
@@ -540,6 +546,7 @@ export function BacklogView() {
                   data={filteredItems}
                   rowKey={(item) => item.id}
                   onRowClick={(item) => toggleSelected(item.id)}
+                  onRowContextMenu={handleRowContextMenu}
                   emptyMessage={emptyMessage}
                   rowTestId="backlog-item-row"
                   virtualized
@@ -558,6 +565,18 @@ export function BacklogView() {
           </>
         )}
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <BacklogContextMenu
+          position={contextMenu.position}
+          swimlanes={swimlanes}
+          onPromote={(swimlaneId) => handlePromoteSingle(contextMenu.item.id, swimlaneId)}
+          onEdit={() => handleEdit(contextMenu.item.id)}
+          onDelete={() => handleDelete(contextMenu.item.id)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
 
       {/* Dialogs */}
       {showNewDialog && (

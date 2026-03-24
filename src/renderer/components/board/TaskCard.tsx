@@ -1,17 +1,18 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail, Image, Images, GitPullRequest, Inbox } from 'lucide-react';
+import { Loader2, Trash2, CirclePause, Mail, Image, Images, GitPullRequest, Inbox, Pencil, Archive } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
+import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
 import { useBacklogStore } from '../../stores/backlog-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { getProgressColor } from '../../utils/color-lerp';
-import type { Task } from '../../../shared/types';
+import type { Task, Swimlane } from '../../../shared/types';
 
 /** Priority: pending command (set by moveTask or manual invoke) > resuming > default. */
 function deriveInitializingLabel(
@@ -31,9 +32,15 @@ interface TaskCardProps {
 }
 
 /** Inline context menu for task cards. */
-function TaskContextMenu({ position, onSendToBacklog, onClose }: {
+function TaskContextMenu({ position, task, swimlanes, onEdit, onMoveTo, onSendToBacklog, onArchive, onDelete, onClose }: {
   position: { x: number; y: number };
+  task: Task;
+  swimlanes: Swimlane[];
+  onEdit: () => void;
+  onMoveTo: (targetSwimlaneId: string) => void;
   onSendToBacklog: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -55,20 +62,84 @@ function TaskContextMenu({ position, onSendToBacklog, onClose }: {
     };
   }, [onClose]);
 
+  const moveTargets = swimlanes.filter(
+    (lane) => lane.id !== task.swimlane_id && !lane.is_archived && !lane.is_ghost,
+  );
+
+  const menuStyle: React.CSSProperties = {
+    left: Math.min(position.x, window.innerWidth - 200),
+    top: Math.min(position.y, window.innerHeight - 300),
+  };
+
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-surface-raised border border-edge rounded-lg shadow-xl py-1 min-w-[160px]"
-      style={{ left: position.x, top: position.y }}
+      className="fixed z-50 bg-surface-raised border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
+      style={menuStyle}
     >
       <button
         type="button"
-        onClick={onSendToBacklog}
+        onClick={() => { onEdit(); onClose(); }}
+        className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
+        data-testid="context-edit-task"
+      >
+        <Pencil size={14} className="text-fg-faint" />
+        Edit
+      </button>
+
+      {moveTargets.length > 0 && (
+        <>
+          <div className="border-t border-edge my-1" />
+          <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-fg-faint">
+            Move to
+          </div>
+          {moveTargets.map((lane) => (
+            <button
+              key={lane.id}
+              type="button"
+              onClick={() => { onMoveTo(lane.id); onClose(); }}
+              className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
+              data-testid="context-move-to"
+            >
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: lane.color }}
+              />
+              {lane.name}
+            </button>
+          ))}
+        </>
+      )}
+
+      <div className="border-t border-edge my-1" />
+
+      <button
+        type="button"
+        onClick={() => { onSendToBacklog(); }}
         className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
         data-testid="context-send-to-backlog"
       >
-        <Inbox size={14} />
-        Send to Backlog
+        <Inbox size={14} className="text-fg-faint" />
+        Backlog
+      </button>
+      <button
+        type="button"
+        onClick={() => { onArchive(); onClose(); }}
+        className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
+        data-testid="context-archive-task"
+      >
+        <Archive size={14} className="text-fg-faint" />
+        Archive
+      </button>
+
+      <button
+        type="button"
+        onClick={() => { onDelete(); onClose(); }}
+        className="w-full px-3 py-1.5 text-sm text-red-400 text-left hover:bg-red-400/10 flex items-center gap-2"
+        data-testid="context-delete-task"
+      >
+        <Trash2 size={14} />
+        Delete
       </button>
     </div>
   );
@@ -134,6 +205,8 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmSendToBacklog, setConfirmSendToBacklog] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [forceEdit, setForceEdit] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDragOverlay) return;
@@ -157,6 +230,46 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
       message: `Sent "${taskTitle}" to backlog`,
       variant: 'info',
     });
+  };
+
+  const handleMoveTo = async (targetSwimlaneId: string) => {
+    const { swimlanes: currentSwimlanes, tasks: currentTasks, moveTask } = useBoardStore.getState();
+    const targetName = currentSwimlanes.find((lane) => lane.id === targetSwimlaneId)?.name ?? 'column';
+    const laneTasks = currentTasks.filter(
+      (boardTask) => boardTask.swimlane_id === targetSwimlaneId,
+    );
+    await moveTask({ taskId: task.id, targetSwimlaneId, targetPosition: laneTasks.length });
+    useToastStore.getState().addToast({
+      message: `Moved "${task.title}" to ${targetName}`,
+      variant: 'success',
+    });
+  };
+
+  const handleArchive = async () => {
+    const { swimlanes: currentSwimlanes, tasks: currentTasks, archiveTask } = useBoardStore.getState();
+    const doneLane = currentSwimlanes.find((lane) => lane.role === 'done');
+    if (!doneLane) return;
+    const taskTitle = task.title;
+    const taskId = task.id;
+    archiveTask(taskId);
+    const laneTasks = currentTasks.filter(
+      (boardTask) => boardTask.swimlane_id === doneLane.id,
+    );
+    await window.electronAPI.tasks.move({ taskId, targetSwimlaneId: doneLane.id, targetPosition: laneTasks.length });
+    useToastStore.getState().addToast({
+      message: `Archived "${taskTitle}"`,
+      variant: 'info',
+    });
+  };
+
+  const handleContextDelete = async (dontAskAgain: boolean) => {
+    if (dontAskAgain) useConfigStore.getState().updateConfig({ skipDeleteConfirm: true });
+    const session = useSessionStore.getState()._sessionByTaskId.get(task.id);
+    if (session) {
+      await useSessionStore.getState().killSession(session.id);
+    }
+    await useBoardStore.getState().deleteTask(task.id);
+    setConfirmDelete(false);
   };
 
   if (compact) {
@@ -321,12 +434,16 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
       </div>
 
       {showDetail && (
-        <TaskDetailDialog task={task} onClose={() => setDetailTaskId(null)} initialEdit={displayState.kind === 'none' && !task.archived_at} />
+        <TaskDetailDialog task={task} onClose={() => { setDetailTaskId(null); setForceEdit(false); }} initialEdit={forceEdit || (displayState.kind === 'none' && !task.archived_at)} />
       )}
 
       {contextMenu && (
         <TaskContextMenu
           position={contextMenu}
+          task={task}
+          swimlanes={useBoardStore.getState().swimlanes}
+          onEdit={() => { setForceEdit(true); setDetailTaskId(task.id); }}
+          onMoveTo={handleMoveTo}
           onSendToBacklog={() => {
             setContextMenu(null);
             // Skip confirmation when non-destructive (no session, no worktree) or user opted out
@@ -336,6 +453,16 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
               handleSendToBacklog();
             } else {
               setConfirmSendToBacklog(true);
+            }
+          }}
+          onArchive={handleArchive}
+          onDelete={() => {
+            setContextMenu(null);
+            const skipConfirm = useConfigStore.getState().config.skipDeleteConfirm;
+            if (skipConfirm) {
+              handleContextDelete(false);
+            } else {
+              setConfirmDelete(true);
             }
           }}
           onClose={() => setContextMenu(null)}
@@ -356,6 +483,21 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
             handleSendToBacklog();
           }}
           onCancel={() => setConfirmSendToBacklog(false)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete task"
+          message={<>
+            <p>This will permanently delete &quot;{task.title}&quot; and its session data.</p>
+            <p className="text-red-400 font-medium">This action cannot be undone.</p>
+          </>}
+          confirmLabel="Delete"
+          variant="danger"
+          showDontAskAgain
+          onConfirm={handleContextDelete}
+          onCancel={() => setConfirmDelete(false)}
         />
       )}
     </>

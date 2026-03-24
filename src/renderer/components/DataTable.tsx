@@ -19,6 +19,7 @@ interface DataTableProps<TRow, TKey extends string = string> {
   data: TRow[];
   rowKey: (row: TRow) => string;
   onRowClick?: (row: TRow) => void;
+  onRowContextMenu?: (row: TRow, event: React.MouseEvent) => void;
   defaultSortKey?: TKey;
   defaultSortDirection?: 'asc' | 'desc';
   emptyMessage?: string;
@@ -38,6 +39,7 @@ function SortableRow<TRow, TKey extends string>({
   rowId,
   columns,
   onRowClick,
+  onRowContextMenu,
   rowTestId,
   isDragDisabled,
 }: {
@@ -45,6 +47,7 @@ function SortableRow<TRow, TKey extends string>({
   rowId: string;
   columns: DataTableColumn<TRow, TKey>[];
   onRowClick?: (row: TRow) => void;
+  onRowContextMenu?: (row: TRow, event: React.MouseEvent) => void;
   rowTestId?: string;
   isDragDisabled: boolean;
 }) {
@@ -71,6 +74,7 @@ function SortableRow<TRow, TKey extends string>({
       style={style}
       className={`border-b border-edge/30 transition-colors even:bg-surface/20 ${onRowClick ? 'hover:bg-surface-hover/30 cursor-pointer' : ''}`}
       onClick={onRowClick ? () => onRowClick(row) : undefined}
+      onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event); } : undefined}
       data-testid={rowTestId}
     >
       {/* Drag handle cell */}
@@ -105,6 +109,7 @@ export function DataTable<TRow, TKey extends string = string>({
   data,
   rowKey,
   onRowClick,
+  onRowContextMenu,
   defaultSortKey,
   defaultSortDirection = 'desc',
   emptyMessage = 'No data',
@@ -241,6 +246,7 @@ export function DataTable<TRow, TKey extends string = string>({
                         rowId={id}
                         columns={columns}
                         onRowClick={onRowClick}
+                        onRowContextMenu={onRowContextMenu}
                         rowTestId={rowTestId}
                         isDragDisabled={isDragDisabled}
                       />
@@ -254,6 +260,7 @@ export function DataTable<TRow, TKey extends string = string>({
                       ref={virtualizer.measureElement}
                       className={`border-b border-edge/30 transition-colors even:bg-surface/20 ${onRowClick ? 'hover:bg-surface-hover/30 cursor-pointer' : ''}`}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event); } : undefined}
                       data-testid={rowTestId}
                     >
                       {columns.map((column, columnIndex) => (
@@ -304,6 +311,7 @@ export function DataTable<TRow, TKey extends string = string>({
                   rowId={id}
                   columns={columns}
                   onRowClick={onRowClick}
+                  onRowContextMenu={onRowContextMenu}
                   rowTestId={rowTestId}
                   isDragDisabled={isDragDisabled}
                 />
@@ -314,6 +322,7 @@ export function DataTable<TRow, TKey extends string = string>({
                 key={rowKey(row)}
                 className={`border-b border-edge/30 transition-colors even:bg-surface/20 ${onRowClick ? 'hover:bg-surface-hover/30 cursor-pointer' : ''}`}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onContextMenu={onRowContextMenu ? (event) => { event.preventDefault(); onRowContextMenu(row, event); } : undefined}
                 data-testid={rowTestId}
               >
                 {columns.map((column, columnIndex) => (

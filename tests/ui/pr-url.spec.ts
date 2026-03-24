@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { launchPage, waitForBoard, createProject, createTask } from './helpers';
+import { launchPage, createProject, createTask } from './helpers';
 import type { Browser, Page } from '@playwright/test';
 
 const PROJECT_NAME = `PR URL Test ${Date.now()}`;
@@ -23,36 +23,41 @@ function taskCard(title: string) {
 }
 
 test.describe('PR URL in Edit Form', () => {
-  test('PR URL field is visible in edit mode', async () => {
+  test('PR URL field is hidden in To Do column', async () => {
     await createTask(page, 'PR URL Test Task');
     await taskCard('PR URL Test Task').click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     const prUrlInput = page.locator('[data-testid="pr-url-input"]');
-    await expect(prUrlInput).toBeVisible();
-    await expect(prUrlInput).toHaveValue('');
+    await expect(prUrlInput).not.toBeVisible();
 
     await page.keyboard.press('Escape');
   });
 
   test('saving PR URL persists and shows PR badge on card', async () => {
-    await taskCard('PR URL Test Task').click();
+    // Move task to Planning via context menu
+    await taskCard('PR URL Test Task').click({ button: 'right' });
+    await page.locator('[data-testid="context-move-to"]', { hasText: 'Planning' }).click();
+
+    // Open task in Planning
+    const planning = page.locator('[data-swimlane-name="Planning"]');
+    await planning.locator('text=PR URL Test Task').first().click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     const prUrlInput = page.locator('[data-testid="pr-url-input"]');
+    await expect(prUrlInput).toBeVisible();
     await prUrlInput.fill('https://github.com/owner/repo/pull/99');
     await page.locator('button:has-text("Save")').click();
 
-    // Dialog closes after save (no session). Card should now show PR badge.
-    const backlog = page.locator('[data-swimlane-name="To Do"]');
-    const prBadge = backlog.locator('[data-testid="task-card-pr-link"]');
+    // Card should now show PR badge
+    const prBadge = planning.locator('[data-testid="task-card-pr-link"]');
     await expect(prBadge).toBeVisible({ timeout: 3000 });
     await expect(prBadge).toHaveText('PR #99');
   });
 
   test('clearing PR URL removes badge from card', async () => {
-    // Reopen and clear PR URL
-    await taskCard('PR URL Test Task').click();
+    const planning = page.locator('[data-swimlane-name="Planning"]');
+    await planning.locator('text=PR URL Test Task').first().click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'visible' });
 
     const prUrlInput = page.locator('[data-testid="pr-url-input"]');
@@ -61,7 +66,6 @@ test.describe('PR URL in Edit Form', () => {
     await page.locator('button:has-text("Save")').click();
 
     // PR badge on card should be gone
-    const backlog = page.locator('[data-swimlane-name="To Do"]');
-    await expect(backlog.locator('[data-testid="task-card-pr-link"]')).not.toBeVisible({ timeout: 3000 });
+    await expect(planning.locator('[data-testid="task-card-pr-link"]')).not.toBeVisible({ timeout: 3000 });
   });
 });

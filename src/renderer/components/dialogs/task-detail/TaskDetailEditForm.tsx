@@ -97,23 +97,25 @@ export function TaskDetailEditForm({
         onPreview={attachments.handlePreview}
         onRemove={attachments.removeAttachment}
       />
-      <div>
-        <label className="text-[10px] text-fg-muted mb-1 flex items-center gap-1">
-          <GitPullRequest size={10} />
-          Pull Request URL
-        </label>
-        <input
-          type="url"
-          placeholder="https://github.com/owner/repo/pull/123"
-          value={prUrl}
-          onChange={(e) => setPrUrl(e.target.value)}
-          className="w-full bg-surface border border-edge-input rounded px-3 py-1.5 text-xs text-fg placeholder-fg-faint focus:outline-none focus:border-accent"
-          data-testid="pr-url-input"
-        />
-      </div>
+      {!isInTodo && (
+        <div>
+          <label className="text-xs text-fg-muted mb-1 flex items-center gap-1">
+            <GitPullRequest size={12} />
+            Pull Request
+          </label>
+          <input
+            type="url"
+            placeholder="https://github.com/owner/repo/pull/123"
+            value={prUrl}
+            onChange={(e) => setPrUrl(e.target.value)}
+            className="w-full bg-surface border border-edge-input rounded px-3 py-1.5 text-xs text-fg placeholder-fg-faint focus:outline-none focus:border-accent"
+            data-testid="pr-url-input"
+          />
+        </div>
+      )}
       {!isSessionActive && !isArchived && isInTodo && (
         <div>
-          <label className="text-[10px] text-fg-muted mb-1 block">Branch</label>
+          <label className="text-xs text-fg-muted mb-1 block">Branch</label>
           <div className="flex items-center gap-2">
             <input
               data-testid="custom-branch-name-input"
