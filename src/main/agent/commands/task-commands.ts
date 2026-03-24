@@ -1,4 +1,6 @@
 import { TaskRepository } from '../../db/repositories/task-repository';
+import { AttachmentRepository } from '../../db/repositories/attachment-repository';
+import { readFileAsAttachment } from '../../db/repositories/attachment-utils';
 import { resolveColumn } from './column-resolver';
 import type { CommandContext, CommandHandler, CommandResponse } from './types';
 
@@ -12,6 +14,7 @@ export const handleCreateTask: CommandHandler = (
   const branchName = params.branchName as string | null;
   const baseBranch = params.baseBranch as string | null;
   const useWorktree = params.useWorktree as boolean | null;
+  const attachments = params.attachments as Array<{ filePath: string; filename?: string }> | null;
 
   if (!title.trim()) {
     return { success: false, error: 'Task title is required' };
@@ -34,6 +37,20 @@ export const handleCreateTask: CommandHandler = (
     ...(useWorktree !== null ? { useWorktree } : {}),
     ...(branchName ? { customBranchName: branchName } : {}),
   });
+
+  // Process file attachments if provided
+  if (attachments && attachments.length > 0) {
+    const attachmentRepo = new AttachmentRepository(db);
+    const projectPath = context.getProjectPath();
+    for (const entry of attachments) {
+      try {
+        const fileData = readFileAsAttachment(entry.filePath, entry.filename);
+        attachmentRepo.add(projectPath, task.id, fileData.filename, fileData.base64Data, fileData.mediaType);
+      } catch (error) {
+        console.error(`[create_task] Failed to attach file "${entry.filePath}":`, error);
+      }
+    }
+  }
 
   context.onTaskCreated(task, targetSwimlane.name, targetSwimlane.id);
 

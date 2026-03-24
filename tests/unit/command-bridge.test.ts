@@ -200,6 +200,25 @@ vi.mock('../../src/main/db/repositories/backlog-repository', () => ({
   },
 }));
 
+vi.mock('../../src/main/db/repositories/attachment-repository', () => ({
+  AttachmentRepository: class MockAttachmentRepository {
+    list() { return []; }
+    add() { return { id: 'att-1', task_id: '', filename: '', file_path: '', media_type: '', size_bytes: 0, created_at: '' }; }
+  },
+}));
+
+vi.mock('../../src/main/db/repositories/backlog-attachment-repository', () => ({
+  BacklogAttachmentRepository: class MockBacklogAttachmentRepository {
+    list() { return []; }
+    add() { return { id: 'batt-1', backlog_item_id: '', filename: '', file_path: '', media_type: '', size_bytes: 0, created_at: '' }; }
+    deleteByItemId() {}
+  },
+}));
+
+vi.mock('../../src/main/db/repositories/attachment-utils', () => ({
+  readFileAsAttachment: () => ({ filename: 'test.png', base64Data: '', mediaType: 'image/png', sizeBytes: 0 }),
+}));
+
 // ── Import after mocks are set up ────────────────────────────────────────
 
 import { CommandBridge } from '../../src/main/agent/command-bridge';
@@ -217,6 +236,7 @@ function createBridge(overrides?: {
     responsesDir: path.join(tmpDir, 'responses'),
     projectId: 'test-project',
     getProjectDb: () => database,
+    getProjectPath: () => tmpDir,
     onTaskCreated: overrides?.onTaskCreated ?? (() => {}),
     onTaskUpdated: overrides?.onTaskUpdated ?? (() => {}),
   });

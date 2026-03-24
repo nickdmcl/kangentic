@@ -1,5 +1,9 @@
+import fs from 'node:fs';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { BacklogRepository } from '../../db/repositories/backlog-repository';
+import { AttachmentRepository } from '../../db/repositories/attachment-repository';
+import { BacklogAttachmentRepository } from '../../db/repositories/backlog-attachment-repository';
+import { readFileAsAttachment } from '../../db/repositories/attachment-utils';
 import { BACKLOG_PRIORITY_LABELS } from '../../../shared/types';
 import { resolveColumn } from './column-resolver';
 import type { CommandContext, CommandHandler, CommandResponse } from './types';
@@ -62,6 +66,7 @@ export const handleCreateBacklogItem: CommandHandler = (
   const description = String(params.description ?? '').slice(0, 10_000);
   const priority = (params.priority as number) ?? 0;
   const labels = (params.labels as string[]) ?? [];
+  const attachments = params.attachments as Array<{ filePath: string; filename?: string }> | null;
 
   if (!title.trim()) {
     return { success: false, error: 'Title is required' };
@@ -80,6 +85,20 @@ export const handleCreateBacklogItem: CommandHandler = (
     priority: priority,
     labels,
   });
+
+  // Process file attachments if provided
+  if (attachments && attachments.length > 0) {
+    const backlogAttachmentRepo = new BacklogAttachmentRepository(db);
+    const projectPath = context.getProjectPath();
+    for (const entry of attachments) {
+      try {
+        const fileData = readFileAsAttachment(entry.filePath, entry.filename);
+        backlogAttachmentRepo.add(projectPath, item.id, fileData.filename, fileData.base64Data, fileData.mediaType);
+      } catch (error) {
+        console.error(`[create_backlog_item] Failed to attach file "${entry.filePath}":`, error);
+      }
+    }
+  }
 
   const priorityLabel = BACKLOG_PRIORITY_LABELS[item.priority] ?? 'None';
   return {
@@ -158,6 +177,10 @@ export const handlePromoteBacklog: CommandHandler = (
   }
   const { swimlane: targetSwimlane } = resolution;
 
+  const backlogAttachmentRepo = new BacklogAttachmentRepository(db);
+  const attachmentRepo = new AttachmentRepository(db);
+  const projectPath = context.getProjectPath();
+
   const promoted: Array<{ taskId: string; title: string }> = [];
   const notFound: string[] = [];
 
@@ -173,6 +196,20 @@ export const handlePromoteBacklog: CommandHandler = (
       description: item.description,
       swimlane_id: targetSwimlane.id,
     });
+
+    // Copy backlog attachments to task attachments
+    const backlogAttachments = backlogAttachmentRepo.list(itemId);
+    for (const backlogAttachment of backlogAttachments) {
+      try {
+        const buffer = fs.readFileSync(backlogAttachment.file_path);
+        const base64Data = buffer.toString('base64');
+        attachmentRepo.add(projectPath, task.id, backlogAttachment.filename, base64Data, backlogAttachment.media_type);
+      } catch (error) {
+        console.error(`[promote_backlog] Failed to copy attachment "${backlogAttachment.filename}":`, error);
+      }
+    }
+    // Clean up backlog attachment files
+    backlogAttachmentRepo.deleteByItemId(itemId);
 
     backlogRepo.delete(itemId);
     promoted.push({ taskId: task.id, title: task.title });

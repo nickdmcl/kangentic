@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC } from '../shared/ipc-channels';
 import type { ElectronAPI, NotificationInput, Project, Session, SessionUsage, ActivityState, SessionEvent, UpdateDownloadedInfo } from '../shared/types';
 
@@ -250,6 +250,10 @@ const api: ElectronAPI = {
   },
 
   platform: process.platform,
+
+  webUtils: {
+    getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

@@ -352,6 +352,25 @@ export function runProjectMigrations(db: Database.Database): void {
     `);
   }
 
+  // Migration: create backlog_attachments table for backlog item file attachments
+  const hasBacklogAttachmentsTable = (db.prepare(
+    "SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name='backlog_attachments'"
+  ).get() as { c: number }).c > 0;
+  if (!hasBacklogAttachmentsTable) {
+    db.exec(`
+      CREATE TABLE backlog_attachments (
+        id TEXT PRIMARY KEY,
+        backlog_item_id TEXT NOT NULL REFERENCES backlog_items(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_backlog_attachments_item_id ON backlog_attachments(backlog_item_id);
+    `);
+  }
+
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)
   const laneCount = db.prepare('SELECT COUNT(*) as c FROM swimlanes').get() as { c: number };
   if (laneCount.c === 0) {

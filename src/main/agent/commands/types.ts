@@ -3,6 +3,7 @@ import type { Task } from '../../../shared/types';
 
 export interface CommandContext {
   getProjectDb: () => Database.Database;
+  getProjectPath: () => string;
   onTaskCreated: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated: (task: Task) => void;
 }

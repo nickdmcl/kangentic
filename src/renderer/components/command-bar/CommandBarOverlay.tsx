@@ -6,6 +6,8 @@ import { Pill } from '../Pill';
 import { KebabMenu, KebabMenuItem, KebabMenuDivider } from '../KebabMenu';
 import { CommandPalettePopover } from '../dialogs/task-detail/CommandPalettePopover';
 import { useTerminal } from '../../hooks/useTerminal';
+import { useTerminalFileDrop } from '../../hooks/useTerminalFileDrop';
+import { FileDropOverlay } from '../terminal/FileDropOverlay';
 import { useSessionStore } from '../../stores/session-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
@@ -110,6 +112,8 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
     scrollbackLines: config.terminal.scrollbackLines,
     cursorStyle: config.terminal.cursorStyle,
   });
+
+  const fileDrop = useTerminalFileDrop(effectiveSessionId, focus);
 
   // Init terminal once session is ready AND container has dimensions.
   const initialized = useRef(false);
@@ -372,6 +376,7 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
           {/* Terminal area */}
           <div className="relative h-[60vh]" style={{ backgroundColor: '#18181b' }}>
             {!terminalReady && <ShimmerOverlay label="Starting Command Terminal..." />}
+            <FileDropOverlay {...fileDrop} />
             <div
               ref={terminalRef}
               className="h-full"

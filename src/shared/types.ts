@@ -53,6 +53,16 @@ export interface TaskAttachment {
   created_at: string;
 }
 
+export interface BacklogAttachment {
+  id: string;
+  backlog_item_id: string;
+  filename: string;
+  file_path: string;
+  media_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export type SwimlaneRole = 'todo' | 'done';
 
 export interface Swimlane {
@@ -966,6 +976,11 @@ export interface ElectronAPI {
 
   // Platform
   platform: string;
+
+  // Web utilities
+  webUtils: {
+    getPathForFile: (file: File) => string;
+  };
 }
 
 declare global {

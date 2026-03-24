@@ -256,6 +256,7 @@ Created on project open. Stored in the global config directory (not inside the p
 - **sessions** -- Session persistence for recovery/resume. Fields: id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status (`running`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
 - **task_attachments** -- File attachments (images, etc.) stored on disk, metadata in DB
 - **backlog_items** -- Staging area items (Backlog View). Pre-board tasks with priority, labels, and optional external source tracking.
+- **backlog_attachments** -- File attachments for backlog items, mirroring `task_attachments`. Copied to `task_attachments` on promote.
 
 Repositories follow a simple pattern -- one class per table, all queries are synchronous (better-sqlite3). Transactions used for position shifts (task move, swimlane reorder).
 

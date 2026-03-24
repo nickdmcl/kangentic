@@ -87,16 +87,21 @@ server.registerTool(
   'kangentic_create_task',
   {
     description: 'Create a new task on the Kangentic board. Use this when you identify work that should be tracked separately (bugs, refactoring opportunities, follow-ups, improvements).',
-    inputSchema: {
+    inputSchema: z.object({
       title: z.string().max(200).describe('Task title (max 200 characters)'),
       description: z.string().max(10000).optional().describe('Task description. Supports markdown.'),
       column: z.string().optional().describe('Target column name. Defaults to the To Do column. Use kangentic_list_columns to see available columns.'),
       branchName: z.string().optional().describe('Custom git branch name for the task (e.g. "bugfix/login-screen"). If omitted, a branch name is auto-generated from the title.'),
       baseBranch: z.string().optional().describe('Base branch to create the task branch from (e.g. "develop", "main"). Defaults to the project setting.'),
       useWorktree: z.boolean().optional().describe('Whether to use a git worktree for isolation. Defaults to the project setting. Set false to work in the main repo.'),
-    },
+      attachments: z.array(z.object({
+        filePath: z.string().describe('Absolute path to the file to attach'),
+        filename: z.string().optional().describe('Override display filename'),
+      })).optional().describe('File attachments (array of file paths)'),
+    }),
   },
-  async ({ title, description, column, branchName, baseBranch, useWorktree }) => {
+  async ({ title, description, column, branchName, baseBranch, useWorktree, attachments }) => {
+    console.error('[mcp] create_task params:', JSON.stringify({ title, description: description?.slice(0, 100) }));
     if (taskCreationCount >= MAX_TASKS_PER_SESSION) {
       return {
         content: [{ type: 'text' as const, text: `Rate limit reached: maximum ${MAX_TASKS_PER_SESSION} tasks per session.` }],
@@ -112,6 +117,7 @@ server.registerTool(
         branchName: branchName ?? null,
         baseBranch: baseBranch ?? null,
         useWorktree: useWorktree ?? null,
+        attachments: attachments ?? null,
       });
 
       if (!response.success) {
@@ -144,7 +150,7 @@ server.registerTool(
   'kangentic_list_columns',
   {
     description: 'List all columns (swimlanes) on the Kangentic board. Returns column names, roles, and task counts.',
-    inputSchema: {},
+    inputSchema: z.object({}),
   },
   async () => {
     try {
@@ -181,9 +187,9 @@ server.registerTool(
   'kangentic_list_tasks',
   {
     description: 'List tasks on the Kangentic board. Optionally filter by column name.',
-    inputSchema: {
+    inputSchema: z.object({
       column: z.string().optional().describe('Filter by column name. If omitted, returns all tasks.'),
-    },
+    }),
   },
   async ({ column }) => {
     try {
@@ -229,10 +235,10 @@ server.registerTool(
   'kangentic_search_tasks',
   {
     description: 'Search board tasks by keyword across titles and descriptions. Searches both active and completed (archived) tasks. Does not search backlog items - use kangentic_search_backlog for that.',
-    inputSchema: {
+    inputSchema: z.object({
       query: z.string().describe('Search keyword or phrase to match against task titles and descriptions (case-insensitive).'),
       status: z.enum(['active', 'completed', 'all']).optional().describe('Filter by task status. "active" = on the board, "completed" = in Done/archived. Defaults to "all".'),
-    },
+    }),
   },
   async ({ query, status }) => {
     try {
@@ -287,11 +293,11 @@ server.registerTool(
   'kangentic_get_task_stats',
   {
     description: 'Get session metrics and statistics for tasks. Returns token usage, cost, duration, tool calls, and lines changed. Can query a specific task or get a summary across all completed tasks, optionally filtered by keyword.',
-    inputSchema: {
+    inputSchema: z.object({
       taskId: z.string().optional().describe('Specific task ID to get stats for. If omitted, returns aggregate stats across completed tasks.'),
       query: z.string().optional().describe('Filter completed tasks by keyword in title/description before aggregating stats.'),
       sortBy: z.enum(['tokens', 'cost', 'duration', 'toolCalls', 'linesChanged']).optional().describe('Sort results by this metric (descending). Defaults to "tokens". Only applies when querying multiple tasks.'),
-    },
+    }),
   },
   async ({ taskId, query, sortBy }) => {
     try {
@@ -326,11 +332,11 @@ server.registerTool(
   'kangentic_find_task',
   {
     description: 'Find a task by branch name, title keyword, or PR number. Returns full task details including branch, worktree, PR info, and current column. Use this to check if a task exists for a given branch or feature.',
-    inputSchema: {
+    inputSchema: z.object({
       branch: z.string().optional().describe('Git branch name to search for (exact or partial match, e.g. "feature/92294" or "bugfix/login").'),
       title: z.string().optional().describe('Keyword to search in task titles (case-insensitive).'),
       prNumber: z.number().optional().describe('Pull request number to search for.'),
-    },
+    }),
   },
   async ({ branch, title, prNumber }) => {
     if (!branch && !title && prNumber === undefined) {
@@ -361,7 +367,7 @@ server.registerTool(
   'kangentic_board_summary',
   {
     description: 'Get a high-level summary of the Kangentic board: task counts per column, active sessions, completed task count, and aggregate cost/token usage across all sessions.',
-    inputSchema: {},
+    inputSchema: z.object({}),
   },
   async () => {
     try {
@@ -382,9 +388,9 @@ server.registerTool(
   'kangentic_get_session_history',
   {
     description: 'Get the session history for a task: how many sessions it went through, when they started/ended, exit codes, and whether they were suspended by user or system. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
-    inputSchema: {
+    inputSchema: z.object({
       taskId: z.string().describe('Task ID to get session history for.'),
-    },
+    }),
   },
   async ({ taskId }) => {
     try {
@@ -405,9 +411,9 @@ server.registerTool(
   'kangentic_get_column_detail',
   {
     description: 'Get detailed configuration for a board column: automation settings (auto-spawn, auto-command, permission mode), plan exit target, role, and visual settings.',
-    inputSchema: {
+    inputSchema: z.object({
       column: z.string().describe('Column name (case-insensitive).'),
-    },
+    }),
   },
   async ({ column }) => {
     try {
@@ -428,13 +434,13 @@ server.registerTool(
   'kangentic_update_task',
   {
     description: 'Update an existing task\'s title, description, or PR info. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
-    inputSchema: {
+    inputSchema: z.object({
       taskId: z.string().describe('Task ID to update.'),
       title: z.string().max(200).optional().describe('New task title (max 200 characters).'),
       description: z.string().max(10000).optional().describe('New task description (markdown). Replaces the entire description.'),
       prUrl: z.string().url().optional().describe('Pull request URL (e.g. https://github.com/owner/repo/pull/123).'),
       prNumber: z.number().int().positive().optional().describe('Pull request number.'),
-    },
+    }),
   },
   async ({ taskId, title, description, prUrl, prNumber }) => {
     if (!title && description === undefined && prUrl === undefined && prNumber === undefined) {
@@ -467,10 +473,10 @@ server.registerTool(
   'kangentic_list_backlog',
   {
     description: 'List items in the backlog staging area. The backlog holds work items before they are moved to the board. Items have priority levels and labels for organization.',
-    inputSchema: {
+    inputSchema: z.object({
       priority: z.number().min(0).max(4).optional().describe('Filter by priority level: 0=none, 1=low, 2=medium, 3=high, 4=urgent.'),
       query: z.string().optional().describe('Search keyword to filter items by title, description, or labels (case-insensitive).'),
-    },
+    }),
   },
   async ({ priority, query }) => {
     try {
@@ -494,14 +500,19 @@ server.registerTool(
   'kangentic_create_backlog_item',
   {
     description: 'Create a new item in the backlog staging area. Use this for work that should be tracked but is not ready for the board yet (future tasks, ideas, improvements). Unlike kangentic_create_task, backlog items do not have branches or worktrees.',
-    inputSchema: {
+    inputSchema: z.object({
       title: z.string().max(200).describe('Item title (max 200 characters).'),
       description: z.string().max(10000).optional().describe('Item description. Supports markdown.'),
       priority: z.number().min(0).max(4).optional().describe('Priority level: 0=none (default), 1=low, 2=medium, 3=high, 4=urgent.'),
       labels: z.array(z.string()).optional().describe('Labels for categorization (e.g. ["bug", "frontend", "p1"]).'),
-    },
+      attachments: z.array(z.object({
+        filePath: z.string().describe('Absolute path to the file to attach'),
+        filename: z.string().optional().describe('Override display filename'),
+      })).optional().describe('File attachments (array of file paths)'),
+    }),
   },
-  async ({ title, description, priority, labels }) => {
+  async ({ title, description, priority, labels, attachments }) => {
+    console.error('[mcp] create_backlog_item params:', JSON.stringify({ title, description: description?.slice(0, 100) }));
     if (taskCreationCount >= MAX_TASKS_PER_SESSION) {
       return {
         content: [{ type: 'text' as const, text: `Rate limit reached: maximum ${MAX_TASKS_PER_SESSION} items per session.` }],
@@ -514,6 +525,7 @@ server.registerTool(
         description: description ?? '',
         priority: priority ?? 0,
         labels: labels ?? [],
+        attachments: attachments ?? null,
       });
       if (!response.success) {
         return { content: [{ type: 'text' as const, text: `Failed to create backlog item: ${response.error}` }], isError: true };
@@ -532,9 +544,9 @@ server.registerTool(
   'kangentic_search_backlog',
   {
     description: 'Search backlog items by keyword across titles, descriptions, and labels.',
-    inputSchema: {
+    inputSchema: z.object({
       query: z.string().describe('Search keyword or phrase (case-insensitive).'),
-    },
+    }),
   },
   async ({ query }) => {
     try {
@@ -555,10 +567,10 @@ server.registerTool(
   'kangentic_promote_backlog',
   {
     description: 'Move one or more backlog items to the board, creating tasks in the specified column. Moved items are removed from the backlog. Find item IDs with kangentic_list_backlog or kangentic_search_backlog.',
-    inputSchema: {
+    inputSchema: z.object({
       itemIds: z.array(z.string()).describe('Backlog item IDs to move to the board.'),
       column: z.string().optional().describe('Target column name. Defaults to the To Do column.'),
-    },
+    }),
   },
   async ({ itemIds, column }) => {
     try {

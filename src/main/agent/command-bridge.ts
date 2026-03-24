@@ -20,6 +20,7 @@ interface CommandBridgeOptions {
   responsesDir: string;
   projectId: string;
   getProjectDb: () => Database.Database;
+  getProjectPath: () => string;
   onTaskCreated: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated: (task: Task) => void;
 }
@@ -46,6 +47,7 @@ export class CommandBridge {
     this.projectId = options.projectId;
     this.context = {
       getProjectDb: options.getProjectDb,
+      getProjectPath: options.getProjectPath,
       onTaskCreated: options.onTaskCreated,
       onTaskUpdated: options.onTaskUpdated,
     };

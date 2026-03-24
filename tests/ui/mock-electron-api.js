@@ -1054,6 +1054,10 @@
     },
 
     platform: 'win32',
+
+    webUtils: {
+      getPathForFile: function () { return '/mock/path/file.txt'; },
+    },
   };
 
   /**

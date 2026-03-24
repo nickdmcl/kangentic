@@ -58,6 +58,7 @@ Create a new task on the board. Defaults to the To Do column.
 | `branchName` | string | No | Custom git branch name |
 | `baseBranch` | string | No | Base branch for the task |
 | `useWorktree` | boolean | No | Whether to use a git worktree |
+| `attachments` | array | No | File attachments: `[{ filePath: string, filename?: string }]`. Files are read from disk and stored in the project's `.kangentic/` directory. |
 
 If the target column has `auto_spawn` enabled, creating a task there will also spawn an agent session for it.
 
@@ -143,6 +144,48 @@ Update a task's title, description, or PR info.
 | `prNumber` | number | No | Pull request number |
 
 At least one of `title`, `description`, `prUrl`, or `prNumber` is required.
+
+### kangentic_list_backlog
+
+List items in the backlog staging area. Items have priority levels and labels for organization.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `priority` | number | No | Filter by priority: 0=none, 1=low, 2=medium, 3=high, 4=urgent |
+| `query` | string | No | Search keyword to filter by title, description, or labels |
+
+### kangentic_create_backlog_item
+
+Create a new item in the backlog staging area for work not yet ready for the board.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `title` | string | Yes | Item title (max 200 chars) |
+| `description` | string | No | Item description, supports markdown (max 10000 chars) |
+| `priority` | number | No | Priority: 0=none (default), 1=low, 2=medium, 3=high, 4=urgent |
+| `labels` | array | No | String labels for categorization |
+| `attachments` | array | No | File attachments: `[{ filePath: string, filename?: string }]` |
+
+Rate limit: shared with task creation (50 per session).
+
+### kangentic_search_backlog
+
+Search backlog items by keyword across titles, descriptions, and labels.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Search keyword (case-insensitive) |
+
+### kangentic_promote_backlog
+
+Move backlog items to the board, creating tasks in the specified column.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `itemIds` | array | Yes | Backlog item IDs to move |
+| `column` | string | No | Target column name. Defaults to To Do. |
+
+Attachments on promoted backlog items are automatically copied to the new task.
 
 ## Configuration
 

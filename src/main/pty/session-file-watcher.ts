@@ -116,11 +116,16 @@ export class SessionFileWatcher {
       const commandsPath = path.join(sessionDir, 'commands.jsonl');
       const responsesDir = path.join(sessionDir, 'responses');
 
+      // Derive project path from statusOutputPath pattern:
+      // <projectPath>/.kangentic/sessions/<sessionId>/status.json
+      const projectPath = path.resolve(statusOutputPath, '..', '..', '..', '..');
+
       state.commandBridge = new CommandBridge({
         commandsPath,
         responsesDir,
         projectId,
         getProjectDb: () => getProjectDb(projectId),
+        getProjectPath: () => projectPath,
         onTaskCreated: (task, columnName, swimlaneId) => {
           this.callbacks.onTaskCreated(sessionId, task, columnName, swimlaneId);
         },

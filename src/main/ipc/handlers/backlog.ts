@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { ipcMain } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { getProjectDb } from '../../db/database';
@@ -6,6 +7,7 @@ import { TaskRepository } from '../../db/repositories/task-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { ActionRepository } from '../../db/repositories/action-repository';
 import { AttachmentRepository } from '../../db/repositories/attachment-repository';
+import { BacklogAttachmentRepository } from '../../db/repositories/backlog-attachment-repository';
 import { SessionRepository } from '../../db/repositories/session-repository';
 import { cleanupTaskResources, createTransitionEngine, getProjectRepos, ensureTaskWorktree, ensureTaskBranchCheckout } from '../helpers';
 import { guardActiveNonWorktreeSessions } from './task-move';
@@ -38,7 +40,11 @@ export function registerBacklogHandlers(context: IpcContext): void {
   });
 
   ipcMain.handle(IPC.BACKLOG_DELETE, (_, id: string) => {
-    getBacklogRepo(context).delete(id);
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    // Clean up backlog attachments before deleting the item
+    new BacklogAttachmentRepository(db).deleteByItemId(id);
+    new BacklogRepository(db).delete(id);
   });
 
   ipcMain.handle(IPC.BACKLOG_REORDER, (_, ids: string[]) => {
@@ -46,7 +52,14 @@ export function registerBacklogHandlers(context: IpcContext): void {
   });
 
   ipcMain.handle(IPC.BACKLOG_BULK_DELETE, (_, ids: string[]) => {
-    getBacklogRepo(context).bulkDelete(ids);
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    const backlogAttachmentRepo = new BacklogAttachmentRepository(db);
+    // Clean up backlog attachments before bulk delete
+    for (const id of ids) {
+      backlogAttachmentRepo.deleteByItemId(id);
+    }
+    new BacklogRepository(db).bulkDelete(ids);
   });
 
   ipcMain.handle(IPC.BACKLOG_PROMOTE, async (_, input: BacklogPromoteInput) => {
@@ -61,6 +74,8 @@ export function registerBacklogHandlers(context: IpcContext): void {
     const swimlanes = new SwimlaneRepository(db);
     const actions = new ActionRepository(db);
     const attachments = new AttachmentRepository(db);
+
+    const backlogAttachments = new BacklogAttachmentRepository(db);
 
     const targetSwimlane = swimlanes.getById(input.targetSwimlaneId);
     if (!targetSwimlane) throw new Error(`Swimlane ${input.targetSwimlaneId} not found`);
@@ -77,6 +92,20 @@ export function registerBacklogHandlers(context: IpcContext): void {
         description: item.description,
         swimlane_id: input.targetSwimlaneId,
       });
+
+      // Copy backlog attachments to task attachments
+      const itemAttachments = backlogAttachments.list(backlogItemId);
+      for (const backlogAttachment of itemAttachments) {
+        try {
+          const buffer = fs.readFileSync(backlogAttachment.file_path);
+          const base64Data = buffer.toString('base64');
+          attachments.add(projectPath, task.id, backlogAttachment.filename, base64Data, backlogAttachment.media_type);
+        } catch (error) {
+          console.error(`[BACKLOG_PROMOTE] Failed to copy attachment "${backlogAttachment.filename}":`, error);
+        }
+      }
+      // Clean up backlog attachment files
+      backlogAttachments.deleteByItemId(backlogItemId);
 
       // Remove from backlog
       backlogRepo.delete(backlogItemId);

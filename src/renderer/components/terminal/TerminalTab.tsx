@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTerminal } from '../../hooks/useTerminal';
+import { useTerminalFileDrop } from '../../hooks/useTerminalFileDrop';
+import { FileDropOverlay } from './FileDropOverlay';
 import { useConfigStore } from '../../stores/config-store';
 import { useSessionStore } from '../../stores/session-store';
 import { useBoardStore } from '../../stores/board-store';
@@ -220,9 +222,12 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     };
   }, [active, fit, focus]);
 
+  const fileDrop = useTerminalFileDrop(sessionId, focus);
+
   return (
     <div className="h-full w-full bg-surface relative">
       <div ref={terminalRef} className="h-full w-full" />
+      <FileDropOverlay {...fileDrop} />
       {/* Placeholder overlay while Claude CLI is loading (before first usage report).
           Stays visible until scrollback replay + clear are both done.
           z-10 ensures it paints above xterm's WebGL canvas layers. */}
