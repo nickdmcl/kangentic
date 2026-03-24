@@ -182,7 +182,7 @@ export function ProjectSidebar({ onToggleSidebar }: ProjectSidebarProps) {
   const renderProjectItem = (project: Project, isGrouped: boolean) => {
     const isActive = currentProject?.id === project.id;
     const runningSessions = sessions.filter(
-      (s) => s.projectId === project.id && s.status === 'running',
+      (s) => s.projectId === project.id && s.status === 'running' && !s.transient,
     );
     const thinkingCount = runningSessions.filter(
       (s) => sessionActivity[s.id] !== 'idle',

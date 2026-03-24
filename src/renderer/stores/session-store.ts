@@ -304,12 +304,35 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const transientSessionId = get().transientSessionId;
     if (transientSessionId) {
       await window.electronAPI.sessions.killTransient(transientSessionId);
-      set({ transientSessionId: null, transientBranch: null });
+      get().clearTransientSession();
     }
   },
 
   clearTransientSession: () => {
-    set({ transientSessionId: null, transientBranch: null });
+    const transientSessionId = get().transientSessionId;
+    if (transientSessionId) {
+      set((state) => {
+        const { [transientSessionId]: _usage, ...restUsage } = state.sessionUsage;
+        const { [transientSessionId]: _firstOutput, ...restFirstOutput } = state.sessionFirstOutput;
+        const { [transientSessionId]: _activity, ...restActivity } = state.sessionActivity;
+        const { [transientSessionId]: _events, ...restEvents } = state.sessionEvents;
+        const { [transientSessionId]: _seen, ...restSeen } = state.seenIdleSessions;
+        const sessions = state.sessions.filter((s) => s.id !== transientSessionId);
+        return {
+          sessions,
+          _sessionByTaskId: buildSessionByTaskId(sessions),
+          sessionUsage: restUsage,
+          sessionFirstOutput: restFirstOutput,
+          sessionActivity: restActivity,
+          sessionEvents: restEvents,
+          seenIdleSessions: restSeen,
+          transientSessionId: null,
+          transientBranch: null,
+        };
+      });
+    } else {
+      set({ transientSessionId: null, transientBranch: null });
+    }
   },
 
   getRunningCount: () => get().sessions.filter((s) => s.status === 'running').length,

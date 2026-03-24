@@ -19,8 +19,12 @@ export function TitleBar({ onQuickSession, commandBarOpen }: TitleBarProps) {
   const setSettingsOpen = useConfigStore((s) => s.setSettingsOpen);
   const openProjectSettings = useConfigStore((s) => s.openProjectSettings);
   const transientSessionId = useSessionStore((s) => s.transientSessionId);
+  const transientActivity = useSessionStore((s) =>
+    s.transientSessionId ? s.sessionActivity[s.transientSessionId] : undefined,
+  );
 
   const hasBackgroundSession = !!transientSessionId && !commandBarOpen;
+  const transientIsIdle = hasBackgroundSession && transientActivity === 'idle';
 
   const isWorktree = currentProject?.path ? isWorktreePath(currentProject.path) : false;
 
@@ -72,7 +76,9 @@ export function TitleBar({ onQuickSession, commandBarOpen }: TitleBarProps) {
             <TerminalSquare size={20} />
             {hasBackgroundSession && (
               <span
-                className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400 animate-pulse"
+                className={`absolute top-1 right-1 w-2 h-2 rounded-full animate-pulse ${
+                  transientIsIdle ? 'bg-yellow-400' : 'bg-green-400'
+                }`}
                 data-testid="transient-session-indicator"
               />
             )}
