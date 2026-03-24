@@ -54,6 +54,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   openProject: async (id) => {
+    // Kill any background transient session from the previous project
+    useSessionStore.getState().killTransientSession().catch(() => {});
     await window.electronAPI.projects.open(id);
     const project = get().projects.find((p) => p.id === id) || await window.electronAPI.projects.getCurrent();
     set({ currentProject: project });

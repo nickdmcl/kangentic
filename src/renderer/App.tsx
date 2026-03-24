@@ -168,7 +168,10 @@ export function App() {
         if (currentSession?.status === 'suspended') return;
 
         // Transient sessions (command terminal) are ephemeral - skip toasts and notifications
-        if (currentSession?.transient) return;
+        if (currentSession?.transient) {
+          useSessionStore.getState().clearTransientSession();
+          return;
+        }
 
         updateSessionStatus(sessionId, { status: 'exited', exitCode });
 

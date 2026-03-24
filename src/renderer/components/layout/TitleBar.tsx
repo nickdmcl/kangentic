@@ -2,23 +2,27 @@ import React from 'react';
 import { Minus, Settings, Square, TerminalSquare, X } from 'lucide-react';
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';
+import { useSessionStore } from '../../stores/session-store';
+import { isWorktreePath } from '../../../shared/git-utils';
 import logoSrc from '../../assets/logo-32.png';
 
 const isMac = window.electronAPI.platform === 'darwin';
 
 interface TitleBarProps {
   onQuickSession?: () => void;
+  commandBarOpen?: boolean;
 }
 
-export function TitleBar({ onQuickSession }: TitleBarProps) {
+export function TitleBar({ onQuickSession, commandBarOpen }: TitleBarProps) {
   const currentProject = useProjectStore((s) => s.currentProject);
   const settingsOpen = useConfigStore((s) => s.settingsOpen);
   const setSettingsOpen = useConfigStore((s) => s.setSettingsOpen);
   const openProjectSettings = useConfigStore((s) => s.openProjectSettings);
+  const transientSessionId = useSessionStore((s) => s.transientSessionId);
 
-  const isWorktree = currentProject?.path
-    ? currentProject.path.replace(/\\/g, '/').includes('.kangentic/worktrees/')
-    : false;
+  const hasBackgroundSession = !!transientSessionId && !commandBarOpen;
+
+  const isWorktree = currentProject?.path ? isWorktreePath(currentProject.path) : false;
 
   const handleGearClick = () => {
     if (settingsOpen) {
@@ -60,12 +64,18 @@ export function TitleBar({ onQuickSession }: TitleBarProps) {
         {currentProject && onQuickSession && (
           <button
             onClick={onQuickSession}
-            className="p-1.5 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
+            className="relative p-1.5 hover:bg-surface-hover rounded text-fg-muted hover:text-fg transition-colors"
             title={`Command Terminal (${isMac ? '⌘' : 'Ctrl'}+Shift+P)`}
             aria-label="Command Terminal"
             data-testid="quick-session-button"
           >
             <TerminalSquare size={20} />
+            {hasBackgroundSession && (
+              <span
+                className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400 animate-pulse"
+                data-testid="transient-session-indicator"
+              />
+            )}
           </button>
         )}
         <button

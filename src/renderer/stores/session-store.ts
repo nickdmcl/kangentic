@@ -55,8 +55,11 @@ interface SessionStore {
 
   // Transient session (command bar)
   transientSessionId: string | null;
+  transientBranch: string | null;
   spawnTransientSession: (branch?: string) => Promise<{ session: Session; branch: string; checkoutError?: string }>;
   killTransientSession: () => Promise<void>;
+  /** Clear transient session ID without IPC call (session already exited naturally). */
+  clearTransientSession: () => void;
 
   getRunningCount: () => number;
   getQueuedCount: () => number;
@@ -78,6 +81,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   _pendingOpenTaskId: null,
   _syncGeneration: 0,
   transientSessionId: null,
+  transientBranch: null,
 
   setPendingOpenTaskId: (id) => set({ _pendingOpenTaskId: id }),
 
@@ -292,7 +296,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       projectId: currentProject.id,
       branch,
     });
-    set({ transientSessionId: result.session.id });
+    set({ transientSessionId: result.session.id, transientBranch: result.branch });
     return result;
   },
 
@@ -300,8 +304,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const transientSessionId = get().transientSessionId;
     if (transientSessionId) {
       await window.electronAPI.sessions.killTransient(transientSessionId);
-      set({ transientSessionId: null });
+      set({ transientSessionId: null, transientBranch: null });
     }
+  },
+
+  clearTransientSession: () => {
+    set({ transientSessionId: null, transientBranch: null });
   },
 
   getRunningCount: () => get().sessions.filter((s) => s.status === 'running').length,

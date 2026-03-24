@@ -202,4 +202,98 @@ test.describe('Command Terminal', () => {
       }
     });
   });
+
+  test.describe('Background Session Indicator', () => {
+    test('pulsing indicator appears on TitleBar button when transient session is in background', async () => {
+      const { browser, page } = await launchWithState(preConfigWithTransientSession());
+      try {
+        await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
+
+        // Set transientSessionId in the session store to simulate a background session
+        await page.evaluate(() => {
+          const { useSessionStore } = require('./src/renderer/stores/session-store');
+          useSessionStore.setState({ transientSessionId: 'sess-transient-1' });
+        }).catch(() => {
+          // Store not accessible via require in browser context - use addInitScript approach instead
+        });
+
+        // Use a pre-configured approach: inject transientSessionId via mock state
+        // The mock spawnTransient sets transientSessionId when called, so open and close the overlay
+        await page.keyboard.press('Control+Shift+P');
+        await expect(page.getByTestId('command-bar-overlay')).toBeVisible();
+
+        // Close overlay - session should remain in background
+        await page.keyboard.press('Control+Shift+P');
+        await expect(page.getByTestId('command-bar-overlay')).not.toBeVisible({ timeout: 5000 });
+
+        // The pulsing indicator should appear on the TitleBar button
+        await expect(page.getByTestId('transient-session-indicator')).toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+  });
+
+  test.describe('Overlay Header Controls', () => {
+    test('close button (X) hides the overlay without killing session', async () => {
+      const { browser, page } = await launchWithState(preConfigWithTransientSession());
+      try {
+        await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
+
+        // Open overlay
+        await page.keyboard.press('Control+Shift+P');
+        await expect(page.getByTestId('command-bar-overlay')).toBeVisible();
+
+        // Click the X close button
+        await page.locator('[aria-label="Hide terminal"]').click();
+        await expect(page.getByTestId('command-bar-overlay')).not.toBeVisible({ timeout: 5000 });
+
+        // Indicator should show - session still alive in background
+        await expect(page.getByTestId('transient-session-indicator')).toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+
+    test('stop button terminates the session and closes overlay', async () => {
+      const { browser, page } = await launchWithState(preConfigWithTransientSession());
+      try {
+        await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
+
+        // Open overlay
+        await page.keyboard.press('Control+Shift+P');
+        await expect(page.getByTestId('command-bar-overlay')).toBeVisible();
+
+        // Click the stop button
+        await page.getByTestId('command-bar-terminate-button').click();
+        await expect(page.getByTestId('command-bar-overlay')).not.toBeVisible({ timeout: 5000 });
+
+        // No background indicator - session was killed
+        await expect(page.getByTestId('transient-session-indicator')).not.toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+
+    test('kebab menu renders with expected items', async () => {
+      const { browser, page } = await launchWithState(preConfigWithTransientSession());
+      try {
+        await page.locator('[data-swimlane-name="Backlog"]').waitFor({ state: 'visible', timeout: 15000 });
+
+        // Open overlay
+        await page.keyboard.press('Control+Shift+P');
+        await expect(page.getByTestId('command-bar-overlay')).toBeVisible();
+
+        // Click the kebab menu button
+        await page.locator('[title="Actions"]').click();
+
+        // Verify menu items (use nth(1) for "Commands" to avoid matching the header pill)
+        await expect(page.locator('button:has-text("Open folder")')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Commands' }).nth(1)).toBeVisible();
+        await expect(page.getByTestId('command-bar-kebab-stop')).toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+  });
 });

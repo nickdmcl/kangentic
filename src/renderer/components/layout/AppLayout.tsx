@@ -26,7 +26,10 @@ export function AppLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-surface">
-      <TitleBar onQuickSession={commandBar.open} />
+      <TitleBar
+        onQuickSession={commandBar.open}
+        commandBarOpen={commandBar.isOpen}
+      />
 
       <div className="flex flex-1 min-h-0">
         {/* Hide sidebar entirely when no projects (welcome screen is primary UI) */}

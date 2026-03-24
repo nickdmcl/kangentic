@@ -4,17 +4,10 @@ import { ipcMain } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import simpleGit from 'simple-git';
 import { IPC } from '../../../shared/ipc-channels';
+import { resolveProjectRoot } from '../../../shared/git-utils';
 import { trackEvent } from '../../analytics/analytics';
-import { isKangenticWorktree } from '../../git/worktree-manager';
 import type { SpawnTransientSessionInput, PermissionMode } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
-
-/** Resolve the main repo root from a project path that may be a worktree. */
-function resolveProjectRoot(projectPath: string): string {
-  if (!isKangenticWorktree(projectPath)) return projectPath;
-  // Worktree paths are <project>/.kangentic/worktrees/<slug> - go up 3 levels
-  return path.resolve(projectPath, '..', '..', '..');
-}
 
 /**
  * Transient sessions are ephemeral Claude Code terminals spawned from the

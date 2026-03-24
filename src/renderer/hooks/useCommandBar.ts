@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../stores/project-store';
-import { useSessionStore } from '../stores/session-store';
 import { useToastStore } from '../stores/toast-store';
 
 /**
@@ -22,12 +21,7 @@ export function useCommandBar() {
     setIsOpen(true);
   }, []);
 
-  const close = useCallback(async () => {
-    try {
-      await useSessionStore.getState().killTransientSession();
-    } catch {
-      // Best-effort cleanup
-    }
+  const close = useCallback(() => {
     setIsOpen(false);
   }, []);
 
