@@ -57,3 +57,25 @@ export const Pill = React.memo(React.forwardRef<HTMLElement, PillProps>(function
 
   return React.createElement(Element, elementProps, children);
 }));
+
+/** Renders a row of label pills with configured colors. Muted background, colored text. */
+export const LabelPills = React.memo(function LabelPills({ labels, labelColors }: { labels: string[]; labelColors: Record<string, string> }) {
+  if (labels.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {labels.map((label) => {
+        const color = labelColors[label];
+        return (
+          <Pill
+            key={label}
+            size="sm"
+            className={color ? 'bg-surface-hover/60 font-medium' : 'bg-surface-hover/60 text-fg-muted'}
+            style={color ? { color } : undefined}
+          >
+            {label}
+          </Pill>
+        );
+      })}
+    </div>
+  );
+});

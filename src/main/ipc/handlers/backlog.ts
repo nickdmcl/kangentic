@@ -116,11 +116,13 @@ export function registerBacklogHandlers(context: IpcContext): void {
       const item = backlogRepo.getById(backlogItemId);
       if (!item) continue;
 
-      // Create a task from the backlog item
+      // Create a task from the backlog item, carrying over labels and priority
       const task = tasks.create({
         title: item.title,
         description: item.description,
         swimlane_id: input.targetSwimlaneId,
+        labels: item.labels,
+        priority: item.priority,
       });
 
       // Copy backlog attachments to task attachments
@@ -193,12 +195,12 @@ export function registerBacklogHandlers(context: IpcContext): void {
     // Clean up session, worktree, and branch
     await cleanupTaskResources(context, task, tasks);
 
-    // Create backlog item from task
+    // Create backlog item from task, preserving labels/priority (input overrides task values)
     const backlogItem = backlogRepo.createFromTask(
       task.title,
       task.description,
-      input.priority,
-      input.labels,
+      input.priority ?? task.priority,
+      input.labels ?? task.labels,
     );
 
     // Copy task attachments to backlog item before deleting
@@ -228,11 +230,17 @@ export function registerBacklogHandlers(context: IpcContext): void {
   });
 
   ipcMain.handle(IPC.BACKLOG_RENAME_LABEL, (_, oldName: string, newName: string) => {
-    return getBacklogRepo(context).renameLabel(oldName, newName);
+    const backlogCount = getBacklogRepo(context).renameLabel(oldName, newName);
+    const { tasks } = getProjectRepos(context);
+    const taskCount = tasks.renameLabel(oldName, newName);
+    return backlogCount + taskCount;
   });
 
   ipcMain.handle(IPC.BACKLOG_DELETE_LABEL, (_, name: string) => {
-    return getBacklogRepo(context).deleteLabel(name);
+    const backlogCount = getBacklogRepo(context).deleteLabel(name);
+    const { tasks } = getProjectRepos(context);
+    const taskCount = tasks.deleteLabel(name);
+    return backlogCount + taskCount;
   });
 
   // === Backlog Attachments ===

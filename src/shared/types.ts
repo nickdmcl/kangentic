@@ -38,6 +38,8 @@ export interface Task {
   pr_url: string | null;
   base_branch: string | null;
   use_worktree: number | null;
+  labels: string[];
+  priority: number;
   attachment_count: number;
   archived_at: string | null;
   created_at: string;
@@ -561,6 +563,14 @@ export const BACKLOG_PRIORITY_LABELS: Record<number, string> = {
   4: 'Urgent',
 };
 
+export const DEFAULT_PRIORITY_CONFIG: Array<{ label: string; color: string }> = [
+  { label: 'None', color: '#6b7280' },
+  { label: 'Low', color: '#3b82f6' },
+  { label: 'Medium', color: '#eab308' },
+  { label: 'High', color: '#f97316' },
+  { label: 'Urgent', color: '#ef4444' },
+];
+
 export interface BacklogItem {
   id: string;
   title: string;
@@ -611,6 +621,8 @@ export interface TaskCreateInput {
   title: string;
   description: string;
   swimlane_id: string;
+  labels?: string[];
+  priority?: number;
   baseBranch?: string;
   useWorktree?: boolean | null;
   customBranchName?: string;
@@ -635,6 +647,8 @@ export interface TaskUpdateInput {
   pr_url?: string | null;
   base_branch?: string | null;
   use_worktree?: number | null;
+  labels?: string[];
+  priority?: number;
 }
 
 export interface TaskSwitchBranchInput {

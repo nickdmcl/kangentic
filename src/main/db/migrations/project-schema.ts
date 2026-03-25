@@ -390,6 +390,16 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_display_id ON tasks(display_id)');
   }
 
+  // --- Add labels and priority columns to tasks ---
+  const hasTaskLabelsColumn = (db.pragma('table_info(tasks)') as Array<{ name: string }>).some((col) => col.name === 'labels');
+  if (!hasTaskLabelsColumn) {
+    db.exec("ALTER TABLE tasks ADD COLUMN labels TEXT NOT NULL DEFAULT '[]'");
+  }
+  const hasTaskPriorityColumn = (db.pragma('table_info(tasks)') as Array<{ name: string }>).some((col) => col.name === 'priority');
+  if (!hasTaskPriorityColumn) {
+    db.exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0');
+  }
+
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)
   const laneCount = db.prepare('SELECT COUNT(*) as c FROM swimlanes').get() as { c: number };
   if (laneCount.c === 0) {

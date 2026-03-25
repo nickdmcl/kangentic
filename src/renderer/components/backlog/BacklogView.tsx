@@ -101,6 +101,7 @@ export function BacklogView() {
   const bulkDelete = useBacklogStore((state) => state.bulkDelete);
   const promoteItems = useBacklogStore((state) => state.promoteItems);
   const swimlanes = useBoardStore((state) => state.swimlanes);
+  const boardTasks = useBoardStore((state) => state.tasks);
   const config = useConfigStore((state) => state.config);
   const skipDeleteConfirm = config.skipDeleteConfirm;
   const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -127,14 +128,17 @@ export function BacklogView() {
     { label: 'Urgent', color: '#ef4444' },
   ];
 
-  // All unique labels across backlog items
+  // All unique labels across backlog items and board tasks
   const allLabels = useMemo(() => {
     const labelSet = new Set<string>();
     for (const item of items) {
       for (const label of item.labels) labelSet.add(label);
     }
+    for (const task of boardTasks) {
+      for (const label of (task.labels ?? [])) labelSet.add(label);
+    }
     return [...labelSet].sort();
-  }, [items]);
+  }, [items, boardTasks]);
 
   const hasActiveFilters = priorityFilters.size > 0 || labelFilters.size > 0;
 
@@ -309,8 +313,8 @@ export function BacklogView() {
                 <Pill
                   key={label}
                   size="sm"
-                  className={color ? 'font-medium' : 'bg-surface-hover/60 text-fg-muted'}
-                  style={color ? { backgroundColor: `${color}20`, color, border: `1px solid ${color}30` } : undefined}
+                  className={color ? 'bg-surface-hover/60 font-medium' : 'bg-surface-hover/60 text-fg-muted'}
+                  style={color ? { color } : undefined}
                 >
                   {label}
                 </Pill>
@@ -451,12 +455,8 @@ export function BacklogView() {
                       ) : (
                         <Pill
                           size="sm"
-                          className={`font-medium ${isActive ? 'ring-1 ring-fg-muted' : ''}`}
-                          style={{
-                            backgroundColor: `${priority.color}20`,
-                            color: priority.color,
-                            border: `1px solid ${priority.color}30`,
-                          }}
+                          className={`bg-surface-hover/60 font-medium ${isActive ? 'ring-1 ring-fg-muted' : ''}`}
+                          style={{ color: priority.color }}
                         >
                           {priority.label}
                         </Pill>
@@ -487,14 +487,10 @@ export function BacklogView() {
                           <Pill
                             size="sm"
                             className={color
-                              ? `font-medium w-full ${isActive ? 'ring-1 ring-fg-muted' : ''}`
+                              ? `bg-surface-hover/60 font-medium w-full ${isActive ? 'ring-1 ring-fg-muted' : ''}`
                               : `w-full ${isActive ? 'bg-surface-hover text-fg ring-1 ring-fg-muted' : 'bg-surface-hover/60 text-fg-muted'}`
                             }
-                            style={color ? {
-                              backgroundColor: `${color}20`,
-                              color,
-                              border: `1px solid ${color}30`,
-                            } : undefined}
+                            style={color ? { color } : undefined}
                           >
                             {label}
                           </Pill>

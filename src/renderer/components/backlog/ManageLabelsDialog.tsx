@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { Pill } from '../Pill';
 import { useBacklogStore } from '../../stores/backlog-store';
+import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
 import type { AppConfig } from '../../../shared/types';
 
@@ -185,6 +186,7 @@ export function LabelsPopover() {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const items = useBacklogStore((state) => state.items);
+  const boardTasks = useBoardStore((state) => state.tasks);
   const renameLabel = useBacklogStore((state) => state.renameLabel);
   const deleteLabel = useBacklogStore((state) => state.deleteLabel);
   const config = useConfigStore((state) => state.config);
@@ -223,10 +225,15 @@ export function LabelsPopover() {
         counts.set(label, (counts.get(label) ?? 0) + 1);
       }
     }
+    for (const task of boardTasks) {
+      for (const label of (task.labels ?? [])) {
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+    }
     return [...counts.entries()]
       .sort(([labelA], [labelB]) => labelA.localeCompare(labelB))
       .map(([name, count]) => ({ name, count, color: labelColors[name] ?? null }));
-  }, [items, labelColors]);
+  }, [items, boardTasks, labelColors]);
 
   const handleColorChange = useCallback((labelName: string, newColor: string) => {
     const updated = { ...labelColors, [labelName]: newColor };
@@ -402,8 +409,8 @@ function LabelRow({
           ) : (
             <Pill
               size="sm"
-              className="font-medium cursor-pointer"
-              style={{ backgroundColor: `${effectiveColor}20`, color: effectiveColor, border: `1px solid ${effectiveColor}30` }}
+              className="bg-surface-hover/60 font-medium cursor-pointer"
+              style={{ color: effectiveColor }}
             >
               {name}
             </Pill>
@@ -741,8 +748,8 @@ function PriorityRow({
           ) : (
             <Pill
               size="sm"
-              className="font-medium cursor-pointer"
-              style={{ backgroundColor: `${color}20`, color, border: `1px solid ${color}30` }}
+              className="bg-surface-hover/60 font-medium cursor-pointer"
+              style={{ color }}
             >
               {label}
             </Pill>

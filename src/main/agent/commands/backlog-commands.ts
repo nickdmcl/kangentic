@@ -197,6 +197,8 @@ export const handlePromoteBacklog: CommandHandler = (
       title: item.title,
       description: item.description,
       swimlane_id: targetSwimlane.id,
+      labels: item.labels,
+      priority: item.priority,
     });
 
     // Copy backlog attachments to task attachments

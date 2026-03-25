@@ -4,6 +4,7 @@ import { BaseDialog } from '../dialogs/BaseDialog';
 import { Select } from '../settings/shared';
 import { Pill } from '../Pill';
 import { useBacklogStore } from '../../stores/backlog-store';
+import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { MAX_ATTACHMENT_BYTES, MEDIA_TYPE_EXT, resolveMediaType, isImageMediaType, getFileTypeIcon, getExtension } from '../dialogs/attachment-utils';
@@ -72,8 +73,9 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
     { label: 'Urgent', color: '#ef4444' },
   ];
 
-  // Collect all unique labels from existing backlog items for auto-complete
+  // Collect all unique labels from backlog items and board tasks for auto-complete
   const existingItems = useBacklogStore((state) => state.items);
+  const boardTasks = useBoardStore((state) => state.tasks);
   const allExistingLabels = useMemo(() => {
     const labelSet = new Set<string>();
     for (const item of existingItems) {
@@ -81,8 +83,13 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
         labelSet.add(label);
       }
     }
+    for (const task of boardTasks) {
+      for (const label of (task.labels ?? [])) {
+        labelSet.add(label);
+      }
+    }
     return [...labelSet].sort();
-  }, [existingItems]);
+  }, [existingItems, boardTasks]);
 
   const filteredSuggestions = useMemo(() => {
     const query = labelInput.toLowerCase().trim();
@@ -490,8 +497,8 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
                     <Pill
                       key={label}
                       size="sm"
-                      className={color ? 'font-medium' : 'bg-surface-raised text-fg-secondary font-medium border border-edge-input'}
-                      style={color ? { backgroundColor: `${color}30`, color, border: `1px solid ${color}40` } : undefined}
+                      className={color ? 'bg-surface-hover/60 font-medium' : 'bg-surface-raised text-fg-secondary font-medium border border-edge-input'}
+                      style={color ? { color } : undefined}
                     >
                       {label}
                       <button

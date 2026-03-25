@@ -103,6 +103,8 @@ Valid role values: `todo`, `done`, or NULL (custom column).
 | pr_url | TEXT | | NULL |
 | base_branch | TEXT | | NULL |
 | use_worktree | INTEGER | | NULL |
+| labels | TEXT | NOT NULL | '[]' |
+| priority | INTEGER | NOT NULL | 0 |
 | archived_at | TEXT | | NULL |
 | created_at | TEXT | NOT NULL | |
 | updated_at | TEXT | NOT NULL | |

@@ -388,6 +388,8 @@
           pr_url: null,
           base_branch: input.baseBranch || null,
           use_worktree: input.useWorktree != null ? (input.useWorktree ? 1 : 0) : null,
+          labels: input.labels || [],
+          priority: input.priority || 0,
           attachment_count: 0,
           archived_at: null,
           created_at: now(),
@@ -980,6 +982,8 @@
             pr_url: null,
             base_branch: null,
             use_worktree: null,
+            labels: item.labels || [],
+            priority: item.priority || 0,
             attachment_count: 0,
             archived_at: null,
             created_at: new Date().toISOString(),
@@ -999,8 +1003,8 @@
           id: 'backlog-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
           title: task.title,
           description: task.description,
-          priority: input.priority || 0,
-          labels: input.labels || [],
+          priority: input.priority != null ? input.priority : (task.priority || 0),
+          labels: input.labels != null ? input.labels : (task.labels || []),
           position: maxPos + 1,
           external_id: null,
           external_source: null,
@@ -1020,8 +1024,16 @@
           var index = item.labels.indexOf(oldName);
           if (index !== -1) {
             item.labels[index] = newName;
-            // Deduplicate
             item.labels = item.labels.filter(function (label, labelIndex, array) { return array.indexOf(label) === labelIndex; });
+            count++;
+          }
+        });
+        tasks.forEach(function (task) {
+          var taskLabels = task.labels || [];
+          var index = taskLabels.indexOf(oldName);
+          if (index !== -1) {
+            taskLabels[index] = newName;
+            task.labels = taskLabels.filter(function (label, labelIndex, array) { return array.indexOf(label) === labelIndex; });
             count++;
           }
         });
@@ -1033,6 +1045,12 @@
           var before = item.labels.length;
           item.labels = item.labels.filter(function (label) { return label !== name; });
           if (item.labels.length !== before) count++;
+        });
+        tasks.forEach(function (task) {
+          var taskLabels = task.labels || [];
+          var before = taskLabels.length;
+          task.labels = taskLabels.filter(function (label) { return label !== name; });
+          if (task.labels.length !== before) count++;
         });
         return count;
       },

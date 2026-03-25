@@ -12,6 +12,7 @@ import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useSessionDisplayState } from '../../utils/session-display-state';
 import { getProgressColor } from '../../utils/color-lerp';
+import { LabelPills } from '../Pill';
 import type { Task, Swimlane } from '../../../shared/types';
 
 /** Priority: pending command (set by moveTask or manual invoke) > resuming > default. */
@@ -276,6 +277,10 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
     });
   };
 
+  // Label display config
+  const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
+  const taskLabels = task.labels ?? [];
+
   const handleContextDelete = async (dontAskAgain: boolean) => {
     if (dontAskAgain) useConfigStore.getState().updateConfig({ skipDeleteConfirm: true });
     const session = useSessionStore.getState()._sessionByTaskId.get(task.id);
@@ -319,6 +324,9 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
             <span className="text-xs text-fg-disabled flex-shrink-0 ml-auto">
               {task.archived_at ? formatDistanceToNow(new Date(task.archived_at), { addSuffix: true }) : ''}
             </span>
+          </div>
+          <div className="mt-1">
+            <LabelPills labels={taskLabels} labelColors={labelColors} />
           </div>
         </div>
 
@@ -377,6 +385,10 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         {task.description && (
           <div className="text-xs text-fg-faint mt-1 line-clamp-3">{task.description}</div>
         )}
+
+        <div className="mt-1.5">
+          <LabelPills labels={taskLabels} labelColors={labelColors} />
+        </div>
 
         {task.attachment_count > 0 && displayState.kind === 'none' && (
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-edge">

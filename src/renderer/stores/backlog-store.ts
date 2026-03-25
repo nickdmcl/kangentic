@@ -132,11 +132,13 @@ export const useBacklogStore = create<BacklogState>((set, get) => ({
   renameLabel: async (oldName, newName) => {
     await window.electronAPI.backlog.renameLabel(oldName, newName);
     get().loadBacklog();
+    useBoardStore.getState().loadBoard();
   },
 
   deleteLabel: async (name) => {
     await window.electronAPI.backlog.deleteLabel(name);
     get().loadBacklog();
+    useBoardStore.getState().loadBoard();
   },
 
   toggleSelected: (id) => {

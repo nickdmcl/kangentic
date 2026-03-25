@@ -3,6 +3,9 @@ import { TerminalTab } from '../../terminal/TerminalTab';
 import { ContextBar } from '../../terminal/ContextBar';
 import { ShimmerOverlay } from '../../ShimmerOverlay';
 import { SessionSummaryPanel } from '../SessionSummaryPanel';
+import { PriorityBadge } from '../../backlog/PriorityBadge';
+import { LabelPills } from '../../Pill';
+import { useConfigStore } from '../../../stores/config-store';
 import { QueuedPlaceholder } from './QueuedPlaceholder';
 import { AttachmentThumbnails } from './AttachmentThumbnails';
 import type { AttachmentWithPreview } from './useAttachments';
@@ -41,6 +44,18 @@ export function TaskDetailBody({
   removeAttachment,
   handleToggle,
 }: TaskDetailBodyProps) {
+  const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
+  const taskLabels = task.labels ?? [];
+  const taskPriority = task.priority ?? 0;
+  const hasLabelsOrPriority = taskPriority > 0 || taskLabels.length > 0;
+
+  const labelsAndPriorityRow = hasLabelsOrPriority && (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <PriorityBadge priority={taskPriority} />
+      <LabelPills labels={taskLabels} labelColors={labelColors} />
+    </div>
+  );
+
   const thumbnailStrip = (
     <AttachmentThumbnails
       attachments={savedAttachments}
@@ -52,11 +67,12 @@ export function TaskDetailBody({
   );
 
   // Description view mode with attachment thumbnails (non-archived, non-session)
-  const descriptionBar = !isArchived && (task.description || savedAttachments.length > 0) && !hasSessionContext && (
+  const descriptionBar = !isArchived && (task.description || savedAttachments.length > 0 || hasLabelsOrPriority) && !hasSessionContext && (
     <div className="px-4 py-3 border-b border-edge flex-shrink-0 space-y-2">
       {task.description && (
         <p className="text-sm text-fg-muted whitespace-pre-wrap">{task.description}</p>
       )}
+      {labelsAndPriorityRow}
       {thumbnailStrip}
     </div>
   );
@@ -66,11 +82,12 @@ export function TaskDetailBody({
     return (
       <>
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {(task.description || savedAttachments.length > 0) ? (
+          {(task.description || savedAttachments.length > 0 || hasLabelsOrPriority) ? (
             <div className="px-4 py-4 space-y-3 max-h-[40vh] overflow-y-auto">
               {task.description && (
                 <p className="text-sm text-fg-muted whitespace-pre-wrap leading-relaxed">{task.description}</p>
               )}
+              {labelsAndPriorityRow}
               {thumbnailStrip}
             </div>
           ) : (
