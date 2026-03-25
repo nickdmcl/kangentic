@@ -371,6 +371,25 @@ export function runProjectMigrations(db: Database.Database): void {
     `);
   }
 
+  // Migration: add display_id column for short human-readable task IDs
+  const hasDisplayIdColumn = (db.pragma('table_info(tasks)') as Array<{ name: string }>)
+    .some((col) => col.name === 'display_id');
+  if (!hasDisplayIdColumn) {
+    db.exec('ALTER TABLE tasks ADD COLUMN display_id INTEGER DEFAULT NULL');
+    // Backfill existing tasks with sequential display IDs ordered by creation time
+    const existingTasks = db.prepare('SELECT id FROM tasks ORDER BY created_at ASC').all() as Array<{ id: string }>;
+    const updateDisplayId = db.prepare('UPDATE tasks SET display_id = ? WHERE id = ?');
+    const backfillTransaction = db.transaction(() => {
+      let counter = 1;
+      for (const task of existingTasks) {
+        updateDisplayId.run(counter, task.id);
+        counter++;
+      }
+    });
+    backfillTransaction();
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_display_id ON tasks(display_id)');
+  }
+
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)
   const laneCount = db.prepare('SELECT COUNT(*) as c FROM swimlanes').get() as { c: number };
   if (laneCount.c === 0) {

@@ -23,7 +23,7 @@ export const handleSearchTasks: CommandHandler = (
     task.title.toLowerCase().includes(query) ||
     task.description.toLowerCase().includes(query);
 
-  const results: Array<{ id: string; title: string; description: string; column: string; status: string }> = [];
+  const results: Array<{ id: string; displayId: number; title: string; description: string; column: string; status: string }> = [];
   let totalActive = 0;
   let totalCompleted = 0;
 
@@ -35,6 +35,7 @@ export const handleSearchTasks: CommandHandler = (
           totalActive++;
           results.push({
             id: task.id,
+            displayId: task.display_id,
             title: task.title,
             description: task.description,
             column: swimlaneMap.get(task.swimlane_id) ?? 'Unknown',
@@ -52,6 +53,7 @@ export const handleSearchTasks: CommandHandler = (
         totalCompleted++;
         results.push({
           id: task.id,
+          displayId: task.display_id,
           title: task.title,
           description: task.description,
           column: 'Done',
@@ -122,7 +124,7 @@ export const handleFindTask: CommandHandler = (
     if (task.worktree_path) parts.push(`worktree: ${task.worktree_path}`);
     if (task.pr_url) parts.push(`PR: ${task.pr_url}`);
     else if (task.pr_number) parts.push(`PR #${task.pr_number}`);
-    parts.push(`id: ${task.id}`);
+    parts.push(`#${task.display_id}, id: ${task.id}`);
     return `- ${parts.join(' | ')}`;
   });
 
@@ -131,6 +133,7 @@ export const handleFindTask: CommandHandler = (
     message: `Found ${matches.length} task(s):\n${lines.join('\n')}`,
     data: matches.map((task) => ({
       id: task.id,
+      displayId: task.display_id,
       title: task.title,
       description: task.description,
       column: task.archived_at ? 'Done' : (swimlaneMap.get(task.swimlane_id) ?? 'Unknown'),

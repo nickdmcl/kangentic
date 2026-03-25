@@ -19,6 +19,7 @@
   let summaryCache = {};
   let currentProjectId = null;
   let projectConfigs = {};
+  let nextDisplayId = 1;
 
   let config = Object.assign({
     theme: 'dark',
@@ -374,6 +375,7 @@
         var taskId = uuid();
         var task = {
           id: taskId,
+          display_id: nextDisplayId++,
           title: input.title,
           description: input.description || '',
           swimlane_id: input.swimlane_id,
@@ -940,6 +942,7 @@
           var maxPos = tasks.reduce(function (max, t) { return t.swimlane_id === input.targetSwimlaneId ? Math.max(max, t.position) : max; }, -1);
           var task = {
             id: 'task-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+            display_id: nextDisplayId++,
             title: item.title,
             description: item.description,
             swimlane_id: input.targetSwimlaneId,

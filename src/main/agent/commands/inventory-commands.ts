@@ -44,12 +44,13 @@ export const handleListTasks: CommandHandler = (
     targetSwimlanes = [matched];
   }
 
-  const tasks: Array<{ id: string; title: string; description: string; column: string }> = [];
+  const tasks: Array<{ id: string; displayId: number; title: string; description: string; column: string }> = [];
   for (const swimlane of targetSwimlanes) {
     const swimlaneTasks = taskRepo.list(swimlane.id);
     for (const task of swimlaneTasks) {
       tasks.push({
         id: task.id,
+        displayId: task.display_id,
         title: task.title,
         description: task.description,
         column: swimlane.name,

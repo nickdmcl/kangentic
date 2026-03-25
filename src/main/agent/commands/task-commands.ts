@@ -2,6 +2,7 @@ import { TaskRepository } from '../../db/repositories/task-repository';
 import { AttachmentRepository } from '../../db/repositories/attachment-repository';
 import { readFileAsAttachment } from '../../db/repositories/attachment-utils';
 import { resolveColumn } from './column-resolver';
+import { resolveTask } from './task-resolver';
 import type { CommandContext, CommandHandler, CommandResponse } from './types';
 
 export const handleCreateTask: CommandHandler = (
@@ -56,8 +57,8 @@ export const handleCreateTask: CommandHandler = (
 
   return {
     success: true,
-    data: { taskId: task.id, title: task.title, column: targetSwimlane.name },
-    message: `Created task "${task.title}" in ${targetSwimlane.name} column (id: ${task.id})`,
+    data: { taskId: task.id, displayId: task.display_id, title: task.title, column: targetSwimlane.name },
+    message: `Created task "${task.title}" in ${targetSwimlane.name} column (#${task.display_id}, id: ${task.id})`,
   };
 };
 
@@ -77,12 +78,12 @@ export const handleUpdateTask: CommandHandler = (
 
   const db = context.getProjectDb();
   const taskRepo = new TaskRepository(db);
-  const task = taskRepo.getById(taskId);
+  const task = resolveTask(taskRepo, taskId);
   if (!task) {
     return { success: false, error: `Task "${taskId}" not found` };
   }
 
-  const updates: Record<string, unknown> = { id: taskId };
+  const updates: Record<string, unknown> = { id: task.id };
   if (newTitle !== null) updates.title = String(newTitle).slice(0, 200);
   if (newDescription !== null) updates.description = String(newDescription).slice(0, 10_000);
   if (newPrUrl !== null) updates.pr_url = String(newPrUrl);

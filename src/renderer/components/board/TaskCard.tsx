@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive } from 'lucide-react';
+import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
@@ -77,6 +77,20 @@ function TaskContextMenu({ position, task, swimlanes, onEdit, onMoveTo, onSendTo
       className="fixed z-50 bg-surface-raised border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
       style={menuStyle}
     >
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(String(task.display_id));
+          useToastStore.getState().addToast({ message: `Copied Task ID #${task.display_id}` });
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 text-sm font-mono text-fg-faint hover:text-fg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+        data-testid="context-copy-task-id"
+      >
+        <Copy size={14} />
+        Task #{task.display_id}
+      </button>
+      <div className="border-t border-edge my-1" />
       <button
         type="button"
         onClick={() => { onEdit(); onClose(); }}

@@ -128,11 +128,11 @@ server.registerTool(
       }
 
       taskCreationCount++;
-      const data = response.data as { taskId: string; title: string; column: string };
+      const data = response.data as { taskId: string; displayId: number; title: string; column: string };
       return {
         content: [{
           type: 'text' as const,
-          text: response.message ?? `Created task "${data.title}" in ${data.column} column (id: ${data.taskId})`,
+          text: response.message ?? `Created task "${data.title}" in ${data.column} column (#${data.displayId}, id: ${data.taskId})`,
         }],
       };
     } catch (error) {
@@ -202,7 +202,7 @@ server.registerTool(
         };
       }
 
-      const tasks = response.data as Array<{ id: string; title: string; description: string; column: string }>;
+      const tasks = response.data as Array<{ id: string; displayId: number; title: string; description: string; column: string }>;
       if (tasks.length === 0) {
         const filterNote = column ? ` in "${column}"` : '';
         return {
@@ -214,7 +214,7 @@ server.registerTool(
         const descriptionPreview = task.description
           ? ` - ${task.description.slice(0, 100)}${task.description.length > 100 ? '...' : ''}`
           : '';
-        return `- [${task.column}] ${task.title}${descriptionPreview} (id: ${task.id})`;
+        return `- [${task.column}] ${task.title}${descriptionPreview} (#${task.displayId}, id: ${task.id})`;
       });
 
       return {
@@ -255,7 +255,7 @@ server.registerTool(
       }
 
       const results = response.data as {
-        tasks: Array<{ id: string; title: string; description: string; column: string; status: string }>;
+        tasks: Array<{ id: string; displayId: number; title: string; description: string; column: string; status: string }>;
         totalActive: number;
         totalCompleted: number;
       };
@@ -272,7 +272,7 @@ server.registerTool(
           ? ` - ${task.description.slice(0, 100)}${task.description.length > 100 ? '...' : ''}`
           : '';
         const statusTag = task.status === 'completed' ? ' [completed]' : ` [${task.column}]`;
-        return `- ${task.title}${statusTag}${descriptionPreview} (id: ${task.id})`;
+        return `- ${task.title}${statusTag}${descriptionPreview} (#${task.displayId}, id: ${task.id})`;
       });
 
       return {
@@ -294,7 +294,7 @@ server.registerTool(
   {
     description: 'Get session metrics and statistics for tasks. Returns token usage, cost, duration, tool calls, and lines changed. Can query a specific task or get a summary across all completed tasks, optionally filtered by keyword.',
     inputSchema: z.object({
-      taskId: z.string().optional().describe('Specific task ID to get stats for. If omitted, returns aggregate stats across completed tasks.'),
+      taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). If omitted, returns aggregate stats across completed tasks.'),
       query: z.string().optional().describe('Filter completed tasks by keyword in title/description before aggregating stats.'),
       sortBy: z.enum(['tokens', 'cost', 'duration', 'toolCalls', 'linesChanged']).optional().describe('Sort results by this metric (descending). Defaults to "tokens". Only applies when querying multiple tasks.'),
     }),
@@ -389,7 +389,7 @@ server.registerTool(
   {
     description: 'Get the session history for a task: how many sessions it went through, when they started/ended, exit codes, and whether they were suspended by user or system. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
     inputSchema: z.object({
-      taskId: z.string().describe('Task ID to get session history for.'),
+      taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
     }),
   },
   async ({ taskId }) => {
@@ -435,7 +435,7 @@ server.registerTool(
   {
     description: 'Update an existing task\'s title, description, or PR info. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
     inputSchema: z.object({
-      taskId: z.string().describe('Task ID to update.'),
+      taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
       title: z.string().max(200).optional().describe('New task title (max 200 characters).'),
       description: z.string().max(10000).optional().describe('New task description (markdown). Replaces the entire description.'),
       prUrl: z.string().url().optional().describe('Pull request URL (e.g. https://github.com/owner/repo/pull/123).'),

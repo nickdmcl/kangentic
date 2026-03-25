@@ -3,6 +3,7 @@ import { SessionRepository } from '../../db/repositories/session-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { BacklogRepository } from '../../db/repositories/backlog-repository';
 import { listActiveSwimlanes } from './column-resolver';
+import { resolveTask } from './task-resolver';
 import type { Task } from '../../../shared/types';
 import type { CommandContext, CommandHandler, CommandResponse } from './types';
 
@@ -20,12 +21,12 @@ export const handleGetTaskStats: CommandHandler = (
 
   // Single task stats
   if (taskId) {
-    const task = taskRepo.getById(taskId);
+    const task = resolveTask(taskRepo, taskId);
     if (!task) {
       return { success: false, error: `Task "${taskId}" not found` };
     }
 
-    const summary = sessionRepo.getSummaryForTask(taskId);
+    const summary = sessionRepo.getSummaryForTask(task.id);
     if (!summary) {
       return {
         success: true,
@@ -234,14 +235,14 @@ export const handleGetSessionHistory: CommandHandler = (
 
   const db = context.getProjectDb();
   const taskRepo = new TaskRepository(db);
-  const task = taskRepo.getById(taskId);
+  const task = resolveTask(taskRepo, taskId);
   if (!task) {
     return { success: false, error: `Task "${taskId}" not found` };
   }
 
   const records = db.prepare(
     `SELECT * FROM sessions WHERE task_id = ? ORDER BY started_at ASC`
-  ).all(taskId) as Array<{
+  ).all(task.id) as Array<{
     id: string;
     session_type: string;
     claude_session_id: string | null;

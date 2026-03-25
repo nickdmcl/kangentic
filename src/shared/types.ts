@@ -25,6 +25,7 @@ export interface Project {
 
 export interface Task {
   id: string;
+  display_id: number;
   title: string;
   description: string;
   swimlane_id: string;

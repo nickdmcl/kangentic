@@ -30,6 +30,11 @@ export class TaskRepository {
       WHERE t.id = ?`).get(id) as Task | undefined;
   }
 
+  getByDisplayId(displayId: number): Task | undefined {
+    return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
+      WHERE t.display_id = ?`).get(displayId) as Task | undefined;
+  }
+
   getBySessionId(sessionId: string): Task | undefined {
     return this.db.prepare(`${TaskRepository.SELECT_WITH_COUNT}
       WHERE t.session_id = ? AND t.archived_at IS NULL
@@ -43,8 +48,13 @@ export class TaskRepository {
     const maxPos = this.db.prepare('SELECT COALESCE(MAX(position), -1) as max FROM tasks WHERE swimlane_id = ?').get(input.swimlane_id) as { max: number };
     const position = maxPos.max + 1;
 
+    // Get next display_id (auto-incrementing human-readable ID)
+    const maxDisplayId = this.db.prepare('SELECT COALESCE(MAX(display_id), 0) as max FROM tasks').get() as { max: number };
+    const displayId = maxDisplayId.max + 1;
+
     const task: Task = {
       id,
+      display_id: displayId,
       title: input.title,
       description: input.description,
       swimlane_id: input.swimlane_id,
@@ -64,9 +74,9 @@ export class TaskRepository {
     };
 
     this.db.prepare(`
-      INSERT INTO tasks (id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, use_worktree, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(task.id, task.title, task.description, task.swimlane_id, task.position, task.agent, task.session_id, task.worktree_path, task.branch_name, task.pr_number, task.pr_url, task.base_branch, task.use_worktree, task.created_at, task.updated_at);
+      INSERT INTO tasks (id, display_id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, use_worktree, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(task.id, task.display_id, task.title, task.description, task.swimlane_id, task.position, task.agent, task.session_id, task.worktree_path, task.branch_name, task.pr_number, task.pr_url, task.base_branch, task.use_worktree, task.created_at, task.updated_at);
 
     return task;
   }

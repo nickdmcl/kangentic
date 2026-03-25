@@ -90,6 +90,7 @@ Valid role values: `todo`, `done`, or NULL (custom column).
 | Column | Type | Constraints | Default |
 |--------|------|-------------|---------|
 | id | TEXT | PRIMARY KEY | |
+| display_id | INTEGER | UNIQUE INDEX | NULL |
 | title | TEXT | NOT NULL | |
 | description | TEXT | NOT NULL | '' |
 | swimlane_id | TEXT | NOT NULL, FK->swimlanes | |
@@ -106,7 +107,7 @@ Valid role values: `todo`, `done`, or NULL (custom column).
 | created_at | TEXT | NOT NULL | |
 | updated_at | TEXT | NOT NULL | |
 
-Index: `idx_tasks_swimlane_position` on (swimlane_id, position).
+Indexes: `idx_tasks_swimlane_position` on (swimlane_id, position), `idx_tasks_display_id` on (display_id) UNIQUE.
 
 ### actions table
 
@@ -259,6 +260,7 @@ Listed in execution order within `runProjectMigrations()`:
 20. **Swimlane role rename (`backlog` to `todo`)** -- renames the "Backlog" swimlane to "To Do" (also catches "Not Started") and migrates role values from `backlog` to `todo`.
 21. **`backlog_items` table** -- creates the staging area table for the Backlog View feature. Stores pre-board items with priority, labels, external source tracking, and position ordering. Includes indexes on position and (external_source, external_id).
 22. **`backlog_attachments` table** -- creates the attachment table for backlog items with `ON DELETE CASCADE` on `backlog_item_id` and an index on `backlog_item_id`. Mirrors `task_attachments` structure.
+23. **`display_id` column on tasks** -- adds a human-readable sequential integer ID for tasks. Backfills existing tasks with sequential IDs ordered by `created_at ASC`. Creates a unique index on `display_id`.
 
 ### Key Migrations (Global DB)
 
