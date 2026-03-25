@@ -95,6 +95,7 @@ export function registerAllIpc(mainWindow: BrowserWindow): void {
     commandInjector,
     currentProjectId: null,
     currentProjectPath: null,
+    externalCommandBridge: null,
   };
 
   registerProjectHandlers(context);

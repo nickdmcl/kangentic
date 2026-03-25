@@ -8,6 +8,7 @@ import type { ClaudeDetector } from '../agent/claude-detector';
 import type { GitDetector } from '../agent/git-detector';
 import type { ShellResolver } from '../pty/shell-resolver';
 import type { CommandBuilder } from '../agent/command-builder';
+import type { CommandBridge } from '../agent/command-bridge';
 import type { CommandInjector } from '../engine/command-injector';
 
 export interface IpcContext {
@@ -24,4 +25,5 @@ export interface IpcContext {
   commandInjector: CommandInjector;
   currentProjectId: string | null;
   currentProjectPath: string | null;
+  externalCommandBridge: CommandBridge | null;
 }

@@ -10,6 +10,7 @@ import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree } from '../../git/worktree-manager';
 import { stripKangenticHooks } from '../../agent/hook-manager';
 import { getProjectDb, closeProjectDb } from '../../db/database';
+import { CommandBridge } from '../../agent/command-bridge';
 import { PATHS } from '../../config/paths';
 import { ensureGitignore } from '../helpers';
 import { trackEvent } from '../../analytics/analytics';
@@ -28,8 +29,10 @@ import type { ConfigManager } from '../../config/config-manager';
  * Does NOT touch the `.claude/` directory, git branches, or any user data.
  */
 export async function cleanupProject(context: IpcContext, projectId: string, projectPath: string): Promise<void> {
-  // Detach board config manager before cleanup
+  // Detach board config manager and external MCP bridge before cleanup
   context.boardConfigManager.detach();
+  context.externalCommandBridge?.stop();
+  context.externalCommandBridge = null;
 
   // Guard: project path must exist
   if (!fs.existsSync(projectPath)) {
@@ -256,6 +259,41 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
   }
   // Always export DB state to kangentic.json so teams can commit it
   context.boardConfigManager.exportFromDb();
+
+  // Start external MCP command bridge so Claude Code sessions running
+  // outside Kangentic can interact with this project's board.
+  // Config file at .kangentic/mcp-config.json (written by scripts/dev.js).
+  if (!isReopen) {
+    context.externalCommandBridge?.stop();
+    const externalBridgeDirectory = path.join(project.path, '.kangentic', '_mcp-bridge');
+    context.externalCommandBridge = new CommandBridge({
+      commandsPath: path.join(externalBridgeDirectory, 'commands.jsonl'),
+      responsesDir: path.join(externalBridgeDirectory, 'responses'),
+      projectId: project.id,
+      getProjectDb: () => getProjectDb(project.id),
+      getProjectPath: () => project.path,
+      onTaskCreated: (task, columnName, swimlaneId) => {
+        if (!context.mainWindow.isDestroyed()) {
+          context.mainWindow.webContents.send(
+            IPC.TASK_CREATED_BY_AGENT, task.id, task.title, columnName, project.id
+          );
+        }
+      },
+      onTaskUpdated: (task) => {
+        if (!context.mainWindow.isDestroyed()) {
+          context.mainWindow.webContents.send(
+            IPC.TASK_UPDATED_BY_AGENT, task.id, task.title, project.id
+          );
+        }
+      },
+      onBacklogChanged: () => {
+        if (!context.mainWindow.isDestroyed()) {
+          context.mainWindow.webContents.send(IPC.BACKLOG_CHANGED_BY_AGENT, project.id);
+        }
+      },
+    });
+    context.externalCommandBridge.start();
+  }
 
   const config = context.configManager.getEffectiveConfig(project.path);
   context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);

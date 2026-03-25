@@ -110,6 +110,29 @@ async function start() {
   ]);
   console.timeEnd('[dev] esbuild');
   console.log('[dev] Main + preload built');
+
+  // Write MCP config so external Claude Code sessions can interact with
+  // this instance's board via: claude --mcp-config .kangentic/mcp-config.json
+  const bridgeDir = path.join(projectDir, '.kangentic', '_mcp-bridge');
+  fs.mkdirSync(bridgeDir, { recursive: true });
+  const mcpConfig = {
+    mcpServers: {
+      kangentic: {
+        command: 'node',
+        args: [
+          path.join(projectDir, '.vite', 'build', 'mcp-server.js').replace(/\\/g, '/'),
+          path.join(bridgeDir, 'commands.jsonl').replace(/\\/g, '/'),
+          path.join(bridgeDir, 'responses').replace(/\\/g, '/'),
+        ],
+      },
+    },
+  };
+  fs.writeFileSync(
+    path.join(projectDir, '.kangentic', 'mcp-config.json'),
+    JSON.stringify(mcpConfig, null, 2)
+  );
+  console.log('[dev] MCP config written to .kangentic/mcp-config.json');
+  console.log('[dev] Use with: claude --mcp-config .kangentic/mcp-config.json');
   if (coldCache) {
     console.log('[dev] Vite cache is cold -- warming up will take longer while Vite optimizes dependencies...');
   }
