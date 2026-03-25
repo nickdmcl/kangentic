@@ -79,7 +79,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   // Use large dialog when there's an active session OR a suspended one (but not for archived tasks)
   const hasSessionContext = !isArchived && ((displayState.kind !== 'none' && displayState.kind !== 'exited') || toggling);
   const dialogSizeClass = isEditing || !hasSessionContext
-    ? (isQueued ? 'w-[520px] h-[320px]' : 'w-[640px] max-h-[80vh]')
+    ? (isQueued ? 'w-[520px] h-[320px]' : 'w-[700px]')
     : 'w-[90vw] h-[85vh]';
 
   const { copied: displayIdCopied, copy: copyDisplayId } = useCopyDisplayId(task.display_id);

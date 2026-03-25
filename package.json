@@ -58,6 +58,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/remove-markdown": "^0.3.4",
     "@types/uuid": "^10.0.0",
     "@types/which": "^3.0.4",
     "@vitejs/plugin-react": "^5.1.4",
@@ -110,6 +111,9 @@
     "better-sqlite3": "^12.8.0",
     "bindings": "^1.5.0",
     "file-uri-to-path": "^1.0.0",
-    "node-pty": "^1.1.0"
+    "node-pty": "^1.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "remove-markdown": "^0.6.3"
   }
 }

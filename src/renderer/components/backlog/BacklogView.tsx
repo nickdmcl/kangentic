@@ -8,6 +8,7 @@ import type { DataTableColumn } from '../DataTable';
 import { Pill } from '../Pill';
 import { PriorityBadge } from './PriorityBadge';
 import { PromotePopover } from './PromotePopover';
+import { stripMarkdown } from '../../utils/strip-markdown';
 import { BacklogContextMenu } from './BacklogContextMenu';
 import { BacklogBulkToolbar } from './BacklogBulkToolbar';
 import { NewBacklogItemDialog } from './NewBacklogItemDialog';
@@ -295,7 +296,7 @@ export function BacklogView() {
         <div className="min-w-0">
           <div className="text-fg font-medium truncate">{item.title}</div>
           {item.description && (
-            <div className="text-xs text-fg-faint truncate mt-0.5">{item.description}</div>
+            <div className="text-xs text-fg-faint truncate mt-0.5">{stripMarkdown(item.description)}</div>
           )}
         </div>
       ),

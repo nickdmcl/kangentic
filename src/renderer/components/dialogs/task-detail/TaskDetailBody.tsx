@@ -9,6 +9,7 @@ import { useConfigStore } from '../../../stores/config-store';
 import { QueuedPlaceholder } from './QueuedPlaceholder';
 import { AttachmentThumbnails } from './AttachmentThumbnails';
 import type { AttachmentWithPreview } from './useAttachments';
+import { MarkdownRenderer } from '../../MarkdownRenderer';
 import type { Task, SessionDisplayState } from '../../../../shared/types';
 
 interface TaskDetailBodyProps {
@@ -70,7 +71,7 @@ export function TaskDetailBody({
   const descriptionBar = !isArchived && (task.description || savedAttachments.length > 0 || hasLabelsOrPriority) && !hasSessionContext && (
     <div className="px-4 py-3 border-b border-edge flex-shrink-0 space-y-2">
       {task.description && (
-        <p className="text-sm text-fg-muted whitespace-pre-wrap">{task.description}</p>
+        <MarkdownRenderer content={task.description} />
       )}
       {labelsAndPriorityRow}
       {thumbnailStrip}
@@ -85,7 +86,7 @@ export function TaskDetailBody({
           {(task.description || savedAttachments.length > 0 || hasLabelsOrPriority) ? (
             <div className="px-4 py-4 space-y-3 max-h-[40vh] overflow-y-auto">
               {task.description && (
-                <p className="text-sm text-fg-muted whitespace-pre-wrap leading-relaxed">{task.description}</p>
+                <MarkdownRenderer content={task.description} />
               )}
               {labelsAndPriorityRow}
               {thumbnailStrip}

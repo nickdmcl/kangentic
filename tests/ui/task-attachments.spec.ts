@@ -26,21 +26,19 @@ async function openNewTaskDialog() {
 }
 
 test.describe('New Task Dialog Layout', () => {
-  test('dialog renders at wider width (640px)', async () => {
+  test('dialog renders at wider width (700px)', async () => {
     await openNewTaskDialog();
-    const dialog = page.locator('.w-\\[640px\\]');
+    const dialog = page.locator('.w-\\[700px\\]');
     await expect(dialog).toBeVisible();
     await page.keyboard.press('Escape');
   });
 
-  test('textarea is resizable and has larger min height', async () => {
+  test('textarea container has fixed height', async () => {
     await openNewTaskDialog();
     const textarea = page.locator('textarea');
     await expect(textarea).toBeVisible();
-    // Check it has the resize-y class (min-h-[160px])
-    const classes = await textarea.getAttribute('class');
-    expect(classes).toContain('resize-y');
-    expect(classes).toContain('min-h-');
+    const container = page.locator('.h-\\[280px\\]');
+    await expect(container).toBeVisible();
     await page.keyboard.press('Escape');
   });
 

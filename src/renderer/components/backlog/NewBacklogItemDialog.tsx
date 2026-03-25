@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, X, Paperclip } from 'lucide-react';
+import { Plus, X, Paperclip, Eye, PenLine } from 'lucide-react';
 import { BaseDialog } from '../dialogs/BaseDialog';
 import { Select } from '../settings/shared';
 import { Pill } from '../Pill';
@@ -7,6 +7,7 @@ import { useBacklogStore } from '../../stores/backlog-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
+import { MarkdownRenderer } from '../MarkdownRenderer';
 import { MAX_ATTACHMENT_BYTES, MEDIA_TYPE_EXT, resolveMediaType, isImageMediaType, getFileTypeIcon, getExtension } from '../dialogs/attachment-utils';
 import type { BacklogItem, BacklogItemCreateInput, BacklogItemUpdateInput } from '../../../shared/types';
 
@@ -53,6 +54,7 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
   const [previewAttachment, setPreviewAttachment] = useState<DisplayAttachment | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [textareaFocused, setTextareaFocused] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const labelInputRef = useRef<HTMLInputElement>(null);
@@ -166,14 +168,6 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
     })();
     return () => { cancelled = true; };
   }, [isEditMode, editItem]);
-
-  // Auto-expand textarea as user types
-  useEffect(() => {
-    const element = textareaRef.current;
-    if (!element) return;
-    element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, 800)}px`;
-  }, [description]);
 
   // Close suggestions on click outside
   useEffect(() => {
@@ -358,7 +352,7 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
           preventBackdropClose={isDirty}
           title={isEditMode ? 'Edit Backlog Task' : 'New Backlog Task'}
           icon={<Plus size={14} className="text-fg-muted" />}
-          className="w-[640px]"
+          className="w-[700px]"
           testId="new-backlog-item-dialog"
           footer={
             <div className="flex items-center justify-end gap-3">
@@ -396,29 +390,69 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
               data-testid="backlog-item-title"
             />
 
-            <div className="relative">
-              <textarea
-                ref={textareaRef}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                onPaste={handlePaste}
-                onFocus={() => setTextareaFocused(true)}
-                onBlur={() => setTextareaFocused(false)}
-                className="w-full bg-surface border border-edge-input rounded px-3 py-2 text-sm text-fg focus:outline-none focus:border-accent min-h-[200px] max-h-[800px] resize-y overflow-y-auto"
-                data-testid="backlog-item-description"
-              />
-              {/* Visual placeholder with image drop hint */}
-              {!description && (
-                <div className={`absolute inset-0 flex flex-col pointer-events-none px-3 py-2 transition-opacity duration-200 ${textareaFocused ? 'opacity-100' : 'opacity-40'}`}>
-                  <span className="text-sm text-fg-faint">Describe the task for the agent...</span>
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-1.5 border border-dashed border-edge rounded-lg px-6 py-4">
-                      <Paperclip size={20} className="text-fg-disabled" />
-                      <span className="text-xs text-fg-disabled">Paste or drop files here</span>
-                    </div>
+            <div className="rounded border border-edge-input overflow-hidden focus-within:border-accent">
+              <div className="flex items-center border-b border-edge-input">
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(false)}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                    !showPreview ? 'text-fg-secondary bg-surface-hover/50' : 'text-fg-faint hover:text-fg-muted'
+                  }`}
+                  data-testid="description-edit-tab"
+                >
+                  <PenLine size={12} />
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(true)}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs transition-colors ${
+                    showPreview ? 'text-fg-secondary bg-surface-hover/50' : 'text-fg-faint hover:text-fg-muted'
+                  }`}
+                  data-testid="description-preview-toggle"
+                >
+                  <Eye size={12} />
+                  Preview
+                </button>
+              </div>
+              <div className="relative w-full bg-surface h-[280px] overflow-hidden">
+                {showPreview ? (
+                  <div
+                    className="absolute inset-0 px-3 py-2 overflow-y-auto"
+                    data-testid="description-preview"
+                  >
+                    {description ? (
+                      <MarkdownRenderer content={description} />
+                    ) : (
+                      <span className="text-sm text-fg-faint">Nothing to preview</span>
+                    )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <textarea
+                      ref={textareaRef}
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      onPaste={handlePaste}
+                      onFocus={() => setTextareaFocused(true)}
+                      onBlur={() => setTextareaFocused(false)}
+                      className="absolute inset-0 w-full h-full bg-transparent px-3 py-2 text-sm text-fg focus:outline-none resize-none overflow-y-auto"
+                      data-testid="backlog-item-description"
+                    />
+                    {!description && (
+                      <div className={`absolute inset-0 flex flex-col pointer-events-none px-3 py-2 transition-opacity duration-200 ${textareaFocused ? 'opacity-100' : 'opacity-40'}`}>
+                        <span className="text-sm text-fg-faint">Describe the task for the agent...</span>
+                        <div className="flex-1 flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-1.5 border border-dashed border-edge rounded-lg px-6 py-4">
+                            <Paperclip size={20} className="text-fg-disabled" />
+                            <span className="text-xs text-fg-disabled">Paste or drop files here</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Thumbnail strip */}

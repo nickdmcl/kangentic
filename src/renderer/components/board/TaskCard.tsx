@@ -5,6 +5,7 @@ import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, P
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
+import { stripMarkdown } from '../../utils/strip-markdown';
 import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
 import { useBacklogStore } from '../../stores/backlog-store';
@@ -319,7 +320,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             {task.description && (
-              <span className="text-xs text-fg-disabled truncate flex-1">{task.description}</span>
+              <span className="text-xs text-fg-disabled truncate flex-1">{stripMarkdown(task.description)}</span>
             )}
             <span className="text-xs text-fg-disabled flex-shrink-0 ml-auto">
               {task.archived_at ? formatDistanceToNow(new Date(task.archived_at), { addSuffix: true }) : ''}
@@ -383,7 +384,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         )}
 
         {task.description && (
-          <div className="text-xs text-fg-faint mt-1 line-clamp-3">{task.description}</div>
+          <div className="text-xs text-fg-faint mt-1 line-clamp-3">{stripMarkdown(task.description)}</div>
         )}
 
         <div className="mt-1.5">
