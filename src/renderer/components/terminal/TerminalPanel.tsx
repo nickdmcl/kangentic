@@ -24,6 +24,8 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
   const setDetailTaskId = useSessionStore((s) => s.setDetailTaskId);
   const dialogSessionId = useSessionStore((s) => s.dialogSessionId);
   const sessionActivity = useSessionStore((s) => s.sessionActivity);
+  const seenIdleSessions = useSessionStore((s) => s.seenIdleSessions);
+  const markSingleIdleSessionSeen = useSessionStore((s) => s.markSingleIdleSessionSeen);
 
   // Only show sessions that are actively running.
   // Queued/exited/suspended sessions are removed from the panel.
@@ -54,6 +56,13 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
       setActiveSession(effectiveActiveId);
     }
   }, [effectiveActiveId, activeSessionId, setActiveSession]);
+
+  // Mark the active session as seen when it becomes the selected tab
+  useEffect(() => {
+    if (effectiveActiveId && effectiveActiveId !== ACTIVITY_TAB && sessionActivity[effectiveActiveId] === 'idle') {
+      markSingleIdleSessionSeen(effectiveActiveId);
+    }
+  }, [effectiveActiveId, sessionActivity, markSingleIdleSessionSeen]);
 
   const tasks = useBoardStore((s) => s.tasks);
 
@@ -118,6 +127,10 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
               >
                 {session.status === 'running' && sessionActivity[session.id] !== 'idle' ? (
                   <Loader2 size={8} className="text-green-400 animate-spin" />
+                ) : session.status === 'running' && sessionActivity[session.id] === 'idle' ? (
+                  <div className={`w-1.5 h-1.5 rounded-full bg-amber-400${
+                    effectiveActiveId !== session.id && !seenIdleSessions[session.id] ? ' animate-pulse' : ''
+                  }`} />
                 ) : (
                   <div className={`w-1.5 h-1.5 rounded-full ${
                     session.status === 'running' ? 'bg-green-400' : 'bg-fg-faint'

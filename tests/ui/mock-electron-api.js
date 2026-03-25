@@ -82,7 +82,7 @@
     showBoardSearch: true,
     skipDeleteConfirm: false,
     skipBoardConfigConfirm: false,
-    autoFocusIdleSession: true,
+    autoFocusIdleSession: false,
     activateAllProjectsOnStartup: true,
     restoreWindowPosition: true,
     windowBounds: null,

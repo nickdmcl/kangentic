@@ -52,6 +52,7 @@ interface SessionStore {
   setPendingCommandLabel: (taskId: string, label: string) => void;
   clearPendingCommandLabel: (taskId: string) => void;
   markIdleSessionsSeen: (projectId: string) => void;
+  markSingleIdleSessionSeen: (sessionId: string) => void;
 
   // Transient session (command bar)
   transientSessionId: string | null;
@@ -287,6 +288,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       updated[id] = true;
     }
     set({ seenIdleSessions: updated });
+  },
+
+  markSingleIdleSessionSeen: (sessionId) => {
+    const { sessionActivity, seenIdleSessions } = get();
+    if (sessionActivity[sessionId] === 'idle' && !seenIdleSessions[sessionId]) {
+      set({ seenIdleSessions: { ...seenIdleSessions, [sessionId]: true } });
+    }
   },
 
   spawnTransientSession: async (branch?) => {

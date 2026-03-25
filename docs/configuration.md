@@ -53,7 +53,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `sidebarVisible` | boolean | `true` | Show/hide sidebar. Global-only. |
 | `boardLayout` | `'horizontal'` \| `'vertical'` | `'horizontal'` | Board scroll direction. Global-only. |
 | `skipDeleteConfirm` | boolean | `false` | Skip confirmation dialog on task delete |
-| `autoFocusIdleSession` | boolean | `true` | Auto-switch to session tab when agent goes idle |
+| `autoFocusIdleSession` | boolean | `false` | Auto-switch to session tab when agent goes idle. Idle tabs are always highlighted regardless of this setting. |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
 | `restoreWindowPosition` | boolean | `true` | Remember window size and position between launches. Global-only. |
 | `showBoardSearch` | boolean | `true` | Display the search bar above board columns. Toggle with Ctrl+F / Cmd+F. Global-only. |
