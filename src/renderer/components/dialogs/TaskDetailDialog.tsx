@@ -1,6 +1,6 @@
 import { useState, useLayoutEffect, useRef, useEffect, useMemo, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Check, Copy, Pencil, Trash2 } from 'lucide-react';
 import { useBoardStore } from '../../stores/board-store';
 import { useBacklogStore } from '../../stores/backlog-store';
 import { useSessionStore } from '../../stores/session-store';
@@ -18,6 +18,7 @@ import {
   ImagePreviewOverlay,
   useAttachments,
   useBranchConfig,
+  useCopyDisplayId,
 } from './task-detail';
 import type { Task, ClaudeCommand, ShortcutConfig } from '../../../shared/types';
 
@@ -80,6 +81,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const dialogSizeClass = isEditing || !hasSessionContext
     ? (isQueued ? 'w-[520px] h-[320px]' : 'w-[640px] max-h-[80vh]')
     : 'w-[90vw] h-[85vh]';
+
+  const { copied: displayIdCopied, copy: copyDisplayId } = useCopyDisplayId(task.display_id);
 
   // Track whether mouse is inside the dialog content (for Escape key behavior)
   const mouseInsideDialog = useRef(false);
@@ -454,7 +457,27 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
       <BaseDialog
         onClose={onClose}
         {...(isEditing
-          ? { title: 'Edit Task', icon: <Pencil size={14} className="text-fg-muted" /> }
+          ? {
+            title: (
+              <span className="flex items-center gap-2">
+                Edit Task
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-sm font-mono text-fg-muted hover:text-fg-secondary transition-colors font-normal"
+                  title={`Click to copy: ${task.display_id}`}
+                  data-testid="task-display-id"
+                  onClick={copyDisplayId}
+                >
+                  {displayIdCopied
+                    ? <Check size={12} className="text-green-400" />
+                    : <Copy size={12} className="text-fg-disabled" />
+                  }
+                  #{task.display_id}
+                </button>
+              </span>
+            ),
+            icon: <Pencil size={14} className="text-fg-muted" />,
+          }
           : { header: customHeader, rawBody: true }
         )}
         onContentMouseEnter={() => { mouseInsideDialog.current = true; }}

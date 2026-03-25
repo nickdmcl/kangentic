@@ -8,7 +8,7 @@ interface BaseDialogProps {
   children: React.ReactNode;
 
   // Standard header (renders title + X button)
-  title?: string;
+  title?: React.ReactNode;
   icon?: React.ReactNode;
   headerRight?: React.ReactNode;
 

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useCopyDisplayId } from './useCopyDisplayId';
 import { X, Trash2, Pencil, Loader2, FolderGit2, FolderOpen, GitPullRequest, ArrowRightLeft, ChevronRight, ChevronLeft, CirclePause, CirclePlay, Clock, SquareChevronRight, Zap, Archive, Inbox, Copy, Check } from 'lucide-react';
 import { usePopoverPosition } from '../../../hooks/usePopoverPosition';
 import { getSwimlaneIcon } from '../../../utils/swimlane-icons';
@@ -54,23 +55,8 @@ export function TaskDetailHeader({
   projectPath,
 }: TaskDetailHeaderProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [displayIdCopied, setDisplayIdCopied] = useState(false);
-  const displayIdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commandButtonRef = useRef<HTMLDivElement>(null);
-
-  // Clean up the copy feedback timer on unmount
-  useEffect(() => {
-    return () => {
-      if (displayIdTimerRef.current) clearTimeout(displayIdTimerRef.current);
-    };
-  }, []);
-
-  const copyDisplayId = useCallback(() => {
-    navigator.clipboard.writeText(String(task.display_id));
-    setDisplayIdCopied(true);
-    if (displayIdTimerRef.current) clearTimeout(displayIdTimerRef.current);
-    displayIdTimerRef.current = setTimeout(() => setDisplayIdCopied(false), 1500);
-  }, [task.display_id]);
+  const { copied: displayIdCopied, copy: copyDisplayId } = useCopyDisplayId(task.display_id);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 min-w-0">
@@ -104,16 +90,16 @@ export function TaskDetailHeader({
       {/* Display ID - clickable to copy */}
       <button
         type="button"
-        className="flex items-center gap-1 text-xs font-mono text-fg-muted hover:text-fg-secondary transition-colors flex-shrink-0"
+        className="flex items-center gap-1 text-sm font-mono text-fg-muted hover:text-fg-secondary transition-colors flex-shrink-0"
         title={`Click to copy: ${task.display_id}`}
         data-testid="task-display-id"
         onClick={copyDisplayId}
       >
-        #{task.display_id}
         {displayIdCopied
-          ? <Check size={10} className="text-green-400" />
-          : <Copy size={10} className="text-fg-disabled" />
+          ? <Check size={12} className="text-green-400" />
+          : <Copy size={12} className="text-fg-disabled" />
         }
+        #{task.display_id}
       </button>
 
       {/* Title */}

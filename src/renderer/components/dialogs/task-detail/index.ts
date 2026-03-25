@@ -4,5 +4,6 @@ export { TaskDetailBody } from './TaskDetailBody';
 export { ImagePreviewOverlay } from './ImagePreviewOverlay';
 export { useAttachments } from './useAttachments';
 export { useBranchConfig } from './useBranchConfig';
+export { useCopyDisplayId } from './useCopyDisplayId';
 export type { AttachmentWithPreview, AttachmentsState } from './useAttachments';
 export type { BranchConfigState } from './useBranchConfig';
