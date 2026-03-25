@@ -888,6 +888,28 @@
       },
     },
 
+    backlogAttachments: {
+      list: async function (/* backlogItemId */) {
+        return [];
+      },
+      add: async function (input) {
+        return {
+          id: 'ba-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          backlog_item_id: input.backlog_item_id,
+          filename: input.filename,
+          file_path: '/mock/' + input.filename,
+          media_type: input.media_type,
+          size_bytes: input.data ? input.data.length : 0,
+          created_at: new Date().toISOString(),
+        };
+      },
+      remove: async function (/* id */) {},
+      getDataUrl: async function (/* id */) {
+        return 'data:image/png;base64,iVBORw0KGgo=';
+      },
+      open: async function (/* id */) { return ''; },
+    },
+
     backlog: {
       list: async function () {
         return backlogItems.slice().sort(function (a, b) { return a.position - b.position; });
@@ -905,7 +927,7 @@
           external_source: null,
           external_url: null,
           sync_status: null,
-          attachment_count: 0,
+          attachment_count: input.pendingAttachments ? input.pendingAttachments.length : 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -919,6 +941,9 @@
         if (input.description !== undefined) item.description = input.description;
         if (input.priority !== undefined) item.priority = input.priority;
         if (input.labels !== undefined) item.labels = input.labels;
+        if (input.pendingAttachments) {
+          item.attachment_count = (item.attachment_count || 0) + input.pendingAttachments.length;
+        }
         item.updated_at = new Date().toISOString();
         return Object.assign({}, item);
       },

@@ -7,7 +7,7 @@ import { useBacklogStore } from '../../stores/backlog-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { MAX_ATTACHMENT_BYTES, MEDIA_TYPE_EXT, resolveMediaType, isImageMediaType, getFileTypeIcon, getExtension } from '../dialogs/attachment-utils';
-import type { BacklogItem, BacklogItemCreateInput } from '../../../shared/types';
+import type { BacklogItem, BacklogItemCreateInput, BacklogItemUpdateInput } from '../../../shared/types';
 
 interface PendingAttachment {
   id: string;
@@ -17,11 +17,26 @@ interface PendingAttachment {
   previewUrl: string;
 }
 
+/** A saved attachment loaded from the backend (has no base64 data in memory). */
+interface SavedAttachment {
+  id: string;
+  filename: string;
+  media_type: string;
+  previewUrl: string;
+  saved: true;
+}
+
+type DisplayAttachment = PendingAttachment | SavedAttachment;
+
+function isSavedAttachment(attachment: DisplayAttachment): attachment is SavedAttachment {
+  return 'saved' in attachment && attachment.saved === true;
+}
+
 interface NewBacklogItemDialogProps {
   onClose: () => void;
   onCreate: (input: BacklogItemCreateInput) => Promise<unknown>;
   editItem?: BacklogItem;
-  onUpdate?: (input: { id: string; title?: string; description?: string; priority?: number; labels?: string[] }) => Promise<unknown>;
+  onUpdate?: (input: BacklogItemUpdateInput) => Promise<unknown>;
 }
 
 export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: NewBacklogItemDialogProps) {
@@ -33,8 +48,8 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
   const [labelInput, setLabelInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [previewAttachment, setPreviewAttachment] = useState<PendingAttachment | null>(null);
+  const [attachments, setAttachments] = useState<DisplayAttachment[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<DisplayAttachment | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [textareaFocused, setTextareaFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +58,7 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const nextIdRef = useRef(0);
   // Ref tracks current attachments for cleanup on unmount (avoids stale closure)
-  const attachmentsRef = useRef<PendingAttachment[]>([]);
+  const attachmentsRef = useRef<DisplayAttachment[]>([]);
   attachmentsRef.current = attachments;
 
   const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
@@ -91,7 +106,9 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
   // Cleanup object URLs on unmount using ref to avoid stale closure
   useEffect(() => {
     return () => {
-      attachmentsRef.current.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
+      attachmentsRef.current.forEach((attachment) => {
+        if (!isSavedAttachment(attachment)) URL.revokeObjectURL(attachment.previewUrl);
+      });
     };
   }, []);
 
@@ -107,6 +124,41 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [previewAttachment]);
+
+  // Load existing attachments in edit mode
+  useEffect(() => {
+    if (!isEditMode || !editItem) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await window.electronAPI.backlogAttachments.list(editItem.id);
+        if (cancelled) return;
+        const displayAttachments: SavedAttachment[] = [];
+        for (const attachment of saved) {
+          try {
+            const isImage = isImageMediaType(attachment.media_type);
+            const previewUrl = isImage
+              ? await window.electronAPI.backlogAttachments.getDataUrl(attachment.id)
+              : '';
+            if (cancelled) return;
+            displayAttachments.push({
+              id: attachment.id,
+              filename: attachment.filename,
+              media_type: attachment.media_type,
+              previewUrl,
+              saved: true,
+            });
+          } catch (error) {
+            console.error('[NewBacklogItemDialog] Failed to load attachment preview:', error);
+          }
+        }
+        setAttachments((previous) => [...displayAttachments, ...previous]);
+      } catch (error) {
+        console.error('[NewBacklogItemDialog] Failed to load attachments:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEditMode, editItem]);
 
   // Auto-expand textarea as user types
   useEffect(() => {
@@ -157,12 +209,21 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
   }, []);
 
   const removeAttachment = useCallback((id: string) => {
-    setAttachments((previous) => {
-      const removed = previous.find((attachment) => attachment.id === id);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
-      return previous.filter((attachment) => attachment.id !== id);
-    });
-  }, []);
+    const target = attachments.find((attachment) => attachment.id === id);
+    if (!target) return;
+
+    if (isSavedAttachment(target)) {
+      // Delete from backend, then update UI on success
+      window.electronAPI.backlogAttachments.remove(id).then(() => {
+        setAttachments((previous) => previous.filter((attachment) => attachment.id !== id));
+      }).catch((error: unknown) => {
+        console.error('[NewBacklogItemDialog] Failed to remove saved attachment:', error);
+      });
+    } else {
+      URL.revokeObjectURL(target.previewUrl);
+      setAttachments((previous) => previous.filter((attachment) => attachment.id !== id));
+    }
+  }, [attachments]);
 
   const handlePaste = useCallback((event: React.ClipboardEvent) => {
     const items = event.clipboardData?.items;
@@ -250,6 +311,11 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
       ? [...labels, labelInput.trim()].filter((label, index, array) => array.indexOf(label) === index)
       : labels;
     try {
+      // Collect only pending (unsaved) attachments to send to backend
+      const pendingAttachments = attachments
+        .filter((attachment): attachment is PendingAttachment => !isSavedAttachment(attachment))
+        .map(({ filename, data, media_type }) => ({ filename, data, media_type }));
+
       if (isEditMode && onUpdate && editItem) {
         await onUpdate({
           id: editItem.id,
@@ -257,6 +323,7 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
           description: description.trim(),
           priority,
           labels: finalLabels,
+          pendingAttachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
         });
       } else {
         await onCreate({
@@ -264,9 +331,12 @@ export function NewBacklogItemDialog({ onClose, onCreate, editItem, onUpdate }: 
           description: description.trim(),
           priority,
           labels: finalLabels,
+          pendingAttachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
         });
       }
-      attachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
+      attachments.forEach((attachment) => {
+        if (!isSavedAttachment(attachment)) URL.revokeObjectURL(attachment.previewUrl);
+      });
       onClose();
     } finally {
       setSubmitting(false);

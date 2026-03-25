@@ -1,5 +1,7 @@
 import fs from 'node:fs';
-import { ipcMain } from 'electron';
+import os from 'node:os';
+import path from 'node:path';
+import { ipcMain, shell } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { getProjectDb } from '../../db/database';
 import { BacklogRepository } from '../../db/repositories/backlog-repository';
@@ -26,17 +28,45 @@ function getBacklogRepo(context: IpcContext): BacklogRepository {
   return new BacklogRepository(db);
 }
 
+/** Save pending attachments for a backlog item and return the item with updated attachment_count. */
+function savePendingAttachments(
+  db: ReturnType<typeof getProjectDb>,
+  projectPath: string,
+  backlogItemId: string,
+  pendingAttachments?: Array<{ filename: string; data: string; media_type: string }>,
+): void {
+  if (!pendingAttachments?.length) return;
+  const backlogAttachmentRepo = new BacklogAttachmentRepository(db);
+  for (const attachment of pendingAttachments) {
+    backlogAttachmentRepo.add(projectPath, backlogItemId, attachment.filename, attachment.data, attachment.media_type);
+  }
+}
+
 export function registerBacklogHandlers(context: IpcContext): void {
   ipcMain.handle(IPC.BACKLOG_LIST, () => {
     return getBacklogRepo(context).list();
   });
 
   ipcMain.handle(IPC.BACKLOG_CREATE, (_, input: BacklogItemCreateInput) => {
-    return getBacklogRepo(context).create(input);
+    if (!context.currentProjectId || !context.currentProjectPath) {
+      throw new Error('No project is currently open');
+    }
+    const db = getProjectDb(context.currentProjectId);
+    const backlogRepo = new BacklogRepository(db);
+    const item = backlogRepo.create(input);
+    savePendingAttachments(db, context.currentProjectPath, item.id, input.pendingAttachments);
+    return backlogRepo.getById(item.id) ?? item;
   });
 
   ipcMain.handle(IPC.BACKLOG_UPDATE, (_, input: BacklogItemUpdateInput) => {
-    return getBacklogRepo(context).update(input);
+    if (!context.currentProjectId || !context.currentProjectPath) {
+      throw new Error('No project is currently open');
+    }
+    const db = getProjectDb(context.currentProjectId);
+    const backlogRepo = new BacklogRepository(db);
+    const item = backlogRepo.update(input);
+    savePendingAttachments(db, context.currentProjectPath, item.id, input.pendingAttachments);
+    return backlogRepo.getById(item.id) ?? item;
   });
 
   ipcMain.handle(IPC.BACKLOG_DELETE, (_, id: string) => {
@@ -146,9 +176,12 @@ export function registerBacklogHandlers(context: IpcContext): void {
   });
 
   ipcMain.handle(IPC.BACKLOG_DEMOTE, async (_, input: BacklogDemoteInput) => {
-    if (!context.currentProjectId) throw new Error('No project is currently open');
+    if (!context.currentProjectId || !context.currentProjectPath) {
+      throw new Error('No project is currently open');
+    }
     const db = getProjectDb(context.currentProjectId);
     const backlogRepo = new BacklogRepository(db);
+    const backlogAttachmentRepo = new BacklogAttachmentRepository(db);
     const { tasks, attachments } = getProjectRepos(context);
 
     const task = tasks.getById(input.taskId);
@@ -168,13 +201,26 @@ export function registerBacklogHandlers(context: IpcContext): void {
       input.labels,
     );
 
-    // Remove attachment files from disk before deleting the task
+    // Copy task attachments to backlog item before deleting
+    const taskAttachments = attachments.list(task.id);
+    for (const taskAttachment of taskAttachments) {
+      try {
+        const buffer = fs.readFileSync(taskAttachment.file_path);
+        const base64Data = buffer.toString('base64');
+        backlogAttachmentRepo.add(context.currentProjectPath, backlogItem.id, taskAttachment.filename, base64Data, taskAttachment.media_type);
+      } catch (error) {
+        console.error(`[BACKLOG_DEMOTE] Failed to copy attachment "${taskAttachment.filename}":`, error);
+      }
+    }
+
+    // Remove task attachment files from disk before deleting the task
     attachments.deleteByTaskId(task.id);
 
     // Delete the task from the board
     tasks.delete(task.id);
 
-    return backlogItem;
+    // Re-fetch to get updated attachment_count
+    return backlogRepo.getById(backlogItem.id) ?? backlogItem;
   });
 
   ipcMain.handle(IPC.BACKLOG_REMAP_PRIORITIES, (_, mapping: Record<number, number>) => {
@@ -187,5 +233,48 @@ export function registerBacklogHandlers(context: IpcContext): void {
 
   ipcMain.handle(IPC.BACKLOG_DELETE_LABEL, (_, name: string) => {
     return getBacklogRepo(context).deleteLabel(name);
+  });
+
+  // === Backlog Attachments ===
+
+  ipcMain.handle(IPC.BACKLOG_ATTACHMENT_LIST, (_, backlogItemId: string) => {
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    return new BacklogAttachmentRepository(db).list(backlogItemId);
+  });
+
+  ipcMain.handle(IPC.BACKLOG_ATTACHMENT_ADD, (_, input: { backlog_item_id: string; filename: string; data: string; media_type: string }) => {
+    if (!context.currentProjectId || !context.currentProjectPath) {
+      throw new Error('No project is currently open');
+    }
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const dataSize = Buffer.byteLength(input.data, 'base64');
+    if (dataSize > maxSize) throw new Error(`Attachment exceeds 10MB limit (${(dataSize / 1024 / 1024).toFixed(1)}MB)`);
+    const db = getProjectDb(context.currentProjectId);
+    return new BacklogAttachmentRepository(db).add(context.currentProjectPath, input.backlog_item_id, input.filename, input.data, input.media_type);
+  });
+
+  ipcMain.handle(IPC.BACKLOG_ATTACHMENT_REMOVE, (_, id: string) => {
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    new BacklogAttachmentRepository(db).remove(id);
+  });
+
+  ipcMain.handle(IPC.BACKLOG_ATTACHMENT_GET_DATA_URL, (_, id: string) => {
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    return new BacklogAttachmentRepository(db).getDataUrl(id);
+  });
+
+  ipcMain.handle(IPC.BACKLOG_ATTACHMENT_OPEN, (_, id: string) => {
+    if (!context.currentProjectId) throw new Error('No project is currently open');
+    const db = getProjectDb(context.currentProjectId);
+    const attachment = new BacklogAttachmentRepository(db).getById(id);
+    if (!attachment) throw new Error(`Backlog attachment ${id} not found`);
+    const tempDir = path.join(os.tmpdir(), 'kangentic-attachments');
+    fs.mkdirSync(tempDir, { recursive: true });
+    const tempPath = path.join(tempDir, attachment.id + '_' + attachment.filename);
+    fs.copyFileSync(attachment.file_path, tempPath);
+    return shell.openPath(tempPath);
   });
 }

@@ -156,6 +156,13 @@ export const IPC = {
   BACKLOG_REMAP_PRIORITIES: 'backlog:remapPriorities',
   BACKLOG_CHANGED_BY_AGENT: 'backlog:changedByAgent',
 
+  // Backlog Attachments
+  BACKLOG_ATTACHMENT_LIST: 'backlogAttachment:list',
+  BACKLOG_ATTACHMENT_ADD: 'backlogAttachment:add',
+  BACKLOG_ATTACHMENT_REMOVE: 'backlogAttachment:remove',
+  BACKLOG_ATTACHMENT_GET_DATA_URL: 'backlogAttachment:getDataUrl',
+  BACKLOG_ATTACHMENT_OPEN: 'backlogAttachment:open',
+
   // Updater
   UPDATE_CHECK: 'updater:check',
   UPDATE_INSTALL: 'updater:install',

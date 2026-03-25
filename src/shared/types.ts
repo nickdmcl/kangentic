@@ -582,6 +582,7 @@ export interface BacklogItemCreateInput {
   description?: string;
   priority?: number;
   labels?: string[];
+  pendingAttachments?: Array<{ filename: string; data: string; media_type: string }>;
 }
 
 export interface BacklogItemUpdateInput {
@@ -590,6 +591,7 @@ export interface BacklogItemUpdateInput {
   description?: string;
   priority?: number;
   labels?: string[];
+  pendingAttachments?: Array<{ filename: string; data: string; media_type: string }>;
 }
 
 export interface BacklogPromoteInput {
@@ -946,6 +948,15 @@ export interface ElectronAPI {
     checkForUpdate: () => Promise<void>;
     installUpdate: () => Promise<void>;
     onUpdateDownloaded: (callback: (info: UpdateDownloadedInfo) => void) => () => void;
+  };
+
+  // Backlog Attachments
+  backlogAttachments: {
+    list: (backlogItemId: string) => Promise<BacklogAttachment[]>;
+    add: (input: { backlog_item_id: string; filename: string; data: string; media_type: string }) => Promise<BacklogAttachment>;
+    remove: (id: string) => Promise<void>;
+    getDataUrl: (id: string) => Promise<string>;
+    open: (id: string) => Promise<string>;
   };
 
   // Backlog

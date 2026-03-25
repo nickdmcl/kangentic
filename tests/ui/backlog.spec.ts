@@ -210,4 +210,104 @@ test.describe('Backlog View', () => {
 
     await browser.close();
   });
+
+  test('create backlog item with attachment passes pendingAttachments', async () => {
+    const { browser, page } = await launchPage();
+    await createProject(page, 'backlog-attach-test');
+
+    await page.locator('[data-testid="view-toggle-backlog"]').click();
+    await page.locator('[data-testid="new-backlog-item-btn"]').click();
+
+    // Fill in title
+    await page.locator('[data-testid="backlog-item-title"]').fill('Item with image');
+
+    // Paste an image into the description textarea
+    await page.evaluate(() => {
+      const textarea = document.querySelector('[data-testid="backlog-item-description"]');
+      if (!textarea) return;
+      const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+      const blob = new Blob([bytes], { type: 'image/png' });
+      const file = new File([blob], 'screenshot.png', { type: 'image/png' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      textarea.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dataTransfer }));
+    });
+
+    // Wait for thumbnail to appear
+    await page.waitForTimeout(500);
+    const thumbnails = page.locator('[data-testid="attachment-thumbnails"]');
+    await expect(thumbnails).toBeVisible();
+    await expect(page.locator('text=1 attachment')).toBeVisible();
+
+    // Submit the form
+    await page.locator('[data-testid="create-backlog-item-btn"]').click();
+    await page.locator('[data-testid="new-backlog-item-dialog"]').waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Item should appear in the backlog table
+    await expect(page.locator('text=Item with image')).toBeVisible();
+
+    // Verify the mock received pendingAttachments by checking stored attachment_count
+    const attachmentCount = await page.evaluate(() => {
+      return window.electronAPI.backlog.list().then(
+        (items: Array<{ title: string; attachment_count: number }>) =>
+          items.find((item) => item.title === 'Item with image')?.attachment_count
+      );
+    });
+    expect(attachmentCount).toBe(1);
+
+    await browser.close();
+  });
+
+  test('edit backlog item with new attachment updates attachment_count', async () => {
+    const { browser, page } = await launchPage();
+    await createProject(page, 'backlog-edit-attach-test');
+
+    await page.locator('[data-testid="view-toggle-backlog"]').click();
+
+    // Create an item without attachments
+    await page.locator('[data-testid="new-backlog-item-btn"]').click();
+    await page.locator('[data-testid="backlog-item-title"]').fill('Edit me later');
+    await page.locator('[data-testid="create-backlog-item-btn"]').click();
+    await page.locator('[data-testid="new-backlog-item-dialog"]').waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Open edit dialog
+    await page.locator('[data-testid="edit-item-btn"]').click();
+    await expect(page.locator('[data-testid="backlog-item-title"]')).toHaveValue('Edit me later');
+
+    // Paste an image
+    await page.evaluate(() => {
+      const textarea = document.querySelector('[data-testid="backlog-item-description"]');
+      if (!textarea) return;
+      const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+      const blob = new Blob([bytes], { type: 'image/png' });
+      const file = new File([blob], 'update.png', { type: 'image/png' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      textarea.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dataTransfer }));
+    });
+
+    await page.waitForTimeout(500);
+    await expect(page.locator('[data-testid="attachment-thumbnails"]')).toBeVisible();
+
+    // Save
+    await page.locator('[data-testid="create-backlog-item-btn"]').click();
+    await page.locator('[data-testid="new-backlog-item-dialog"]').waitFor({ state: 'hidden', timeout: 3000 });
+
+    // Verify attachment_count was incremented via mock
+    const attachmentCount = await page.evaluate(() => {
+      return window.electronAPI.backlog.list().then(
+        (items: Array<{ title: string; attachment_count: number }>) =>
+          items.find((item) => item.title === 'Edit me later')?.attachment_count
+      );
+    });
+    expect(attachmentCount).toBe(1);
+
+    await browser.close();
+  });
 });

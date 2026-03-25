@@ -94,6 +94,15 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `backlog:remapPriorities` | invoke | Remap priority values across all backlog items |
 | `backlog:changedByAgent` | on | Event: backlog was modified by an agent via MCP tool call |
 
+### Backlog Attachments (5 channels)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `backlogAttachment:list` | invoke | Fetch backlog item attachments |
+| `backlogAttachment:add` | invoke | Add attachment to a backlog item (base64 data) |
+| `backlogAttachment:remove` | invoke | Delete backlog item attachment |
+| `backlogAttachment:getDataUrl` | invoke | Get data URL for display |
+| `backlogAttachment:open` | invoke | Open attachment in the system default application |
+
 ### Swimlanes (5 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
