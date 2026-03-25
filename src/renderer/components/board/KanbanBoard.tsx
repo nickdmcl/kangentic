@@ -315,11 +315,7 @@ export function KanbanBoard() {
           matchCount={searchMatchCount}
           filterButton={filterButtonElement}
         />
-      ) : (
-        <div className="mx-4 mt-4 mb-0 flex justify-end">
-          {filterButtonElement}
-        </div>
-      )}
+      ) : null}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
       <WelcomeOverlay />
       <DndContext
