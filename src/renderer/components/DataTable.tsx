@@ -43,7 +43,6 @@ function SortableRow<TRow, TKey extends string>({
   onRowDoubleClick,
   onRowContextMenu,
   rowTestId,
-  isDragDisabled,
 }: {
   row: TRow;
   rowId: string;
@@ -52,7 +51,6 @@ function SortableRow<TRow, TKey extends string>({
   onRowDoubleClick?: (row: TRow) => void;
   onRowContextMenu?: (row: TRow, event: React.MouseEvent) => void;
   rowTestId?: string;
-  isDragDisabled: boolean;
 }) {
   const {
     attributes,
@@ -61,7 +59,7 @@ function SortableRow<TRow, TKey extends string>({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: rowId, disabled: isDragDisabled });
+  } = useSortable({ id: rowId });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -86,12 +84,8 @@ function SortableRow<TRow, TKey extends string>({
         <div
           {...attributes}
           {...listeners}
-          className={`flex items-center justify-center ${
-            isDragDisabled
-              ? 'text-fg-disabled/30 cursor-not-allowed'
-              : 'text-fg-disabled hover:text-fg-muted cursor-grab active:cursor-grabbing'
-          }`}
-          title={isDragDisabled ? 'Clear column sort to drag' : 'Drag to reorder'}
+          className="flex items-center justify-center text-fg-disabled hover:text-fg-muted cursor-grab active:cursor-grabbing"
+          title="Drag to reorder"
         >
           <GripVertical size={14} />
         </div>
@@ -129,28 +123,25 @@ export function DataTable<TRow, TKey extends string = string>({
 
   const handleHeaderClick = (column: DataTableColumn<TRow, TKey>) => {
     if (!column.sortValue) return;
-    let newSortKey: TKey | undefined;
+    let newKey: TKey | undefined;
+    let newDirection = sortDirection;
     if (sortKey === column.key) {
       // Clicking the same column cycles: asc -> desc -> clear
       if (sortDirection === 'asc') {
-        setSortDirection('desc');
-        newSortKey = column.key;
+        newDirection = 'desc';
+        newKey = column.key;
       } else {
         // Clear sort (return to manual/position order)
-        setSortKey(undefined);
-        newSortKey = undefined;
+        newKey = undefined;
       }
     } else {
-      setSortKey(column.key);
-      setSortDirection(column.align === 'left' || !column.align ? 'asc' : 'desc');
-      newSortKey = column.key;
+      newKey = column.key;
+      newDirection = column.align === 'left' || !column.align ? 'asc' : 'desc';
     }
-    if (newSortKey === undefined) setSortKey(undefined);
-    onSortChange?.(newSortKey);
+    setSortKey(newKey);
+    setSortDirection(newDirection);
+    onSortChange?.(newKey);
   };
-
-  const isColumnSorted = sortKey !== undefined;
-  const isDragDisabled = isColumnSorted;
 
   const sortedData = useMemo(() => {
     if (!sortKey) return data;
@@ -254,7 +245,7 @@ export function DataTable<TRow, TKey extends string = string>({
                         onRowDoubleClick={onRowDoubleClick}
                         onRowContextMenu={onRowContextMenu}
                         rowTestId={rowTestId}
-                        isDragDisabled={isDragDisabled}
+
                       />
                     );
                   }
@@ -321,7 +312,6 @@ export function DataTable<TRow, TKey extends string = string>({
                   onRowDoubleClick={onRowDoubleClick}
                   onRowContextMenu={onRowContextMenu}
                   rowTestId={rowTestId}
-                  isDragDisabled={isDragDisabled}
                 />
               );
             }

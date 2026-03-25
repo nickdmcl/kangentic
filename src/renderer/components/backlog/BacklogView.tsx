@@ -169,7 +169,7 @@ export function BacklogView() {
     });
   }, []);
 
-  // --- Sort state (for disabling drag when column-sorted) ---
+  // --- Sort state (column sort disables drag-to-reorder) ---
   const [isColumnSorted, setIsColumnSorted] = useState(false);
 
   // --- Filtered data ---
@@ -193,16 +193,6 @@ export function BacklogView() {
     }
     return filtered;
   }, [items, searchQuery, priorityFilters, labelFilters]);
-
-  // --- Drag-to-reorder ---
-  const canDrag = !isColumnSorted && !hasActiveFilters && !searchQuery.trim();
-  const {
-    sensors,
-    collisionDetection,
-    handleDragStart,
-    handleDragEnd,
-    handleDragCancel,
-  } = useBacklogDragDrop(filteredItems);
 
   // --- Action handlers ---
 
@@ -357,6 +347,18 @@ export function BacklogView() {
     },
   ], [selectedIds, toggleSelected, selectAll, swimlanes, handlePromoteSingle, handleEdit, handleDelete, labelColors]);
 
+  // --- Drag-to-reorder ---
+  // Drag is allowed with filters/search (slot algorithm preserves hidden items),
+  // but disabled when column sort is active (sort determines order, not position).
+  const canDrag = !isColumnSorted;
+  const {
+    sensors,
+    collisionDetection,
+    handleDragStart,
+    handleDragEnd,
+    handleDragCancel,
+  } = useBacklogDragDrop(filteredItems, items);
+
   const emptyMessage = searchQuery || hasActiveFilters
     ? 'No items match your filters'
     : undefined;
@@ -387,9 +389,19 @@ export function BacklogView() {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search backlog..."
-            className="w-56 bg-surface/50 border border-edge/50 rounded-md text-sm text-fg placeholder-fg-disabled pl-8 pr-3 py-1.5 outline-none focus:border-edge-input"
+            className="w-56 bg-surface/50 border border-edge/50 rounded-md text-sm text-fg placeholder-fg-disabled pl-8 pr-8 py-1.5 outline-none focus:border-edge-input"
             data-testid="backlog-search"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-disabled hover:text-fg-muted transition-colors"
+              data-testid="backlog-search-clear"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div className="relative">
