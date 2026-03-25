@@ -305,11 +305,17 @@ export class WorktreeManager {
         throw new Error(`Cannot create worktree: stale directory at ${worktreePath} could not be removed. A process may still hold file handles. Close any terminals or editors using this path and retry.`);
       }
     }
+    // On Windows, enable long paths to prevent "Filename too long" errors
+    // when the project contains deeply nested files (e.g. .NET migrations).
+    // The -c flag is per-command and does not modify the project's git config.
+    // This setting is Windows-only (uses \\?\ extended-length path prefix);
+    // macOS/Linux have 1024-4096 byte PATH_MAX and are unaffected.
+    const longPathsConfig = process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : [];
     if (branchExists) {
-      await this.git.raw(['worktree', 'add', worktreePath, branchName]);
+      await this.git.raw([...longPathsConfig, 'worktree', 'add', worktreePath, branchName]);
       console.log(`[WORKTREE] Created worktree (existing branch): ${branchName}`);
     } else {
-      await this.git.raw(['worktree', 'add', '-b', branchName, worktreePath, startPoint]);
+      await this.git.raw([...longPathsConfig, 'worktree', 'add', '-b', branchName, worktreePath, startPoint]);
       console.log(`[WORKTREE] Created worktree (new branch): ${branchName} from ${startPoint}`);
     }
 
@@ -321,6 +327,14 @@ export class WorktreeManager {
       await wtGit.raw(['config', 'kangentic.baseBranch', baseBranch]);
     } catch {
       // Non-fatal -- merge-back falls back to 'main'
+    }
+
+    // Persist long paths in the worktree's local config so all subsequent
+    // git operations (sparse-checkout, agent commits, merges) also work.
+    if (process.platform === 'win32') {
+      try {
+        await wtGit.raw(['config', 'core.longpaths', 'true']);
+      } catch { /* non-fatal */ }
     }
 
     // Exclude only .claude/commands/ from worktree via sparse-checkout.
