@@ -382,6 +382,13 @@ export function App() {
       }));
     }
 
+    // Label colors changed by agent (MCP server created labels with colors)
+    if (backlog?.onLabelColorsChanged) {
+      cleanups.push(backlog.onLabelColorsChanged(() => {
+        useConfigStore.getState().loadConfig();
+      }));
+    }
+
     // Task auto-moved (plan exit → next column)
     if (tasks?.onAutoMoved) {
       cleanups.push(tasks.onAutoMoved((autoMovedTaskId, _targetSwimlaneId, taskTitle, autoMoveProjectId) => {

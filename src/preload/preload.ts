@@ -241,6 +241,11 @@ const api: ElectronAPI = {
       ipcRenderer.on(IPC.BACKLOG_CHANGED_BY_AGENT, handler);
       return () => ipcRenderer.removeListener(IPC.BACKLOG_CHANGED_BY_AGENT, handler);
     },
+    onLabelColorsChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on(IPC.BACKLOG_LABEL_COLORS_CHANGED, handler);
+      return () => ipcRenderer.removeListener(IPC.BACKLOG_LABEL_COLORS_CHANGED, handler);
+    },
   },
 
   boardConfig: {

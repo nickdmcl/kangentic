@@ -987,6 +987,7 @@ export interface ElectronAPI {
     deleteLabel: (name: string) => Promise<number>;
     remapPriorities: (mapping: Record<number, number>) => Promise<number>;
     onChangedByAgent: (callback: (projectId?: string) => void) => () => void;
+    onLabelColorsChanged: (callback: () => void) => () => void;
   };
 
   // Board Config

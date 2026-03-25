@@ -65,8 +65,22 @@ export const handleCreateBacklogItem: CommandHandler = (
   const title = String(params.title ?? '').slice(0, 200);
   const description = String(params.description ?? '').slice(0, 10_000);
   const priority = (params.priority as number) ?? 0;
-  const labels = (params.labels as string[]) ?? [];
+  const rawLabels = (params.labels as Array<string | { name: string; color: string }>) ?? [];
   const attachments = params.attachments as Array<{ filePath: string; filename?: string }> | null;
+
+  // Normalize labels: extract names for DB storage and colors for config
+  const labelNames: string[] = [];
+  const labelColorMap: Record<string, string> = {};
+  for (const entry of rawLabels) {
+    if (typeof entry === 'string') {
+      labelNames.push(entry);
+    } else if (entry && typeof entry === 'object' && entry.name) {
+      labelNames.push(entry.name);
+      if (entry.color) {
+        labelColorMap[entry.name] = entry.color;
+      }
+    }
+  }
 
   if (!title.trim()) {
     return { success: false, error: 'Title is required' };
@@ -83,7 +97,7 @@ export const handleCreateBacklogItem: CommandHandler = (
     title,
     description,
     priority: priority,
-    labels,
+    labels: labelNames,
   });
 
   // Process file attachments if provided
@@ -98,6 +112,11 @@ export const handleCreateBacklogItem: CommandHandler = (
         console.error(`[create_backlog_item] Failed to attach file "${entry.filePath}":`, error);
       }
     }
+  }
+
+  // Persist label colors to config if any were provided
+  if (Object.keys(labelColorMap).length > 0) {
+    context.onLabelColorsChanged(labelColorMap);
   }
 
   context.onBacklogChanged();

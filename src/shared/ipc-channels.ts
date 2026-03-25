@@ -155,6 +155,7 @@ export const IPC = {
   BACKLOG_DELETE_LABEL: 'backlog:deleteLabel',
   BACKLOG_REMAP_PRIORITIES: 'backlog:remapPriorities',
   BACKLOG_CHANGED_BY_AGENT: 'backlog:changedByAgent',
+  BACKLOG_LABEL_COLORS_CHANGED: 'backlog:labelColorsChanged',
 
   // Backlog Attachments
   BACKLOG_ATTACHMENT_LIST: 'backlogAttachment:list',

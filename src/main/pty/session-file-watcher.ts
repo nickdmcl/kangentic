@@ -11,6 +11,7 @@ interface SessionFileWatcherCallbacks {
   onTaskCreated(sessionId: string, task: Task, columnName: string, swimlaneId: string): void;
   onTaskUpdated(sessionId: string, task: Task): void;
   onBacklogChanged(sessionId: string): void;
+  onLabelColorsChanged(sessionId: string, colors: Record<string, string>): void;
 }
 
 interface WatcherState {
@@ -135,6 +136,9 @@ export class SessionFileWatcher {
         },
         onBacklogChanged: () => {
           this.callbacks.onBacklogChanged(sessionId);
+        },
+        onLabelColorsChanged: (colors) => {
+          this.callbacks.onLabelColorsChanged(sessionId, colors);
         },
       });
       state.commandBridge.start();

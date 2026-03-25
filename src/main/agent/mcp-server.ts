@@ -504,7 +504,13 @@ server.registerTool(
       title: z.string().max(200).describe('Item title (max 200 characters).'),
       description: z.string().max(10000).optional().describe('Item description. Supports markdown.'),
       priority: z.number().min(0).max(4).optional().describe('Priority level: 0=none (default), 1=low, 2=medium, 3=high, 4=urgent.'),
-      labels: z.array(z.string()).optional().describe('Labels for categorization (e.g. ["bug", "frontend", "p1"]).'),
+      labels: z.array(z.union([
+        z.string(),
+        z.object({
+          name: z.string(),
+          color: z.string().regex(/^#[0-9a-fA-F]{6}$/).describe('Hex color (e.g. "#ef4444")'),
+        }),
+      ])).optional().describe('Labels for categorization. Each entry can be a plain string or an object with name and hex color (e.g. ["bug", { "name": "frontend", "color": "#3b82f6" }]).'),
       attachments: z.array(z.object({
         filePath: z.string().describe('Absolute path to the file to attach'),
         filename: z.string().optional().describe('Override display filename'),

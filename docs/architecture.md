@@ -78,7 +78,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `attachment:getDataUrl` | invoke | Get data URL for display |
 | `attachment:open` | invoke | Open attachment in the system default application |
 
-### Backlog (12 channels)
+### Backlog (13 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `backlog:list` | invoke | Fetch all backlog items (ordered by position) |
@@ -93,6 +93,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `backlog:deleteLabel` | invoke | Remove a label from all backlog items |
 | `backlog:remapPriorities` | invoke | Remap priority values across all backlog items |
 | `backlog:changedByAgent` | on | Event: backlog was modified by an agent via MCP tool call |
+| `backlog:labelColorsChanged` | on | Event: label color mappings changed by agent via MCP tool call |
 
 ### Backlog Attachments (5 channels)
 | Channel | Pattern | Purpose |

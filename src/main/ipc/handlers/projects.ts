@@ -295,6 +295,12 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
           context.mainWindow.webContents.send(IPC.BACKLOG_CHANGED_BY_AGENT, project.id);
         }
       },
+      onLabelColorsChanged: (colors) => {
+        context.configManager.save({ backlog: { labelColors: colors } } as Partial<AppConfig>);
+        if (!context.mainWindow.isDestroyed()) {
+          context.mainWindow.webContents.send(IPC.BACKLOG_LABEL_COLORS_CHANGED);
+        }
+      },
     });
     context.externalCommandBridge.start();
   }

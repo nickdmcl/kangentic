@@ -1068,6 +1068,9 @@
       onChangedByAgent: function () {
         return noop;
       },
+      onLabelColorsChanged: function () {
+        return noop;
+      },
     },
 
     boardConfig: {

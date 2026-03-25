@@ -7,7 +7,7 @@ import { getProjectRepos, ensureTaskWorktree, createTransitionEngine, autoSpawnF
 import { handleTaskMove } from './tasks';
 import { trackEvent } from '../../analytics/analytics';
 import { captureSessionMetrics } from './session-metrics';
-import type { Session } from '../../../shared/types';
+import type { Session, AppConfig } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
 // Track session start times for duration calculation on exit
@@ -299,6 +299,14 @@ export function registerSessionHandlers(context: IpcContext): void {
     if (!context.mainWindow.isDestroyed()) {
       const projectId = context.sessionManager.getSessionProjectId(sessionId);
       context.mainWindow.webContents.send(IPC.BACKLOG_CHANGED_BY_AGENT, projectId);
+    }
+  });
+
+  // Label colors changed by agent (MCP server created labels with colors)
+  context.sessionManager.on('label-colors-changed', (_sessionId: string, colors: Record<string, string>) => {
+    context.configManager.save({ backlog: { labelColors: colors } } as Partial<AppConfig>);
+    if (!context.mainWindow.isDestroyed()) {
+      context.mainWindow.webContents.send(IPC.BACKLOG_LABEL_COLORS_CHANGED);
     }
   });
 

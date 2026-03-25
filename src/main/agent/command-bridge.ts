@@ -24,6 +24,7 @@ interface CommandBridgeOptions {
   onTaskCreated: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated: (task: Task) => void;
   onBacklogChanged: () => void;
+  onLabelColorsChanged: (colors: Record<string, string>) => void;
 }
 
 interface Command {
@@ -52,6 +53,7 @@ export class CommandBridge {
       onTaskCreated: options.onTaskCreated,
       onTaskUpdated: options.onTaskUpdated,
       onBacklogChanged: options.onBacklogChanged,
+      onLabelColorsChanged: options.onLabelColorsChanged,
     };
   }
 

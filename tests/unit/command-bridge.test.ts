@@ -231,6 +231,7 @@ function createBridge(overrides?: {
   onTaskCreated?: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated?: (task: Task) => void;
   onBacklogChanged?: () => void;
+  onLabelColorsChanged?: (colors: Record<string, string>) => void;
 }): CommandBridge {
   return new CommandBridge({
     commandsPath: path.join(tmpDir, 'commands.jsonl'),
@@ -241,6 +242,7 @@ function createBridge(overrides?: {
     onTaskCreated: overrides?.onTaskCreated ?? (() => {}),
     onTaskUpdated: overrides?.onTaskUpdated ?? (() => {}),
     onBacklogChanged: overrides?.onBacklogChanged ?? (() => {}),
+    onLabelColorsChanged: overrides?.onLabelColorsChanged ?? (() => {}),
   });
 }
 
@@ -855,6 +857,46 @@ describe('CommandBridge - create_backlog_item', () => {
 
     expect(response.success).toBe(false);
     expect(response.error).toContain('0-4');
+  });
+
+  it('calls onLabelColorsChanged when labels include color objects', () => {
+    const onLabelColorsChanged = vi.fn();
+    const bridge = createBridge({ onLabelColorsChanged });
+    bridge.start();
+
+    const response = sendCommand(bridge, 'create_backlog_item', {
+      title: 'Colored labels test',
+      labels: [
+        { name: 'Bug', color: '#ef4444' },
+        'plain-label',
+        { name: 'Feature', color: '#3b82f6' },
+      ],
+    });
+
+    bridge.stop();
+
+    expect(response.success).toBe(true);
+    const data = response.data as { labels: string[] };
+    expect(data.labels).toEqual(['Bug', 'plain-label', 'Feature']);
+    expect(onLabelColorsChanged).toHaveBeenCalledWith({
+      Bug: '#ef4444',
+      Feature: '#3b82f6',
+    });
+  });
+
+  it('does not call onLabelColorsChanged for plain string labels', () => {
+    const onLabelColorsChanged = vi.fn();
+    const bridge = createBridge({ onLabelColorsChanged });
+    bridge.start();
+
+    sendCommand(bridge, 'create_backlog_item', {
+      title: 'Plain labels test',
+      labels: ['bug', 'frontend'],
+    });
+
+    bridge.stop();
+
+    expect(onLabelColorsChanged).not.toHaveBeenCalled();
   });
 });
 

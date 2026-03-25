@@ -7,6 +7,7 @@ export interface CommandContext {
   onTaskCreated: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated: (task: Task) => void;
   onBacklogChanged: () => void;
+  onLabelColorsChanged: (colors: Record<string, string>) => void;
 }
 
 export interface CommandResponse {
