@@ -100,6 +100,8 @@ export const handleCreateBacklogItem: CommandHandler = (
     }
   }
 
+  context.onBacklogChanged();
+
   const priorityLabel = BACKLOG_PRIORITY_LABELS[item.priority] ?? 'None';
   return {
     success: true,
@@ -216,6 +218,8 @@ export const handlePromoteBacklog: CommandHandler = (
 
     context.onTaskCreated(task, targetSwimlane.name, targetSwimlane.id);
   }
+
+  context.onBacklogChanged();
 
   if (promoted.length === 0) {
     return { success: false, error: `No backlog items found for the provided IDs` };

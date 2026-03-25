@@ -154,6 +154,7 @@ export const IPC = {
   BACKLOG_RENAME_LABEL: 'backlog:renameLabel',
   BACKLOG_DELETE_LABEL: 'backlog:deleteLabel',
   BACKLOG_REMAP_PRIORITIES: 'backlog:remapPriorities',
+  BACKLOG_CHANGED_BY_AGENT: 'backlog:changedByAgent',
 
   // Updater
   UPDATE_CHECK: 'updater:check',

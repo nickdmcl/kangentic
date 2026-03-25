@@ -10,6 +10,7 @@ interface SessionFileWatcherCallbacks {
   onEventsFileChanged(sessionId: string, eventsOutputPath: string): void;
   onTaskCreated(sessionId: string, task: Task, columnName: string, swimlaneId: string): void;
   onTaskUpdated(sessionId: string, task: Task): void;
+  onBacklogChanged(sessionId: string): void;
 }
 
 interface WatcherState {
@@ -131,6 +132,9 @@ export class SessionFileWatcher {
         },
         onTaskUpdated: (task) => {
           this.callbacks.onTaskUpdated(sessionId, task);
+        },
+        onBacklogChanged: () => {
+          this.callbacks.onBacklogChanged(sessionId);
         },
       });
       state.commandBridge.start();

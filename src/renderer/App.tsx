@@ -348,6 +348,7 @@ export function App() {
         const activeProjectId = useProjectStore.getState().currentProject?.id;
         if (!createdByAgentProjectId || createdByAgentProjectId === activeProjectId) {
           useBoardStore.getState().loadBoard();
+          useBacklogStore.getState().loadBacklog();
         }
         useToastStore.getState().addToast({
           message: `Task created by agent: "${taskTitle}" in ${columnName}`,
@@ -367,6 +368,17 @@ export function App() {
           message: `Task updated by agent: "${taskTitle}"`,
           variant: 'info',
         });
+      }));
+    }
+
+    // Backlog changed by agent (MCP server created/promoted backlog items)
+    const backlog = window.electronAPI?.backlog;
+    if (backlog?.onChangedByAgent) {
+      cleanups.push(backlog.onChangedByAgent((changedProjectId) => {
+        const activeProjectId = useProjectStore.getState().currentProject?.id;
+        if (!changedProjectId || changedProjectId === activeProjectId) {
+          useBacklogStore.getState().loadBacklog();
+        }
       }));
     }
 

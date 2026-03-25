@@ -228,6 +228,11 @@ const api: ElectronAPI = {
     renameLabel: (oldName, newName) => ipcRenderer.invoke(IPC.BACKLOG_RENAME_LABEL, oldName, newName),
     deleteLabel: (name) => ipcRenderer.invoke(IPC.BACKLOG_DELETE_LABEL, name),
     remapPriorities: (mapping) => ipcRenderer.invoke(IPC.BACKLOG_REMAP_PRIORITIES, mapping),
+    onChangedByAgent: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, projectId?: string) => callback(projectId);
+      ipcRenderer.on(IPC.BACKLOG_CHANGED_BY_AGENT, handler);
+      return () => ipcRenderer.removeListener(IPC.BACKLOG_CHANGED_BY_AGENT, handler);
+    },
   },
 
   boardConfig: {

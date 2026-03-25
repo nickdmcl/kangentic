@@ -230,6 +230,7 @@ let database: ReturnType<typeof Database>;
 function createBridge(overrides?: {
   onTaskCreated?: (task: Task, columnName: string, swimlaneId: string) => void;
   onTaskUpdated?: (task: Task) => void;
+  onBacklogChanged?: () => void;
 }): CommandBridge {
   return new CommandBridge({
     commandsPath: path.join(tmpDir, 'commands.jsonl'),
@@ -239,6 +240,7 @@ function createBridge(overrides?: {
     getProjectPath: () => tmpDir,
     onTaskCreated: overrides?.onTaskCreated ?? (() => {}),
     onTaskUpdated: overrides?.onTaskUpdated ?? (() => {}),
+    onBacklogChanged: overrides?.onBacklogChanged ?? (() => {}),
   });
 }
 

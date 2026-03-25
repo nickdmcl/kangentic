@@ -1022,6 +1022,9 @@
         });
         return count;
       },
+      onChangedByAgent: function () {
+        return noop;
+      },
     },
 
     boardConfig: {
