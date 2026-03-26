@@ -9,9 +9,17 @@ import { trackEvent } from '../../analytics/analytics';
 import { captureSessionMetrics } from './session-metrics';
 import type { Session, AppConfig } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
+import { isAbortError } from '../../../shared/abort-utils';
 
 // Track session start times for duration calculation on exit
 const sessionStartTimes = new Map<string, number>();
+
+/**
+ * Per-task AbortController to cancel in-flight resumes when the session is
+ * suspended before the async resume completes. Prevents orphaned sessions
+ * from spawning when the user quickly moves a task back after clicking resume.
+ */
+const sessionResumeControllers = new Map<string, AbortController>();
 
 export function registerSessionHandlers(context: IpcContext): void {
   // === Sessions ===
@@ -34,6 +42,9 @@ export function registerSessionHandlers(context: IpcContext): void {
 
   // === Session Suspend / Resume ===
   ipcMain.handle(IPC.SESSION_SUSPEND, async (_, taskId: string) => {
+    // Cancel any in-flight resume for this task
+    sessionResumeControllers.get(taskId)?.abort();
+
     const resolvedProjectId = context.currentProjectId;
     if (!resolvedProjectId) throw new Error('No project is currently open');
 
@@ -81,28 +92,51 @@ export function registerSessionHandlers(context: IpcContext): void {
       throw new Error('Cannot resume a session for a task in the To Do column');
     }
 
-    // Create worktree if needed
+    // Abort any in-flight resume for this task, then create a fresh controller
+    sessionResumeControllers.get(taskId)?.abort();
+    const resumeController = new AbortController();
+    sessionResumeControllers.set(taskId, resumeController);
+    const { signal } = resumeController;
+
     try {
-      await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
-    } catch (worktreeError) {
-      const message = worktreeError instanceof Error ? worktreeError.message : String(worktreeError);
-      throw new Error(`Worktree setup failed: ${message}`);
+      // Create worktree if needed
+      try {
+        await ensureTaskWorktree(context, task, tasks, resolvedProjectPath, { signal });
+      } catch (worktreeError) {
+        if (isAbortError(worktreeError)) throw worktreeError;
+        const message = worktreeError instanceof Error ? worktreeError.message : String(worktreeError);
+        throw new Error(`Worktree setup failed: ${message}`);
+      }
+
+      const db = getProjectDb(resolvedProjectId);
+      const sessionRepo = new SessionRepository(db);
+      const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachmentRepo, resolvedProjectId, resolvedProjectPath);
+
+      await engine.resumeSuspendedSession(task, lane?.permission_mode, undefined, resumePrompt, signal);
+
+      // Re-read task to get the new session_id
+      const updated = tasks.getById(taskId);
+      if (!updated?.session_id) throw new Error('Session resume failed -- no session_id on task');
+
+      // Return the new session object
+      const newSession = context.sessionManager.getSession(updated.session_id);
+      if (!newSession) throw new Error('Session resume failed -- session not in manager');
+      return newSession;
+    } catch (error) {
+      if (isAbortError(error)) {
+        // A suspend or newer resume superseded this one - clean up partial state
+        console.log(`[SESSION_RESUME] Aborted stale resume for task ${taskId.slice(0, 8)}`);
+        context.sessionManager.removeByTaskId(taskId);
+        tasks.update({ id: taskId, session_id: null });
+        return null;
+      }
+      throw error;
+    } finally {
+      // Clean up controller only if it's still ours (not replaced by a newer resume)
+      if (sessionResumeControllers.get(taskId) === resumeController) {
+        sessionResumeControllers.delete(taskId);
+      }
     }
-
-    const db = getProjectDb(resolvedProjectId);
-    const sessionRepo = new SessionRepository(db);
-    const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachmentRepo, resolvedProjectId, resolvedProjectPath);
-
-    await engine.resumeSuspendedSession(task, lane?.permission_mode, undefined, resumePrompt);
-
-    // Re-read task to get the new session_id
-    const updated = tasks.getById(taskId);
-    if (!updated?.session_id) throw new Error('Session resume failed -- no session_id on task');
-
-    // Return the new session object
-    const newSession = context.sessionManager.getSession(updated.session_id);
-    if (!newSession) throw new Error('Session resume failed -- session not in manager');
-    return newSession;
   });
 
   // === Session Summaries ===
