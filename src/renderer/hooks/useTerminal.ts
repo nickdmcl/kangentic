@@ -233,9 +233,7 @@ export function useTerminal(options: UseTerminalOptions) {
     const handlePaste = (e: Event) => {
       if (!isInside(e)) return;
       navigator.clipboard.readText().then((text) => {
-        if (text && options.sessionId) {
-          xtermRef.current?.paste(text);
-        }
+        if (text) xtermRef.current?.paste(text);
       }).catch(() => { /* clipboard access denied */ });
     };
     window.addEventListener('terminal-copy', handleCopy);
