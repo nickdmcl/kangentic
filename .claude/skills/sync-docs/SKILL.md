@@ -28,6 +28,25 @@ Each doc file and the source files that are its authority:
 | `developer-guide.md` | `scripts/`, `tests/`, `electron-builder.yml`, `package.json` |
 | `docs/README.md` | All other docs (index) |
 
+## Website Cross-Reference
+
+The marketing website (`../kangentic.com/`) mirrors much of `docs/` as MDX pages. When updating internal docs, note which changes also affect the website. The website's `/sync-docs` command handles the actual website updates, but flagging drift here saves a round trip.
+
+| Internal Doc | Website Page(s) |
+|-------------|-----------------|
+| `user-guide.md` | Multiple: `guide/creating-tasks.mdx`, `guide/backlog.mdx`, `guide/command-terminal.mdx`, `features/agent-orchestration.mdx`, `features/sessions.mdx`, `features/notifications.mdx`, `features/settings.mdx` |
+| `configuration.md` | `configuration.mdx`, `features/settings.mdx` |
+| `activity-detection.md` | `features/activity-detection.mdx` |
+| `transition-engine.md` | `features/workflows.mdx` |
+| `worktree-strategy.md` | `features/git-worktrees.mdx` |
+| `session-lifecycle.md` | `features/sessions.mdx` |
+| `cross-platform.md` | `dev/shell-support.mdx` |
+| `architecture.md` | `architecture.mdx` |
+| `developer-guide.md` | `dev/contributing.mdx`, `dev/testing.mdx`, `dev/packaging.mdx` |
+| `mcp-server.md` | `features/agent-orchestration.mdx` (MCP section) |
+
+When the Step 7 report lists updated docs, append a note: "Website may need update: [list of affected website pages from this table]".
+
 ## Doc Conventions
 
 - Flat structure in `docs/` - no subdirectories
