@@ -6,6 +6,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.12.0] - 2026-03-26
+
+### Features
+- Add backlog view for staging tasks before the board (85b3c8b)
+- Background transient sessions with reattach support (6dcfa45)
+- Right-click context menus with move, edit, delete, archive on board and backlog (caadf15)
+- Use column color for drag-and-drop drop target highlight (33dc140)
+- Support paste/drop of any file type as attachment (edc5757)
+- Fix MCP schema serialization, add attachment support, and file drop-to-terminal (759f585)
+- Double-click backlog row to open edit dialog (7e8379e)
+- Add copyable task display ID to board and MCP (f3d8770)
+- Wire up attachment persistence for backlog items (38c1d24)
+- Add external MCP command bridge for preview isolation (0648766)
+- Add copyable display ID to task edit dialog header (3e0384e)
+- Allow drag reorder while filters or search are active in backlog (544c652)
+- Add color support to backlog label creation via MCP (02d209f)
+- Carry labels and priority from backlog to board tasks (a262cd2)
+- Add markdown rendering for task descriptions (3dae7e8)
+- Import tasks from GitHub Issues and Projects (6a533a2)
+- Show priority badge in task detail dialog header (8f3b2b0)
+- Replace auto-focus idle sessions with amber tab indicator (ad5625a)
+- Add label and priority editing to board task forms (65599bd)
+- Add label and priority filtering to the board view (49fd4b2)
+- Move Labels/Priorities into board header row (4f8b7ca)
+- Add Azure DevOps as an import source (9f59872)
+- Fetch Azure DevOps comments and file attachments (0c3b43d)
+- Mention import option in empty backlog state (a0b3f7a)
+- Add usage stats time period dropdown to status bar (7aad7f4)
+
+### Fixes
+- Replace native select with custom popover and fix metrics persistence in status bar (e7281c2)
+- Support UNC paths for SMB network share projects (9f92295)
+- Add fallback spawn to ensure all promoted tasks get agents (8d54da0)
+- Make context menu paste consistent with Ctrl+V path (d5b4386)
+- Make backlog promotion instant with deferred agent spawn (56be2da)
+- Pass AbortSignal through SESSION_RESUME to prevent stale spawns (1c4f879)
+- Pass AbortSignal through promotion async chain (408e279)
+- Include config-defined labels in autocomplete suggestions (9a2e451)
+- Make backlog context menu respect multi-selection (d327f4e)
+- Cancel in-flight session spawns when task is moved back quickly (bb88ff8)
+- Prevent large paste truncation with chunked PTY writes and bracketed paste (eeb4e29)
+- Make xterm cursor transparent to prevent flickering (4028d68)
+- Preserve command terminal across project switches (50fc1e5)
+- Hide entire search/filter row when Ctrl+F dismisses it (d677241)
+- Enable core.longpaths for worktree creation on Windows (85ea878)
+- Sync backlog store after MCP create/promote operations (9558d41)
+- Clean up transient session state on stop and add idle indicator (0fcc344)
+- Unblock CLA assistant on protected main branch (c0d5256)
+
+### Other
+- Consolidate spawn fallback into single spawnAgent primitive (3845165)
+- Update all documentation for v0.12.0 and consolidate /sync-docs skill (48f3260)
+- Move time ago to its own line below labels on completed cards (4758dfd)
+- Replace generation counter with AbortController in syncSessions (7e30695)
+- Rename BacklogItem to BacklogTask across codebase (727dee4)
+- Extract shared DescriptionEditor component (1760a89)
+- Extract auto-spawn into shared function for external bridge (e6c2b85)
+- Decompose large single-file modules into focused submodules (bc1739b)
+- Add gh pr permission to project settings (ab001c8)
+- Use wildcard MCP permissions instead of individual tool entries (b3e1bb4)
+
 ## [v0.11.0] - 2026-03-23
 
 ### Features
