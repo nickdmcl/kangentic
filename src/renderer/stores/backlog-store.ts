@@ -7,6 +7,7 @@ import type {
   Task,
 } from '../../shared/types';
 import { useBoardStore } from './board-store';
+import { useToastStore } from './toast-store';
 
 interface BacklogState {
   items: BacklogTask[];
@@ -100,21 +101,35 @@ export const useBacklogStore = create<BacklogState>((set, get) => ({
   },
 
   promoteItems: async (ids, targetSwimlaneId) => {
-    const createdTasks = await window.electronAPI.backlog.promote({
-      backlogTaskIds: ids,
-      targetSwimlaneId,
-    });
+    // Save removed items for rollback on failure
+    const removedItems = get().items.filter((item) => ids.includes(item.id));
 
-    // Remove promoted items from local state
+    // Optimistically remove from backlog UI immediately
     set((state) => ({
       items: state.items.filter((item) => !ids.includes(item.id)),
       selectedIds: new Set(),
     }));
 
-    // Reload the board to pick up the new tasks
-    useBoardStore.getState().loadBoard();
+    try {
+      // Fire IPC (returns after DB work, before agent spawn)
+      const createdTasks = await window.electronAPI.backlog.promote({
+        backlogTaskIds: ids,
+        targetSwimlaneId,
+      });
 
-    return createdTasks;
+      // Reload the board to pick up the new tasks
+      useBoardStore.getState().loadBoard();
+
+      return createdTasks;
+    } catch (error) {
+      // Rollback: restore removed items
+      set((state) => ({ items: [...state.items, ...removedItems] }));
+      useToastStore.getState().addToast({
+        message: `Failed to promote tasks: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'error',
+      });
+      throw error;
+    }
   },
 
   demoteTask: async (input) => {

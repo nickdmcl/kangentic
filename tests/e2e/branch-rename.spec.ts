@@ -150,7 +150,7 @@ async function editTaskTitle(p: Page, oldTitle: string, newTitle: string) {
   await editOption.click();
   await p.waitForTimeout(200);
 
-  const titleInput = dialog.locator('input[type="text"]');
+  const titleInput = dialog.getByPlaceholder('Task title');
   await titleInput.fill(newTitle);
 
   const saveBtn = dialog.locator('button:has-text("Save")');

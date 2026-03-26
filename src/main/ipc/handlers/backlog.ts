@@ -11,7 +11,7 @@ import { ActionRepository } from '../../db/repositories/action-repository';
 import { AttachmentRepository } from '../../db/repositories/attachment-repository';
 import { BacklogAttachmentRepository } from '../../db/repositories/backlog-attachment-repository';
 import { SessionRepository } from '../../db/repositories/session-repository';
-import { cleanupTaskResources, createTransitionEngine, getProjectRepos, ensureTaskWorktree, ensureTaskBranchCheckout } from '../helpers';
+import { buildAutoCommandVars, cleanupTaskResources, createTransitionEngine, getProjectRepos, ensureTaskWorktree, ensureTaskBranchCheckout } from '../helpers';
 import { guardActiveNonWorktreeSessions } from './task-move';
 import { isAbortError } from '../../../shared/abort-utils';
 import type { IpcContext } from '../ipc-context';
@@ -129,7 +129,9 @@ export function registerBacklogHandlers(context: IpcContext): void {
     const targetSwimlane = swimlanes.getById(input.targetSwimlaneId);
     if (!targetSwimlane) throw new Error(`Swimlane ${input.targetSwimlaneId} not found`);
 
+    // Phase 1: Synchronous DB work - create tasks and return immediately
     const createdTasks: Task[] = [];
+    const tasksToSpawn: Task[] = [];
 
     for (const backlogTaskId of input.backlogTaskIds) {
       const item = backlogRepo.getById(backlogTaskId);
@@ -161,58 +163,79 @@ export function registerBacklogHandlers(context: IpcContext): void {
       // Remove from backlog
       backlogRepo.delete(backlogTaskId);
 
-      // Fire transition engine if target column auto-spawns
+      const freshTask = tasks.getById(task.id) ?? task;
+      createdTasks.push(freshTask);
+
       if (targetSwimlane.auto_spawn) {
-        const promotionController = new AbortController();
-        promotionControllers.set(task.id, promotionController);
-        const { signal } = promotionController;
+        tasksToSpawn.push(freshTask);
+      }
+    }
 
+    // Phase 2: Fire-and-forget async work - worktree setup + agent spawn
+    // Runs in background so the UI updates instantly
+    if (tasksToSpawn.length > 0) {
+      void (async () => {
         try {
-          try {
-            await ensureTaskWorktree(context, task, tasks, projectPath, { signal });
-          } catch (worktreeError) {
-            if (isAbortError(worktreeError)) throw worktreeError;
-            console.error('[BACKLOG_PROMOTE] Worktree creation failed:', worktreeError);
-            createdTasks.push(tasks.getById(task.id) ?? task);
-            continue;
-          }
+          for (const task of tasksToSpawn) {
+            const promotionController = new AbortController();
+            promotionControllers.set(task.id, promotionController);
+            const { signal } = promotionController;
 
-          try {
-            guardActiveNonWorktreeSessions(context, task, tasks);
-            await ensureTaskBranchCheckout(task, projectPath, { signal });
-          } catch (checkoutError) {
-            if (isAbortError(checkoutError)) throw checkoutError;
-            console.error('[BACKLOG_PROMOTE] Branch checkout failed:', checkoutError);
-            createdTasks.push(tasks.getById(task.id) ?? task);
-            continue;
-          }
+            try {
+              try {
+                await ensureTaskWorktree(context, task, tasks, projectPath, { signal });
+              } catch (worktreeError) {
+                if (isAbortError(worktreeError)) throw worktreeError;
+                console.error('[BACKLOG_PROMOTE] Worktree creation failed:', worktreeError);
+                continue;
+              }
 
-          const sessionRepo = new SessionRepository(db);
-          const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, projectId, projectPath);
+              try {
+                guardActiveNonWorktreeSessions(context, task, tasks);
+                await ensureTaskBranchCheckout(task, projectPath, { signal });
+              } catch (checkoutError) {
+                if (isAbortError(checkoutError)) throw checkoutError;
+                console.error('[BACKLOG_PROMOTE] Branch checkout failed:', checkoutError);
+                continue;
+              }
 
-          try {
-            await engine.executeTransition(task, '*', input.targetSwimlaneId, undefined, undefined, signal);
-          } catch (transitionError) {
-            if (isAbortError(transitionError)) throw transitionError;
-            console.error('[BACKLOG_PROMOTE] Transition failed:', transitionError);
+              const sessionRepo = new SessionRepository(db);
+              const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, projectId, projectPath);
+
+              try {
+                await engine.executeTransition(task, '*', input.targetSwimlaneId, targetSwimlane.permission_mode, undefined, signal);
+              } catch (transitionError) {
+                if (isAbortError(transitionError)) throw transitionError;
+                console.error('[BACKLOG_PROMOTE] Transition failed:', transitionError);
+              }
+
+              // Schedule auto_command injection for fresh spawns (mirrors task-move behavior)
+              if (targetSwimlane.auto_command?.trim()) {
+                const finalTask = tasks.getById(task.id);
+                if (finalTask?.session_id) {
+                  const vars = buildAutoCommandVars(finalTask);
+                  const interpolated = context.commandBuilder.interpolateTemplate(targetSwimlane.auto_command, vars);
+                  context.commandInjector.schedule(finalTask.id, finalTask.session_id, interpolated, { freshlySpawned: true });
+                }
+              }
+            } catch (error) {
+              if (isAbortError(error)) {
+                console.log(`[BACKLOG_PROMOTE] Aborted promotion for task ${task.id.slice(0, 8)}`);
+                context.sessionManager.removeByTaskId(task.id);
+                tasks.update({ id: task.id, session_id: null });
+                continue;
+              }
+              throw error;
+            } finally {
+              if (promotionControllers.get(task.id) === promotionController) {
+                promotionControllers.delete(task.id);
+              }
+            }
           }
         } catch (error) {
-          if (isAbortError(error)) {
-            console.log(`[BACKLOG_PROMOTE] Aborted promotion for task ${task.id.slice(0, 8)}`);
-            context.sessionManager.removeByTaskId(task.id);
-            tasks.update({ id: task.id, session_id: null });
-            createdTasks.push(tasks.getById(task.id) ?? task);
-            continue;
-          }
-          throw error;
-        } finally {
-          if (promotionControllers.get(task.id) === promotionController) {
-            promotionControllers.delete(task.id);
-          }
+          console.error('[BACKLOG_PROMOTE] Background agent spawn failed:', error);
         }
-      }
-
-      createdTasks.push(tasks.getById(task.id) ?? task);
+      })();
     }
 
     return createdTasks;
