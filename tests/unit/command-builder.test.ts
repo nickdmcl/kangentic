@@ -15,6 +15,9 @@ import {
   adaptCommandForShell,
   convertWindowsExePath,
   sanitizeForPty,
+  isUncPath,
+  toGitBashPath,
+  toWslPath,
 } from '../../src/shared/paths';
 import { interpolateTemplate, CommandBuilder } from '../../src/main/agent/command-builder';
 import { slugify } from '../../src/shared/slugify';
@@ -1109,5 +1112,102 @@ describe('Merged Settings -- MCP Server via --mcp-config', () => {
     expect(fs.readFileSync(path.join(tmpDir, '.mcp.json'), 'utf-8')).toBe(originalContent);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// UNC Path Support (Windows network shares like \\server\share)
+// Pure string transforms - run on all platforms, no platform guard needed.
+// ---------------------------------------------------------------------------
+
+describe('UNC Path Support', () => {
+  describe('isUncPath', () => {
+    it('detects backslash UNC paths', () => {
+      expect(isUncPath('\\\\server\\share')).toBe(true);
+      expect(isUncPath('\\\\192.168.0.1\\project')).toBe(true);
+    });
+
+    it('detects forward-slash UNC paths', () => {
+      expect(isUncPath('//server/share')).toBe(true);
+    });
+
+    it('rejects drive-letter paths', () => {
+      expect(isUncPath('C:\\Users')).toBe(false);
+      expect(isUncPath('D:\\project')).toBe(false);
+    });
+
+    it('rejects Unix absolute paths', () => {
+      expect(isUncPath('/usr/local/bin')).toBe(false);
+      expect(isUncPath('/home/user/project')).toBe(false);
+    });
+
+    it('rejects relative paths', () => {
+      expect(isUncPath('relative/path')).toBe(false);
+      expect(isUncPath('./local')).toBe(false);
+    });
+
+    it('rejects paths with only slashes', () => {
+      expect(isUncPath('//')).toBe(false);
+      expect(isUncPath('\\\\')).toBe(false);
+    });
+  });
+
+  describe('toGitBashPath with UNC', () => {
+    it('converts UNC backslashes to forward slashes', () => {
+      expect(toGitBashPath('\\\\192.168.0.1\\project\\sub'))
+        .toBe('//192.168.0.1/project/sub');
+    });
+
+    it('converts UNC server name only', () => {
+      expect(toGitBashPath('\\\\server\\share'))
+        .toBe('//server/share');
+    });
+
+    it('preserves existing drive-letter behavior', () => {
+      expect(toGitBashPath('C:\\Users\\dev')).toBe('/c/Users/dev');
+    });
+  });
+
+  describe('toWslPath with UNC', () => {
+    it('converts UNC backslashes to forward slashes (best-effort)', () => {
+      expect(toWslPath('\\\\server\\share\\path'))
+        .toBe('//server/share/path');
+    });
+
+    it('preserves existing drive-letter behavior', () => {
+      expect(toWslPath('C:\\Users\\dev')).toBe('/mnt/c/Users/dev');
+    });
+  });
+
+  describe('convertWindowsExePath with UNC', () => {
+    it('normalizes unquoted UNC exe path', () => {
+      expect(convertWindowsExePath('\\\\server\\share\\bin\\exe --flag', false))
+        .toBe('//server/share/bin/exe --flag');
+    });
+
+    it('normalizes quoted UNC exe path (strips quotes when no spaces)', () => {
+      expect(convertWindowsExePath('"\\\\server\\share\\bin\\exe" --flag', false))
+        .toBe('//server/share/bin/exe --flag');
+    });
+
+    it('scopes replacement to exe path only, preserving backslash args', () => {
+      expect(convertWindowsExePath('\\\\server\\share\\exe --dir C:\\other\\path', false))
+        .toBe('//server/share/exe --dir C:\\other\\path');
+    });
+
+    it('scopes quoted replacement to exe path only', () => {
+      expect(convertWindowsExePath('"\\\\server\\share\\my exe" --dir C:\\other', false))
+        .toBe('"//server/share/my exe" --dir C:\\other');
+    });
+
+    it('preserves existing drive-letter behavior', () => {
+      expect(convertWindowsExePath('C:\\Users\\dev\\bin\\claude.exe --print', false))
+        .toBe('/c/Users/dev/bin/claude.exe --print');
+    });
+
+    it('preserves existing Unix path behavior (no-op)', () => {
+      const cmd = '/usr/local/bin/claude --print "hello"';
+      expect(convertWindowsExePath(cmd, false)).toBe(cmd);
+    });
+  });
 });
 

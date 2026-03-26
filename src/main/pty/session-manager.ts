@@ -9,7 +9,7 @@ import { PtyBufferManager } from './pty-buffer-manager';
 import { SessionFileWatcher } from './session-file-watcher';
 import { UsageTracker } from './usage-tracker';
 import { detectPR } from './pr-connectors';
-import { adaptCommandForShell } from '../../shared/paths';
+import { adaptCommandForShell, isUncPath } from '../../shared/paths';
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { isShuttingDown } from '../shutdown-state';
 import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent, SpawnSessionInput } from '../../shared/types';
@@ -275,6 +275,16 @@ export class SessionManager extends EventEmitter {
       });
     }
 
+    // cmd.exe does not support UNC paths as working directory. It prints
+    // "UNC paths are not supported" and defaults to C:\Windows. Use pushd
+    // which auto-maps a temporary drive letter (e.g. Z: -> \\server\share).
+    // Other shells (PowerShell, Git Bash) handle UNC natively.
+    let uncPushdPrefix: string | null = null;
+    if (process.platform === 'win32' && isUncPath(effectiveCwd) && shellName.includes('cmd')) {
+      uncPushdPrefix = `pushd "${effectiveCwd}"`;
+      effectiveCwd = os.homedir();
+    }
+
     let ptyProcess: pty.IPty;
     try {
       ptyProcess = pty.spawn(shellExe, shellArgs, {
@@ -413,7 +423,13 @@ export class SessionManager extends EventEmitter {
     if (input.command) {
       setTimeout(() => {
         const cmd = adaptCommandForShell(input.command!, shellName);
-        ptyProcess.write(cmd + '\r');
+        if (uncPushdPrefix) {
+          // pushd maps UNC path to a temporary drive letter, then run the command
+          ptyProcess.write(uncPushdPrefix + '\r');
+          setTimeout(() => ptyProcess.write(cmd + '\r'), 200);
+        } else {
+          ptyProcess.write(cmd + '\r');
+        }
       }, 100);
     }
 

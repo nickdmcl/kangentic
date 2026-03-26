@@ -21,6 +21,7 @@ vi.mock('../../src/main/pty/shell-resolver', () => {
 
 vi.mock('../../src/shared/paths', () => ({
   adaptCommandForShell: (command: string) => command,
+  isUncPath: (p: string) => /^[\\/]{2}[^\\/]/.test(p),
 }));
 
 vi.mock('../../src/main/analytics/analytics', () => ({

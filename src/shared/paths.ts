@@ -36,6 +36,14 @@ export function resolveForwardSlash(p: string): string {
   return toForwardSlash(path.resolve(p));
 }
 
+/**
+ * True for Windows UNC paths: \\server\share or //server/share.
+ * Always false on macOS/Linux (single leading slash is not UNC).
+ */
+export function isUncPath(p: string): boolean {
+  return /^[\\/]{2}[^\\/]/.test(p);
+}
+
 // ---------------------------------------------------------------------------
 // Shell-specific executable path conversion (Windows only)
 // ---------------------------------------------------------------------------
@@ -45,6 +53,10 @@ export function resolveForwardSlash(p: string): string {
  *   C:\Users\dev → /c/Users/dev
  */
 export function toGitBashPath(windowsPath: string): string {
+  // UNC: \\server\share\path -> //server/share/path (Git Bash UNC format)
+  if (isUncPath(windowsPath)) {
+    return windowsPath.replace(/\\/g, '/');
+  }
   return windowsPath.replace(
     /^([A-Za-z]):(.*)/,
     (_m, drive: string, rest: string) =>
@@ -57,6 +69,11 @@ export function toGitBashPath(windowsPath: string): string {
  *   C:\Users\dev → /mnt/c/Users/dev
  */
 export function toWslPath(windowsPath: string): string {
+  // UNC: WSL cannot access Windows UNC shares via /mnt/.
+  // Convert slashes as best-effort; user must mount the share in WSL.
+  if (isUncPath(windowsPath)) {
+    return windowsPath.replace(/\\/g, '/');
+  }
   return windowsPath.replace(
     /^([A-Za-z]):(.*)/,
     (_m, drive: string, rest: string) =>
@@ -169,6 +186,25 @@ export function quoteArg(arg: string, shell?: string): string {
  * Unquoted: C:\path\to\exe --flag             →  /c/path/to/exe --flag
  */
 export function convertWindowsExePath(cmd: string, isWsl: boolean): string {
+  // UNC paths (\\server\share) - normalize slashes in the exe path only,
+  // leaving arguments after it unchanged. Exe paths are almost never on
+  // network shares, but handle gracefully if they are.
+  if (cmd.startsWith('"\\\\')) {
+    return cmd.replace(
+      /^"(\\\\[^"]+)"/,
+      (_m, uncPath: string) => {
+        const posix = uncPath.replace(/\\/g, '/');
+        return posix.includes(' ') ? `"${posix}"` : posix;
+      },
+    );
+  }
+  if (cmd.startsWith('\\\\')) {
+    return cmd.replace(
+      /^(\\\\[^\s]+)/,
+      (_m, uncPath: string) => uncPath.replace(/\\/g, '/'),
+    );
+  }
+
   const prefix = isWsl ? '/mnt/' : '/';
 
   if (cmd.startsWith('"')) {
