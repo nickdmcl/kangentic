@@ -1,20 +1,26 @@
-import { SquareTerminal, ClipboardCheck, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { SquareTerminal, ClipboardCheck, ArrowUp, ArrowDown, ChevronDown, Check } from 'lucide-react';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useProjectStore } from '../../stores/project-store';
 import { formatTokenCount } from '../../utils/format-tokens';
 import { useValuePulse } from '../../hooks/useValuePulse';
+import { usePopoverPosition } from '../../hooks/usePopoverPosition';
 import { Pill } from '../Pill';
 import type { UsageTimePeriod } from '../../../shared/types';
 
-const PERIOD_LABELS: Record<UsageTimePeriod, string> = {
-  live: 'Live',
-  today: 'Today',
-  week: 'This Week',
-  month: 'This Month',
-  all: 'All Time',
-};
+const PERIOD_OPTIONS: Array<{ value: UsageTimePeriod; label: string }> = [
+  { value: 'live', label: 'Live' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'all', label: 'All Time' },
+];
+
+const PERIOD_LABELS: Record<UsageTimePeriod, string> = Object.fromEntries(
+  PERIOD_OPTIONS.map(({ value, label }) => [value, label]),
+) as Record<UsageTimePeriod, string>;
 
 export function StatusBar() {
   const allSessions = useSessionStore((s) => s.sessions);
@@ -27,6 +33,42 @@ export function StatusBar() {
   const tasks = useBoardStore((s) => s.tasks);
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const currentProject = useProjectStore((s) => s.currentProject);
+
+  // Period popover state
+  const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
+  const periodTriggerRef = useRef<HTMLButtonElement>(null);
+  const periodPopoverRef = useRef<HTMLDivElement>(null);
+  const { style: periodPopoverStyle } = usePopoverPosition(
+    periodTriggerRef, periodPopoverRef, periodPopoverOpen, { mode: 'dropdown' },
+  );
+
+  // Close popover on click outside
+  useEffect(() => {
+    if (!periodPopoverOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        periodPopoverRef.current && !periodPopoverRef.current.contains(event.target as Node) &&
+        periodTriggerRef.current && !periodTriggerRef.current.contains(event.target as Node)
+      ) {
+        setPeriodPopoverOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [periodPopoverOpen]);
+
+  // Close popover on Escape
+  useEffect(() => {
+    if (!periodPopoverOpen) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setPeriodPopoverOpen(false);
+      }
+    }
+    document.addEventListener('keydown', handleEscape, true);
+    return () => document.removeEventListener('keydown', handleEscape, true);
+  }, [periodPopoverOpen]);
 
   const projectSessions = allSessions.filter((s) => s.projectId === currentProject?.id);
   const activeSessions = projectSessions.filter((s) => s.status === 'running').length;
@@ -59,6 +101,11 @@ export function StatusBar() {
   const tokenKey = `${displayInput}-${displayOutput}`;
   const tokenPulseRef = useValuePulse(tokenKey);
   const costPulseRef = useValuePulse(displayCost);
+
+  function handlePeriodSelect(period: UsageTimePeriod) {
+    setSelectedPeriod(period);
+    setPeriodPopoverOpen(false);
+  }
 
   return (
     <div className="h-9 bg-surface border-t border-edge flex items-center px-3 text-xs text-fg-faint select-none flex-shrink-0">
@@ -95,17 +142,38 @@ export function StatusBar() {
             </>
           )}
           {(hasUsage || !isLive) && <div className="w-px h-3.5 bg-edge flex-shrink-0" />}
-          <select
-            value={selectedPeriod}
-            onChange={(event) => setSelectedPeriod(event.target.value as UsageTimePeriod)}
-            className="appearance-none bg-transparent border border-edge rounded px-1.5 py-0.5 text-xs text-fg-muted cursor-pointer hover:border-edge-input focus:outline-none focus:border-accent"
-            data-testid="usage-period-select"
-            title="Usage stats time range"
-          >
-            {(Object.keys(PERIOD_LABELS) as UsageTimePeriod[]).map((period) => (
-              <option key={period} value={period}>{PERIOD_LABELS[period]}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              ref={periodTriggerRef}
+              type="button"
+              onClick={() => setPeriodPopoverOpen(!periodPopoverOpen)}
+              className="flex items-center gap-1 bg-transparent border border-edge rounded px-1.5 py-0.5 text-xs text-fg-muted cursor-pointer hover:border-edge-input focus:outline-none focus:border-accent transition-colors"
+              data-testid="usage-period-select"
+              title="Usage stats time range"
+            >
+              {PERIOD_LABELS[selectedPeriod]}
+              <ChevronDown size={10} className="text-fg-faint" />
+            </button>
+            {periodPopoverOpen && (
+              <div
+                ref={periodPopoverRef}
+                style={periodPopoverStyle}
+                className="absolute z-50 bg-surface-raised border border-edge rounded-lg shadow-xl py-1 min-w-[120px]"
+              >
+                {PERIOD_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handlePeriodSelect(value)}
+                    className="w-full px-3 py-1.5 text-xs text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center justify-between gap-3"
+                  >
+                    {label}
+                    {value === selectedPeriod && <Check size={12} className="text-accent flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
