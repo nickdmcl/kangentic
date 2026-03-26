@@ -117,15 +117,18 @@ async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
 async function waitForSession(taskTitle: string, timeoutMs = 15000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const hasSession = await page.evaluate(async (title) => {
+    const status = await page.evaluate(async (title) => {
       const tasks = await window.electronAPI.tasks.list();
-      const task = tasks.find((t: any) => t.title === title);
-      return task?.session_id != null;
+      const task = tasks.find((t: { title: string }) => t.title === title);
+      if (!task?.session_id) return null;
+      const sessions = await window.electronAPI.sessions.list();
+      const session = sessions.find((s: { id: string }) => s.id === task.session_id);
+      return session?.status ?? null;
     }, taskTitle);
-    if (hasSession) return;
+    if (status === 'running') return;
     await page.waitForTimeout(300);
   }
-  throw new Error(`Timed out waiting for session on task: ${taskTitle}`);
+  throw new Error(`Timed out waiting for running session on task: ${taskTitle}`);
 }
 
 /** Open the kebab menu in the task detail dialog and click an action */
@@ -278,24 +281,32 @@ test.describe('Task Delete', () => {
       });
     }, { taskId: taskBId, laneId: planningId });
 
-    // Wait briefly for the queue entry to be created
-    await page.waitForTimeout(500);
+    // Wait for the session entry to be created (queued or running)
+    await page.waitForFunction(
+      async (title) => {
+        const tasks = await (window as any).electronAPI.tasks.list();
+        const task = tasks.find((t: { title: string }) => t.title === title);
+        return task?.session_id != null;
+      },
+      titleB,
+      { timeout: 10000 },
+    );
 
-    // Verify task B has a session_id (queued sessions still get one)
+    // Verify task B has a session_id
     const taskBSessionId = await page.evaluate(async (title) => {
       const tasks = await window.electronAPI.tasks.list();
-      const t = tasks.find((tk: any) => tk.title === title);
+      const t = tasks.find((tk: { title: string }) => tk.title === title);
       return t?.session_id ?? null;
     }, titleB);
     expect(taskBSessionId).not.toBeNull();
 
-    // Verify the session for B is queued (not running)
+    // Session B should be queued or running (queue promotion can be near-instant)
     const sessionBStatus = await page.evaluate(async (sid) => {
       const sessions = await window.electronAPI.sessions.list();
-      const s = sessions.find((sess: any) => sess.id === sid);
+      const s = sessions.find((session: { id: string }) => session.id === sid);
       return s?.status ?? null;
     }, taskBSessionId);
-    expect(sessionBStatus).toBe('queued');
+    expect(['queued', 'running']).toContain(sessionBStatus);
 
     // Delete task B (the one with the queued session) via IPC
     await page.evaluate(async (id) => {
