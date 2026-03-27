@@ -19,9 +19,9 @@ import type { CommandHandler } from './types';
  */
 export const commandHandlers: Record<string, CommandHandler> = {
   create_task: handleCreateTask,
+  move_task: handleMoveTask,
   update_task: handleUpdateTask,
   delete_task: handleDeleteTask,
-  move_task: handleMoveTask,
   update_column: handleUpdateColumn,
   list_columns: handleListColumns,
   list_tasks: handleListTasks,

@@ -101,6 +101,46 @@ export const handleCreateTask: CommandHandler = (
   };
 };
 
+export const handleMoveTask: CommandHandler = (
+  params: Record<string, unknown>,
+  context: CommandContext,
+): CommandResponse => {
+  const taskId = params.taskId as string;
+  const columnName = params.column as string;
+
+  if (!taskId) return { success: false, error: 'taskId is required' };
+  if (!columnName) return { success: false, error: 'column is required' };
+
+  const db = context.getProjectDb();
+  const taskRepo = new TaskRepository(db);
+
+  const task = resolveTask(taskRepo, taskId);
+  if (!task) return { success: false, error: `Task "${taskId}" not found` };
+
+  const resolution = resolveColumn(db, columnName);
+  if ('error' in resolution) return { success: false, error: resolution.error };
+  const { swimlane: targetSwimlane } = resolution;
+
+  if (task.swimlane_id === targetSwimlane.id) {
+    return { success: true, message: `"${task.title}" is already in ${targetSwimlane.name}.` };
+  }
+
+  const { cnt } = db
+    .prepare('SELECT COUNT(*) as cnt FROM tasks WHERE swimlane_id = ? AND archived_at IS NULL')
+    .get(targetSwimlane.id) as { cnt: number };
+
+  taskRepo.move({ taskId: task.id, targetSwimlaneId: targetSwimlane.id, targetPosition: cnt });
+
+  const moved = taskRepo.getById(task.id)!;
+  context.onTaskUpdated(moved);
+
+  return {
+    success: true,
+    message: `Moved "${task.title}" to ${targetSwimlane.name}.`,
+    data: { id: moved.id, title: moved.title, column: targetSwimlane.name },
+  };
+};
+
 export const handleUpdateTask: CommandHandler = (
   params: Record<string, unknown>,
   context: CommandContext,

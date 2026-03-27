@@ -6,11 +6,16 @@ const rendererOptimizeDeps = require('./renderer-optimize-deps.json');
 
 const projectDir = path.resolve(__dirname, '..');
 
+// Ensure cwd is the project root so Vite resolves node_modules correctly
+// regardless of where this script is invoked from.
+process.chdir(projectDir);
+
 // Parse CLI flags
 const portArg = process.argv.find(a => a.startsWith('--port='));
 const port = portArg ? parseInt(portArg.split('=')[1], 10) : 5173;
 const ephemeral = process.argv.includes('--ephemeral');
 const fresh = process.argv.includes('--fresh');
+const noElectron = process.argv.includes('--no-electron');
 
 // Detect Electron executable path per-platform
 const electronExe = process.platform === 'win32'
@@ -112,10 +117,18 @@ async function start() {
     console.log('[dev] Vite cache is cold -- warming up will take longer while Vite optimizes dependencies...');
   }
   console.time('[dev] warmup');
-  await viteServer.transformRequest('/src/renderer/index.tsx');
-  console.timeEnd('[dev] warmup');
+  viteServer.transformRequest('/src/renderer/index.tsx').then(() => {
+    console.timeEnd('[dev] warmup');
+  }).catch(() => {
+    console.log('[dev] warmup skipped (dependency pre-bundling will happen on first request)');
+  });
 
-  // 3. Launch Electron
+  // 3. Launch Electron (skipped when --no-electron is passed)
+  if (noElectron) {
+    console.log('[dev] Skipping Electron launch (--no-electron). Ctrl+C to stop.');
+    return;
+  }
+
   const positionalArgs = process.argv.slice(2).filter(a => !a.startsWith('--'));
   const targetDir = positionalArgs[0] || (fresh ? null : projectDir);
   const electronArgs = [projectDir];

@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy, GitCompare } from 'lucide-react';
+import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy, GitCompare, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { TaskChangesDialog } from '../dialogs/TaskChangesDialog';
@@ -25,12 +25,14 @@ interface TaskCardProps {
 }
 
 /** Inline context menu for task cards. */
-function TaskContextMenu({ position, task, swimlanes, onEdit, onShowChanges, onMoveTo, onSendToBacklog, onArchive, onDelete, onClose }: {
+function TaskContextMenu({ position, task, swimlanes, canRestart, onEdit, onShowChanges, onRestart, onMoveTo, onSendToBacklog, onArchive, onDelete, onClose }: {
   position: { x: number; y: number };
   task: Task;
   swimlanes: Swimlane[];
+  canRestart: boolean;
   onEdit: () => void;
   onShowChanges: () => void;
+  onRestart: () => void;
   onMoveTo: (targetSwimlaneId: string) => void;
   onSendToBacklog: () => void;
   onArchive: () => void;
@@ -104,6 +106,18 @@ function TaskContextMenu({ position, task, swimlanes, onEdit, onShowChanges, onM
         >
           <GitCompare size={14} className="text-fg-faint" />
           Changes
+        </button>
+      )}
+
+      {canRestart && (
+        <button
+          type="button"
+          onClick={() => { onRestart(); onClose(); }}
+          className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
+          data-testid="context-restart-task"
+        >
+          <RefreshCw size={14} className="text-fg-faint" />
+          Restart
         </button>
       )}
 
@@ -311,6 +325,17 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
     }
     await useBoardStore.getState().deleteTask(task.id);
     setConfirmDelete(false);
+  };
+
+  const handleRestart = async () => {
+    try {
+      await useSessionStore.getState().restartSession(task.id);
+    } catch (err) {
+      useToastStore.getState().addToast({
+        message: `Restart failed: ${err instanceof Error ? err.message : String(err)}`,
+        variant: 'error',
+      });
+    }
   };
 
   if (compact) {
@@ -536,8 +561,10 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           position={contextMenu}
           task={task}
           swimlanes={useBoardStore.getState().swimlanes}
+          canRestart={displayState.kind === 'initializing' || displayState.kind === 'running' || displayState.kind === 'suspended'}
           onEdit={() => { setForceEdit(true); setDetailTaskId(task.id); }}
           onShowChanges={() => setShowChanges(true)}
+          onRestart={handleRestart}
           onMoveTo={handleMoveTo}
           onSendToBacklog={() => {
             setContextMenu(null);

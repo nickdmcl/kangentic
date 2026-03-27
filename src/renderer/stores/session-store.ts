@@ -88,6 +88,7 @@ interface SessionStore {
   resetSession: (taskId: string) => Promise<void>;
   suspendSession: (taskId: string) => Promise<void>;
   resumeSession: (taskId: string, resumePrompt?: string) => Promise<Session>;
+  restartSession: (taskId: string) => Promise<Session>;
   setActiveSession: (id: string | null) => void;
   setDialogSessionId: (id: string | null) => void;
   upsertSession: (session: Session) => void;
@@ -304,6 +305,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       };
     });
     return newSession;
+  },
+
+  restartSession: async (taskId) => {
+    await window.electronAPI.sessions.suspend(taskId);
+    set((s) => {
+      const sessions = s.sessions.filter((sess) => sess.taskId !== taskId);
+      return { sessions, _sessionByTaskId: buildSessionByTaskId(sessions) };
+    });
+    return get().resumeSession(taskId);
   },
 
   setActiveSession: (id) => set({ activeSessionId: id }),
