@@ -194,11 +194,18 @@ export class BoardConfigManager {
       // Query existing lanes once. Used for both system column ID reuse and reconciliation.
       const existingLanes = swimlaneRepo.list();
 
-      // Normalize legacy role: "backlog" → "todo" (backlog is now a separate view)
+      // Normalize legacy role: "backlog" → "todo" (backlog is now a separate view).
+      // If a todo column already exists alongside the backlog column, the backlog
+      // column is a staging area — demote it to a plain custom column instead of
+      // creating a duplicate todo.
+      const alreadyHasTodo = config.columns.some((column) => column.role === 'todo');
       for (const column of config.columns) {
         if (column.role === 'backlog' as SwimlaneRole) {
-          column.role = 'todo';
-          if (column.name === 'Backlog') column.name = 'To Do';
+          if (!alreadyHasTodo) {
+            column.role = 'todo';
+            if (column.name === 'Backlog') column.name = 'To Do';
+          }
+          // If a todo column already exists, keep role as "backlog" — it's a staging column.
         }
       }
 
@@ -231,12 +238,14 @@ export class BoardConfigManager {
         warnings.push('kangentic.json is missing a done column. Added default.');
       }
 
-      // Enforce position: To Do first, Done last
+      // Enforce position: Backlog (if present) first, To Do second (or first), Done last.
       const todoIndex = config.columns.findIndex((column) => column.role === 'todo');
-      if (todoIndex > 0) {
+      const backlogAtFront = (config.columns[0]?.role as string) === 'backlog';
+      const todoAllowedAt = backlogAtFront ? 1 : 0;
+      if (todoIndex > todoAllowedAt) {
         const [todoColumn] = config.columns.splice(todoIndex, 1);
-        config.columns.unshift(todoColumn);
-        warnings.push('To Do column must be first. Position corrected.');
+        config.columns.splice(todoAllowedAt, 0, todoColumn);
+        warnings.push('To Do column must be first (or second after Backlog). Position corrected.');
       }
 
       const doneIndex = config.columns.findIndex((column) => column.role === 'done');

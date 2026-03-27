@@ -2,6 +2,13 @@
   "version": 1,
   "columns": [
     {
+      "id": "1fd68b63-0cf3-4920-9510-c90d82324deb",
+      "name": "To Do",
+      "role": "todo",
+      "icon": "layers",
+      "color": "#6b7280"
+    },
+    {
       "id": "e6350e8a-77fa-43a2-815b-6447820adf40",
       "name": "To Do",
       "role": "todo",
@@ -46,6 +53,22 @@
       "color": "#f97316",
       "autoSpawn": true,
       "autoCommand": "/merge-back"
+    },
+    {
+      "id": "60acb790-e7ba-4c8a-926c-0a7c354dc65c",
+      "name": "Staging",
+      "icon": "merge",
+      "color": "#06b6d4",
+      "autoSpawn": true,
+      "autoCommand": "A new feature has been merged to the staging branch. Set up the local environment so Nick can test the full combined build.\n\nStep 1 — Update staging branch:\nRun `git rev-parse --show-toplevel` to find the project root, then from that directory:\ngit fetch origin\ngit checkout staging\ngit pull --rebase origin staging\n\nStep 2 — Restart all dev servers (always restart to pick up latest code, whether already running or not):\nCheck this project's standard startup commands (package.json scripts, Makefile, Pipfile, or README). Kill any running instances on the relevant ports and restart all services. If startup commands are unclear, report what you found and ask before proceeding.\n\nStep 3 — Confirm servers are up by hitting the project's health/root endpoints.\n\nStep 4 — Build the test checklist:\n\nGet the raw git changes:\ngit log origin/staging ^origin/main --oneline\ngit diff origin/main origin/staging --stat\n\nThen use the Kangentic MCP tools to list all cards currently in the Staging column. For each card, read its title and description.\n\nCombine both sources to produce a numbered test checklist — one section per feature. Each section should include:\n- The feature name (from the card title)\n- 2–4 specific things to click or verify in the UI, based on what the task description says was built\n- Any edge cases or error states worth checking\n\nKeep each item concrete and actionable: \"Go to X, do Y, confirm Z\" — not just \"test the feature\".\n\n---\nEnd your report with:\n\nStaging ready: [local URL]\n\nTest checklist:\n[numbered checklist here]\n\nWhen all items pass, drag all cards in this column to Notify Dev."
+    },
+    {
+      "id": "b7b01d2b-b600-496d-bc12-3f32f1e4d8b0",
+      "name": "Notify Dev",
+      "icon": "send",
+      "color": "#10b981",
+      "autoSpawn": true,
+      "autoCommand": "A task is ready for deployment. First promote staging to main, then notify the dev team.\n\nStep 1 — Promote staging to main (idempotent):\nRun `git rev-parse --show-toplevel` to find the project root, then from that directory:\ngit fetch origin\ngit merge-base --is-ancestor origin/staging origin/main && echo \"ALREADY_MERGED\" || (\n  git checkout main &&\n  git pull --rebase origin main &&\n  git merge --no-ff staging -m \"Merge staging to main\" &&\n  git push origin main &&\n  echo \"MERGE_DONE\"\n)\n\nIf output is ALREADY_MERGED — staging is already in main (another card in this batch already triggered the merge). Skip to Step 2.\nIf output is MERGE_DONE — confirm the merge succeeded before proceeding.\n\nStep 2 — Notify the dev team via Slack.\n\nUse the kangentic MCP tools to get the current task's title and branch name.\n\nInfer the repo URL:\n  git remote get-url origin\nConvert to a browser URL: git@bitbucket.org:workspace/repo.git → https://bitbucket.org/workspace/repo, or strip credentials and .git from an HTTPS remote URL.\n\nRun `cat ~/Developer/nicks-utils/Kangentic_admin/dev-team.json` to read the available dev team members. Present the list as a numbered list and ask who to notify. Wait for their choice.\n\nRun `grep SLACK_WEBHOOK_URL ~/Developer/nicks-utils/Kangentic_admin/.env | cut -d'=' -f2-` to read the webhook URL.\n\nCompose a Slack message in this format:\n▎ Hey <@SLACK_USER_ID> — [branch-name] is ready to go live. [1-sentence summary of the change and its impact]. [repo-url] — Please deploy when you're ready.\n\nSend it with:\ncurl -s -X POST -H 'Content-type: application/json' \\\n  --data '{\"text\":\"<message>\"}' \\\n  \"<SLACK_WEBHOOK_URL>\"\n\nStep 3 — Confirm: Report \"Slack message sent to [name].\" then move the task to Done using the kangentic MCP tools."
     },
     {
       "id": "64f9ef9a-c05d-44f8-a846-329a8f15e69f",
@@ -98,5 +121,5 @@
       "id": "460b4921-4c86-45c3-be7a-b9397e98be02"
     }
   ],
-  "_modifiedBy": "7ef4fd0cb484"
+  "_modifiedBy": "0f733ebea217"
 }
