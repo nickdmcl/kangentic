@@ -31,6 +31,8 @@ interface NewTaskDialogProps {
 
 export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
   const createTask = useBoardStore((s) => s.createTask);
+  const moveTask = useBoardStore((s) => s.moveTask);
+  const swimlanes = useBoardStore((s) => s.swimlanes);
   const defaultBaseBranch = useConfigStore((s) => s.config.git.defaultBaseBranch);
   const worktreesEnabled = useConfigStore((s) => s.config.git.worktreesEnabled);
   const currentProject = useProjectStore((s) => s.currentProject);
@@ -43,6 +45,8 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
   const [baseBranch, setBaseBranch] = useState('');
   const [useWorktree, setUseWorktree] = useState<boolean | null>(null);
   const effectiveWorktree = useWorktree ?? worktreesEnabled;
+  const planningSwimlane = swimlanes.find((s) => s.permission_mode === 'plan') ?? null;
+  const showCreateAndPlan = planningSwimlane !== null && planningSwimlane.id !== swimlaneId;
   const [customBranchName, setCustomBranchName] = useState('');
   const branchNameError = customBranchName.trim() && !isValidGitBranchName(customBranchName.trim())
     ? 'Invalid git branch name'
@@ -206,32 +210,51 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
     }
   }, [addFile]);
 
+  const buildTaskInput = () => ({
+    title: title.trim(),
+    description: description.trim(),
+    swimlane_id: swimlaneId,
+    ...(labels.length > 0 ? { labels } : {}),
+    ...(priority > 0 ? { priority } : {}),
+    ...(baseBranch.trim() ? { baseBranch: baseBranch.trim() } : {}),
+    ...(useWorktree !== null ? { useWorktree } : {}),
+    ...(customBranchName.trim() ? { customBranchName: customBranchName.trim() } : {}),
+    ...(attachments.length > 0 ? {
+      pendingAttachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        data: attachment.data,
+        media_type: attachment.media_type,
+      })),
+    } : {}),
+  });
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
     if (branchNameError) return;
     const taskTitle = title.trim();
-    await createTask({
-      title: taskTitle,
-      description: description.trim(),
-      swimlane_id: swimlaneId,
-      ...(labels.length > 0 ? { labels } : {}),
-      ...(priority > 0 ? { priority } : {}),
-      ...(baseBranch.trim() ? { baseBranch: baseBranch.trim() } : {}),
-      ...(useWorktree !== null ? { useWorktree } : {}),
-      ...(customBranchName.trim() ? { customBranchName: customBranchName.trim() } : {}),
-      ...(attachments.length > 0 ? {
-        pendingAttachments: attachments.map((attachment) => ({
-          filename: attachment.filename,
-          data: attachment.data,
-          media_type: attachment.media_type,
-        })),
-      } : {}),
-    });
+    await createTask(buildTaskInput());
     // Revoke all preview URLs
     attachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
     useToastStore.getState().addToast({
       message: `Created task "${taskTitle}"`,
+      variant: 'info',
+    });
+    onClose();
+  };
+
+  const handleSubmitAndPlan = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+    if (branchNameError) return;
+    if (!planningSwimlane) return;
+    const taskTitle = title.trim();
+    const task = await createTask(buildTaskInput());
+    const planningTasks = useBoardStore.getState().getTasksBySwimlane(planningSwimlane.id);
+    await moveTask({ taskId: task.id, targetSwimlaneId: planningSwimlane.id, targetPosition: planningTasks.length });
+    attachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
+    useToastStore.getState().addToast({
+      message: `Created and moved to Planning`,
       variant: 'info',
     });
     onClose();
