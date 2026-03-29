@@ -15,6 +15,7 @@ import { useToastStore } from '../../stores/toast-store';
 import { useTaskProgress } from '../../utils/task-progress';
 import { getProgressColor } from '../../utils/color-lerp';
 import { LabelPills } from '../Pill';
+import { EventType } from '../../../shared/types';
 import type { Task, Swimlane } from '../../../shared/types';
 
 interface TaskCardProps {
@@ -230,6 +231,28 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
     ),
   );
 
+  // Most recent AI result text from Notification or TaskCompleted events
+  const lastResultText = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) => {
+        if (!sessionId) return null;
+        const events = s.sessionEvents[sessionId];
+        if (!events) return null;
+        for (let i = events.length - 1; i >= 0; i--) {
+          const ev = events[i];
+          if (
+            (ev.type === EventType.Notification || ev.type === EventType.TaskCompleted) &&
+            ev.detail
+          ) {
+            return ev.detail;
+          }
+        }
+        return null;
+      },
+      [sessionId],
+    ),
+  );
+
   const {
     attributes,
     listeners,
@@ -438,8 +461,17 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           </div>
         )}
 
-        {!isCompactDensity && task.description && (
-          <div className={`text-xs text-fg-faint mt-1 ${isComfortableDensity ? 'line-clamp-5' : 'line-clamp-3'}`}>{stripMarkdown(task.description)}</div>
+        {!isCompactDensity && (lastResultText || task.description) && (
+          <div className={`text-xs mt-1 ${isComfortableDensity ? 'line-clamp-5' : 'line-clamp-3'} flex items-start gap-1`}>
+            {lastResultText ? (
+              <>
+                <span className="text-fg-faint/60 shrink-0 mt-px" title="Latest AI result">›</span>
+                <span className="text-fg-secondary">{lastResultText}</span>
+              </>
+            ) : (
+              <span className="text-fg-faint">{stripMarkdown(task.description)}</span>
+            )}
+          </div>
         )}
 
         <div className={isCompactDensity ? 'mt-1' : 'mt-1.5'}>
