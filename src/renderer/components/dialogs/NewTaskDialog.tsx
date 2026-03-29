@@ -248,7 +248,6 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
     if (!title.trim()) return;
     if (branchNameError) return;
     if (!planningSwimlane) return;
-    const taskTitle = title.trim();
     const task = await createTask(buildTaskInput());
     const planningTasks = useBoardStore.getState().getTasksBySwimlane(planningSwimlane.id);
     await moveTask({ taskId: task.id, targetSwimlaneId: planningSwimlane.id, targetPosition: planningTasks.length });
@@ -278,6 +277,16 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
               >
                 Cancel
               </button>
+              {showCreateAndPlan && (
+                <button
+                  type="button"
+                  onClick={handleSubmitAndPlan}
+                  disabled={!!branchNameError}
+                  className="px-4 py-1.5 text-xs border border-accent text-accent-fg hover:bg-accent/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create & Plan
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={!!branchNameError}
