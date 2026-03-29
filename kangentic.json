@@ -2,13 +2,6 @@
   "version": 1,
   "columns": [
     {
-      "id": "1fd68b63-0cf3-4920-9510-c90d82324deb",
-      "name": "To Do",
-      "role": "todo",
-      "icon": "layers",
-      "color": "#6b7280"
-    },
-    {
       "id": "e6350e8a-77fa-43a2-815b-6447820adf40",
       "name": "To Do",
       "role": "todo",
