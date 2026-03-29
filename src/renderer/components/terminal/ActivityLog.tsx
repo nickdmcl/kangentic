@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { useShallow } from 'zustand/react/shallow';
 import { useSessionStore } from '../../stores/session-store';
-import { Select } from '../settings/shared';
+import { ChevronDown } from 'lucide-react';
 import { EventType, IdleReason } from '../../../shared/types';
 import type { SessionEvent } from '../../../shared/types';
 
@@ -189,12 +189,27 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     return (
       <div className="h-full w-full bg-surface flex flex-col font-mono">
         {showFilter && (
-          <FilterPill
-            sessionIds={sessionIds}
-            taskLabelMap={taskLabelMap}
-            filterSessionId={filterSessionId}
-            onFilter={setFilterSessionId}
-          />
+          <div className="bg-surface border-b border-edge pt-2 pb-1.5 px-2">
+            <div className="relative inline-block">
+              <select
+                data-testid="activity-filter"
+                value={filterSessionId ?? ''}
+                onChange={(e) => setFilterSessionId(e.target.value || null)}
+                className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="">All</option>
+                {sessionIds.map((sid) => (
+                  <option key={sid} value={sid}>
+                    {taskLabelMap.get(sid) || sid.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={12}
+                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-fg-muted"
+              />
+            </div>
+          </div>
         )}
         <div className="flex-1 flex items-center justify-center text-fg-disabled text-sm">
           {filteredLabel
@@ -213,26 +228,41 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
       onMouseLeave={handleMouseLeave}
       className={`h-full w-full bg-surface overflow-y-auto font-mono text-xs leading-5 px-2 pb-2 ${showFilter || lastPromptText ? 'pt-0' : 'pt-2'}`}
     >
-      {/* Sticky last-prompt banner — always visible while events scroll below */}
-      {lastPromptText && (
-        <div className="sticky top-0 z-10 bg-surface border-b border-edge px-0 pt-2 pb-1.5 mb-1">
-          <div className="flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/10 px-2 py-1 rounded-r min-w-0">
-            <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
-            <span className="text-sky-200 text-xs leading-4 truncate min-w-0">
-              {lastPromptText.length > PROMPT_DISPLAY_CHARS
-                ? lastPromptText.slice(0, PROMPT_DISPLAY_CHARS) + '…'
-                : lastPromptText}
-            </span>
-          </div>
+      {/* Single sticky header — prompt banner and/or session filter (combined to avoid two sticky top-0 elements overlapping) */}
+      {(lastPromptText || showFilter) && (
+        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2 pb-1.5 mb-1">
+          {lastPromptText && (
+            <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/10 px-2 py-1 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
+              <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
+              <span className="text-fg-tertiary text-xs leading-4 truncate min-w-0">
+                {lastPromptText.length > PROMPT_DISPLAY_CHARS
+                  ? lastPromptText.slice(0, PROMPT_DISPLAY_CHARS) + '…'
+                  : lastPromptText}
+              </span>
+            </div>
+          )}
+          {showFilter && (
+            <div className="relative inline-block">
+              <select
+                data-testid="activity-filter"
+                value={filterSessionId ?? ''}
+                onChange={(e) => setFilterSessionId(e.target.value || null)}
+                className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="">All</option>
+                {sessionIds.map((sid) => (
+                  <option key={sid} value={sid}>
+                    {taskLabelMap.get(sid) || sid.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={12}
+                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-fg-muted"
+              />
+            </div>
+          )}
         </div>
-      )}
-      {showFilter && (
-        <FilterPill
-          sessionIds={sessionIds}
-          taskLabelMap={taskLabelMap}
-          filterSessionId={filterSessionId}
-          onFilter={setFilterSessionId}
-        />
       )}
       {displayEvents.map((item, i) => (
         <EventLine
@@ -248,42 +278,6 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   );
 }
 
-/* ── Filter Pill ── */
-
-interface FilterPillProps {
-  sessionIds: string[];
-  taskLabelMap: Map<string, string>;
-  filterSessionId: string | null;
-  onFilter: (id: string | null) => void;
-}
-
-function FilterPill({
-  sessionIds,
-  taskLabelMap,
-  filterSessionId,
-  onFilter,
-}: FilterPillProps) {
-  return (
-    <div className="sticky top-0 z-10 bg-surface pt-2 pb-1.5 mb-1 border-b border-edge">
-      <Select
-        data-testid="activity-filter"
-        value={filterSessionId ?? ''}
-        onChange={(event) => onFilter(event.target.value || null)}
-        className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
-        wrapperClassName="relative inline-block"
-        chevronSize={12}
-        chevronClassName="right-2"
-      >
-        <option value="">All</option>
-        {sessionIds.map((sessionId) => (
-          <option key={sessionId} value={sessionId}>
-            {taskLabelMap.get(sessionId) || sessionId.slice(0, 8)}
-          </option>
-        ))}
-      </Select>
-    </div>
-  );
-}
 
 function formatTime(ts: number): string {
   return format(ts, 'HH:mm:ss');
@@ -310,7 +304,7 @@ function PromptLine({ ts, label, colorClass, showLabel, text }: {
       {showLabel && <span className={`${colorClass} font-semibold shrink-0 mt-0.5`}>[{label}]</span>}
       <div className="flex flex-col min-w-0">
         <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider select-none leading-4">You</span>
-        <span className="text-sky-200 leading-4 break-words">{displayText}</span>
+        <span className="text-fg-tertiary leading-4 break-words">{displayText}</span>
       </div>
     </div>
   );
@@ -324,7 +318,7 @@ function AiReadyLine({ ts, label, colorClass, showLabel }: {
     <div className="flex items-baseline gap-1.5 my-1 border-l-2 border-emerald-500 bg-emerald-500/10 pl-2 pr-1 py-0.5 rounded-r">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
-      <span className="bg-emerald-900/40 text-emerald-300 px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none">AI Ready</span>
+      <span className="bg-emerald-900/30 text-emerald-400 px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none">AI Ready</span>
     </div>
   );
 }
