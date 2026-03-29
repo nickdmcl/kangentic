@@ -8,6 +8,7 @@ import type { SessionEvent } from '../../../shared/types';
 
 const MAX_RENDERED_EVENTS = 500;
 const SCROLL_RETURN_DELAY_MS = 3000;
+const PROMPT_DISPLAY_CHARS = 160;
 
 // 8 distinct colors for session badges (Tailwind-ish)
 const BADGE_COLORS = [
@@ -91,6 +92,15 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     () => allEvents.length > MAX_RENDERED_EVENTS ? allEvents.slice(-MAX_RENDERED_EVENTS) : allEvents,
     [allEvents],
   );
+
+  // Last user prompt text for the sticky header
+  const lastPromptText = useMemo(() => {
+    for (let i = displayEvents.length - 1; i >= 0; i--) {
+      const { event } = displayEvents[i];
+      if (event.type === EventType.Prompt && event.detail) return event.detail;
+    }
+    return null;
+  }, [displayEvents]);
 
   // Smooth-scroll back to bottom and re-enable auto-scroll
   const smoothScrollToBottom = () => {
@@ -201,8 +211,21 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
       onScroll={handleScroll}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`h-full w-full bg-surface overflow-y-auto font-mono text-xs leading-5 px-2 pb-2 ${showFilter ? 'pt-0' : 'pt-2'}`}
+      className={`h-full w-full bg-surface overflow-y-auto font-mono text-xs leading-5 px-2 pb-2 ${showFilter || lastPromptText ? 'pt-0' : 'pt-2'}`}
     >
+      {/* Sticky last-prompt banner — always visible while events scroll below */}
+      {lastPromptText && (
+        <div className="sticky top-0 z-10 bg-surface border-b border-edge px-0 pt-2 pb-1.5 mb-1">
+          <div className="flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/10 px-2 py-1 rounded-r min-w-0">
+            <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
+            <span className="text-sky-200 text-xs leading-4 truncate min-w-0">
+              {lastPromptText.length > PROMPT_DISPLAY_CHARS
+                ? lastPromptText.slice(0, PROMPT_DISPLAY_CHARS) + '…'
+                : lastPromptText}
+            </span>
+          </div>
+        </div>
+      )}
       {showFilter && (
         <FilterPill
           sessionIds={sessionIds}
@@ -274,6 +297,38 @@ interface EventLineProps {
   showLabel: boolean;
 }
 
+/** User prompt block — sky blue, visually distinct from the activity stream. */
+function PromptLine({ ts, label, colorClass, showLabel, text }: {
+  ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
+}) {
+  const displayText = text.length > PROMPT_DISPLAY_CHARS
+    ? text.slice(0, PROMPT_DISPLAY_CHARS) + '…'
+    : text;
+  return (
+    <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-sky-500 bg-sky-500/10 pl-2 pr-1 py-1 rounded-r min-w-0">
+      <span className="text-zinc-600 shrink-0 mt-0.5">{formatTime(ts)}</span>
+      {showLabel && <span className={`${colorClass} font-semibold shrink-0 mt-0.5`}>[{label}]</span>}
+      <div className="flex flex-col min-w-0">
+        <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider select-none leading-4">You</span>
+        <span className="text-sky-200 leading-4 break-words">{displayText}</span>
+      </div>
+    </div>
+  );
+}
+
+/** AI-ready line — emerald green, signals the agent has stopped and is waiting for input. */
+function AiReadyLine({ ts, label, colorClass, showLabel }: {
+  ts: number; label: string; colorClass: string; showLabel: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5 my-1 border-l-2 border-emerald-500 bg-emerald-500/10 pl-2 pr-1 py-0.5 rounded-r">
+      <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
+      {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
+      <span className="bg-emerald-900/40 text-emerald-300 px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none">AI Ready</span>
+    </div>
+  );
+}
+
 /** Dim italic text line (no detail). */
 function DimLine({ ts, label, colorClass, showLabel, text }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
@@ -335,16 +390,14 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
       return <BadgeLine {...common} badge={`${event.tool || 'Tool'} interrupted`} detail={event.detail} variant="warn" />;
 
     case EventType.Idle:
-      return <DimLine {...common} text={event.detail === IdleReason.Timeout ? 'Idle (no activity detected)' : 'Idle (waiting for input)'} />;
+      return event.detail === IdleReason.Timeout
+        ? <DimLine {...common} text="Idle (no activity detected)" />
+        : <AiReadyLine {...common} />;
 
     case EventType.Prompt:
-      return (
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-zinc-600 shrink-0">{formatTime(event.ts)}</span>
-          {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
-          <span className="text-fg-muted">Thinking...</span>
-        </div>
-      );
+      return event.detail
+        ? <PromptLine {...common} text={event.detail} />
+        : <DimLine {...common} text="Thinking..." />;
 
     case EventType.SessionStart:
       return <DimLine {...common} text="Session started" />;

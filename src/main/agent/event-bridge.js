@@ -134,6 +134,44 @@ process.stdin.on('end', () => {
     if (Object.keys(hookCtx).length > 0) {
       event.hookContext = JSON.stringify(hookCtx).slice(0, 2048);
     }
+  } else if (eventType === 'subagent_start' || eventType === 'subagent_stop') {
+    try {
+      const ctx = JSON.parse(input);
+      const detail = ctx.agent_type || ctx.subagent_type;
+      if (detail) event.detail = String(detail).slice(0, 200);
+    } catch { /* best effort */ }
+  } else if (eventType === 'notification') {
+    try {
+      const ctx = JSON.parse(input);
+      const detail = ctx.message || ctx.notification;
+      if (detail) event.detail = String(detail).slice(0, 200);
+    } catch { /* best effort */ }
+  } else if (eventType === 'worktree_create' || eventType === 'worktree_remove') {
+    try {
+      const ctx = JSON.parse(input);
+      const detail = ctx.name || ctx.path;
+      if (detail) event.detail = String(detail).slice(0, 200);
+    } catch { /* best effort */ }
+  } else if (eventType === 'task_completed') {
+    try {
+      const ctx = JSON.parse(input);
+      const detail = ctx.task || ctx.description || ctx.name;
+      if (detail) event.detail = String(detail).slice(0, 200);
+    } catch { /* best effort */ }
+  } else if (eventType === 'teammate_idle') {
+    try {
+      const ctx = JSON.parse(input);
+      const detail = ctx.agent || ctx.teammate || ctx.name;
+      if (detail) event.detail = String(detail).slice(0, 200);
+    } catch { /* best effort */ }
+  } else if (eventType === 'prompt') {
+    try {
+      const ctx = JSON.parse(input);
+      if (ctx.prompt) event.detail = String(ctx.prompt).slice(0, 500);
+    } catch { /* best effort */ }
+  } else if (eventType === 'idle') {
+    const reason = process.argv[4];
+    if (reason) event.detail = String(reason).slice(0, 200);
   }
 
   try {
