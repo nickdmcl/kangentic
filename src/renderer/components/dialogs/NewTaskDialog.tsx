@@ -248,15 +248,22 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
     if (!title.trim()) return;
     if (branchNameError) return;
     if (!planningSwimlane) return;
-    const task = await createTask(buildTaskInput());
-    const planningTasks = useBoardStore.getState().getTasksBySwimlane(planningSwimlane.id);
-    await moveTask({ taskId: task.id, targetSwimlaneId: planningSwimlane.id, targetPosition: planningTasks.length });
-    attachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
-    useToastStore.getState().addToast({
-      message: `Created and moved to Planning`,
-      variant: 'info',
-    });
-    onClose();
+    try {
+      const task = await createTask(buildTaskInput());
+      const planningTasks = useBoardStore.getState().getTasksBySwimlane(planningSwimlane.id);
+      await moveTask({ taskId: task.id, targetSwimlaneId: planningSwimlane.id, targetPosition: planningTasks.length });
+      attachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
+      useToastStore.getState().addToast({
+        message: `Created and moved to Planning`,
+        variant: 'info',
+      });
+      onClose();
+    } catch (err) {
+      useToastStore.getState().addToast({
+        message: `Failed to create task: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: 'error',
+      });
+    }
   };
 
   return (
