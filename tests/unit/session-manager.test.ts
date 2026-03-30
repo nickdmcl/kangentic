@@ -1005,9 +1005,15 @@ describe('Synthetic session_end', () => {
     fs.appendFileSync(filePath, JSON.stringify(event) + '\n');
   }
 
-  /** Wait for the file watcher debounce (50ms) + processing time. */
-  function waitForWatcher(): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, 200));
+  /** Directly trigger event processing, bypassing fs.watch (unreliable in Vitest workers). */
+  function triggerEventRead(sessionId: string, eventsPath: string): void {
+    const internals = manager as unknown as {
+      usageTracker: { readAndProcessEvents: (sessionId: string, eventsOutputPath: string, fileOffset: number) => number };
+      fileWatcher: { getEventsFileOffset: (sessionId: string) => number; setEventsFileOffset: (sessionId: string, offset: number) => void };
+    };
+    const offset = internals.fileWatcher.getEventsFileOffset(sessionId);
+    const newOffset = internals.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
+    internals.fileWatcher.setEventsFileOffset(sessionId, newOffset);
   }
 
   async function spawnWithEvents(taskId = 'task-synth') {
@@ -1032,7 +1038,7 @@ describe('Synthetic session_end', () => {
 
     // Write a tool_start event so the cache has content
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.ToolStart, tool: 'Read' });
-    await waitForWatcher();
+    triggerEventRead(session.id, eventsPath);
 
     await manager.suspend(session.id);
     spawnedSessionId = null; // already suspended
@@ -1047,7 +1053,7 @@ describe('Synthetic session_end', () => {
 
     // Write a session_end event from Claude Code's hook
     appendEvent(eventsPath, { ts: Date.now(), type: EventType.SessionEnd });
-    await waitForWatcher();
+    triggerEventRead(session.id, eventsPath);
 
     const eventsBefore = manager.getEventsForSession(session.id);
     const sessionEndCountBefore = eventsBefore.filter(
