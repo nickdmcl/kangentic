@@ -194,7 +194,7 @@ test.describe('Image Attachments', () => {
     await page.waitForTimeout(500);
 
     // Submit the form
-    const createButton = page.locator('button:has-text("Create")');
+    const createButton = page.getByRole('button', { name: 'Create', exact: true });
     await createButton.click();
     await page.waitForTimeout(300);
 

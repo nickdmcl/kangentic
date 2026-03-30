@@ -165,7 +165,7 @@ test.describe('Worktree Toggle', () => {
     await toggle.click();
 
     // Create the task
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 3000 });
 
     // Verify the task was created with use_worktree = 0
@@ -184,7 +184,7 @@ test.describe('Worktree Toggle', () => {
     await page.locator('input[placeholder="Task title"]').fill('Default Worktree Task');
 
     // Create the task
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 3000 });
 
     // Verify the task was created with use_worktree = null (follows global)
@@ -351,5 +351,54 @@ test.describe('To Do Edit Branch Config', () => {
     await expect(branchChip).toBeVisible();
 
     await page.keyboard.press('Escape');
+  });
+});
+
+test.describe('Create & Plan button', () => {
+  test('button is visible when opening dialog from To Do column', async () => {
+    await openNewTaskDialog();
+
+    const btn = page.getByRole('button', { name: 'Create & Plan', exact: true });
+    await expect(btn).toBeVisible();
+
+    await closeDialog();
+  });
+
+  test('clicking Create & Plan creates the task and moves it to Planning', async () => {
+    await openNewTaskDialog();
+
+    const uniqueTitle = `CreateAndPlan-${Date.now()}`;
+    await page.locator('input[placeholder="Task title"]').fill(uniqueTitle);
+
+    await page.getByRole('button', { name: 'Create & Plan', exact: true }).click();
+    await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 5000 });
+
+    // Verify the task exists and is in the Planning swimlane
+    const taskData = await page.evaluate(() => window.electronAPI.tasks.list());
+    const task = taskData.find((t: { title: string }) => t.title === uniqueTitle);
+    expect(task).toBeDefined();
+
+    const swimlanes = await page.evaluate(() => window.electronAPI.swimlanes.list());
+    const planning = swimlanes.find((s: { name: string }) => s.name === 'Planning');
+    expect(planning).toBeDefined();
+    expect(task.swimlane_id).toBe(planning.id);
+  });
+
+  test('Create button still works normally alongside Create & Plan', async () => {
+    await openNewTaskDialog();
+
+    const uniqueTitle = `CreateOnly-${Date.now()}`;
+    await page.locator('input[placeholder="Task title"]').fill(uniqueTitle);
+
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 3000 });
+
+    const taskData = await page.evaluate(() => window.electronAPI.tasks.list());
+    const task = taskData.find((t: { title: string }) => t.title === uniqueTitle);
+    expect(task).toBeDefined();
+
+    const swimlanes = await page.evaluate(() => window.electronAPI.swimlanes.list());
+    const todo = swimlanes.find((s: { role: string }) => s.role === 'todo');
+    expect(task.swimlane_id).toBe(todo.id);
   });
 });

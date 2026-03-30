@@ -101,7 +101,7 @@ export async function createTask(
     await descInput.fill(description);
   }
 
-  const createButton = page.locator('button:has-text("Create")');
+  const createButton = page.getByRole('button', { name: 'Create', exact: true });
   await createButton.click();
   await page.locator('input[placeholder="Task title"]').waitFor({ state: 'hidden', timeout: 3000 });
 }

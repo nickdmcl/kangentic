@@ -131,7 +131,7 @@ test.describe('Task CRUD', () => {
 
     await page.locator('input[placeholder="Task title"]').fill('Test Task Alpha');
     await page.locator('.fixed textarea').fill('Description for alpha task');
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(taskCard('Test Task Alpha')).toBeVisible({ timeout: 3000 });
   });
@@ -173,7 +173,7 @@ test.describe('Task CRUD', () => {
     await backlog.locator('text=Add task').click();
 
     await page.locator('input[placeholder="Task title"]').fill('Test Task Beta');
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect(taskCard('Test Task Beta')).toBeVisible({ timeout: 3000 });
   });
@@ -229,7 +229,7 @@ test.describe('Task CRUD', () => {
     const backlog = page.locator('[data-swimlane-name="To Do"]');
     await backlog.locator('text=Add task').click();
     await page.locator('input[placeholder="Task title"]').fill('Task To Delete');
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(taskCard('Task To Delete')).toBeVisible({ timeout: 3000 });
 
     // Open the task (backlog tasks open in edit mode with Delete in footer)
@@ -251,7 +251,7 @@ test.describe('Task CRUD', () => {
     const backlog = page.locator('[data-swimlane-name="To Do"]');
     await backlog.locator('text=Add task').click();
     await page.locator('input[placeholder="Task title"]').fill('Test Task Gamma');
-    await page.locator('button:has-text("Create")').click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(taskCard('Test Task Gamma')).toBeVisible({ timeout: 3000 });
 
     // Open the task detail dialog
