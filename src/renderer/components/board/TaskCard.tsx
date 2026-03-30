@@ -15,8 +15,7 @@ import { useToastStore } from '../../stores/toast-store';
 import { useTaskProgress } from '../../utils/task-progress';
 import { getProgressColor } from '../../utils/color-lerp';
 import { LabelPills } from '../Pill';
-import { EventType } from '../../../shared/types';
-import type { Task, Swimlane } from '../../../shared/types';
+import { EventType, type Task, type Swimlane } from '../../../shared/types';
 
 interface TaskCardProps {
   task: Task;
@@ -231,7 +230,6 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
     ),
   );
 
-  // Most recent AI result text from Notification or TaskCompleted events
   const lastResultText = useSessionStore(
     useCallback(
       (s: ReturnType<typeof useSessionStore.getState>) => {
@@ -466,7 +464,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
             {lastResultText ? (
               <>
                 <span className="text-fg-faint/60 shrink-0 mt-px" title="Latest AI result">›</span>
-                <span className="text-fg-secondary">{lastResultText}</span>
+                <span className="text-fg-secondary">{stripMarkdown(lastResultText)}</span>
               </>
             ) : (
               <span className="text-fg-faint">{stripMarkdown(task.description)}</span>
