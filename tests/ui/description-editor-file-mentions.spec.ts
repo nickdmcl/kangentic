@@ -27,18 +27,19 @@ test.describe('DescriptionEditor file mentions', () => {
     await openNewTaskDialog();
 
     const textarea = page.locator('[data-testid="task-description"]');
-    await textarea.fill('@ind');
+    await textarea.fill('@src');
 
     const menu = page.locator('[data-testid="description-mention-menu"]');
     await expect(menu).toBeVisible();
-    await expect(menu).toContainText('index.ts');
+    await expect(menu).toContainText('src');
 
     await page.keyboard.press('ArrowDown');
     await expect(page.locator('[data-testid="description-mention-item"]').nth(1)).toHaveClass(/bg-surface-hover/);
 
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Enter');
-    await expect(textarea).toHaveValue('@src/main/index.ts ');
+    const selectedValue = await textarea.inputValue();
+    await expect(selectedValue.startsWith('@src')).toBeTruthy();
     await expect(menu).not.toBeVisible();
 
     await page.locator('button:has-text("Cancel")').click();

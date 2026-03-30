@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
+import { toForwardSlash } from '../../../shared/paths';
 import type { ProjectSearchEntry, ProjectSearchEntriesInput, ProjectSearchEntriesResult } from '../../../shared/types';
 
 const WORKSPACE_CACHE_TTL_MS = 15_000;
@@ -53,8 +54,19 @@ export function clearProjectEntrySearchCache(cwd?: string): void {
   inFlightWorkspaceIndexBuilds.clear();
 }
 
-function toPosixPath(input: string): string {
-  return input.split(path.sep).join('/');
+function killProcessTree(child: ReturnType<typeof spawn>): void {
+  if (process.platform === 'win32' && child.pid) {
+    try {
+      execSync(`taskkill /PID ${child.pid} /T /F`, {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch {
+      // Process may already be dead
+    }
+  } else {
+    child.kill('SIGTERM');
+  }
 }
 
 function parentPathOf(input: string): string | undefined {
@@ -147,14 +159,14 @@ async function runGit(
     };
 
     const timeoutId = setTimeout(() => {
-      child.kill('SIGTERM');
+      killProcessTree(child);
       finish(() => reject(new Error(`git ${args.join(' ')} timed out`)));
     }, 20_000);
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBytes += chunk.length;
       if (stdoutBytes > GIT_MAX_BUFFER_BYTES) {
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(() => reject(new Error(`git ${args.join(' ')} exceeded max buffer`)));
         return;
       }
@@ -210,7 +222,7 @@ async function filterGitIgnoredPaths(cwd: string, relativePaths: string[]): Prom
     if (result.code !== 0 && result.code !== 1) return false;
 
     for (const ignoredPath of splitNullSeparatedPaths(result.stdout)) {
-      ignoredPaths.add(toPosixPath(ignoredPath));
+      ignoredPaths.add(toForwardSlash(ignoredPath));
     }
     return true;
   };
@@ -252,7 +264,7 @@ async function buildWorkspaceIndexFromGit(cwd: string): Promise<WorkspaceIndex |
   }
 
   const listedPaths = splitNullSeparatedPaths(listedFiles.stdout)
-    .map((entry) => toPosixPath(entry))
+    .map((entry) => toForwardSlash(entry))
     .filter((entry) => entry.length > 0 && !isPathInIgnoredDirectory(entry));
   const filePaths = await filterGitIgnoredPaths(cwd, listedPaths);
 
@@ -334,7 +346,7 @@ async function buildWorkspaceIndex(cwd: string): Promise<WorkspaceIndex> {
         if (dirent.isDirectory() && IGNORED_DIRECTORY_NAMES.has(dirent.name)) continue;
         if (!dirent.isDirectory() && !dirent.isFile()) continue;
 
-        const relativePath = toPosixPath(
+        const relativePath = toForwardSlash(
           relativeDir ? path.join(relativeDir, dirent.name) : dirent.name,
         );
         if (isPathInIgnoredDirectory(relativePath)) continue;

@@ -61,10 +61,10 @@ export function DescriptionEditor({
           Preview
         </button>
       </div>
-      <div className="relative h-[280px] w-full overflow-hidden bg-surface">
+      <div className="relative w-full bg-surface h-[280px] overflow-hidden">
         {showPreview ? (
           <div
-            className="absolute inset-0 overflow-y-auto px-3 py-2"
+            className="absolute inset-0 px-3 py-2 overflow-y-auto"
             data-testid="description-preview"
           >
             {value ? (
@@ -90,7 +90,7 @@ export function DescriptionEditor({
               onKeyDown={mentions.handleTextareaKeyDown}
               onSelect={mentions.handleTextareaSelect}
               onClick={mentions.handleTextareaClick}
-              className="absolute inset-0 h-full w-full resize-none overflow-y-auto bg-transparent px-3 py-2 text-sm text-fg focus:outline-none"
+              className="absolute inset-0 w-full h-full bg-transparent px-3 py-2 text-sm text-fg focus:outline-none resize-none overflow-y-auto"
             />
             {mentions.menuOpen && (
               <DescriptionMentionMenu
@@ -105,8 +105,8 @@ export function DescriptionEditor({
             {!value && (
               <div className={`absolute inset-0 flex flex-col pointer-events-none px-3 py-2 transition-opacity duration-200 ${textareaFocused ? 'opacity-100' : 'opacity-40'}`}>
                 <span className="text-sm text-fg-faint">{placeholder}</span>
-                <div className="flex flex-1 items-center justify-center">
-                  <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-edge px-6 py-4">
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-1.5 border border-dashed border-edge rounded-lg px-6 py-4">
                     <Paperclip size={20} className="text-fg-disabled" />
                     <span className="text-xs text-fg-disabled">Paste or drop files here</span>
                   </div>

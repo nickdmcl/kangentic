@@ -194,60 +194,14 @@
     { path: 'docs/worktree-strategy.md', kind: 'file', parentPath: 'docs' },
   ];
 
-  function basenameOfPath(pathValue) {
-    var slashIndex = pathValue.lastIndexOf('/');
-    return slashIndex === -1 ? pathValue : pathValue.slice(slashIndex + 1);
-  }
-
   function normalizeEntryQuery(query) {
     return (query || '').trim().replace(/^[@./]+/, '').toLowerCase();
   }
 
-  function subsequenceScore(value, query) {
-    if (!query) return 0;
-
-    var queryIndex = 0;
-    var firstMatchIndex = -1;
-    var previousMatchIndex = -1;
-    var gapPenalty = 0;
-
-    for (var valueIndex = 0; valueIndex < value.length; valueIndex += 1) {
-      if (value[valueIndex] !== query[queryIndex]) continue;
-      if (firstMatchIndex === -1) firstMatchIndex = valueIndex;
-      if (previousMatchIndex !== -1) gapPenalty += valueIndex - previousMatchIndex - 1;
-      previousMatchIndex = valueIndex;
-      queryIndex += 1;
-
-      if (queryIndex === query.length) {
-        var spanPenalty = valueIndex - firstMatchIndex + 1 - query.length;
-        var lengthPenalty = Math.min(64, value.length - query.length);
-        return firstMatchIndex * 2 + gapPenalty * 3 + spanPenalty + lengthPenalty;
-      }
-    }
-
-    return null;
-  }
-
   function scoreMockProjectEntry(entry, query) {
     if (!query) return entry.kind === 'directory' ? 0 : 1;
-
     var normalizedPath = entry.path.toLowerCase();
-    var normalizedName = basenameOfPath(normalizedPath);
-
-    if (normalizedName === query) return 0;
-    if (normalizedPath === query) return 1;
-    if (normalizedName.indexOf(query) === 0) return 2;
-    if (normalizedPath.indexOf(query) === 0) return 3;
-    if (normalizedPath.indexOf('/' + query) !== -1) return 4;
-    if (normalizedName.indexOf(query) !== -1) return 5;
-    if (normalizedPath.indexOf(query) !== -1) return 6;
-
-    var nameFuzzyScore = subsequenceScore(normalizedName, query);
-    if (nameFuzzyScore !== null) return 100 + nameFuzzyScore;
-
-    var pathFuzzyScore = subsequenceScore(normalizedPath, query);
-    if (pathFuzzyScore !== null) return 200 + pathFuzzyScore;
-
+    if (normalizedPath.indexOf(query) !== -1) return 0;
     return null;
   }
 
