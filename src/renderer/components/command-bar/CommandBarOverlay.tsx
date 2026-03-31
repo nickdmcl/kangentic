@@ -265,7 +265,7 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
 
             {/* Action pills - overflow hidden to clip when header is narrow, but
                 disabled when command palette is open so the dropdown isn't clipped */}
-            <div className={`flex-1 flex items-center gap-3 min-w-0${showCommandPalette ? '' : ' overflow-hidden'}`}>
+            <div className={`flex-1 flex items-center flex-wrap gap-3 min-w-0${showCommandPalette ? '' : ' overflow-hidden max-h-7'}`}>
               <div className="relative flex-shrink-0" ref={commandButtonRef}>
                 <Pill
                   shape="square"
