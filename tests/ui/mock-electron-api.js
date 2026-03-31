@@ -183,6 +183,28 @@
     { name: 'Done', role: 'done', color: '#10b981', icon: 'circle-check-big', is_archived: true, is_ghost: false, permission_mode: null, auto_spawn: false, auto_command: null, plan_exit_target_id: null },
   ];
 
+  var MOCK_PROJECT_ENTRIES = [
+    { path: 'src', kind: 'directory', parentPath: undefined },
+    { path: 'src/main', kind: 'directory', parentPath: 'src' },
+    { path: 'src/main/index.ts', kind: 'file', parentPath: 'src/main' },
+    { path: 'src/renderer', kind: 'directory', parentPath: 'src' },
+    { path: 'src/renderer/components', kind: 'directory', parentPath: 'src/renderer' },
+    { path: 'src/renderer/components/DescriptionEditor.tsx', kind: 'file', parentPath: 'src/renderer/components' },
+    { path: 'README.md', kind: 'file', parentPath: undefined },
+    { path: 'docs/worktree-strategy.md', kind: 'file', parentPath: 'docs' },
+  ];
+
+  function normalizeEntryQuery(query) {
+    return (query || '').trim().replace(/^[@./]+/, '').toLowerCase();
+  }
+
+  function scoreMockProjectEntry(entry, query) {
+    if (!query) return entry.kind === 'directory' ? 0 : 1;
+    var normalizedPath = entry.path.toLowerCase();
+    if (normalizedPath.indexOf(query) !== -1) return 0;
+    return null;
+  }
+
   function noop() {}
 
   window.electronAPI = {
@@ -295,6 +317,23 @@
           }
         }
         return project;
+      },
+      searchEntries: async function (input) {
+        var normalizedQuery = normalizeEntryQuery(input.query);
+        var limit = Math.max(0, Math.floor(input.limit || 0));
+        var ranked = MOCK_PROJECT_ENTRIES.map(function (entry) {
+          return { entry: entry, score: scoreMockProjectEntry(entry, normalizedQuery) };
+        }).filter(function (candidate) {
+          return candidate.score !== null;
+        }).sort(function (left, right) {
+          if (left.score !== right.score) return left.score - right.score;
+          return left.entry.path.localeCompare(right.entry.path);
+        });
+
+        return {
+          entries: ranked.slice(0, limit).map(function (candidate) { return candidate.entry; }),
+          truncated: ranked.length > limit,
+        };
       },
       reorder: async function (ids) {
         ids.forEach(function (id, i) {
