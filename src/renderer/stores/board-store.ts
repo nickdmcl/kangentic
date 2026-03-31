@@ -200,6 +200,10 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
             : `Agent started for "${movedTask.title}"`,
           variant: 'success',
         });
+      } else if (targetAutoCommand) {
+        // No new session was spawned (e.g. user-paused task moved to auto_command column).
+        // Clear the optimistic pendingCommandLabel to prevent stale shimmer overlay.
+        useSessionStore.getState().clearPendingCommandLabel(input.taskId);
       }
     } catch (err) {
       if (moveGeneration !== thisGen) return; // Don't clobber newer state on error
