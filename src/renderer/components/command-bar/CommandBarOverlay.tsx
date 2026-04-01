@@ -16,7 +16,7 @@ import { useToastStore } from '../../stores/toast-store';
 import { resolveShortcutCommand } from '../../../shared/template-vars';
 import { ICON_REGISTRY } from '../../utils/swimlane-icons';
 import { resolveProjectRoot } from '../../../shared/git-utils';
-import type { ClaudeCommand } from '../../../shared/types';
+import type { AgentCommand } from '../../../shared/types';
 
 type Phase = 'entering' | 'visible' | 'exiting';
 
@@ -197,7 +197,7 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
     onClose();
   }, [onClose]);
 
-  const handleCommandSelect = useCallback((command: ClaudeCommand) => {
+  const handleCommandSelect = useCallback((command: AgentCommand) => {
     setShowCommandPalette(false);
     if (!sessionId) return;
     // Write the command name directly to the running terminal

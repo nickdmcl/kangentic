@@ -245,7 +245,7 @@ export const handleGetSessionHistory: CommandHandler = (
   ).all(task.id) as Array<{
     id: string;
     session_type: string;
-    claude_session_id: string | null;
+    agent_session_id: string | null;
     status: string;
     exit_code: number | null;
     started_at: string;

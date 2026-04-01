@@ -182,8 +182,8 @@ export type SuspendedBy = 'user' | 'system';
 export interface SessionRecord {
   id: string;
   task_id: string;
-  session_type: 'claude_agent' | 'run_script';
-  claude_session_id: string | null;
+  session_type: string;
+  agent_session_id: string | null;
   command: string;
   cwd: string;
   permission_mode: string | null;
@@ -280,12 +280,12 @@ export const HookEvent = {
 } as const;
 export type HookEvent = (typeof HookEvent)[keyof typeof HookEvent];
 
-/** Claude Code tool names we detect/react to. */
-export const ClaudeTool = {
+/** Agent tool names we detect/react to. */
+export const AgentTool = {
   Bash: 'Bash',
   ExitPlanMode: 'ExitPlanMode',
 } as const;
-export type ClaudeTool = (typeof ClaudeTool)[keyof typeof ClaudeTool];
+export type AgentTool = (typeof AgentTool)[keyof typeof AgentTool];
 
 /**
  * Declarative mapping from EventType → ActivityState.
@@ -605,9 +605,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   statusBarPeriod: 'live',
 };
 
-// === Claude Commands ===
+// === Agent Commands ===
 
-export interface ClaudeCommand {
+export interface AgentCommand {
   name: string;         // "code-review"
   displayName: string;  // "/code-review"
   description: string;  // from frontmatter, or empty
@@ -1064,10 +1064,10 @@ export interface ElectronAPI {
     syncDefaultToProjects: (partial: DeepPartial<AppConfig>) => Promise<number>;
   };
 
-  // Claude detection & commands
-  claude: {
+  // Agent detection & commands
+  agent: {
     detect: () => Promise<{ found: boolean; path: string | null; version: string | null }>;
-    listCommands: (cwd?: string) => Promise<ClaudeCommand[]>;
+    listCommands: (cwd?: string) => Promise<AgentCommand[]>;
   };
 
   // Shell

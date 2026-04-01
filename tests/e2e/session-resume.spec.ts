@@ -4,7 +4,7 @@
  * Verifies that:
  *  1. Moving a task out of an agent column suspends the session DB record
  *  2. Moving it back resumes with --resume (not --session-id)
- *  3. The original claude_session_id is preserved across the cycle
+ *  3. The original agent_session_id is preserved across the cycle
  *  4. Closing the app marks sessions as 'suspended' in the DB
  *  5. Relaunching resumes sessions with --resume (not fresh --session-id)
  *

@@ -29,7 +29,7 @@ export function StatusBar() {
   const selectedPeriod = useSessionStore((s) => s.selectedPeriod);
   const periodStats = useSessionStore((s) => s.periodStats);
   const setSelectedPeriod = useSessionStore((s) => s.setSelectedPeriod);
-  const claudeInfo = useConfigStore((s) => s.claudeInfo);
+  const agentInfo = useConfigStore((s) => s.agentInfo);
   const appVersion = useConfigStore((s) => s.appVersion);
   const tasks = useBoardStore((s) => s.tasks);
   const swimlanes = useBoardStore((s) => s.swimlanes);
@@ -181,7 +181,7 @@ export function StatusBar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-4">
-        {claudeInfo && !claudeInfo.found && (
+        {agentInfo && !agentInfo.found && (
           <span className="text-red-400">claude not found</span>
         )}
         {appVersion && (

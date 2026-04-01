@@ -23,13 +23,13 @@ export class SessionRepository {
   insert(record: SessionInsertInput): SessionRecord {
     const id = uuidv4();
     this.db.prepare(`
-      INSERT INTO sessions (id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status, exit_code, started_at, suspended_at, exited_at, suspended_by)
+      INSERT INTO sessions (id, task_id, session_type, agent_session_id, command, cwd, permission_mode, prompt, status, exit_code, started_at, suspended_at, exited_at, suspended_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       record.task_id,
       record.session_type,
-      record.claude_session_id,
+      record.agent_session_id,
       record.command,
       record.cwd,
       record.permission_mode,
@@ -86,7 +86,7 @@ export class SessionRepository {
     this.db.prepare(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...params);
   }
 
-  /** Get suspended claude_agent sessions that can be resumed */
+  /** Get suspended agent sessions that can be resumed */
   getResumable(): SessionRecord[] {
     return this.db.prepare(
       `SELECT * FROM sessions WHERE status = 'suspended' AND session_type = 'claude_agent'`
@@ -117,7 +117,7 @@ export class SessionRepository {
     ).run(...ids);
   }
 
-  /** Get orphaned claude_agent sessions */
+  /** Get orphaned agent sessions */
   getOrphaned(): SessionRecord[] {
     return this.db.prepare(
       `SELECT * FROM sessions WHERE status = 'orphaned' AND session_type = 'claude_agent'`
@@ -154,12 +154,12 @@ export class SessionRepository {
     return new Set(rows.map(r => r.task_id));
   }
 
-  /** Get all distinct Claude session IDs (for stale directory cleanup). */
-  listAllClaudeSessionIds(): string[] {
+  /** Get all distinct agent session IDs (for stale directory cleanup). */
+  listAllAgentSessionIds(): string[] {
     const rows = this.db.prepare(
-      `SELECT DISTINCT claude_session_id FROM sessions WHERE claude_session_id IS NOT NULL`
-    ).all() as Array<{ claude_session_id: string }>;
-    return rows.map(r => r.claude_session_id);
+      `SELECT DISTINCT agent_session_id FROM sessions WHERE agent_session_id IS NOT NULL`
+    ).all() as Array<{ agent_session_id: string }>;
+    return rows.map(r => r.agent_session_id);
   }
 
   /** Update the 7 metric columns for a session record. */
@@ -232,7 +232,7 @@ export class SessionRepository {
     };
 
     return {
-      sessionId: latestRecord.claude_session_id ?? latestRecord.id,
+      sessionId: latestRecord.agent_session_id ?? latestRecord.id,
       totalCostUsd: latestRecord.total_cost_usd ?? 0,
       totalInputTokens: latestRecord.total_input_tokens ?? 0,
       totalOutputTokens: latestRecord.total_output_tokens ?? 0,
@@ -258,7 +258,7 @@ export class SessionRepository {
       `SELECT
          s.task_id,
          t.created_at AS task_created_at,
-         s.claude_session_id,
+         s.agent_session_id,
          s.id AS record_id,
          s.total_cost_usd,
          s.total_input_tokens,
@@ -280,7 +280,7 @@ export class SessionRepository {
     ).all() as Array<{
       task_id: string;
       task_created_at: string;
-      claude_session_id: string | null;
+      agent_session_id: string | null;
       record_id: string;
       total_cost_usd: number | null;
       total_input_tokens: number | null;
@@ -330,7 +330,7 @@ export class SessionRepository {
       }
 
       result[taskId] = {
-        sessionId: latest.claude_session_id ?? latest.record_id,
+        sessionId: latest.agent_session_id ?? latest.record_id,
         totalCostUsd: latest.total_cost_usd ?? 0,
         totalInputTokens: latest.total_input_tokens ?? 0,
         totalOutputTokens: latest.total_output_tokens ?? 0,

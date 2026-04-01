@@ -99,7 +99,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
   const projectOverrides = useConfigStore((state) => state.projectOverrides);
   const updateConfig = useConfigStore((state) => state.updateConfig);
   const updateProjectOverride = useConfigStore((state) => state.updateProjectOverride);
-  const claudeInfo = useConfigStore((state) => state.claudeInfo);
+  const agentInfo = useConfigStore((state) => state.agentInfo);
 
   // Effective config for per-project tabs: global merged with project overrides
   const effectiveConfig = useMemo(
@@ -127,7 +127,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
               <div className="space-y-4">
                 {tab.id === 'appearance' && <AppearanceTab config={effectiveConfig} />}
                 {tab.id === 'terminal' && <TerminalTab config={effectiveConfig} globalConfig={globalConfig} shells={shells} />}
-                {tab.id === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+                {tab.id === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} agentInfo={agentInfo} />}
                 {tab.id === 'git' && <GitTab config={effectiveConfig} />}
                 {tab.id === 'shortcuts' && <ShortcutsTab />}
                 {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
@@ -145,7 +145,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
         <>
           {activeTab === 'appearance' && <AppearanceTab config={effectiveConfig} />}
           {activeTab === 'terminal' && <TerminalTab config={effectiveConfig} globalConfig={globalConfig} shells={shells} />}
-          {activeTab === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} claudeInfo={claudeInfo} />}
+          {activeTab === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} agentInfo={agentInfo} />}
           {activeTab === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
           {activeTab === 'mcpServer' && <McpServerTab globalConfig={globalConfig} />}
           {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
@@ -264,7 +264,7 @@ function TerminalTab({ config, globalConfig, shells }: { config: AppConfig; glob
   );
 }
 
-function AgentTab({ config, globalConfig, claudeInfo }: { config: AppConfig; globalConfig: AppConfig; claudeInfo: { found: boolean; path: string | null; version: string | null } | null }) {
+function AgentTab({ config, globalConfig, agentInfo }: { config: AppConfig; globalConfig: AppConfig; agentInfo: { found: boolean; path: string | null; version: string | null } | null }) {
   const updateGlobal = useScopedUpdate('global');
   const updateProject = useScopedUpdate('project');
   return (
@@ -275,12 +275,12 @@ function AgentTab({ config, globalConfig, claudeInfo }: { config: AppConfig; glo
             type="text"
             value={globalConfig.claude.cliPath || ''}
             onChange={(event) => updateGlobal({ claude: { cliPath: event.target.value || null } })}
-            placeholder={claudeInfo?.found ? (claudeInfo.path ?? undefined) : 'Not found. Enter path manually'}
-            className={`${INPUT_CLASS} pr-8 ${claudeInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
+            placeholder={agentInfo?.found ? (agentInfo.path ?? undefined) : 'Not found. Enter path manually'}
+            className={`${INPUT_CLASS} pr-8 ${agentInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
           />
-          {claudeInfo && (
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={claudeInfo.found ? `Detected: ${claudeInfo.version || 'unknown version'}` : 'Claude CLI not found'}>
-              {claudeInfo.found
+          {agentInfo && (
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={agentInfo.found ? `Detected: ${agentInfo.version || 'unknown version'}` : 'Claude CLI not found'}>
+              {agentInfo.found
                 ? <Check size={16} className="text-green-400" />
                 : <CircleAlert size={16} className="text-red-400" />}
             </div>

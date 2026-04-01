@@ -16,7 +16,7 @@ export function App() {
   const loadBoard = useBoardStore((s) => s.loadBoard);
   const loadConfig = useConfigStore((s) => s.loadConfig);
   const loadAppVersion = useConfigStore((s) => s.loadAppVersion);
-  const detectClaude = useConfigStore((s) => s.detectClaude);
+  const detectAgent = useConfigStore((s) => s.detectAgent);
   const detectGit = useConfigStore((s) => s.detectGit);
   const upsertSession = useSessionStore((s) => s.upsertSession);
   const updateSessionStatus = useSessionStore((s) => s.updateSessionStatus);
@@ -30,7 +30,7 @@ export function App() {
     }
     loadConfig();
     loadAppVersion();
-    detectClaude();
+    detectAgent();
     detectGit();
     loadProjects();
     useProjectStore.getState().loadGroups();

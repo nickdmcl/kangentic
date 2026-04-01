@@ -144,7 +144,7 @@ Index: `idx_transitions_from_to` on (from_swimlane_id, to_swimlane_id).
 | id | TEXT | PRIMARY KEY | |
 | task_id | TEXT | NOT NULL, FK->tasks | |
 | session_type | TEXT | NOT NULL | |
-| claude_session_id | TEXT | | NULL |
+| agent_session_id | TEXT | | NULL |
 | command | TEXT | NOT NULL | |
 | cwd | TEXT | NOT NULL | |
 | permission_mode | TEXT | | NULL |
@@ -269,6 +269,7 @@ Listed in execution order within `runProjectMigrations()`:
 23. **Import-related columns on `backlog_tasks`** -- adds `assignee`, `due_date`, `item_type`, and `external_metadata` columns for richer external source integration (GitHub Issues, GitHub Projects, Azure DevOps).
 24. **`display_id` column on tasks** -- adds a human-readable sequential integer ID for tasks. Backfills existing tasks with sequential IDs ordered by `created_at ASC`. Creates a unique index on `display_id`.
 25. **`labels` and `priority` columns on tasks** -- adds label and priority support to board tasks (mirroring backlog_tasks). Labels default to `'[]'` (JSON array), priority defaults to `0`. Preserved during promote from backlog.
+26. **`claude_session_id` renamed to `agent_session_id`** -- renames the `claude_session_id` column to `agent_session_id` on the `sessions` table. Generalizes the column name to support multiple agent adapters.
 
 ### Key Migrations (Global DB)
 
@@ -356,7 +357,7 @@ Operates on a per-project DB.
 | `deleteByTaskId(taskId)` | Delete all session records for a given task |
 | `getLatestForTask(taskId)` | Find the most recent session record for a task (by `started_at` DESC) |
 | `getUserPausedTaskIds()` | Get task IDs whose latest session was user-paused (`suspended_by = 'user'`) |
-| `listAllClaudeSessionIds()` | Get all distinct `claude_session_id` values (for stale session directory cleanup) |
+| `listAllAgentSessionIds()` | Get all distinct `agent_session_id` values (for stale session directory cleanup) |
 
 ### AttachmentRepository
 

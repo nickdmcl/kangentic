@@ -142,27 +142,27 @@ export class TransitionEngine {
     // Check for a previous session to resume (only explicitly suspended sessions)
     const previousSession = this.sessionRepo?.getLatestForTask(task.id);
     const canResume = previousSession
-      && previousSession.claude_session_id
+      && previousSession.agent_session_id
       && previousSession.session_type === 'claude_agent'
       && previousSession.status === 'suspended';
 
     console.log(
-      `[spawn_agent] task=${task.id.slice(0, 8)} previousSession=${previousSession ? `{id=${previousSession.id.slice(0, 8)}, status=${previousSession.status}, claude_id=${previousSession.claude_session_id?.slice(0, 8)}}` : 'none'} canResume=${!!canResume}`,
+      `[spawn_agent] task=${task.id.slice(0, 8)} previousSession=${previousSession ? `{id=${previousSession.id.slice(0, 8)}, status=${previousSession.status}, agent_id=${previousSession.agent_session_id?.slice(0, 8)}}` : 'none'} canResume=${!!canResume}`,
     );
 
     let prompt: string | undefined;
-    let claudeSessionId: string;
+    let agentSessionId: string;
 
     if (canResume) {
-      // Resume the previous Claude conversation, optionally with a preloaded command
-      claudeSessionId = previousSession.claude_session_id!;
+      // Resume the previous agent conversation, optionally with a preloaded command
+      agentSessionId = previousSession.agent_session_id!;
       prompt = resumePrompt;
-      console.log(`[spawn_agent] RESUMING with claude_session_id=${claudeSessionId.slice(0, 8)}${resumePrompt ? ` prompt="${resumePrompt.slice(0, 40)}"` : ''}`);
+      console.log(`[spawn_agent] RESUMING with agent_session_id=${agentSessionId.slice(0, 8)}${resumePrompt ? ` prompt="${resumePrompt.slice(0, 40)}"` : ''}`);
     } else {
-      // Fresh session: generate a Claude session ID upfront so we can
-      // resume with --session-id on recovery. Claude CLI accepts
+      // Fresh session: generate an agent session ID upfront so we can
+      // resume with --session-id on recovery. The agent CLI accepts
       // --session-id <id> "prompt" to create a new session with a given ID.
-      claudeSessionId = randomUUID();
+      agentSessionId = randomUUID();
       prompt = config.promptTemplate
         ? this.commandBuilder.interpolateTemplate(config.promptTemplate, vars)
         : undefined;
@@ -170,7 +170,7 @@ export class TransitionEngine {
 
     // Ensure the per-session directory exists and compute output paths
     const projectRoot = appConfig.projectPath || cwd;
-    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', claudeSessionId);
+    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', agentSessionId);
     try {
       fs.mkdirSync(sessionDir, { recursive: true });
     } catch (err) {
@@ -187,7 +187,7 @@ export class TransitionEngine {
       cwd,
       permissionMode: permissionMode as PermissionMode,
       projectRoot: appConfig.projectPath || undefined,
-      sessionId: claudeSessionId,
+      sessionId: agentSessionId,
       resume: !!canResume,
       nonInteractive: config.nonInteractive ?? false,
       statusOutputPath,
@@ -228,7 +228,7 @@ export class TransitionEngine {
       this.sessionRepo.insert({
         task_id: task.id,
         session_type: 'claude_agent',
-        claude_session_id: claudeSessionId,
+        agent_session_id: agentSessionId,
         command,
         cwd,
         permission_mode: permissionMode,

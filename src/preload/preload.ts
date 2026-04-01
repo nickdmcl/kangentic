@@ -162,9 +162,9 @@ const api: ElectronAPI = {
     syncDefaultToProjects: (partial) => ipcRenderer.invoke(IPC.CONFIG_SYNC_DEFAULT_TO_PROJECTS, partial),
   },
 
-  claude: {
-    detect: () => ipcRenderer.invoke(IPC.CLAUDE_DETECT),
-    listCommands: (cwd?) => ipcRenderer.invoke(IPC.CLAUDE_LIST_COMMANDS, cwd),
+  agent: {
+    detect: () => ipcRenderer.invoke(IPC.AGENT_DETECT),
+    listCommands: (cwd?) => ipcRenderer.invoke(IPC.AGENT_LIST_COMMANDS, cwd),
   },
 
   shell: {

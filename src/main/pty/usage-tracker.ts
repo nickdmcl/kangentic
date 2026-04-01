@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { ClaudeStatusParser } from '../agent/claude-status-parser';
-import { EventType, EventTypeActivity, ClaudeTool } from '../../shared/types';
+import { EventType, EventTypeActivity, AgentTool } from '../../shared/types';
 import type { SessionUsage, ActivityState, SessionEvent } from '../../shared/types';
 import { matchesPRCommand } from './pr-connectors';
 
@@ -224,7 +224,7 @@ export class UsageTracker {
           // Detect ExitPlanMode -> emit plan-exit
           // Uses ToolStart (PreToolUse) because ExitPlanMode is a mode-transition
           // tool that may not fire PostToolUse (ToolEnd).
-          if (event.type === EventType.ToolStart && event.tool === ClaudeTool.ExitPlanMode) {
+          if (event.type === EventType.ToolStart && event.tool === AgentTool.ExitPlanMode) {
             this.callbacks.onPlanExit(sessionId);
           }
 
@@ -233,12 +233,12 @@ export class UsageTracker {
           // On the corresponding tool_end, fire the callback so the
           // session manager can scan scrollback for PR URLs.
           if (event.type === EventType.ToolStart
-              && event.tool === ClaudeTool.Bash
+              && event.tool === AgentTool.Bash
               && event.detail
               && matchesPRCommand(event.detail)) {
             this.pendingPRCommand.set(sessionId, true);
           } else if (event.type === EventType.ToolEnd
-              && event.tool === ClaudeTool.Bash
+              && event.tool === AgentTool.Bash
               && this.pendingPRCommand.get(sessionId)) {
             this.pendingPRCommand.delete(sessionId);
             this.callbacks.onPRCandidate(sessionId);

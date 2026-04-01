@@ -4,7 +4,7 @@ import { DEFAULT_CONFIG } from '../../shared/types';
 import { deepMergeConfig } from '../../shared/object-utils';
 
 /** Extract the version number from the raw string (e.g. "2.1.50 (Claude Code)" -> "2.1.50"). */
-function parseClaudeVersion(version: string | null): string | null {
+function parseAgentVersion(version: string | null): string | null {
   return version?.replace(/\s*\(.*\)/, '') || null;
 }
 
@@ -20,10 +20,10 @@ interface ConfigStore {
   appVersion: string | null;
   loadAppVersion: () => Promise<void>;
 
-  // -- Claude CLI detection --
-  claudeInfo: { found: boolean; path: string | null; version: string | null } | null;
-  claudeVersionNumber: string | null;
-  detectClaude: () => Promise<void>;
+  // -- Agent CLI detection --
+  agentInfo: { found: boolean; path: string | null; version: string | null } | null;
+  agentVersionNumber: string | null;
+  detectAgent: () => Promise<void>;
 
   // -- Git detection --
   gitInfo: { found: boolean; path: string | null; version: string | null; meetsMinimum: boolean } | null;
@@ -59,8 +59,8 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
   config: DEFAULT_CONFIG,
   globalConfig: DEFAULT_CONFIG,
   appVersion: null,
-  claudeInfo: null,
-  claudeVersionNumber: null,
+  agentInfo: null,
+  agentVersionNumber: null,
   gitInfo: null,
   loading: true,
   settingsOpen: false,
@@ -85,12 +85,12 @@ export const useConfigStore = create<ConfigStore>((set, get) => ({
     set({ appVersion });
   },
 
-  detectClaude: async () => {
-    const claudeInfo = await window.electronAPI.claude.detect();
-    const version = parseClaudeVersion(claudeInfo?.version ?? null);
+  detectAgent: async () => {
+    const agentInfo = await window.electronAPI.agent.detect();
+    const version = parseAgentVersion(agentInfo?.version ?? null);
     set({
-      claudeInfo,
-      claudeVersionNumber: version,
+      agentInfo,
+      agentVersionNumber: version,
     });
   },
 

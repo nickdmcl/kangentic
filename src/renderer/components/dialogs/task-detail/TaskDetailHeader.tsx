@@ -8,7 +8,7 @@ import { Pill } from '../../Pill';
 import { KebabMenu, KebabMenuItem, KebabMenuDivider } from '../../KebabMenu';
 import { CommandPalettePopover } from './CommandPalettePopover';
 import { PriorityBadge } from '../../backlog/PriorityBadge';
-import type { Task, ClaudeCommand, ShortcutConfig, Swimlane } from '../../../../shared/types';
+import type { Task, AgentCommand, ShortcutConfig, Swimlane } from '../../../../shared/types';
 
 interface TaskDetailHeaderProps {
   task: Task;
@@ -21,7 +21,7 @@ interface TaskDetailHeaderProps {
   isArchived: boolean;
   toggling: boolean;
   onToggle: () => void;
-  onCommandSelect: (command: ClaudeCommand) => void;
+  onCommandSelect: (command: AgentCommand) => void;
   onArchive: () => void;
   onSendToBacklog: () => void;
   onDelete: () => void;
@@ -275,7 +275,7 @@ interface TaskDetailKebabItemsProps {
   isArchived: boolean;
   toggling: boolean;
   onToggle: () => void;
-  onCommandSelect: (command: ClaudeCommand) => void;
+  onCommandSelect: (command: AgentCommand) => void;
   onArchive: () => void;
   onSendToBacklog: () => void;
   onDelete: () => void;
@@ -313,7 +313,7 @@ function TaskDetailKebabItems({
 }: TaskDetailKebabItemsProps) {
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
   const [showCommandsSubmenu, setShowCommandsSubmenu] = useState(false);
-  const [kebabCommands, setKebabCommands] = useState<ClaudeCommand[]>([]);
+  const [kebabCommands, setKebabCommands] = useState<AgentCommand[]>([]);
 
   const commandsFlyoutTriggerRef = useRef<HTMLDivElement>(null);
   const commandsFlyoutRef = useRef<HTMLDivElement>(null);
@@ -327,7 +327,7 @@ function TaskDetailKebabItems({
   useEffect(() => {
     if (!isSessionActive) return;
     let cancelled = false;
-    window.electronAPI.claude.listCommands(task.worktree_path ?? projectPath ?? undefined)
+    window.electronAPI.agent.listCommands(task.worktree_path ?? projectPath ?? undefined)
       .then((result) => { if (!cancelled) setKebabCommands(result); })
       .catch(() => {});
     return () => { cancelled = true; };

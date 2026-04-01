@@ -60,7 +60,7 @@ export function registerSessionHandlers(context: IpcContext): void {
 
     // Mark session record as suspended in DB
     const record = sessionRepo.getLatestForTask(task.id);
-    if (record && record.claude_session_id
+    if (record && record.agent_session_id
         && (record.status === 'running' || record.status === 'exited')) {
       // Capture metrics before suspend (caches are still populated)
       captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id!, record.id);
@@ -320,13 +320,13 @@ export function registerSessionHandlers(context: IpcContext): void {
             updated = true;
           }
         }
-        // Fallback: try matching by claude_session_id only if taskId lookup didn't find it
+        // Fallback: try matching by agent_session_id only if taskId lookup didn't find it
         if (!updated) {
-          const byClaudeId = db.prepare(
-            `SELECT id FROM sessions WHERE claude_session_id = ? AND status IN ('running', 'queued') LIMIT 1`
+          const byAgentId = db.prepare(
+            `SELECT id FROM sessions WHERE agent_session_id = ? AND status IN ('running', 'queued') LIMIT 1`
           ).get(sessionId) as { id: string } | undefined;
-          if (byClaudeId) {
-            sessionRepo.updateStatus(byClaudeId.id, 'exited', {
+          if (byAgentId) {
+            sessionRepo.updateStatus(byAgentId.id, 'exited', {
               exit_code: exitCode,
               exited_at: new Date().toISOString(),
             });
@@ -338,7 +338,7 @@ export function registerSessionHandlers(context: IpcContext): void {
         const metricsRecordId = session
           ? sessionRepo.getLatestForTask(session.taskId)?.id
           : (updated ? undefined : (db.prepare(
-              `SELECT id FROM sessions WHERE claude_session_id = ? ORDER BY started_at DESC LIMIT 1`
+              `SELECT id FROM sessions WHERE agent_session_id = ? ORDER BY started_at DESC LIMIT 1`
             ).get(sessionId) as { id: string } | undefined)?.id);
 
         if (metricsRecordId) {

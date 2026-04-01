@@ -194,7 +194,7 @@ export async function recoverSessions(
     task: Task;
     command: string;
     cwd: string;
-    claudeSessionId: string;
+    agentSessionId: string;
     canResume: boolean;
     prompt: string | undefined;
     permissionMode: string;
@@ -231,23 +231,23 @@ export async function recoverSessions(
 
       // Decide whether to resume or start fresh.
       const canResume = (record.status === 'suspended' || record.status === 'orphaned')
-        && !!record.claude_session_id;
+        && !!record.agent_session_id;
 
       let prompt: string | undefined;
-      let claudeSessionId: string;
+      let agentSessionId: string;
 
       if (canResume) {
-        claudeSessionId = record.claude_session_id!;
+        agentSessionId = record.agent_session_id!;
         prompt = undefined;
       } else {
-        claudeSessionId = randomUUID();
+        agentSessionId = randomUUID();
         // Recovery is resuming previously-started work, not starting fresh.
         // Don't re-send the original task description as it would duplicate context.
         prompt = undefined;
       }
 
       // Ensure the per-session directory exists
-      const sessionDir = path.join(projectPath, '.kangentic', 'sessions', claudeSessionId);
+      const sessionDir = path.join(projectPath, '.kangentic', 'sessions', agentSessionId);
       fs.mkdirSync(sessionDir, { recursive: true });
       const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
 
@@ -258,7 +258,7 @@ export async function recoverSessions(
         cwd: record.cwd,
         permissionMode: permissionMode as PermissionMode,
         projectRoot: projectPath,
-        sessionId: claudeSessionId,
+        sessionId: agentSessionId,
         resume: canResume,
         statusOutputPath,
         eventsOutputPath,
@@ -268,7 +268,7 @@ export async function recoverSessions(
 
       spawnInputs.push({
         record, task, command, cwd: record.cwd,
-        claudeSessionId, canResume, prompt, permissionMode,
+        agentSessionId, canResume, prompt, permissionMode,
         statusOutputPath, eventsOutputPath,
       });
     } catch (err) {
@@ -319,7 +319,7 @@ export async function recoverSessions(
       sessionRepo.insert({
         task_id: input.task.id,
         session_type: 'claude_agent',
-        claude_session_id: input.claudeSessionId,
+        agent_session_id: input.agentSessionId,
         command: input.command,
         cwd: input.cwd,
         permission_mode: input.permissionMode,
@@ -432,7 +432,7 @@ export async function reconcileSessions(
     task: Task;
     command: string;
     cwd: string;
-    claudeSessionId: string;
+    agentSessionId: string;
     prompt: string | undefined;
     permissionMode: string;
     agent: string;
@@ -505,14 +505,14 @@ export async function reconcileSessions(
         await ensureWorktreeTrust(cwd);
         await ensureMcpServerTrust(cwd);
 
-        // Generate a Claude session ID upfront so recovery can resume
-        const claudeSessionId = randomUUID();
+        // Generate an agent session ID upfront so recovery can resume
+        const agentSessionId = randomUUID();
         // Reconciliation is resuming previously-started work, not starting fresh.
         // Don't re-send the original task description as it would duplicate context.
         const prompt = undefined;
 
         // Ensure the per-session directory exists
-        const sessionDir = path.join(projectPath, '.kangentic', 'sessions', claudeSessionId);
+        const sessionDir = path.join(projectPath, '.kangentic', 'sessions', agentSessionId);
         fs.mkdirSync(sessionDir, { recursive: true });
         const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
 
@@ -523,7 +523,7 @@ export async function reconcileSessions(
           cwd,
           permissionMode: permissionMode as PermissionMode,
           projectRoot: projectPath,
-          sessionId: claudeSessionId,
+          sessionId: agentSessionId,
           statusOutputPath,
           eventsOutputPath,
           shell: resolvedShell,
@@ -531,7 +531,7 @@ export async function reconcileSessions(
         });
 
         spawnInputs.push({
-          task, command, cwd, claudeSessionId, prompt, permissionMode,
+          task, command, cwd, agentSessionId, prompt, permissionMode,
           agent: actionConfig?.agent || 'claude',
           statusOutputPath, eventsOutputPath,
         });
@@ -581,7 +581,7 @@ export async function reconcileSessions(
       sessionRepo.insert({
         task_id: input.task.id,
         session_type: 'claude_agent',
-        claude_session_id: input.claudeSessionId,
+        agent_session_id: input.agentSessionId,
         command: input.command,
         cwd: input.cwd,
         permission_mode: input.permissionMode,

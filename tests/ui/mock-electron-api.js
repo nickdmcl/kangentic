@@ -879,7 +879,7 @@
       },
     },
 
-    claude: {
+    agent: {
       detect: async function () {
         return { found: true, path: '/usr/bin/claude', version: '2.1.72 (Claude Code)' };
       },

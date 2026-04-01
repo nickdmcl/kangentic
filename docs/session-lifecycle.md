@@ -63,10 +63,10 @@ The in-memory `SessionStatus` does not include `orphaned` (that is a DB-only con
    - Determine CWD (worktree path or project path)
    - Pre-populate `~/.claude.json` trust for worktree paths
    - Check for previous suspended session (can resume?)
-   - If resuming: use existing `claude_session_id` with `--resume`, no prompt
-   - If fresh: generate new UUID for `claude_session_id`, use `--session-id`, include prompt
-   - Create session directory at `.kangentic/sessions/<claudeSessionId>/`
-   - Build Claude CLI command via `CommandBuilder`
+   - If resuming: use existing `agent_session_id` with `--resume`, no prompt
+   - If fresh: generate new UUID for `agent_session_id`, use `--session-id`, include prompt
+   - Create session directory at `.kangentic/sessions/<agentSessionId>/`
+   - Build agent CLI command via `CommandBuilder`
    - Call `SessionManager.spawn()`
 3. `SessionManager.spawn()`:
    - Check concurrency limit; queue if full (returns `queued` placeholder)
@@ -96,7 +96,7 @@ Session teardown varies by target column:
 
 ### What is preserved on suspend (Done / auto_spawn=false)
 
-- `claude_session_id` (for `--resume` on next spawn)
+- `agent_session_id` (for `--resume` on next spawn)
 - Worktree directory and branch
 - Session files on disk (`status.json`, `events.jsonl`, `settings.json`)
 - Scrollback buffer in memory
@@ -123,7 +123,7 @@ Session teardown varies by target column:
 
 When a suspended task moves to an active column:
 
-- Command: `claude --settings <path> --resume <claudeSessionId>` (no prompt)
+- Command: `claude --settings <path> --resume <agentSessionId>` (no prompt)
 - New PTY spawned with scrollback carried over from previous session
 - New session DB record inserted, old record marked `exited`
 
@@ -137,7 +137,7 @@ On project open (`session-recovery.ts`):
 4. **Deduplicate** -- keep only the latest record per `task_id`, mark older duplicates as `exited`
 5. **Filter** -- skip tasks in non-auto-spawn columns, skip user-paused sessions (`suspended_by = 'user'`), skip missing CWD, skip deleted/archived tasks
 6. **Resume or respawn**:
-   - Suspended/orphaned with `claude_session_id` -- use `--resume` (attempts to restore conversation)
+   - Suspended/orphaned with `agent_session_id` -- use `--resume` (attempts to restore conversation)
    - No session ID -- fresh `--session-id` with prompt from matching `spawn_agent` action
 7. **Reconcile** -- spawn fresh agents for tasks in auto_spawn columns with no session at all (skips user-paused tasks)
 
@@ -158,7 +158,7 @@ The actual shutdown sequence (`syncShutdownCleanup()` in `src/main/index.ts`):
 
 A hard failsafe timer (`taskkill /T /F` on Windows, 6 seconds) runs as a backstop in case Electron's shutdown hangs.
 
-Sessions are resumable on next launch via `--resume <claude_session_id>` from the saved DB record. The 2-second graceful `/exit` window is intentionally sacrificed to keep shutdown synchronous and prevent zombie processes.
+Sessions are resumable on next launch via `--resume <agent_session_id>` from the saved DB record. The 2-second graceful `/exit` window is intentionally sacrificed to keep shutdown synchronous and prevent zombie processes.
 
 ## Terminal Ownership Handoff
 

@@ -21,7 +21,7 @@ import {
   useBranchConfig,
   useCopyDisplayId,
 } from './task-detail';
-import type { Task, ClaudeCommand, ShortcutConfig } from '../../../shared/types';
+import type { Task, AgentCommand, ShortcutConfig } from '../../../shared/types';
 
 interface TaskDetailDialogProps {
   task: Task;
@@ -241,7 +241,7 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
     }
   };
 
-  const handleCommandSelect = async (command: ClaudeCommand) => {
+  const handleCommandSelect = async (command: AgentCommand) => {
     if (!task.id || toggling) return;
     setToggling(true);
     try {

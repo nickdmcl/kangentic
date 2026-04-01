@@ -86,7 +86,7 @@ function createMockRepos(backlogTasks: MockTask[] = []) {
 
   const sessionRepo = {
     deleteByTaskId: vi.fn(),
-    listAllClaudeSessionIds: vi.fn(() => []),
+    listAllAgentSessionIds: vi.fn(() => []),
   };
 
   const sessionManager = {
@@ -129,7 +129,7 @@ describe('cleanupStaleResources', () => {
   it('completes without errors when no backlog lane exists', async () => {
     const swimlaneRepo = { list: vi.fn(() => [{ id: 'lane-1', role: null }]) };
     const taskRepo = { list: vi.fn(() => []), listArchived: vi.fn(() => []), update: vi.fn() };
-    const sessionRepo = { deleteByTaskId: vi.fn(), listAllClaudeSessionIds: vi.fn(() => []) };
+    const sessionRepo = { deleteByTaskId: vi.fn(), listAllAgentSessionIds: vi.fn(() => []) };
     const sessionManager = { remove: vi.fn(), listSessions: vi.fn(() => []) };
 
     await cleanupStaleResources(

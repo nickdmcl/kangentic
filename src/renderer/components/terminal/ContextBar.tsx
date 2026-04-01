@@ -30,7 +30,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
     }
     return undefined;
   });
-  const claudeVersionNumber = useConfigStore((s) => s.claudeVersionNumber);
+  const agentVersionNumber = useConfigStore((s) => s.agentVersionNumber);
   const contextBarConfig = useConfigStore((s) => s.config.contextBar);
 
   // Pulse hooks -- always called unconditionally (hooks rules)
@@ -88,8 +88,8 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
       {showVersion && (
         <span className={`${pill} text-fg-muted`}>
           Claude Code
-          {claudeVersionNumber && (
-            <span className="text-fg-faint ml-1.5">v{claudeVersionNumber}</span>
+          {agentVersionNumber && (
+            <span className="text-fg-faint ml-1.5">v{agentVersionNumber}</span>
           )}
         </span>
       )}

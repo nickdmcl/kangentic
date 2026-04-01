@@ -21,7 +21,7 @@ const APP_TSX = path.resolve(__dirname, '../../src/renderer/App.tsx');
 const EXCLUDED_METHODS = new Set([
   'loadArchivedTasks', // only loaded when archive panel is opened
   'loadAppVersion',    // static, doesn't change during a session
-  'detectClaude',      // static CLI detection, doesn't change during a session
+  'detectAgent',       // static CLI detection, doesn't change during a session
   'loadProjectOverrides', // called internally by loadConfig
   'loadShortcuts',     // called internally by loadBoard
 ]);

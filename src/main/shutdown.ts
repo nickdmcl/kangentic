@@ -75,7 +75,7 @@ export function syncShutdownCleanup(dependencies: ShutdownDependencies): void {
 
     // Kill all PTY sessions immediately. We skip the graceful suspendAll()
     // (which sends /exit and waits up to 2s) to keep shutdown synchronous.
-    // Sessions are resumable via --resume <claude_session_id> from the DB record.
+    // Sessions are resumable via --resume <agent_session_id> from the DB record.
     sessionManager.killAll();
     sessionManager.dispose();
 

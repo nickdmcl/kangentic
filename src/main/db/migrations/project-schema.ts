@@ -58,7 +58,7 @@ export function runProjectMigrations(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       task_id TEXT NOT NULL REFERENCES tasks(id),
       session_type TEXT NOT NULL,
-      claude_session_id TEXT,
+      agent_session_id TEXT,
       command TEXT NOT NULL,
       cwd TEXT NOT NULL,
       permission_mode TEXT,
@@ -430,6 +430,13 @@ export function runProjectMigrations(db: Database.Database): void {
   const hasTaskPriorityColumn = (db.pragma('table_info(tasks)') as Array<{ name: string }>).some((col) => col.name === 'priority');
   if (!hasTaskPriorityColumn) {
     db.exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0');
+  }
+
+  // Migration: rename claude_session_id -> agent_session_id
+  const hasClaudeSessionIdColumn = (db.pragma('table_info(sessions)') as Array<{ name: string }>)
+    .some((col) => col.name === 'claude_session_id');
+  if (hasClaudeSessionIdColumn) {
+    db.exec('ALTER TABLE sessions RENAME COLUMN claude_session_id TO agent_session_id');
   }
 
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)

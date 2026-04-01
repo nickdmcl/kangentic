@@ -29,7 +29,7 @@ vi.mock('node:fs', () => ({
 vi.mock('node:crypto', () => ({ randomUUID: vi.fn(() => 'mock-uuid') }));
 vi.mock('../../src/main/db/database', () => ({ getProjectDb: vi.fn() }));
 vi.mock('../../src/main/db/repositories/session-repository', () => ({
-  SessionRepository: class { getLatestForTask = vi.fn(); updateStatus = vi.fn(); deleteByTaskId = vi.fn(); listAllClaudeSessionIds = vi.fn(() => []); },
+  SessionRepository: class { getLatestForTask = vi.fn(); updateStatus = vi.fn(); deleteByTaskId = vi.fn(); listAllAgentSessionIds = vi.fn(() => []); },
 }));
 vi.mock('../../src/main/db/repositories/task-repository', () => ({
   TaskRepository: class { list = vi.fn(() => []); listArchived = vi.fn(() => []); delete = vi.fn(); },
@@ -94,10 +94,10 @@ function makeMockTaskRepo(
   } as unknown as import('../../src/main/db/repositories/task-repository').TaskRepository;
 }
 
-function makeMockSessionRepo(claudeSessionIds: string[] = []) {
+function makeMockSessionRepo(agentSessionIds: string[] = []) {
   return {
     deleteByTaskId: vi.fn(),
-    listAllClaudeSessionIds: vi.fn(() => claudeSessionIds),
+    listAllAgentSessionIds: vi.fn(() => agentSessionIds),
   } as unknown as import('../../src/main/db/repositories/session-repository').SessionRepository;
 }
 

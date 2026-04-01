@@ -164,7 +164,7 @@ export async function handleTaskMove(
       // Accept 'running' AND 'exited' -- exited covers Claude natural exit.
       // Queued sessions never started Claude CLI, so mark exited (not suspended)
       // to avoid a failed --resume attempt when the task is later moved back.
-      if (record && record.claude_session_id
+      if (record && record.agent_session_id
           && (record.status === 'running' || record.status === 'exited')) {
         // Capture metrics before suspend (caches are still populated)
         captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, record.id);
@@ -179,7 +179,7 @@ export async function handleTaskMove(
     } else {
       // No active PTY -- preserve latest exited session for future resume
       const record = sessionRepo.getLatestForTask(task.id);
-      if (record && record.claude_session_id
+      if (record && record.agent_session_id
           && record.session_type === 'claude_agent'
           && record.status === 'exited') {
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
@@ -207,7 +207,7 @@ export async function handleTaskMove(
     context.commandInjector.cancel(task.id);
     if (task.session_id) {
       const record = sessionRepo.getLatestForTask(task.id);
-      if (record && record.claude_session_id
+      if (record && record.agent_session_id
           && (record.status === 'running' || record.status === 'exited')) {
         captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, record.id);
         sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'system' });
@@ -234,7 +234,7 @@ export async function handleTaskMove(
     if (toLane?.auto_command?.trim()) {
       // Suspend session. Will resume with preloaded command.
       const sessionRecord = sessionRepo.getLatestForTask(task.id);
-      if (sessionRecord && sessionRecord.claude_session_id
+      if (sessionRecord && sessionRecord.agent_session_id
           && (sessionRecord.status === 'running' || sessionRecord.status === 'exited')) {
         captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id, sessionRecord.id);
         sessionRepo.updateStatus(sessionRecord.id, 'suspended', {

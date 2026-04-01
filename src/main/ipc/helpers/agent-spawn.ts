@@ -114,7 +114,7 @@ export async function spawnAgent(options: AgentSpawnOptions): Promise<void> {
 
   // Determine resume vs fresh spawn for auto_command handling
   const suspendedRecord = sessionRepo.getLatestForTask(task.id);
-  const wasSuspended = !!suspendedRecord?.claude_session_id
+  const wasSuspended = !!suspendedRecord?.agent_session_id
     && suspendedRecord.status === 'suspended';
 
   // Resume path: preload auto_command as initial resume prompt

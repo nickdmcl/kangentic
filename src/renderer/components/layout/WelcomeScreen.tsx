@@ -16,12 +16,12 @@ function DetectionSkeleton({ label }: { label: string }) {
 export function WelcomeScreen() {
   const openProjectByPath = useProjectStore((state) => state.openProjectByPath);
   const appVersion = useConfigStore((state) => state.appVersion);
-  const claudeInfo = useConfigStore((state) => state.claudeInfo);
-  const claudeVersionNumber = useConfigStore((state) => state.claudeVersionNumber);
+  const agentInfo = useConfigStore((state) => state.agentInfo);
+  const agentVersionNumber = useConfigStore((state) => state.agentVersionNumber);
   const gitInfo = useConfigStore((state) => state.gitInfo);
 
   // Hide the button until both detections complete and both pass
-  const prerequisitesMet = claudeInfo !== null && gitInfo !== null && gitInfo.found !== false && claudeInfo.found !== false;
+  const prerequisitesMet = agentInfo !== null && gitInfo !== null && gitInfo.found !== false && agentInfo.found !== false;
 
   const handleOpenProject = async () => {
     const selectedPath = await window.electronAPI.dialog.selectFolder();
@@ -120,12 +120,12 @@ export function WelcomeScreen() {
 
             {/* Claude Code status */}
             <div data-testid="welcome-claude-status">
-              {claudeInfo === null ? (
+              {agentInfo === null ? (
                 <DetectionSkeleton label="Claude Code" />
-              ) : claudeInfo.found ? (
+              ) : agentInfo.found ? (
                 <div className="flex items-center gap-1.5 text-sm text-green-400">
                   <CheckCircle size={14} />
-                  <span>Claude Code {claudeVersionNumber ? `v${claudeVersionNumber}` : ''}</span>
+                  <span>Claude Code {agentVersionNumber ? `v${agentVersionNumber}` : ''}</span>
                 </div>
               ) : (
                 <div className="space-y-1 text-left">

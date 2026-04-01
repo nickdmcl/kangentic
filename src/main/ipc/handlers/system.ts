@@ -6,7 +6,7 @@ import { app, ipcMain, Notification, dialog, shell } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { WorktreeManager, isGitRepo } from '../../git/worktree-manager';
 import { deepMergeConfig } from '../../../shared/object-utils';
-import type { NotificationInput, ClaudeCommand } from '../../../shared/types';
+import type { NotificationInput, AgentCommand } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
 export function registerSystemHandlers(context: IpcContext): void {
@@ -69,13 +69,13 @@ export function registerSystemHandlers(context: IpcContext): void {
     return updatedCount;
   });
 
-  // === Claude ===
-  ipcMain.handle(IPC.CLAUDE_DETECT, () => {
+  // === Agent ===
+  ipcMain.handle(IPC.AGENT_DETECT, () => {
     const config = context.configManager.load();
     return context.claudeDetector.detect(config.claude.cliPath);
   });
 
-  ipcMain.handle(IPC.CLAUDE_LIST_COMMANDS, (_, cwd?: string): ClaudeCommand[] => {
+  ipcMain.handle(IPC.AGENT_LIST_COMMANDS, (_, cwd?: string): AgentCommand[] => {
     const projectPath = context.currentProjectPath;
     if (!projectPath) return [];
 
@@ -121,7 +121,7 @@ export function registerSystemHandlers(context: IpcContext): void {
     }
 
     const seen = new Set<string>(); // names already collected (closest wins)
-    const commands: ClaudeCommand[] = [];
+    const commands: AgentCommand[] = [];
 
     // Scan .claude/commands/ directories (legacy format: flat .md files)
     function walkCommandsDirectory(directory: string, prefix: string): void {

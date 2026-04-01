@@ -1,17 +1,17 @@
 import React, { useState, useRef, useEffect, useMemo, type RefObject } from 'react';
 import { Loader2, Search } from 'lucide-react';
 import { usePopoverPosition } from '../../../hooks/usePopoverPosition';
-import type { ClaudeCommand } from '../../../../shared/types';
+import type { AgentCommand } from '../../../../shared/types';
 
 export interface CommandPalettePopoverProps {
   triggerRef: RefObject<HTMLElement | null>;
   cwd?: string;
-  onSelect: (command: ClaudeCommand) => void;
+  onSelect: (command: AgentCommand) => void;
   onClose: () => void;
 }
 
 export function CommandPalettePopover({ triggerRef, cwd, onSelect, onClose }: CommandPalettePopoverProps) {
-  const [commands, setCommands] = useState<ClaudeCommand[]>([]);
+  const [commands, setCommands] = useState<AgentCommand[]>([]);
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,7 @@ export function CommandPalettePopover({ triggerRef, cwd, onSelect, onClose }: Co
     let cancelled = false;
     (async () => {
       try {
-        const result = await window.electronAPI.claude.listCommands(cwd);
+        const result = await window.electronAPI.agent.listCommands(cwd);
         if (!cancelled) {
           setCommands(result);
           setLoading(false);

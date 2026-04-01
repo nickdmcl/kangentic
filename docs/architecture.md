@@ -199,11 +199,11 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `notification:show` | send | Show native OS notification (task name + project name) |
 | `notification:clicked` | on | User clicked a notification (includes projectId, taskId) |
 
-### Claude (2 channels)
+### Agent (2 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
-| `claude:detect` | invoke | Detect Claude CLI (path, version) |
-| `claude:listCommands` | invoke | List available Claude Code commands and skills |
+| `agent:detect` | invoke | Detect agent CLI (path, version) |
+| `agent:listCommands` | invoke | List available agent commands and skills |
 
 ### Shell (5 channels)
 | Channel | Pattern | Purpose |
@@ -287,7 +287,7 @@ Created on project open. Stored in the global config directory (not inside the p
 - **tasks** -- Kanban cards. Fields: id, display_id, title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name, pr_number, pr_url, base_branch, use_worktree, labels, priority, archived_at, created_at, updated_at
 - **actions** -- Executable steps. Types: `spawn_agent`, `send_command`, `run_script`, `kill_session`, `create_worktree`, `cleanup_worktree`, `create_pr`, `webhook`. Config stored as JSON.
 - **swimlane_transitions** -- Maps lane pairs to action chains. Fields: from_swimlane_id (`*` = any), to_swimlane_id, action_id, execution_order
-- **sessions** -- Session persistence for recovery/resume. Fields: id, task_id, session_type, claude_session_id, command, cwd, permission_mode, prompt, status (`running`/`queued`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
+- **sessions** -- Session persistence for recovery/resume. Fields: id, task_id, session_type, agent_session_id, command, cwd, permission_mode, prompt, status (`running`/`queued`/`suspended`/`exited`/`orphaned`), exit_code, timestamps
 - **task_attachments** -- File attachments (images, etc.) stored on disk, metadata in DB
 - **backlog_tasks** -- Staging area tasks (Backlog View). Pre-board tasks with priority, labels, and optional external source tracking.
 - **backlog_attachments** -- File attachments for backlog tasks, mirroring `task_attachments`. Copied to `task_attachments` on promote.
@@ -420,11 +420,11 @@ State: `sessions`, `activeSessionId`, `openTaskId`, `dialogSessionId`, `sessionU
 
 ### ConfigStore (`config-store.ts`)
 
-State: `config` (AppConfig), `globalConfig`, `appVersion`, `claudeInfo`, `claudeVersionNumber`, `gitInfo`, `settingsOpen`, `projectOverrides`
+State: `config` (AppConfig), `globalConfig`, `appVersion`, `agentInfo`, `agentVersionNumber`, `gitInfo`, `settingsOpen`, `projectOverrides`
 
 - **Theme subscription** -- watches theme changes, updates `<html>` class for CSS variables.
 - **App version** -- `loadAppVersion()` fetches the Electron app version via IPC.
-- **Claude detection** -- `detectClaude()` finds CLI path and parses version string.
+- **Agent detection** -- `detectAgent()` finds CLI path and parses version string.
 - **Git detection** -- `detectGit()` checks for git installation, version, and minimum version requirement.
 - **Project overrides** -- `loadProjectOverrides()`, `updateProjectOverride()`, `removeProjectOverride()` manage per-project config overrides by filesystem path.
 

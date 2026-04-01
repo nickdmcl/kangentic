@@ -20,7 +20,7 @@ export function SettingsPanel() {
   const openProjectSettings = useConfigStore((state) => state.openProjectSettings);
   const currentProject = useProjectStore((state) => state.currentProject);
   const projects = useProjectStore((state) => state.projects);
-  const detectClaude = useConfigStore((state) => state.detectClaude);
+  const detectAgent = useConfigStore((state) => state.detectAgent);
 
   // Determine if we have a project context (either from sidebar gear icon or current project)
   const hasProject = Boolean(projectSettingsPath || currentProject);
@@ -44,7 +44,7 @@ export function SettingsPanel() {
 
   useEffect(() => {
     window.electronAPI.shell.getAvailable().then(setShells).catch(() => {});
-    detectClaude();
+    detectAgent();
   }, []);
 
   // When opening settings for a different project via sidebar gear icon,
