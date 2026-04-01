@@ -128,4 +128,74 @@ describe('SessionManager queued status', () => {
     expect(statusEvents).toContain('running');
     expect(manager.queuedCount).toBe(0);
   });
+
+  it('kill() on a queued session emits exit event', async () => {
+    const firstMock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
+    await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
+
+    // Second spawn is queued (concurrency limit = 1)
+    const secondMock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(secondMock.mockPty as unknown as pty.IPty);
+    const queued = await manager.spawn({ taskId: 'task-2', projectId: 'project-1', command: '', cwd: '/tmp/test' });
+    expect(queued.status).toBe('queued');
+
+    // Listen for exit events
+    const exitEvents: Array<{ sessionId: string; exitCode: number }> = [];
+    manager.on('exit', (sessionId: string, exitCode: number) => {
+      exitEvents.push({ sessionId, exitCode });
+    });
+
+    // Kill the queued session - should emit exit event for DB cleanup
+    manager.kill(queued.id);
+
+    const exitEvent = exitEvents.find((event) => event.sessionId === queued.id);
+    expect(exitEvent).toBeDefined();
+    expect(exitEvent!.exitCode).toBe(-1);
+    expect(manager.queuedCount).toBe(0);
+  });
+
+  it('removeByTaskId() on a queued session emits exit event', async () => {
+    const firstMock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
+    await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
+
+    const secondMock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(secondMock.mockPty as unknown as pty.IPty);
+    const queued = await manager.spawn({ taskId: 'task-2', projectId: 'project-1', command: '', cwd: '/tmp/test' });
+    expect(queued.status).toBe('queued');
+
+    const exitEvents: Array<{ sessionId: string; exitCode: number }> = [];
+    manager.on('exit', (sessionId: string, exitCode: number) => {
+      exitEvents.push({ sessionId, exitCode });
+    });
+
+    // removeByTaskId is the path used by handleTaskMove abort cleanup
+    manager.removeByTaskId('task-2');
+
+    const exitEvent = exitEvents.find((event) => event.sessionId === queued.id);
+    expect(exitEvent).toBeDefined();
+    expect(exitEvent!.exitCode).toBe(-1);
+    // Session should be fully removed from manager
+    expect(manager.getSession(queued.id)).toBeUndefined();
+  });
+
+  it('kill() on a running session does NOT emit exit event synchronously', async () => {
+    const firstMock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(firstMock.mockPty as unknown as pty.IPty);
+    const running = await manager.spawn({ taskId: 'task-1', projectId: 'project-1', command: '', cwd: '/tmp/test' });
+    expect(running.status).toBe('running');
+
+    const exitEvents: Array<{ sessionId: string; exitCode: number }> = [];
+    manager.on('exit', (sessionId: string, exitCode: number) => {
+      exitEvents.push({ sessionId, exitCode });
+    });
+
+    // Kill a running session - exit event comes async from PTY onExit, not synchronously
+    manager.kill(running.id);
+
+    // No synchronous exit event (PTY hasn't exited yet)
+    const syncExitEvent = exitEvents.find((event) => event.sessionId === running.id);
+    expect(syncExitEvent).toBeUndefined();
+  });
 });

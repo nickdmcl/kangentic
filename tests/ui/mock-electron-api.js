@@ -755,6 +755,14 @@
         }
         return newSession;
       },
+      reset: async function (taskId) {
+        sessions = sessions.filter(function (s) { return s.taskId !== taskId; });
+        var task = tasks.find(function (t) { return t.id === taskId; });
+        if (task) {
+          task.session_id = null;
+          task.updated_at = now();
+        }
+      },
       write: async function () {},
       resize: async function () { return { colsChanged: false }; },
       list: async function () {

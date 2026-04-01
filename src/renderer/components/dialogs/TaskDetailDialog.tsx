@@ -55,6 +55,8 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
   const [priority, setPriority] = useState(task.priority ?? 0);
   const [isEditing, setIsEditing] = useState(!!initialEdit);
   const [toggling, setToggling] = useState(false);
+  const [resumeFailed, setResumeFailed] = useState(false);
+  const [resumeError, setResumeError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showEnableWorktreeConfirm, setShowEnableWorktreeConfirm] = useState(false);
   const changesOpen = useSessionStore((s) => s.changesOpenTasks.has(task.id));
@@ -202,16 +204,40 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
         await suspendSession(task.id);
       } else {
         await resumeSession(task.id);
+        setResumeFailed(false);
+        setResumeError('');
       }
       await loadBoard();
     } catch (err) {
       console.error('Toggle session failed:', err);
+      const reason = err instanceof Error ? err.message : '';
+      if (!isSessionActive) {
+        setResumeFailed(true);
+        setResumeError(reason);
+      }
       useToastStore.getState().addToast({
-        message: `Failed to ${isSessionActive ? 'suspend' : 'resume'} session`,
+        message: reason
+          ? `Failed to ${isSessionActive ? 'suspend' : 'resume'} session: ${reason}`
+          : `Failed to ${isSessionActive ? 'suspend' : 'resume'} session`,
         variant: 'warning',
       });
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handleResetSession = async () => {
+    try {
+      await useSessionStore.getState().resetSession(task.id);
+      setResumeFailed(false);
+      setResumeError('');
+      await loadBoard();
+    } catch (err) {
+      console.error('Reset session failed:', err);
+      useToastStore.getState().addToast({
+        message: 'Failed to reset session',
+        variant: 'warning',
+      });
     }
   };
 
@@ -578,6 +604,9 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
             handleToggle={handleToggle}
             changesOpen={changesOpen}
             projectPath={projectPath ?? ''}
+            resumeFailed={resumeFailed}
+            resumeError={resumeError}
+            onResetSession={handleResetSession}
           />
         )}
       </BaseDialog>

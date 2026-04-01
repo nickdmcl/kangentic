@@ -65,6 +65,10 @@ export function registerSessionHandlers(context: IpcContext): void {
       // Capture metrics before suspend (caches are still populated)
       captureSessionMetrics(context.sessionManager, sessionRepo, task.session_id!, record.id);
       sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: new Date().toISOString(), suspended_by: 'user' });
+    } else if (record && record.status === 'queued') {
+      // Queued sessions never started Claude CLI - mark as exited (not
+      // suspended) to avoid a failed --resume attempt on next resume click.
+      sessionRepo.updateStatus(record.id, 'exited', { exited_at: new Date().toISOString() });
     }
 
     // Kill PTY but preserve session files
@@ -138,6 +142,40 @@ export function registerSessionHandlers(context: IpcContext): void {
         sessionResumeControllers.delete(taskId);
       }
     }
+  });
+
+  // === Session Reset (safety-net recovery for unrecoverable sessions) ===
+  ipcMain.handle(IPC.SESSION_RESET, async (_, taskId: string) => {
+    const resolvedProjectId = context.currentProjectId;
+    if (!resolvedProjectId) throw new Error('No project is currently open');
+
+    // Cancel any in-flight resume
+    sessionResumeControllers.get(taskId)?.abort();
+
+    const { tasks } = getProjectRepos(context, resolvedProjectId);
+    const task = tasks.getById(taskId);
+    if (!task) throw new Error(`Task ${taskId} not found`);
+
+    // Kill PTY if running
+    if (task.session_id) {
+      context.sessionManager.kill(task.session_id);
+    }
+    // Also remove any PTY registered by taskId (covers ghost sessions
+    // that were never written to the task record)
+    context.sessionManager.removeByTaskId(taskId);
+
+    // Mark latest non-exited session record as exited in DB
+    const db = getProjectDb(resolvedProjectId);
+    const sessionRepo = new SessionRepository(db);
+    const latest = sessionRepo.getLatestForTask(taskId);
+    if (latest && latest.status !== 'exited') {
+      sessionRepo.updateStatus(latest.id, 'exited', {
+        exited_at: new Date().toISOString(),
+      });
+    }
+
+    // Clear task's session reference
+    tasks.update({ id: taskId, session_id: null });
   });
 
   // === Session Summaries ===

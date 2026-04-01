@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Loader2, Play } from 'lucide-react';
+import { Loader2, Play, RotateCcw } from 'lucide-react';
 import { TerminalTab } from '../../terminal/TerminalTab';
 import { ContextBar } from '../../terminal/ContextBar';
 import { ShimmerOverlay } from '../../ShimmerOverlay';
@@ -32,6 +32,9 @@ interface TaskDetailBodyProps {
   handleToggle: () => void;
   changesOpen: boolean;
   projectPath: string;
+  resumeFailed?: boolean;
+  resumeError?: string;
+  onResetSession?: () => void;
 }
 
 export function TaskDetailBody({
@@ -51,6 +54,9 @@ export function TaskDetailBody({
   handleToggle,
   changesOpen,
   projectPath,
+  resumeFailed,
+  resumeError,
+  onResetSession,
 }: TaskDetailBodyProps) {
   const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
   const taskLabels = task.labels ?? [];
@@ -180,6 +186,20 @@ export function TaskDetailBody({
             )}
             {toggling ? 'Resuming agent...' : 'Resume session'}
           </button>
+          {resumeFailed && onResetSession && (
+            <div className="flex flex-col items-center gap-2 mt-1">
+              <p className="text-xs text-fg-muted text-center max-w-sm">
+                {resumeError || 'Session could not be resumed.'}
+              </p>
+              <button
+                onClick={onResetSession}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-fg-muted hover:text-fg hover:bg-surface-hover border border-edge-input transition-colors"
+              >
+                <RotateCcw size={14} />
+                Reset session
+              </button>
+            </div>
+          )}
         </div>
         {changesPanelElement}
       </div>

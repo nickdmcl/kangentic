@@ -139,13 +139,14 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `transition:set` | invoke | Set action chain for lane A→B |
 | `transition:getFor` | invoke | Get transitions for lane pair (exact match, then wildcard) |
 
-### Sessions (25 channels)
+### Sessions (26 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `session:spawn` | invoke | Spawn PTY session (may queue) |
 | `session:kill` | invoke | Kill session |
 | `session:suspend` | invoke | Suspend session (preserves for resume) |
 | `session:resume` | invoke | Resume suspended session |
+| `session:reset` | invoke | Reset unrecoverable session (kill PTY, mark DB exited, clear task reference) |
 | `session:write` | invoke | Write to session stdin |
 | `session:resize` | invoke | Resize PTY (cols/rows) |
 | `session:list` | invoke | Fetch all sessions |

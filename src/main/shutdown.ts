@@ -62,6 +62,10 @@ export function syncShutdownCleanup(dependencies: ShutdownDependencies): void {
           const record = sessionRepo.getLatestForTask(session.taskId);
           if (record && record.status === 'running') {
             sessionRepo.updateStatus(record.id, 'suspended', { suspended_at: now, suspended_by: 'system' });
+          } else if (record && record.status === 'queued') {
+            // Queued sessions never started Claude CLI - mark as exited
+            // (not suspended) since there's nothing to resume.
+            sessionRepo.updateStatus(record.id, 'exited', { exited_at: now });
           }
         }
       } catch {

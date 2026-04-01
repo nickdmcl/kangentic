@@ -1028,6 +1028,7 @@ export interface ElectronAPI {
     kill: (sessionId: string) => Promise<void>;
     suspend: (taskId: string) => Promise<void>;
     resume: (taskId: string, resumePrompt?: string) => Promise<Session>;
+    reset: (taskId: string) => Promise<void>;
     write: (sessionId: string, data: string) => Promise<void>;
     resize: (sessionId: string, cols: number, rows: number) => Promise<{ colsChanged: boolean }>;
     list: () => Promise<Session[]>;

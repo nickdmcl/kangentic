@@ -478,6 +478,8 @@ export class SessionManager extends EventEmitter {
    * Used during project deletion to prevent cross-project bleed.
    */
   remove(sessionId: string): void {
+    // kill() may emit 'exit' events that depend on the session still being
+    // in the map (the exit handler looks up the session by ID). Delete AFTER.
     this.kill(sessionId);
     this.fileWatcher.cleanupAndRemove(sessionId);
     this.sessions.delete(sessionId);
@@ -513,10 +515,13 @@ export class SessionManager extends EventEmitter {
       session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
       ptyRef.kill();
     }
-    // Remove from queue if queued, and mark as exited
+    // Remove from queue if queued, and mark as exited.
+    // Queued sessions have no PTY, so onExit never fires. Emit the exit
+    // event explicitly so the DB listener marks the record as exited.
     if (this.sessionQueue.remove(sessionId) && session) {
       session.status = 'exited';
       session.exitCode = -1;
+      this.emit('exit', sessionId, -1);
     }
     // A slot may have opened - let the queue promote
     this.sessionQueue.notifySlotFreed();

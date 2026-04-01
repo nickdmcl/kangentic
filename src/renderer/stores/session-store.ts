@@ -49,6 +49,7 @@ interface SessionStore {
   setDetailTaskId: (id: string | null) => void;
   spawnSession: (input: SpawnSessionInput) => Promise<Session>;
   killSession: (id: string) => Promise<void>;
+  resetSession: (taskId: string) => Promise<void>;
   suspendSession: (taskId: string) => Promise<void>;
   resumeSession: (taskId: string, resumePrompt?: string) => Promise<Session>;
   setActiveSession: (id: string | null) => void;
@@ -196,6 +197,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions = s.sessions.map((sess) =>
         sess.id === id ? { ...sess, status: 'exited' as const, exitCode: -1 } : sess
       );
+      return { sessions, _sessionByTaskId: buildSessionByTaskId(sessions) };
+    });
+  },
+
+  resetSession: async (taskId) => {
+    await window.electronAPI.sessions.reset(taskId);
+    set((s) => {
+      const sessions = s.sessions.filter((session) => session.taskId !== taskId);
       return { sessions, _sessionByTaskId: buildSessionByTaskId(sessions) };
     });
   },
