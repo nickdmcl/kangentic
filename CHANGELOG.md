@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.13.1] - 2026-03-31
+
+### Fixes
+- Send newline instead of carriage return for Ctrl+Enter in terminal (114e8c9)
+
 ## [v0.13.0] - 2026-03-31
 
 ### Features
