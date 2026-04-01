@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [v0.14.0] - 2026-04-01
+
+### Features
+- Support Ctrl+V paste for images and shell-aware path quoting in terminal (5c3d5dd)
+- Show git diff viewer for all tasks with persist panel state and kebab menu (9790d57)
+- Add git diff viewer to task detail dialog (9065b5a)
+
+### Fixes
+- Format currency with thousands separators (129abd6)
+- Emit exit event for killed queued sessions and add session reset (f86523f)
+- Constrain rawBody to prevent header clipping in dialogs (61fd2fc)
+- Use merge-base for branch-only diffs, move Changes to pill row (3accbf0)
+
+### Other
+- Extract AgentAdapter interface and registry (bc89c35)
+
 ## [v0.13.1] - 2026-03-31
 
 ### Fixes

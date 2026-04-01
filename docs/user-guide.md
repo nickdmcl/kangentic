@@ -97,6 +97,10 @@ The amber idle indicator replaces the previous auto-focus behavior (which switch
 
 The leftmost tab shows an activity log - structured events from all sessions. This is a plain list (not a terminal) showing tool calls, idle events, and session state changes.
 
+### Clipboard Paste
+
+Press **Ctrl+V** (Cmd+V on macOS) in the terminal to paste. Text on the clipboard is pasted directly. If the clipboard contains an image (and no text), the image is saved to a temporary file and the file path is written to the PTY, allowing Claude Code to pick it up as a vision input. Paths are automatically quoted for the active shell (PowerShell, bash, cmd, WSL, etc.).
+
 ### File Drop to Terminal
 
 Drag files from your file manager onto the terminal to insert their file paths into the active session. Paths containing spaces are automatically quoted. Multiple files are inserted as a space-separated list. A visual overlay appears when files are dragged over the terminal area.
@@ -130,6 +134,12 @@ Click a task card to open the detail dialog. From here you can:
   - **Move to** - submenu listing all other columns as move targets
   - **Archive** - move the task to Done and archive it
   - **Delete** - permanently delete the task, session, and worktree
+
+### Changes Panel
+
+The Changes tab in the task detail dialog shows a git diff of all files modified by the task's branch compared to its base branch. The file tree on the left lists changed files with insertion/deletion counts. Click a file to view a side-by-side or inline diff on the right. Toggle between split and inline view modes using the button in the toolbar. The panel persists its expanded/collapsed state and selected file across dialog reopens.
+
+The Changes panel is available for all tasks, whether or not worktrees are enabled. It uses `git merge-base` to show only branch-specific changes, excluding upstream commits.
 
 When the dialog is open, it claims the terminal session. The bottom panel releases it. When you close the dialog, the bottom panel reclaims the session.
 
@@ -348,6 +358,14 @@ These are global-only settings that apply to the entire app.
 | Launch All Projects on Startup | Start agents across all projects on launch, not just the current one |
 | Restore Window Position | Remember window size and position between launches |
 | Show Board Search Bar | Display the search bar above board columns. Press Ctrl+F / Cmd+F to toggle. |
+
+### MCP Server
+
+The MCP Server tab controls the built-in Model Context Protocol server. When enabled, agents running inside Kangentic get access to MCP tools for creating tasks, querying the board, and viewing session stats. Disable this if you don't want agents to interact with the board programmatically.
+
+| Setting | Description |
+|---------|-------------|
+| Kangentic MCP Server | Enable or disable the built-in MCP server that gives agents board-aware tools |
 
 ## Board Configuration
 
