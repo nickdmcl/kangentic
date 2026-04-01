@@ -285,6 +285,10 @@ const api: ElectronAPI = {
     setDefaultBaseBranch: (branch: string) => ipcRenderer.invoke(IPC.BOARD_CONFIG_SET_DEFAULT_BASE_BRANCH, branch),
   },
 
+  clipboard: {
+    saveImage: (data: string, extension: string) => ipcRenderer.invoke(IPC.CLIPBOARD_SAVE_IMAGE, data, extension),
+  },
+
   platform: process.platform,
 
   webUtils: {

@@ -180,6 +180,9 @@ export const IPC = {
   BACKLOG_ATTACHMENT_GET_DATA_URL: 'backlogAttachment:getDataUrl',
   BACKLOG_ATTACHMENT_OPEN: 'backlogAttachment:open',
 
+  // Clipboard
+  CLIPBOARD_SAVE_IMAGE: 'clipboard:saveImage',
+
   // Updater
   UPDATE_CHECK: 'updater:check',
   UPDATE_INSTALL: 'updater:install',

@@ -105,15 +105,24 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
   // initializing and fetching noisy scrollback before Claude Code's TUI is drawn.
   const effectiveSessionId = terminalReady ? sessionId : null;
 
+  const commandBarShell = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        sessionId ? s.sessions.find((session) => session.id === sessionId)?.shell : undefined,
+      [sessionId],
+    ),
+  );
+
   const { terminalRef, initTerminal, fit, focus } = useTerminal({
     sessionId: effectiveSessionId,
     fontFamily: config.terminal.fontFamily,
     fontSize: config.terminal.fontSize,
     scrollbackLines: config.terminal.scrollbackLines,
     cursorStyle: config.terminal.cursorStyle,
+    shellName: commandBarShell ?? undefined,
   });
 
-  const fileDrop = useTerminalFileDrop(effectiveSessionId, focus);
+  const fileDrop = useTerminalFileDrop(effectiveSessionId, focus, commandBarShell ?? undefined);
 
   // Init terminal once session is ready AND container has dimensions.
   const initialized = useRef(false);

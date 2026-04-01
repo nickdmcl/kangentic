@@ -27,11 +27,138 @@ export function cleanSelection(raw: string, cols: number): string {
   return result.join('\n').trim();
 }
 
+// ---------------------------------------------------------------------------
+// Shell-aware path helpers (renderer-safe, no node:path dependency)
+// ---------------------------------------------------------------------------
+
+/**
+ * True when the shell is Unix-like and expects POSIX-style paths.
+ * Mirrors `isUnixLikeShell` from `src/shared/paths.ts` for renderer use.
+ */
+function isUnixLikeShell(shellName: string): boolean {
+  const lower = shellName.toLowerCase();
+  return !lower.includes('cmd') && !lower.includes('powershell') && !lower.includes('pwsh');
+}
+
+/**
+ * Convert a Windows path to the format expected by the target shell.
+ *
+ * - WSL shells:        C:\Users\dev → /mnt/c/Users/dev
+ * - Git Bash and other Unix-like: C:\Users\dev → /c/Users/dev
+ * - cmd / PowerShell:  no conversion (native paths work)
+ * - Non-Windows:       no conversion
+ */
+export function convertPathForShell(filePath: string, shellName: string): string {
+  if (window.electronAPI.platform !== 'win32') return filePath;
+  if (!isUnixLikeShell(shellName)) return filePath;
+
+  const lower = shellName.toLowerCase();
+  const prefix = lower.startsWith('wsl') ? '/mnt/' : '/';
+
+  return filePath.replace(
+    /^([A-Za-z]):(.*)/,
+    (_match, drive: string, rest: string) =>
+      `${prefix}${drive.toLowerCase()}${rest.replace(/\\/g, '/')}`,
+  );
+}
+
+/**
+ * Quote a file path for insertion into a terminal PTY.
+ *
+ * - Unix-like shells: single-quotes (no variable expansion)
+ * - cmd / PowerShell: double-quotes with backtick/$ escaping
+ * - No shell provided: simple space-only double-quoting (fallback)
+ *
+ * Mirrors `quoteArg` from `src/shared/paths.ts` for renderer use,
+ * without the `node:path` or `process.platform` dependency.
+ */
+export function quoteForShell(filePath: string, shellName?: string): string {
+  // Simple paths need no quoting (alphanumeric + common path chars).
+  // Backslashes excluded - they're escape chars in Unix-like shells.
+  // Regex matches quoteArg() in src/shared/paths.ts:161.
+  if (/^[a-zA-Z0-9_./:-]+$/.test(filePath)) return filePath;
+
+  if (!shellName) {
+    // Fallback: quote if spaces present (best-effort without shell context)
+    return filePath.includes(' ') ? `"${filePath}"` : filePath;
+  }
+
+  if (isUnixLikeShell(shellName)) {
+    // Single-quotes, escape embedded single-quotes: ' → '\''
+    return `'${filePath.replace(/'/g, "'\\''")}'`;
+  }
+
+  // PowerShell/cmd: double-quotes with backtick and $ escaping
+  return `"${filePath.replace(/`/g, '``').replace(/\$/g, '`$').replace(/"/g, '\\"')}"`;
+}
+
+/** MIME type to file extension mapping for clipboard images.
+ *  Matches the formats supported by the Claude API vision input:
+ *  image/jpeg, image/png, image/gif, image/webp */
+const IMAGE_EXTENSION_MAP: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+};
+
+/**
+ * Handle Ctrl+V / Cmd+V paste in the terminal.
+ *
+ * Priority 1: If the clipboard contains text, paste it into xterm.
+ * Priority 2: If the clipboard contains an image (and no text), save it
+ *   to a temp file and write the file path to the PTY so Claude Code
+ *   can pick it up.
+ */
+async function handlePaste(
+  terminal: Terminal,
+  onWrite?: (data: string) => void,
+  shellName?: string,
+): Promise<void> {
+  // Priority 1: text clipboard
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      terminal.paste(text);
+      return;
+    }
+  } catch {
+    // readText failed or denied - try image below
+  }
+
+  // Priority 2: image clipboard (only useful if we can write to PTY)
+  if (!onWrite) return;
+
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find(type => type.startsWith('image/'));
+      if (!imageType) continue;
+
+      const blob = await item.getType(imageType);
+      const buffer = await blob.arrayBuffer();
+      const base64 = btoa(
+        new Uint8Array(buffer).reduce((accumulated, byte) => accumulated + String.fromCharCode(byte), ''),
+      );
+
+      const extension = IMAGE_EXTENSION_MAP[imageType] || '.png';
+      let filePath = await window.electronAPI.clipboard.saveImage(base64, extension);
+      if (shellName) filePath = convertPathForShell(filePath, shellName);
+      const quoted = quoteForShell(filePath, shellName);
+      onWrite(quoted);
+      return; // only paste the first image
+    }
+  } catch {
+    // clipboard.read() not available or denied - silently fail
+  }
+}
+
 /**
  * Enable clipboard copy support for an xterm.js Terminal instance.
  *
  * - Ctrl+C copies selected text instead of sending SIGINT (when selection exists)
  * - Ctrl+Shift+C always copies
+ * - Ctrl+V / Cmd+V pastes text or image from clipboard
  * - Right-click shows the browser's native context menu (with Copy)
  *
  * Call after `terminal.open(el)`.
@@ -40,6 +167,7 @@ export function enableTerminalClipboard(
   terminal: Terminal,
   el: HTMLElement,
   onWrite?: (data: string) => void,
+  shellName?: string,
 ): void {
   terminal.attachCustomKeyEventHandler((event) => {
     if (event.type !== 'keydown') return true;
@@ -57,15 +185,13 @@ export function enableTerminalClipboard(
       return false;
     }
 
-    // Ctrl+V / Cmd+V / Ctrl+Shift+V - paste from clipboard
+    // Ctrl+V / Cmd+V / Ctrl+Shift+V - paste from clipboard (text or image)
     const isPaste =
       ((event.ctrlKey || event.metaKey) && event.key === 'v') ||
       ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'V');
 
     if (isPaste) {
-      navigator.clipboard.readText().then((text) => {
-        if (text) terminal.paste(text);
-      }).catch(() => { /* clipboard access denied */ });
+      handlePaste(terminal, onWrite, shellName).catch(() => { /* clipboard access denied */ });
       return false;
     }
 

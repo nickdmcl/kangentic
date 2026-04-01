@@ -1171,6 +1171,11 @@ export interface ElectronAPI {
     setDefaultBaseBranch: (branch: string) => Promise<void>;
   };
 
+  // Clipboard
+  clipboard: {
+    saveImage: (data: string, extension: string) => Promise<string>;
+  };
+
   // Platform
   platform: string;
 

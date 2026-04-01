@@ -41,6 +41,7 @@ interface UseTerminalOptions {
   fontSize?: number;
   scrollbackLines?: number;
   cursorStyle?: 'block' | 'underline' | 'bar';
+  shellName?: string;
 }
 
 export function useTerminal(options: UseTerminalOptions) {
@@ -83,7 +84,7 @@ export function useTerminal(options: UseTerminalOptions) {
       if (options.sessionId) {
         window.electronAPI.sessions.write(options.sessionId, data);
       }
-    });
+    }, options.shellName);
 
     terminal.onScroll(() => {
       const buffer = terminal.buffer.active;
@@ -188,7 +189,7 @@ export function useTerminal(options: UseTerminalOptions) {
       // No session -- just fit immediately
       fitAddon.fit();
     }
-  }, [options.sessionId, options.fontFamily, options.fontSize, options.scrollbackLines, options.cursorStyle]);
+  }, [options.sessionId, options.fontFamily, options.fontSize, options.scrollbackLines, options.cursorStyle, options.shellName]);
 
   // Set up data listener
   useEffect(() => {

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { app, ipcMain, Notification, dialog, shell } from 'electron';
@@ -321,5 +322,21 @@ export function registerSystemHandlers(context: IpcContext): void {
     notification.on('close', cleanup);
 
     notification.show();
+  });
+
+  // === Clipboard ===
+  // Matches Claude API vision input: image/jpeg, image/png, image/gif, image/webp
+  const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+
+  ipcMain.handle(IPC.CLIPBOARD_SAVE_IMAGE, (_, data: string, extension: string) => {
+    if (!ALLOWED_IMAGE_EXTENSIONS.includes(extension.toLowerCase())) {
+      throw new Error(`Unsupported image extension: ${extension}`);
+    }
+    const tempDir = path.join(os.tmpdir(), 'kangentic-clipboard');
+    fs.mkdirSync(tempDir, { recursive: true });
+    const filename = `pasted-image-${Date.now()}${extension.toLowerCase()}`;
+    const filePath = path.join(tempDir, filename);
+    fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
+    return filePath;
   });
 }

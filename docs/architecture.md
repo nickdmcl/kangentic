@@ -249,6 +249,11 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 |---------|---------|---------|
 | `app:getVersion` | invoke | Get Electron app version string |
 
+### Clipboard (1 channel)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `clipboard:saveImage` | invoke | Save clipboard image data to a temp file, returns file path |
+
 ### Updater (3 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|

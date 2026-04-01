@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { convertPathForShell, quoteForShell } from '../utils/terminal-clipboard';
 
 /**
  * Hook that manages file drag-and-drop onto a terminal.
@@ -14,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export function useTerminalFileDrop(
   sessionId: string | null,
   focusTerminal: () => void,
+  shellName?: string,
 ) {
   const [fileDragActive, setFileDragActive] = useState(false);
   const windowDragCounterRef = useRef(0);
@@ -89,16 +91,17 @@ export function useTerminalFileDrop(
 
     const paths: string[] = [];
     for (const file of event.dataTransfer.files) {
-      const filePath = window.electronAPI.webUtils.getPathForFile(file);
+      let filePath = window.electronAPI.webUtils.getPathForFile(file);
       if (filePath) {
-        paths.push(filePath.includes(' ') ? `"${filePath}"` : filePath);
+        if (shellName) filePath = convertPathForShell(filePath, shellName);
+        paths.push(quoteForShell(filePath, shellName));
       }
     }
     if (paths.length > 0) {
       window.electronAPI.sessions.write(sessionId, paths.join(' '));
       focusTerminal();
     }
-  }, [sessionId, focusTerminal]);
+  }, [sessionId, focusTerminal, shellName]);
 
   return {
     /** True when a file drag is active anywhere in the window (overlay becomes interactive). */

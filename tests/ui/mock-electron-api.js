@@ -1195,6 +1195,10 @@
       isFocused: function () { return Promise.resolve(true); },
     },
 
+    clipboard: {
+      saveImage: function (_data, extension) { return Promise.resolve('/tmp/kangentic-clipboard/pasted-image-1234567890' + extension); },
+    },
+
     platform: 'win32',
 
     webUtils: {

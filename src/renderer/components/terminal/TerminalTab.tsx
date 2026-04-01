@@ -46,6 +46,13 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
       [sessionId],
     ),
   );
+  const sessionShell = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        s.sessions.find((session) => session.id === sessionId)?.shell ?? undefined,
+      [sessionId],
+    ),
+  );
 
   // Derive overlay label: pending command (set by moveTask or manual invoke) > resume state > swimlane auto_command > generic fallback.
   // pendingCommandLabel is keyed by taskId (a prop), so it resolves on the very first render
@@ -75,6 +82,7 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     fontSize: config.terminal.fontSize,
     scrollbackLines: config.terminal.scrollbackLines,
     cursorStyle: config.terminal.cursorStyle,
+    shellName: sessionShell,
   });
 
   // Sync suppressDataRef with overlay state: suppress all PTY data while overlay is showing.
@@ -222,7 +230,7 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     };
   }, [active, fit, focus]);
 
-  const fileDrop = useTerminalFileDrop(sessionId, focus);
+  const fileDrop = useTerminalFileDrop(sessionId, focus, sessionShell);
 
   return (
     <div className="h-full w-full bg-surface relative">
