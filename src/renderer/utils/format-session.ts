@@ -1,6 +1,5 @@
 /**
  * Shared formatting utilities for session metrics (cost, duration).
- * Used by SessionSummaryPanel and CompletedTasksDialog.
  */
 
 export function formatDuration(milliseconds: number): string {
@@ -15,6 +14,7 @@ export function formatDuration(milliseconds: number): string {
 }
 
 export function formatCost(usd: number): string {
+  if (!Number.isFinite(usd) || usd <= 0) return '$0.00';
   if (usd < 0.01) return '<$0.01';
-  return `$${usd.toFixed(2)}`;
+  return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

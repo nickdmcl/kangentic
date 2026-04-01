@@ -3,6 +3,7 @@ import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { getProgressColor } from '../../utils/color-lerp';
 import { formatTokenCount } from '../../utils/format-tokens';
+import { formatCost } from '../../utils/format-session';
 import { shellDisplayName } from '../../utils/shell-display-name';
 import { useValuePulse } from '../../hooks/useValuePulse';
 
@@ -93,7 +94,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
         </span>
       )}
       {showModel && <span className={`${pill} text-fg-muted`}>{modelName}</span>}
-      {showCost && <span ref={costRef} className={`${pill} text-fg-muted tabular-nums`} title="Session API cost">${usage.cost.totalCostUsd.toFixed(2)}</span>}
+      {showCost && <span ref={costRef} className={`${pill} text-fg-muted tabular-nums`} title="Session API cost">{formatCost(usage.cost.totalCostUsd)}</span>}
 
       {hasLeftPills && hasRightPills && (
         <div className="w-px h-3.5 bg-surface-hover flex-shrink-0" />

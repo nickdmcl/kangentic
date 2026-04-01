@@ -5,6 +5,7 @@ import { useConfigStore } from '../../stores/config-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useProjectStore } from '../../stores/project-store';
 import { formatTokenCount } from '../../utils/format-tokens';
+import { formatCost } from '../../utils/format-session';
 import { useValuePulse } from '../../hooks/useValuePulse';
 import { usePopoverPosition } from '../../hooks/usePopoverPosition';
 import { Pill } from '../Pill';
@@ -137,7 +138,7 @@ export function StatusBar() {
               </span>
               <div className="w-px h-3.5 bg-edge flex-shrink-0" />
               <span ref={costPulseRef} className="tabular-nums" data-testid="aggregate-cost" title={`${PERIOD_LABELS[selectedPeriod]} API cost`}>
-                ${displayCost.toFixed(2)}
+                {formatCost(displayCost)}
               </span>
             </>
           )}
