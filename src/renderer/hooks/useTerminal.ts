@@ -78,8 +78,12 @@ export function useTerminal(options: UseTerminalOptions) {
 
     terminal.open(terminalRef.current);
 
-    // Enable Ctrl+C copy (when text selected) and Ctrl+V paste
-    enableTerminalClipboard(terminal, terminalRef.current);
+    // Enable Ctrl+C copy (when text selected), Ctrl+V paste, and Ctrl+Enter newline
+    enableTerminalClipboard(terminal, terminalRef.current, (data) => {
+      if (options.sessionId) {
+        window.electronAPI.sessions.write(options.sessionId, data);
+      }
+    });
 
     terminal.onScroll(() => {
       const buffer = terminal.buffer.active;

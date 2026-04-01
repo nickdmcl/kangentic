@@ -39,6 +39,7 @@ export function cleanSelection(raw: string, cols: number): string {
 export function enableTerminalClipboard(
   terminal: Terminal,
   el: HTMLElement,
+  onWrite?: (data: string) => void,
 ): void {
   terminal.attachCustomKeyEventHandler((event) => {
     if (event.type !== 'keydown') return true;
@@ -65,6 +66,14 @@ export function enableTerminalClipboard(
       navigator.clipboard.readText().then((text) => {
         if (text) terminal.paste(text);
       }).catch(() => { /* clipboard access denied */ });
+      return false;
+    }
+
+    // Ctrl+Enter / Cmd+Enter: send LF (\n) instead of xterm's default CR (\r).
+    // Real terminals send \n for Ctrl+Enter, which Claude Code's TUI interprets
+    // as "new line in multiline input" rather than "submit prompt".
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && onWrite) {
+      onWrite('\n');
       return false;
     }
 
