@@ -88,13 +88,30 @@ export class DiffService {
     this.gitDirectory = gitDirectory;
   }
 
+  /**
+   * Find the merge-base between the base branch and HEAD.
+   * This is the fork point - where the task branch diverged from the base.
+   * Diffing against this (instead of the base branch tip) shows only changes
+   * made on this branch, excluding changes merged into the base after forking.
+   */
+  private async getMergeBase(git: ReturnType<typeof simpleGit>, baseBranch: string): Promise<string> {
+    const result = await git.raw(['merge-base', baseBranch, 'HEAD']);
+    return result.trim();
+  }
+
   async getDiffFiles(input: GitDiffFilesInput): Promise<GitDiffFilesResult> {
     const git = simpleGit(this.gitDirectory);
     const { baseBranch } = input;
 
-    // Get file stats (insertions/deletions) using diffSummary.
-    // Use two-dot diff to include uncommitted working tree changes when in a worktree.
-    const diffRef = input.worktreePath ? baseBranch : `${baseBranch}...HEAD`;
+    // For worktrees: diff working tree against the merge-base (fork point).
+    // This shows only changes made on this task's branch, including uncommitted edits.
+    // For non-worktree: three-dot diff achieves the same (merge-base..HEAD, committed only).
+    let diffRef: string;
+    if (input.worktreePath) {
+      diffRef = await this.getMergeBase(git, baseBranch);
+    } else {
+      diffRef = `${baseBranch}...HEAD`;
+    }
 
     // Run both git commands in parallel for faster initial load
     const [summary, nameStatusOutput] = await Promise.all([
@@ -144,13 +161,15 @@ export class DiffService {
     let original = '';
     let modified = '';
 
-    // Fetch original content (base branch version)
+    // Fetch original content from the merge-base (fork point), not the base branch tip.
+    // This ensures we show the file as it was when the branch was created.
     if (status !== 'A') {
       try {
         const showPath = oldPath ?? filePath;
-        original = await git.show([`${baseBranch}:${showPath}`]);
+        const mergeBase = await this.getMergeBase(git, baseBranch);
+        original = await git.show([`${mergeBase}:${showPath}`]);
       } catch {
-        // File doesn't exist on base branch
+        // File doesn't exist at the fork point
         original = '';
       }
     }

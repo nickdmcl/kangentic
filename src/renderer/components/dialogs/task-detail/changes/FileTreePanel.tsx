@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from 'react';
-import { Search, RefreshCw, Plus, Pencil, Minus, ArrowRight, Copy, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, Plus, Pencil, Minus, ArrowRight, Copy, ChevronRight, ChevronDown } from 'lucide-react';
 import type { GitDiffFileEntry, GitDiffStatus } from '../../../../../shared/types';
 
 interface FileTreePanelProps {
@@ -8,8 +8,6 @@ interface FileTreePanelProps {
   onSelect: (filePath: string) => void;
   totalInsertions: number;
   totalDeletions: number;
-  onRefresh: () => void;
-  refreshing: boolean;
 }
 
 const STATUS_CONFIG: Record<GitDiffStatus, { icon: typeof Plus; colorClass: string; label: string }> = {
@@ -334,8 +332,6 @@ export function FileTreePanel({
   onSelect,
   totalInsertions,
   totalDeletions,
-  onRefresh,
-  refreshing,
 }: FileTreePanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -352,14 +348,6 @@ export function FileTreePanel({
         <span>{files.length} file{files.length !== 1 ? 's' : ''}</span>
         {totalInsertions > 0 && <span className="text-green-400">+{totalInsertions}</span>}
         {totalDeletions > 0 && <span className="text-red-400">-{totalDeletions}</span>}
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="ml-auto p-0.5 rounded hover:bg-surface-raised transition-colors disabled:opacity-50"
-          title="Refresh diff"
-        >
-          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-        </button>
       </div>
 
       {/* Search */}

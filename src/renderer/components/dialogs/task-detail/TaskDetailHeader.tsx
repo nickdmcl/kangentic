@@ -182,6 +182,24 @@ export function TaskDetailHeader({
             </Pill>
           )}
 
+          {/* Changes toggle pill */}
+          {canShowChanges && (
+            <Pill
+              shape="square"
+              onClick={onToggleChanges}
+              className={`flex-shrink-0 transition-colors ${
+                changesOpen
+                  ? 'bg-accent/15 text-accent-fg border border-accent/30'
+                  : 'bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover'
+              }`}
+              title={changesOpen ? 'Hide changes' : 'Show changes'}
+              data-testid="changes-toggle"
+            >
+              <GitCompareArrows size={14} />
+              Changes
+            </Pill>
+          )}
+
           {/* Shortcut header pills */}
           {headerShortcuts.map((action) => {
             const ActionIcon = ICON_REGISTRY.get(action.icon ?? 'zap') ?? Zap;
@@ -202,23 +220,6 @@ export function TaskDetailHeader({
         </div>
       ) : (
         <div className="flex-1" />
-      )}
-
-      {/* Changes toggle */}
-      {canShowChanges && (
-        <button
-          onClick={onToggleChanges}
-          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors flex-shrink-0 ${
-            changesOpen
-              ? 'bg-accent/15 text-accent-fg border border-accent/30'
-              : 'text-fg-muted hover:text-fg-secondary hover:bg-surface-hover border border-transparent'
-          }`}
-          title={changesOpen ? 'Hide changes' : 'Show changes'}
-          data-testid="changes-toggle"
-        >
-          <GitCompareArrows size={14} />
-          Changes
-        </button>
       )}
 
       {/* Actions */}

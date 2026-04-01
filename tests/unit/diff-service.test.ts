@@ -10,6 +10,7 @@ const mockGit = {
   diffSummary: vi.fn(),
   diff: vi.fn(),
   show: vi.fn(),
+  raw: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
@@ -134,7 +135,8 @@ describe('DiffService', () => {
       expect(result.files[0].deletions).toBe(0);
     });
 
-    it('uses two-dot diff when worktreePath is provided', async () => {
+    it('uses merge-base diff when worktreePath is provided', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
       mockGit.diff.mockResolvedValue('');
 
@@ -144,9 +146,10 @@ describe('DiffService', () => {
         baseBranch: 'main',
       });
 
-      // Two-dot: just 'main' (includes working tree changes)
-      expect(mockGit.diffSummary).toHaveBeenCalledWith(['main']);
-      expect(mockGit.diff).toHaveBeenCalledWith(['--name-status', 'main']);
+      // Should find merge-base first, then diff against it
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'main', 'HEAD']);
+      expect(mockGit.diffSummary).toHaveBeenCalledWith(['abc123']);
+      expect(mockGit.diff).toHaveBeenCalledWith(['--name-status', 'abc123']);
     });
 
     it('uses three-dot diff when no worktreePath', async () => {
@@ -227,6 +230,7 @@ describe('DiffService', () => {
 
   describe('getFileContent', () => {
     it('fetches original and modified for a modified file', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show.mockResolvedValue('original content');
       vi.mocked(fs.promises.readFile).mockResolvedValue('modified content');
 
@@ -241,7 +245,8 @@ describe('DiffService', () => {
       expect(result.original).toBe('original content');
       expect(result.modified).toBe('modified content');
       expect(result.language).toBe('typescript');
-      expect(mockGit.show).toHaveBeenCalledWith(['main:src/index.ts']);
+      // Should use merge-base commit for original
+      expect(mockGit.show).toHaveBeenCalledWith(['abc123:src/index.ts']);
     });
 
     it('returns empty original for added files', async () => {
@@ -257,10 +262,12 @@ describe('DiffService', () => {
 
       expect(result.original).toBe('');
       expect(result.modified).toBe('new file content');
+      // No merge-base or show call for added files
       expect(mockGit.show).not.toHaveBeenCalled();
     });
 
     it('returns empty modified for deleted files', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show.mockResolvedValue('old content');
 
       const result = await service.getFileContent({
@@ -277,6 +284,7 @@ describe('DiffService', () => {
     });
 
     it('uses oldPath for renamed file originals', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show.mockResolvedValue('original at old path');
       vi.mocked(fs.promises.readFile).mockResolvedValue('modified at new path');
 
@@ -290,10 +298,11 @@ describe('DiffService', () => {
       });
 
       expect(result.original).toBe('original at old path');
-      expect(mockGit.show).toHaveBeenCalledWith(['main:src/old-name.ts']);
+      expect(mockGit.show).toHaveBeenCalledWith(['abc123:src/old-name.ts']);
     });
 
     it('reads from HEAD when no worktreePath', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show
         .mockResolvedValueOnce('original')
         .mockResolvedValueOnce('from HEAD');
@@ -310,6 +319,7 @@ describe('DiffService', () => {
     });
 
     it('handles git show failure gracefully for original', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show.mockRejectedValue(new Error('fatal: bad revision'));
       vi.mocked(fs.promises.readFile).mockResolvedValue('content');
 
@@ -326,6 +336,7 @@ describe('DiffService', () => {
     });
 
     it('handles readFile failure gracefully for modified', async () => {
+      mockGit.raw.mockResolvedValue('abc123\n');
       mockGit.show.mockResolvedValue('original');
       vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('ENOENT'));
 

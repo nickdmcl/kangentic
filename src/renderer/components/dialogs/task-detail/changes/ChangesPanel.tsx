@@ -147,8 +147,6 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
             onSelect={handleSelectFile}
             totalInsertions={totalInsertions}
             totalDeletions={totalDeletions}
-            onRefresh={fetchFiles}
-            refreshing={loading}
           />
         </div>
 
