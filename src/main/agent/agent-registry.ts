@@ -2,6 +2,7 @@ import type { AgentAdapter } from './agent-adapter';
 import { ClaudeAdapter } from './adapters/claude-adapter';
 import { CodexAdapter } from './adapters/codex-adapter';
 import { GeminiAdapter } from './adapters/gemini-adapter';
+import { AiderAdapter } from './adapters/aider-adapter';
 
 class AgentRegistry {
   private adapters = new Map<string, AgentAdapter>();
@@ -36,3 +37,4 @@ export const agentRegistry = new AgentRegistry();
 agentRegistry.register(new ClaudeAdapter());
 agentRegistry.register(new CodexAdapter());
 agentRegistry.register(new GeminiAdapter());
+agentRegistry.register(new AiderAdapter());
