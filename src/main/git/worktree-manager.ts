@@ -285,6 +285,17 @@ export class WorktreeManager {
     if (!isGitRepo(this.projectPath)) return null;
     if (isInsideWorktree(this.projectPath)) return null;
 
+    // Guard: git worktree add requires at least one commit. An unborn repo
+    // (e.g. `git init` with no commits) has no valid HEAD ref, so the command
+    // would fail with "fatal: not a valid object name". Skip worktrees and let
+    // the agent run in the main repo directory instead.
+    try {
+      await this.git.raw(['rev-parse', 'HEAD']);
+    } catch {
+      console.log('[WORKTREE] Skipping worktree creation: repository has no commits yet');
+      return null;
+    }
+
     const baseBranch = task.base_branch || gitConfig.defaultBaseBranch || 'main';
     return this.createWorktree(task.id, task.title, baseBranch, gitConfig.copyFiles, task.branch_name, { onProgress: options?.onProgress, signal: options?.signal });
   }
