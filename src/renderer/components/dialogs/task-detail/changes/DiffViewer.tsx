@@ -13,7 +13,6 @@ interface DiffViewerProps {
   status: GitDiffStatus;
   viewMode: 'split' | 'inline';
   onViewModeChange: (mode: 'split' | 'inline') => void;
-  loading: boolean;
   binary: boolean;
 }
 
@@ -34,7 +33,6 @@ export function DiffViewer({
   status,
   viewMode,
   onViewModeChange,
-  loading,
   binary,
 }: DiffViewerProps) {
   const theme = useConfigStore((state) => state.config.theme);
@@ -79,36 +77,29 @@ export function DiffViewer({
             Binary file - cannot display diff
           </div>
         ) : (
-          <>
-            <DiffEditor
-              height="100%"
-              language={language}
-              original={original}
-              modified={modified}
-              theme={monacoTheme}
-              options={{
-                readOnly: true,
-                originalEditable: false,
-                renderSideBySide: viewMode === 'split',
-                automaticLayout: true,
-                scrollBeyondLastLine: false,
-                minimap: { enabled: false },
-                renderWhitespace: 'boundary',
-                fontSize: 12,
-                lineHeight: 18,
-              }}
-              loading={
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 size={20} className="animate-spin text-fg-muted" />
-                </div>
-              }
-            />
-            {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-surface/60 z-10">
+          <DiffEditor
+            height="100%"
+            language={language}
+            original={original}
+            modified={modified}
+            theme={monacoTheme}
+            options={{
+              readOnly: true,
+              originalEditable: false,
+              renderSideBySide: viewMode === 'split',
+              automaticLayout: true,
+              scrollBeyondLastLine: false,
+              minimap: { enabled: false },
+              renderWhitespace: 'boundary',
+              fontSize: 12,
+              lineHeight: 18,
+            }}
+            loading={
+              <div className="flex items-center justify-center h-full">
                 <Loader2 size={20} className="animate-spin text-fg-muted" />
               </div>
-            )}
-          </>
+            }
+          />
         )}
       </div>
     </div>

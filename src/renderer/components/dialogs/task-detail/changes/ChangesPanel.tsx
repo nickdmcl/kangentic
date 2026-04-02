@@ -25,8 +25,6 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   const setChangesSelectedFile = useSessionStore((state) => state.setChangesSelectedFile);
   const setSelectedFile = useCallback((filePath: string | null) => setChangesSelectedFile(task.id, filePath), [task.id, setChangesSelectedFile]);
   const [fileContent, setFileContent] = useState<GitFileContentResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [contentLoading, setContentLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'split' | 'inline'>('split');
 
@@ -34,8 +32,8 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   const defaultBaseBranch = useConfigStore((s) => s.config.git.defaultBaseBranch);
   const baseBranch = task.base_branch || defaultBaseBranch || 'main';
 
-  // Refs for values needed inside the onDiffChanged callback to avoid
-  // stale closures and subscription churn on every file selection.
+  // Refs for values needed inside callbacks to avoid stale closures
+  // and subscription churn on every file selection or re-render.
   const selectedFileRef = useRef(selectedFile);
   selectedFileRef.current = selectedFile;
   const filesRef = useRef(files);
@@ -44,14 +42,19 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   // Stale-while-revalidate content cache. Each entry stores the fetch result
   // and the generation it was fetched in. When fs.watch fires, the generation
   // increments - stale entries are served immediately while a background
-  // refetch runs, avoiding loading spinners for previously-viewed files.
+  // refetch runs, so content updates without any loading indicators.
   const contentCacheRef = useRef(new Map<string, ContentCacheEntry>());
   const cacheGenerationRef = useRef(0);
 
+  // Tracks whether the initial file list fetch has completed, used to gate
+  // the restore effect and suppress error display during live updates.
+  const initialFetchDoneRef = useRef(false);
+
   const fetchFiles = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!initialFetchDoneRef.current) {
+        setError(null);
+      }
       const result: GitDiffFilesResult = await window.electronAPI.git.diffFiles({
         worktreePath,
         projectPath,
@@ -60,44 +63,45 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
       setFiles(result.files);
       setTotalInsertions(result.totalInsertions);
       setTotalDeletions(result.totalDeletions);
+      initialFetchDoneRef.current = true;
     } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Failed to load diff');
-    } finally {
-      setLoading(false);
+      // Only show errors on initial load - transient failures during live
+      // updates (e.g. git lock contention) are silently ignored.
+      if (!initialFetchDoneRef.current) {
+        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load diff');
+      }
     }
   }, [worktreePath, projectPath, baseBranch]);
 
-  const fetchFileContent = useCallback(async (filePath: string, options?: { skipCache?: boolean }) => {
-    if (!options?.skipCache) {
-      const cached = contentCacheRef.current.get(filePath);
-      if (cached) {
-        // Always serve cached content immediately (stale-while-revalidate)
-        setFileContent(cached.result);
-        if (cached.generation === cacheGenerationRef.current) {
-          return; // Fresh entry - no refetch needed
-        }
-        // Stale entry - show cached content now, refetch in background without spinner
-        const currentGeneration = cacheGenerationRef.current;
-        const fileEntry = filesRef.current.find((entry) => entry.path === filePath);
-        window.electronAPI.git.fileContent({
-          worktreePath,
-          projectPath,
-          baseBranch,
-          filePath,
-          status: fileEntry?.status ?? 'M',
-          oldPath: fileEntry?.oldPath,
-        }).then((freshResult) => {
-          contentCacheRef.current.set(filePath, { result: freshResult, generation: currentGeneration });
-          // Only update UI if this file is still selected and content actually changed
-          if (selectedFileRef.current === filePath &&
-              (freshResult.original !== cached.result.original || freshResult.modified !== cached.result.modified)) {
-            setFileContent(freshResult);
-          }
-        }).catch(() => {
-          // Background refetch failed - stale content remains visible
-        });
-        return;
+  const fetchFileContent = useCallback(async (filePath: string) => {
+    const cached = contentCacheRef.current.get(filePath);
+    if (cached) {
+      // Always serve cached content immediately (stale-while-revalidate)
+      setFileContent(cached.result);
+      if (cached.generation === cacheGenerationRef.current) {
+        return; // Fresh entry - no refetch needed
       }
+      // Stale entry - show cached content now, refetch in background
+      const currentGeneration = cacheGenerationRef.current;
+      const fileEntry = filesRef.current.find((entry) => entry.path === filePath);
+      window.electronAPI.git.fileContent({
+        worktreePath,
+        projectPath,
+        baseBranch,
+        filePath,
+        status: fileEntry?.status ?? 'M',
+        oldPath: fileEntry?.oldPath,
+      }).then((freshResult) => {
+        contentCacheRef.current.set(filePath, { result: freshResult, generation: currentGeneration });
+        // Only update UI if this file is still selected and content actually changed
+        if (selectedFileRef.current === filePath &&
+            (freshResult.original !== cached.result.original || freshResult.modified !== cached.result.modified)) {
+          setFileContent(freshResult);
+        }
+      }).catch(() => {
+        // Background refetch failed - stale content remains visible
+      });
+      return;
     }
 
     const searchList = filesRef.current;
@@ -105,7 +109,6 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
     if (!file) return;
 
     try {
-      setContentLoading(true);
       const result = await window.electronAPI.git.fileContent({
         worktreePath,
         projectPath,
@@ -118,26 +121,33 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
       setFileContent(result);
     } catch {
       setFileContent({ original: '', modified: '', language: 'plaintext' });
-    } finally {
-      setContentLoading(false);
     }
   }, [worktreePath, projectPath, baseBranch]);
 
+  // Stable refs for fetch callbacks - used in the subscription effect and
+  // handleSelectFile to avoid re-subscribing or re-creating on every render.
+  const fetchFilesRef = useRef(fetchFiles);
+  fetchFilesRef.current = fetchFiles;
+  const fetchFileContentRef = useRef(fetchFileContent);
+  fetchFileContentRef.current = fetchFileContent;
+
   // Fetch file list on mount
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    fetchFilesRef.current();
+  }, [worktreePath, projectPath, baseBranch]);
 
-  // Restore content for the persisted selected file after files load
+  // Restore content for the persisted selected file after files load.
+  // `files` is in the dependency array so this re-evaluates after the initial
+  // fetchFiles completes and flips initialFetchDoneRef (refs don't trigger renders).
   const restoredRef = useRef(false);
   useEffect(() => {
-    if (restoredRef.current || loading || !selectedFile) return;
+    if (restoredRef.current || !initialFetchDoneRef.current || !selectedFile) return;
     restoredRef.current = true;
-    fetchFileContent(selectedFile);
-  }, [loading, selectedFile, fetchFileContent]);
+    fetchFileContentRef.current(selectedFile);
+  }, [files, selectedFile]);
 
   // Subscribe to live updates via fs.watch.
-  // Uses refs for selectedFile/files to avoid re-subscribing on every selection.
+  // Uses refs for selectedFile/files/fetchers to avoid re-subscribing.
   useEffect(() => {
     const watchPath = worktreePath ?? projectPath;
     if (!watchPath) return;
@@ -147,10 +157,10 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
       // Mark all cache entries stale by advancing the generation counter.
       // Entries are not deleted - they're served immediately as stale-while-revalidate.
       cacheGenerationRef.current += 1;
-      fetchFiles();
+      fetchFilesRef.current();
       const currentFile = selectedFileRef.current;
       if (currentFile) {
-        fetchFileContent(currentFile, { skipCache: true });
+        fetchFileContentRef.current(currentFile);
       }
     });
 
@@ -158,12 +168,12 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
       window.electronAPI.git.unsubscribeDiff(watchPath);
       unsubscribe();
     };
-  }, [worktreePath, projectPath, fetchFiles, fetchFileContent]);
+  }, [worktreePath, projectPath]);
 
   const handleSelectFile = useCallback((filePath: string) => {
     setSelectedFile(filePath);
-    fetchFileContent(filePath);
-  }, [setSelectedFile, fetchFileContent]);
+    fetchFileContentRef.current(filePath);
+  }, [setSelectedFile]);
 
   const selectedFileEntry = files.find((file) => file.path === selectedFile);
 
@@ -217,7 +227,6 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
                 status={selectedFileEntry?.status ?? 'M'}
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
-                loading={contentLoading}
                 binary={selectedFileEntry?.binary ?? false}
               />
             </Suspense>
