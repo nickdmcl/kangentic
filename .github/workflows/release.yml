@@ -28,17 +28,17 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Verify version matches package.json
-        shell: bash
+      - name: Create and push tag
         run: |
+          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ inputs.version }} already exists, skipping creation"
+            exit 0
+          fi
           PKG_VERSION=$(node -p "require('./package.json').version")
           if [ "$PKG_VERSION" != "${{ inputs.version }}" ]; then
             echo "::error::Input version (${{ inputs.version }}) does not match package.json ($PKG_VERSION)"
             exit 1
           fi
-
-      - name: Create and push tag
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
@@ -64,7 +64,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: main
+          # Tag push: github.ref is refs/tags/vX.Y.Z
+          # workflow_dispatch: use the version tag directly
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
           fetch-tags: true
 
       - uses: actions/setup-node@v5
@@ -103,6 +105,7 @@ jobs:
       - name: Build and publish
         run: npm run publish
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
           # macOS notarization
@@ -117,15 +120,39 @@ jobs:
           AZURE_SIGNING_ACCOUNT: sign-kangentic
           AZURE_CERT_PROFILE: kangentic-signing
 
-  publish-notes:
+  # Only publish the draft release when ALL platform builds succeed.
+  # This prevents partial releases (e.g. missing macOS artifacts) from
+  # reaching users. If any platform fails, the release stays as a draft.
+  publish-release:
     needs: [release]
-    if: always() && !cancelled()
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine version tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish release (remove draft status)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ steps.version.outputs.tag }}" --draft=false --repo ${{ github.repository }}
+
+  publish-notes:
+    needs: [publish-release]
+    if: ${{ !cancelled() && needs.publish-release.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
 
       - name: Determine version tag
         id: version
@@ -143,14 +170,14 @@ jobs:
         run: gh release edit "${{ steps.version.outputs.tag }}" --notes-file RELEASE_NOTES.md
 
   publish-npm:
-    needs: [release]
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    needs: [publish-release]
+    if: ${{ !cancelled() && needs.publish-release.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref }}
 
       - uses: actions/setup-node@v5
         with:
