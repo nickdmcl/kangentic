@@ -69,8 +69,9 @@ test.describe('EditColumnDialog', () => {
     // Duplicate is filtered out -- only appears once as the default option
     const options = await select.locator('option').allTextContents();
     expect(options.filter((o) => o === 'Default (Allowlist)')).toHaveLength(1);
-    expect(options).toContain('Plan');
+    expect(options).toContain('Plan (Read-Only)');
     expect(options).toContain('Accept Edits');
+    expect(options).toContain('Auto (Classifier)');
     expect(options).toContain('Bypass (Unsafe)');
 
     await closeDialog();

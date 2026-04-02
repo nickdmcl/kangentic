@@ -128,6 +128,9 @@ export class CommandBuilder {
       case 'dontAsk':
         parts.push('--permission-mode', 'dontAsk');
         break;
+      case 'auto':
+        parts.push('--permission-mode', 'auto');
+        break;
       case 'default':
         break;
     }

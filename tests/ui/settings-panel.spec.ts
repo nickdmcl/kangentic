@@ -145,7 +145,7 @@ test.describe('Settings Panel', () => {
     await closeSettings();
   });
 
-  test('permission mode dropdown has all five Claude Code modes', async () => {
+  test('permission mode dropdown shows agent-specific modes for Claude Code', async () => {
     await openSettings();
     await page.getByRole('button', { name: 'Agent' }).click();
 
@@ -159,10 +159,11 @@ test.describe('Settings Panel', () => {
     const texts = await options.allTextContents();
 
     expect(texts).toEqual([
-      'Plan',
+      'Plan (Read-Only)',
       "Don't Ask (Deny Unless Allowed)",
       'Default (Allowlist)',
       'Accept Edits',
+      'Auto (Classifier)',
       'Bypass (Unsafe)',
     ]);
 

@@ -91,9 +91,10 @@ PermissionMode values:
 - `plan` -- `--permission-mode plan` (read-only tools auto-approved)
 - `acceptEdits` -- `--permission-mode acceptEdits` (edits auto-approved)
 - `dontAsk` -- `--permission-mode dontAsk` (all tools auto-approved except dangerous ones)
+- `auto` -- `--permission-mode auto` (classifier-based auto-approval)
 - `bypassPermissions` -- `--dangerously-skip-permissions` (no prompts at all)
 
-All five modes are available in both the global App Settings "Permissions" dropdown and the per-column Edit Column dialog.
+All six modes are available in both the global App Settings "Permissions" dropdown and the per-column Edit Column dialog. The dropdown shows only the modes supported by the active agent (e.g., Aider only shows Interactive and Auto-Approve).
 
 ### git.*
 

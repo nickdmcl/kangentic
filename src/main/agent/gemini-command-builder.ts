@@ -46,10 +46,22 @@ export class GeminiCommandBuilder {
       this.createMergedSettings(options);
     }
 
-    // Permission mode: Gemini CLI only supports --approval-mode plan.
-    // All non-default permission modes map to it.
-    if (options.permissionMode !== 'default') {
-      parts.push('--approval-mode', 'plan');
+    // Permission mode mapping to Gemini CLI --approval-mode flags
+    switch (options.permissionMode) {
+      case 'plan':
+      case 'dontAsk':
+        parts.push('--approval-mode', 'plan');
+        break;
+      case 'acceptEdits':
+      case 'auto':
+        parts.push('--approval-mode', 'autoEdit');
+        break;
+      case 'bypassPermissions':
+        parts.push('--approval-mode', 'yolo');
+        break;
+      case 'default':
+      default:
+        break;
     }
 
     // Session resume: Gemini uses --resume <id> for existing sessions.

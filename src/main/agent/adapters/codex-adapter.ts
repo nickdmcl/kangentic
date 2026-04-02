@@ -7,7 +7,7 @@ import { toForwardSlash, quoteArg, isUnixLikeShell } from '../../../shared/paths
 import { EventType } from '../../../shared/types';
 import { interpolateTemplate } from '../command-builder';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../agent-adapter';
-import type { SessionUsage, SessionEvent, PermissionMode } from '../../../shared/types';
+import type { SessionUsage, SessionEvent, PermissionMode, AgentPermissionEntry } from '../../../shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -73,13 +73,13 @@ class CodexDetector {
 /** Map Kangentic's PermissionMode to Codex CLI approval-mode flags. */
 function mapPermissionMode(mode: PermissionMode): string[] {
   switch (mode) {
-    case 'default':
     case 'plan':
-      return ['--approval-mode', 'untrusted'];
-    case 'acceptEdits':
-      return ['--approval-mode', 'on-request'];
+    case 'default':
     case 'dontAsk':
-      return ['--approval-mode', 'never'];
+      return ['--approval-mode', 'suggest'];
+    case 'acceptEdits':
+    case 'auto':
+      return ['--approval-mode', 'auto-edit'];
     case 'bypassPermissions':
       return ['--approval-mode', 'full-auto'];
   }
@@ -289,6 +289,11 @@ export class CodexAdapter implements AgentAdapter {
   readonly name = 'codex';
   readonly displayName = 'Codex CLI';
   readonly sessionType = 'codex_agent';
+  readonly permissions: AgentPermissionEntry[] = [
+    { mode: 'plan', label: 'Suggest (Read-Only)' },
+    { mode: 'acceptEdits', label: 'Auto-Edit' },
+    { mode: 'bypassPermissions', label: 'Full Auto (Sandboxed)' },
+  ];
 
   private readonly detector = new CodexDetector();
 

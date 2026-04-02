@@ -7,8 +7,8 @@ import { Pill } from '../Pill';
 import type { SettingsTabDefinition, SettingScope, SettingsContentProps } from './shared';
 import { useProjectStore } from '../../stores/project-store';
 import type { AgentDetectionInfo } from '../../../shared/types';
-import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode } from '../../../shared/types';
-import { NAMED_THEMES } from '../../../shared/types';
+import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode, AgentPermissionEntry } from '../../../shared/types';
+import { NAMED_THEMES, nearestPermission, CLAUDE_DEFAULT_PERMISSIONS } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
 import { agentDisplayName } from '../../utils/agent-display-name';
 import { settingProps } from './settings-registry';
@@ -274,9 +274,20 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
   const currentProject = useProjectStore((state) => state.currentProject);
   const refreshProjects = useProjectStore((state) => state.loadProjects);
 
+  const effectiveAgent = currentProject?.default_agent ?? 'claude';
+  const agentPermissions: AgentPermissionEntry[] = agentList.find((agent) => agent.name === effectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
+
   const handleDefaultAgentChange = async (agentName: string) => {
     if (!currentProject) return;
     await window.electronAPI.projects.setDefaultAgent(currentProject.id, agentName);
+    // Auto-adjust permission mode if unsupported by the new agent
+    const newAgentPermissions = agentList.find((agent) => agent.name === agentName)?.permissions ?? [];
+    if (newAgentPermissions.length > 0) {
+      const adjusted = nearestPermission(newAgentPermissions, config.claude.permissionMode);
+      if (adjusted !== config.claude.permissionMode) {
+        updateProject({ claude: { permissionMode: adjusted } });
+      }
+    }
     await refreshProjects();
   };
 
@@ -284,7 +295,7 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
     <>
       <SettingRow {...settingProps('project.defaultAgent')}>
         <Select
-          value={currentProject?.default_agent ?? 'claude'}
+          value={effectiveAgent}
           onChange={(event) => handleDefaultAgentChange(event.target.value)}
           disabled={!currentProject}
         >
@@ -329,11 +340,9 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
           value={config.claude.permissionMode}
           onChange={(event) => updateProject({ claude: { permissionMode: event.target.value as PermissionMode } })}
         >
-          <option value="plan">Plan</option>
-          <option value="dontAsk">Don&apos;t Ask (Deny Unless Allowed)</option>
-          <option value="default">Default (Allowlist)</option>
-          <option value="acceptEdits">Accept Edits</option>
-          <option value="bypassPermissions">Bypass (Unsafe)</option>
+          {agentPermissions.map((entry) => (
+            <option key={entry.mode} value={entry.mode}>{entry.label}</option>
+          ))}
         </Select>
       </SettingRow>
     </>

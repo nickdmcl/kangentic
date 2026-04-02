@@ -55,19 +55,24 @@ describe('GeminiCommandBuilder', () => {
       expect(command).toContain('--approval-mode plan');
     });
 
-    it('acceptEdits maps to --approval-mode plan', () => {
-      const command = buildCommand({ permissionMode: 'acceptEdits' });
-      expect(command).toContain('--approval-mode plan');
-    });
-
-    it('dontAsk maps to --approval-mode plan', () => {
+    it('dontAsk maps to --approval-mode plan (safest restrictive fallback)', () => {
       const command = buildCommand({ permissionMode: 'dontAsk' });
       expect(command).toContain('--approval-mode plan');
     });
 
-    it('bypassPermissions maps to --approval-mode plan', () => {
+    it('acceptEdits maps to --approval-mode autoEdit', () => {
+      const command = buildCommand({ permissionMode: 'acceptEdits' });
+      expect(command).toContain('--approval-mode autoEdit');
+    });
+
+    it('auto maps to --approval-mode autoEdit', () => {
+      const command = buildCommand({ permissionMode: 'auto' });
+      expect(command).toContain('--approval-mode autoEdit');
+    });
+
+    it('bypassPermissions maps to --approval-mode yolo', () => {
       const command = buildCommand({ permissionMode: 'bypassPermissions' });
-      expect(command).toContain('--approval-mode plan');
+      expect(command).toContain('--approval-mode yolo');
     });
   });
 

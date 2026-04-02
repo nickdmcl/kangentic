@@ -50,7 +50,7 @@ describe('Codex Adapter', () => {
       expect(command).toContain('-C');
       expect(command).toContain('/home/dev/project');
       expect(command).toContain('--approval-mode');
-      expect(command).toContain('untrusted');
+      expect(command).toContain('suggest');
     });
 
     it('includes prompt as positional argument', () => {
@@ -101,10 +101,11 @@ describe('Codex Adapter', () => {
 
   describe('buildCommand - permission mode mapping', () => {
     const permissionCases: Array<{ mode: PermissionMode; expectedFlag: string }> = [
-      { mode: 'default', expectedFlag: 'untrusted' },
-      { mode: 'plan', expectedFlag: 'untrusted' },
-      { mode: 'acceptEdits', expectedFlag: 'on-request' },
-      { mode: 'dontAsk', expectedFlag: 'never' },
+      { mode: 'default', expectedFlag: 'suggest' },
+      { mode: 'plan', expectedFlag: 'suggest' },
+      { mode: 'dontAsk', expectedFlag: 'suggest' },
+      { mode: 'acceptEdits', expectedFlag: 'auto-edit' },
+      { mode: 'auto', expectedFlag: 'auto-edit' },
       { mode: 'bypassPermissions', expectedFlag: 'full-auto' },
     ];
 

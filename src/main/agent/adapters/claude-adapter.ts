@@ -4,7 +4,7 @@ import { ClaudeStatusParser } from '../claude-status-parser';
 import { ensureWorktreeTrust, ensureMcpServerTrust } from '../trust-manager';
 import { stripKangenticHooks } from '../hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../agent-adapter';
-import type { SessionUsage, SessionEvent } from '../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry } from '../../../shared/types';
 
 /**
  * Claude Code adapter - wraps ClaudeDetector, CommandBuilder,
@@ -15,6 +15,14 @@ export class ClaudeAdapter implements AgentAdapter {
   readonly name = 'claude';
   readonly displayName = 'Claude Code';
   readonly sessionType = 'claude_agent';
+  readonly permissions: AgentPermissionEntry[] = [
+    { mode: 'plan', label: 'Plan (Read-Only)' },
+    { mode: 'dontAsk', label: "Don't Ask (Deny Unless Allowed)" },
+    { mode: 'default', label: 'Default (Allowlist)' },
+    { mode: 'acceptEdits', label: 'Accept Edits' },
+    { mode: 'auto', label: 'Auto (Classifier)' },
+    { mode: 'bypassPermissions', label: 'Bypass (Unsafe)' },
+  ];
 
   private readonly detector = new ClaudeDetector();
   private readonly commandBuilder = new CommandBuilder();

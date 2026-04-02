@@ -29,6 +29,7 @@ export interface AgentDetectionInfo {
   found: boolean;
   path: string | null;
   version: string | null;
+  permissions: AgentPermissionEntry[];
 }
 
 export type ProjectSearchEntryKind = 'file' | 'directory';
@@ -421,7 +422,33 @@ export interface GitFileContentResult {
 
 // === Configuration ===
 
-export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'dontAsk' | 'bypassPermissions';
+export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'dontAsk' | 'bypassPermissions' | 'auto';
+
+export interface AgentPermissionEntry {
+  mode: PermissionMode;
+  label: string;
+}
+
+/** Default Claude Code permissions - used as fallback when agent list hasn't loaded yet. */
+export const CLAUDE_DEFAULT_PERMISSIONS: AgentPermissionEntry[] = [
+  { mode: 'plan', label: 'Plan (Read-Only)' },
+  { mode: 'dontAsk', label: "Don't Ask (Deny Unless Allowed)" },
+  { mode: 'default', label: 'Default (Allowlist)' },
+  { mode: 'acceptEdits', label: 'Accept Edits' },
+  { mode: 'auto', label: 'Auto (Classifier)' },
+  { mode: 'bypassPermissions', label: 'Bypass (Unsafe)' },
+];
+
+/** Find the nearest supported mode when switching agents. Exact match or first (safest). */
+export function nearestPermission(permissions: AgentPermissionEntry[], current: PermissionMode): PermissionMode {
+  if (permissions.some((entry) => entry.mode === current)) return current;
+  return permissions[0]?.mode ?? current;
+}
+
+/** Get label for a mode from a permissions list. */
+export function getPermissionLabel(permissions: AgentPermissionEntry[], mode: PermissionMode): string {
+  return permissions.find((entry) => entry.mode === mode)?.label ?? mode;
+}
 
 export type ThemeMode = 'dark' | 'light'
   | 'moon' | 'forest' | 'ocean' | 'ember'

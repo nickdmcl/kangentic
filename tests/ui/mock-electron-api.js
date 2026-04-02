@@ -903,7 +903,43 @@
 
     agents: {
       list: async function () {
-        return [{ name: 'claude', displayName: 'Claude Code', found: true, path: '/usr/bin/claude', version: '2.1.72' }];
+        return [
+          {
+            name: 'claude', displayName: 'Claude Code', found: true, path: '/usr/bin/claude', version: '2.1.72',
+            permissions: [
+              { mode: 'plan', label: 'Plan (Read-Only)' },
+              { mode: 'dontAsk', label: "Don't Ask (Deny Unless Allowed)" },
+              { mode: 'default', label: 'Default (Allowlist)' },
+              { mode: 'acceptEdits', label: 'Accept Edits' },
+              { mode: 'auto', label: 'Auto (Classifier)' },
+              { mode: 'bypassPermissions', label: 'Bypass (Unsafe)' },
+            ],
+          },
+          {
+            name: 'codex', displayName: 'Codex CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'plan', label: 'Suggest (Read-Only)' },
+              { mode: 'acceptEdits', label: 'Auto-Edit' },
+              { mode: 'bypassPermissions', label: 'Full Auto (Sandboxed)' },
+            ],
+          },
+          {
+            name: 'gemini', displayName: 'Gemini CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'plan', label: 'Plan (Read-Only)' },
+              { mode: 'default', label: 'Default (Interactive)' },
+              { mode: 'acceptEdits', label: 'Auto-Edit' },
+              { mode: 'bypassPermissions', label: 'YOLO (Auto-Approve All)' },
+            ],
+          },
+          {
+            name: 'aider', displayName: 'Aider', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'default', label: 'Interactive (Confirm)' },
+              { mode: 'bypassPermissions', label: 'Auto-Approve (--yes)' },
+            ],
+          },
+        ];
       },
     },
 

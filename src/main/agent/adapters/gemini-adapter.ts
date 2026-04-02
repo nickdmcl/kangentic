@@ -3,7 +3,7 @@ import { GeminiCommandBuilder } from '../gemini-command-builder';
 import { GeminiStatusParser } from '../gemini-status-parser';
 import { stripGeminiKangenticHooks } from '../gemini-hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../agent-adapter';
-import type { SessionUsage, SessionEvent } from '../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry } from '../../../shared/types';
 
 /**
  * Gemini CLI adapter - wraps GeminiDetector, GeminiCommandBuilder,
@@ -14,6 +14,12 @@ export class GeminiAdapter implements AgentAdapter {
   readonly name = 'gemini';
   readonly displayName = 'Gemini CLI';
   readonly sessionType = 'gemini_agent';
+  readonly permissions: AgentPermissionEntry[] = [
+    { mode: 'plan', label: 'Plan (Read-Only)' },
+    { mode: 'default', label: 'Default (Interactive)' },
+    { mode: 'acceptEdits', label: 'Auto-Edit' },
+    { mode: 'bypassPermissions', label: 'YOLO (Auto-Approve All)' },
+  ];
 
   private readonly detector = new GeminiDetector();
   private readonly commandBuilder = new GeminiCommandBuilder();

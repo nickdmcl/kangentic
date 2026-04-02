@@ -172,7 +172,7 @@ Valid status values: `running`, `queued`, `suspended`, `exited`, `orphaned`.
 
 Valid suspended_by values: `user` (explicit pause button), `system` (shutdown, task move, idle timeout), or `NULL` (legacy records, treated as `system`).
 
-Valid permission_mode values: `default`, `plan`, `acceptEdits`, `dontAsk`, `bypassPermissions` (see `PermissionMode` type in `src/shared/types.ts`).
+Valid permission_mode values: `default`, `plan`, `acceptEdits`, `dontAsk`, `bypassPermissions`, `auto` (see `PermissionMode` type in `src/shared/types.ts`).
 
 ### task_attachments table
 

@@ -3,20 +3,14 @@ import { Pencil, Lock, Trash2, Palette, ChevronRight, Info } from 'lucide-react'
 import { HexColorPicker } from 'react-colorful';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
+import { useProjectStore } from '../../stores/project-store';
 import { useToastStore } from '../../stores/toast-store';
 import { BaseDialog } from './BaseDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconPickerDialog } from './IconPickerDialog';
 import { ICON_REGISTRY, ROLE_DEFAULTS, getUsedIcons } from '../../utils/swimlane-icons';
+import { nearestPermission, getPermissionLabel, CLAUDE_DEFAULT_PERMISSIONS } from '../../../shared/types';
 import type { Swimlane, PermissionMode, AgentDetectionInfo } from '../../../shared/types';
-
-const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  default: 'Default (Allowlist)',
-  plan: 'Plan',
-  acceptEdits: 'Accept Edits',
-  dontAsk: "Don't Ask (Deny Unless Allowed)",
-  bypassPermissions: 'Bypass (Unsafe)',
-};
 
 const PRESET_COLORS = [
   '#6b7280', '#ef4444', '#f43f5e', '#f97316',
@@ -34,6 +28,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const deleteSwimlane = useBoardStore((s) => s.deleteSwimlane);
   const tasks = useBoardStore((s) => s.tasks);
   const globalPermissionMode = useConfigStore((s) => s.config.claude.permissionMode);
+  const currentProject = useProjectStore((state) => state.currentProject);
 
   const swimlanes = useBoardStore((s) => s.swimlanes);
 
@@ -59,6 +54,9 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const permissionLocked = isTodoOrDone;
   const autoSpawnLocked = isTodoOrDone;
   const isPlanMode = permissionMode === 'plan';
+
+  const effectiveAgent = agentOverride ?? currentProject?.default_agent ?? 'claude';
+  const agentPermissions = agentList.find((agent) => agent.name === effectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
 
   const isCustomColor = !PRESET_COLORS.includes(color);
   const usedIcons = getUsedIcons(swimlanes, swimlane.id);
@@ -335,7 +333,17 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
             <label className="text-xs text-fg-muted mb-1.5 block">Agent</label>
             <select
               value={agentOverride ?? ''}
-              onChange={(event) => setAgentOverride(event.target.value || null)}
+              onChange={(event) => {
+                const newAgent = event.target.value || null;
+                setAgentOverride(newAgent);
+                // Auto-adjust permission if unsupported by the new agent
+                if (permissionMode) {
+                  const newEffectiveAgent = newAgent ?? currentProject?.default_agent ?? 'claude';
+                  const newAgentPermissions = agentList.find((agent) => agent.name === newEffectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
+                  const adjusted = nearestPermission(newAgentPermissions, permissionMode);
+                  if (adjusted !== permissionMode) setPermissionMode(adjusted);
+                }
+              }}
               disabled={isTodoOrDone}
               className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -360,12 +368,12 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
               disabled={permissionLocked}
               className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">{PERMISSION_LABELS[globalPermissionMode]}</option>
-              {globalPermissionMode !== 'plan' && <option value="plan">Plan</option>}
-              {globalPermissionMode !== 'dontAsk' && <option value="dontAsk">Don&apos;t Ask (Deny Unless Allowed)</option>}
-              {globalPermissionMode !== 'default' && <option value="default">Default (Allowlist)</option>}
-              {globalPermissionMode !== 'acceptEdits' && <option value="acceptEdits">Accept Edits</option>}
-              {globalPermissionMode !== 'bypassPermissions' && <option value="bypassPermissions">Bypass (Unsafe)</option>}
+              <option value="">{getPermissionLabel(agentPermissions, globalPermissionMode)}</option>
+              {agentPermissions
+                .filter((entry) => entry.mode !== globalPermissionMode)
+                .map((entry) => (
+                  <option key={entry.mode} value={entry.mode}>{entry.label}</option>
+                ))}
             </select>
             <p className="text-[11px] text-fg-faint mt-1">
               Override the global permission mode for new agents spawned in this column.

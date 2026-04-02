@@ -164,7 +164,7 @@ describe('AiderAdapter', () => {
     // ── Permission mode mapping ──────────────────────────────────────────
 
     describe('permission mode mapping', () => {
-      const yesPermissionModes: PermissionMode[] = ['bypassPermissions', 'dontAsk', 'acceptEdits'];
+      const yesPermissionModes: PermissionMode[] = ['bypassPermissions', 'dontAsk', 'acceptEdits', 'auto'];
       const noYesPermissionModes: PermissionMode[] = ['default', 'plan'];
 
       for (const mode of yesPermissionModes) {

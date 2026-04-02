@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { quoteArg, isUnixLikeShell } from '../../../shared/paths';
 import { interpolateTemplate } from '../command-builder';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../agent-adapter';
-import type { SessionUsage, SessionEvent } from '../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry } from '../../../shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -21,6 +21,10 @@ export class AiderAdapter implements AgentAdapter {
   readonly name = 'aider';
   readonly displayName = 'Aider';
   readonly sessionType = 'aider_agent';
+  readonly permissions: AgentPermissionEntry[] = [
+    { mode: 'default', label: 'Interactive (Confirm)' },
+    { mode: 'bypassPermissions', label: 'Auto-Approve (--yes)' },
+  ];
 
   private cachedDetection: AgentInfo | null = null;
   private inflightDetection: Promise<AgentInfo> | null = null;
@@ -88,12 +92,13 @@ export class AiderAdapter implements AgentAdapter {
       parts.push('--message', quoteArg(safePrompt, shell));
     }
 
-    // Permission mode: bypassPermissions/dontAsk/acceptEdits map to --yes;
+    // Permission mode: bypassPermissions/dontAsk/acceptEdits/auto map to --yes;
     // plan/default leave Aider interactive for user confirmation
     if (
       options.permissionMode === 'bypassPermissions' ||
       options.permissionMode === 'dontAsk' ||
-      options.permissionMode === 'acceptEdits'
+      options.permissionMode === 'acceptEdits' ||
+      options.permissionMode === 'auto'
     ) {
       parts.push('--yes');
     }

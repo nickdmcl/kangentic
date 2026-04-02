@@ -46,6 +46,7 @@ claude --settings <mergedSettingsPath> --resume <uuid>
 | `plan` | `--permission-mode plan` |
 | `acceptEdits` | `--permission-mode acceptEdits` |
 | `dontAsk` | `--permission-mode dontAsk` |
+| `auto` | `--permission-mode auto` |
 | `bypassPermissions` | `--dangerously-skip-permissions` |
 
 ### Permission Mode Resolution (Priority Order)
