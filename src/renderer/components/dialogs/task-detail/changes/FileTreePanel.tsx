@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from 'react';
-import { Search, Plus, Pencil, Minus, ArrowRight, Copy, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, Plus, Pencil, Minus, ArrowRight, Copy, ChevronRight, ChevronDown, FileQuestion } from 'lucide-react';
 import type { GitDiffFileEntry, GitDiffStatus } from '../../../../../shared/types';
 
 interface FileTreePanelProps {
@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<GitDiffStatus, { icon: typeof Plus; colorClass: stri
   D: { icon: Minus, colorClass: 'text-red-400', label: 'Deleted' },
   R: { icon: ArrowRight, colorClass: 'text-blue-400', label: 'Renamed' },
   C: { icon: Copy, colorClass: 'text-blue-400', label: 'Copied' },
+  U: { icon: FileQuestion, colorClass: 'text-green-300', label: 'Untracked' },
 };
 
 // Row height in px for the virtualized list

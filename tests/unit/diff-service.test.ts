@@ -11,6 +11,7 @@ const mockGit = {
   diff: vi.fn(),
   show: vi.fn(),
   raw: vi.fn(),
+  status: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
@@ -54,6 +55,8 @@ describe('DiffService', () => {
     service = new DiffService('/project');
     // Default merge-base mock - tests can override as needed
     mockGit.raw.mockResolvedValue('abc123\n');
+    // Default git status mock - returns no untracked files
+    mockGit.status.mockResolvedValue({ not_added: [] });
   });
 
   describe('getDiffFiles', () => {
@@ -219,6 +222,108 @@ describe('DiffService', () => {
       expect(result.files[0].status).toBe('C');
     });
 
+    it('includes untracked files from git status with status U', async () => {
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([
+        { file: 'src/existing.ts', insertions: 3, deletions: 1 },
+      ]));
+      mockGit.diff.mockResolvedValue('M\tsrc/existing.ts\n');
+      mockGit.status.mockResolvedValue({ not_added: ['src/brand-new.ts'] });
+      // Mock readFile to return a buffer with 3 lines (2 newlines + content after last)
+      vi.mocked(fs.promises.readFile).mockResolvedValue(Buffer.from('line1\nline2\nline3') as never);
+
+      const result = await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      expect(result.files).toHaveLength(2);
+      expect(result.files[1]).toEqual({
+        path: 'src/brand-new.ts',
+        status: 'U',
+        insertions: 3,
+        deletions: 0,
+        binary: false,
+      });
+      // Total insertions includes both tracked and untracked
+      expect(result.totalInsertions).toBe(3 + 3);
+    });
+
+    it('detects binary untracked files via null byte check', async () => {
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
+      mockGit.diff.mockResolvedValue('');
+      mockGit.status.mockResolvedValue({ not_added: ['image.png'] });
+      // Buffer with a null byte in the first 8KB
+      const binaryBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x00, 0x0A]);
+      vi.mocked(fs.promises.readFile).mockResolvedValue(binaryBuffer as never);
+
+      const result = await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      expect(result.files[0]).toEqual({
+        path: 'image.png',
+        status: 'U',
+        insertions: 0,
+        deletions: 0,
+        binary: true,
+      });
+    });
+
+    it('deduplicates untracked files already present in diff', async () => {
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([
+        { file: 'src/file.ts', insertions: 5, deletions: 0 },
+      ]));
+      mockGit.diff.mockResolvedValue('A\tsrc/file.ts\n');
+      // Same file appears in both diff and status.not_added
+      mockGit.status.mockResolvedValue({ not_added: ['src/file.ts'] });
+
+      const result = await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      // Should not duplicate - only one entry with status 'A' from diff
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].status).toBe('A');
+    });
+
+    it('handles untracked file read failure gracefully', async () => {
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
+      mockGit.diff.mockResolvedValue('');
+      mockGit.status.mockResolvedValue({ not_added: ['deleted-before-read.ts'] });
+      vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const result = await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0]).toEqual({
+        path: 'deleted-before-read.ts',
+        status: 'U',
+        insertions: 0,
+        deletions: 0,
+        binary: false,
+      });
+    });
+
+    it('counts lines correctly for files ending with newline', async () => {
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
+      mockGit.diff.mockResolvedValue('');
+      mockGit.status.mockResolvedValue({ not_added: ['src/file.ts'] });
+      // File with trailing newline: 2 lines
+      vi.mocked(fs.promises.readFile).mockResolvedValue(Buffer.from('line1\nline2\n') as never);
+
+      const result = await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      expect(result.files[0].insertions).toBe(2);
+    });
+
     it('skips malformed name-status lines', async () => {
       mockGit.diffSummary.mockResolvedValue(makeDiffSummary([
         { file: 'valid.ts', insertions: 1, deletions: 0 },
@@ -253,6 +358,24 @@ describe('DiffService', () => {
       expect(result.language).toBe('typescript');
       // Should use merge-base commit for original
       expect(mockGit.show).toHaveBeenCalledWith(['abc123:src/index.ts']);
+    });
+
+    it('returns empty original for untracked files', async () => {
+      vi.mocked(fs.promises.readFile).mockResolvedValue('untracked file content');
+
+      const result = await service.getFileContent({
+        projectPath: '/project',
+        worktreePath: '/project/.kangentic/worktrees/task',
+        baseBranch: 'main',
+        filePath: 'src/new-untracked.ts',
+        status: 'U',
+      });
+
+      expect(result.original).toBe('');
+      expect(result.modified).toBe('untracked file content');
+      expect(result.language).toBe('typescript');
+      // No git show call for untracked files
+      expect(mockGit.show).not.toHaveBeenCalled();
     });
 
     it('returns empty original for added files', async () => {

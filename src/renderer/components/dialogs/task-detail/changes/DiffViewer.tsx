@@ -23,6 +23,7 @@ const STATUS_LABELS: Record<GitDiffStatus, { label: string; colorClass: string }
   D: { label: 'Deleted', colorClass: 'text-red-400' },
   R: { label: 'Renamed', colorClass: 'text-blue-400' },
   C: { label: 'Copied', colorClass: 'text-blue-400' },
+  U: { label: 'Untracked', colorClass: 'text-green-300' },
 };
 
 export function DiffViewer({
@@ -71,40 +72,43 @@ export function DiffViewer({
         </div>
       </div>
 
-      {/* Editor area */}
-      <div className="flex-1 min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 size={20} className="animate-spin text-fg-muted" />
-          </div>
-        ) : binary ? (
+      {/* Editor area - Monaco stays mounted to avoid expensive re-initialization */}
+      <div className="flex-1 min-h-0 relative">
+        {binary ? (
           <div className="flex items-center justify-center h-full text-xs text-fg-disabled">
             Binary file - cannot display diff
           </div>
         ) : (
-          <DiffEditor
-            height="100%"
-            language={language}
-            original={original}
-            modified={modified}
-            theme={monacoTheme}
-            options={{
-              readOnly: true,
-              originalEditable: false,
-              renderSideBySide: viewMode === 'split',
-              automaticLayout: true,
-              scrollBeyondLastLine: false,
-              minimap: { enabled: false },
-              renderWhitespace: 'boundary',
-              fontSize: 12,
-              lineHeight: 18,
-            }}
-            loading={
-              <div className="flex items-center justify-center h-full">
+          <>
+            <DiffEditor
+              height="100%"
+              language={language}
+              original={original}
+              modified={modified}
+              theme={monacoTheme}
+              options={{
+                readOnly: true,
+                originalEditable: false,
+                renderSideBySide: viewMode === 'split',
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                minimap: { enabled: false },
+                renderWhitespace: 'boundary',
+                fontSize: 12,
+                lineHeight: 18,
+              }}
+              loading={
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 size={20} className="animate-spin text-fg-muted" />
+                </div>
+              }
+            />
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-surface/60 z-10">
                 <Loader2 size={20} className="animate-spin text-fg-muted" />
               </div>
-            }
-          />
+            )}
+          </>
         )}
       </div>
     </div>

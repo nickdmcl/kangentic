@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DEBOUNCE_MS = 2000;
+const DEBOUNCE_MS = 500;
 const IGNORED_SEGMENTS = new Set(['.git', 'node_modules', '.kangentic']);
 
 interface WatcherEntry {

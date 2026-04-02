@@ -63,7 +63,7 @@ describe('DiffWatcher', () => {
 
     // Trigger a change - only the first callback should be wired
     watchCallback!('change', 'src/file.ts');
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).toHaveBeenCalledTimes(1);
     expect(secondCallback).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('DiffWatcher', () => {
     expect(callback).not.toHaveBeenCalled();
 
     // Advance past debounce (2000ms)
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -89,18 +89,18 @@ describe('DiffWatcher', () => {
     const callback = vi.fn();
     watcher.subscribe('/project', callback);
 
-    // Rapid file changes
+    // Rapid file changes within the debounce window
     watchCallback!('change', 'src/a.ts');
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(200);
     watchCallback!('change', 'src/b.ts');
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(200);
     watchCallback!('change', 'src/c.ts');
 
     // Not fired yet
     expect(callback).not.toHaveBeenCalled();
 
     // Advance past debounce from last change
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -110,7 +110,7 @@ describe('DiffWatcher', () => {
     watcher.subscribe('/project', callback);
 
     watchCallback!('change', '.git/refs/heads/main');
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe('DiffWatcher', () => {
     watcher.subscribe('/project', callback);
 
     watchCallback!('change', 'node_modules/some-package/index.js');
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -130,7 +130,7 @@ describe('DiffWatcher', () => {
     watcher.subscribe('/project', callback);
 
     watchCallback!('change', '.kangentic/worktrees/task/file.ts');
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -140,7 +140,7 @@ describe('DiffWatcher', () => {
     watcher.subscribe('/project', callback);
 
     watchCallback!('change', null);
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -165,7 +165,7 @@ describe('DiffWatcher', () => {
     watcher.unsubscribe('/project');
 
     // Advance past debounce
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(500);
 
     // Callback should NOT have fired
     expect(callback).not.toHaveBeenCalled();

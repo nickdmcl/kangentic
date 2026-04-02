@@ -380,7 +380,7 @@ export const ACTIVITY_TAB = '__all__';
 
 // === Git Diff Types ===
 
-export type GitDiffStatus = 'A' | 'M' | 'D' | 'R' | 'C';
+export type GitDiffStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'U';
 
 export interface GitDiffFileEntry {
   path: string;

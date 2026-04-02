@@ -11,6 +11,11 @@ interface ChangesPanelProps {
   projectPath: string;
 }
 
+interface ContentCacheEntry {
+  result: GitFileContentResult;
+  generation: number;
+}
+
 export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   const [files, setFiles] = useState<GitDiffFileEntry[]>([]);
   const [totalInsertions, setTotalInsertions] = useState(0);
@@ -34,9 +39,12 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   const filesRef = useRef(files);
   filesRef.current = files;
 
-  // Cache fetched file content so switching between already-viewed files is instant.
-  // Invalidated when fs.watch fires (files on disk changed).
-  const contentCacheRef = useRef(new Map<string, GitFileContentResult>());
+  // Stale-while-revalidate content cache. Each entry stores the fetch result
+  // and the generation it was fetched in. When fs.watch fires, the generation
+  // increments - stale entries are served immediately while a background
+  // refetch runs, avoiding loading spinners for previously-viewed files.
+  const contentCacheRef = useRef(new Map<string, ContentCacheEntry>());
+  const cacheGenerationRef = useRef(0);
 
   const fetchFiles = useCallback(async () => {
     try {
@@ -58,11 +66,34 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
   }, [worktreePath, projectPath, baseBranch]);
 
   const fetchFileContent = useCallback(async (filePath: string, options?: { skipCache?: boolean }) => {
-    // Serve from cache if available (instant switching between already-viewed files)
     if (!options?.skipCache) {
       const cached = contentCacheRef.current.get(filePath);
       if (cached) {
-        setFileContent(cached);
+        // Always serve cached content immediately (stale-while-revalidate)
+        setFileContent(cached.result);
+        if (cached.generation === cacheGenerationRef.current) {
+          return; // Fresh entry - no refetch needed
+        }
+        // Stale entry - show cached content now, refetch in background without spinner
+        const currentGeneration = cacheGenerationRef.current;
+        const fileEntry = filesRef.current.find((entry) => entry.path === filePath);
+        window.electronAPI.git.fileContent({
+          worktreePath,
+          projectPath,
+          baseBranch,
+          filePath,
+          status: fileEntry?.status ?? 'M',
+          oldPath: fileEntry?.oldPath,
+        }).then((freshResult) => {
+          contentCacheRef.current.set(filePath, { result: freshResult, generation: currentGeneration });
+          // Only update UI if this file is still selected and content actually changed
+          if (selectedFileRef.current === filePath &&
+              (freshResult.original !== cached.result.original || freshResult.modified !== cached.result.modified)) {
+            setFileContent(freshResult);
+          }
+        }).catch(() => {
+          // Background refetch failed - stale content remains visible
+        });
         return;
       }
     }
@@ -81,7 +112,7 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
         status: file.status,
         oldPath: file.oldPath,
       });
-      contentCacheRef.current.set(filePath, result);
+      contentCacheRef.current.set(filePath, { result, generation: cacheGenerationRef.current });
       setFileContent(result);
     } catch {
       setFileContent({ original: '', modified: '', language: 'plaintext' });
@@ -111,8 +142,9 @@ export function ChangesPanel({ task, projectPath }: ChangesPanelProps) {
 
     window.electronAPI.git.subscribeDiff(watchPath);
     const unsubscribe = window.electronAPI.git.onDiffChanged(() => {
-      // Invalidate content cache since files on disk changed
-      contentCacheRef.current.clear();
+      // Mark all cache entries stale by advancing the generation counter.
+      // Entries are not deleted - they're served immediately as stale-while-revalidate.
+      cacheGenerationRef.current += 1;
       fetchFiles();
       const currentFile = selectedFileRef.current;
       if (currentFile) {
