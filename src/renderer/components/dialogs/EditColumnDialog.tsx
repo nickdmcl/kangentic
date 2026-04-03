@@ -350,7 +350,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
               <option value="">Default (project setting)</option>
               {agentList.map((agent) => (
                 <option key={agent.name} value={agent.name}>
-                  {agent.displayName ?? agent.name}{agent.found ? (agent.version ? ` ${agent.version}` : '') : ' (not found)'}
+                  {agent.displayName ?? agent.name}{agent.found ? '' : ' (not found)'}
                 </option>
               ))}
             </select>

@@ -301,7 +301,7 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
         >
           {agentList.map((agent) => (
             <option key={agent.name} value={agent.name}>
-              {agent.displayName ?? agent.name}{agent.found ? (agent.version ? ` ${agent.version}` : '') : ' (not found)'}
+              {agent.displayName ?? agent.name}{agent.found ? '' : ' (not found)'}
             </option>
           ))}
           {agentList.length === 0 && <option value={DEFAULT_AGENT}>{agentDisplayName(DEFAULT_AGENT)}</option>}
