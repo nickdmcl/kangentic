@@ -1,4 +1,3 @@
-import '../../../../monacoConfig';
 import { DiffEditor } from '@monaco-editor/react';
 import { Loader2, Columns2, Rows2, FileCode } from 'lucide-react';
 import { useConfigStore } from '../../../../stores/config-store';
