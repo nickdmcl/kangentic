@@ -38,16 +38,17 @@ async function closeSettings() {
 }
 
 test.describe('Settings Panel', () => {
-  test('titlebar gear opens Settings panel with all 9 tabs when project is open', async () => {
+  test('titlebar gear opens Settings panel with all 10 tabs when project is open', async () => {
     await openSettings();
     await expect(page.locator('h2:has-text("Settings")')).toBeVisible();
 
-    // All 9 tabs should be visible (5 project + 4 system)
-    await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
+    // All 10 tabs should be visible (5 project + 5 system)
+    await expect(page.getByRole('button', { name: 'Theme' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Terminal', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shortcuts' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Layout' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Behavior' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'MCP Server' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
@@ -56,9 +57,8 @@ test.describe('Settings Panel', () => {
     await closeSettings();
   });
 
-  test('shows Appearance section with Theme', async () => {
+  test('shows Theme tab with color scheme selector', async () => {
     await openSettings();
-    await expect(page.locator('text=Theme')).toBeVisible();
     await expect(page.locator('text=Color scheme for the interface')).toBeVisible();
     await closeSettings();
   });
@@ -79,7 +79,19 @@ test.describe('Settings Panel', () => {
     await expect(page.locator('text=Skip Task Delete Confirmation')).toBeVisible();
     await expect(page.locator('text=Auto-Focus Idle Sessions')).toBeVisible();
     await expect(page.locator('text=Launch All Projects on Startup')).toBeVisible();
+    await closeSettings();
+  });
+
+  test('shows Layout tab with density, width, visibility, and animation settings', async () => {
+    await openSettings();
+    await page.getByRole('button', { name: 'Layout' }).click();
+    await expect(page.locator('text=Card Density')).toBeVisible();
+    await expect(page.locator('text=Column Width')).toBeVisible();
+    await expect(page.getByText('Terminal Panel', { exact: true })).toBeVisible();
+    await expect(page.getByText('Status Bar', { exact: true })).toBeVisible();
+    await expect(page.locator('text=Board Search Bar')).toBeVisible();
     await expect(page.locator('text=Restore Window Position')).toBeVisible();
+    await expect(page.locator('text=Animations')).toBeVisible();
     await closeSettings();
   });
 
@@ -218,10 +230,11 @@ test.describe('Project Settings via Sidebar', () => {
     await page.locator('h2:has-text("Settings")').waitFor({ state: 'visible', timeout: 3000 });
 
     // All tabs visible (no separate project panel with fewer tabs)
-    await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Theme' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Terminal', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Git' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Layout' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'MCP Server' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Behavior' })).toBeVisible();
 
@@ -336,7 +349,7 @@ test.describe('Settings Search', () => {
     // Clear search
     await searchInput.fill('');
 
-    // Should return to normal view (Appearance tab is default but font search
+    // Should return to normal view (Theme tab is default but font search
     // was in Terminal only, so auto-switch should land on Terminal)
     await expect(page.getByText('Terminal shell used for agent sessions')).toBeVisible();
 
@@ -362,9 +375,9 @@ test.describe('Settings Search', () => {
     const searchInput = page.getByTestId('settings-search');
     await searchInput.fill('theme');
 
-    // Appearance sidebar tab should have a match count badge (name includes count)
-    const appearanceTab = page.getByRole('button', { name: 'Appearance 1' });
-    await expect(appearanceTab).not.toHaveClass(/opacity-40/);
+    // Theme sidebar tab should have a match count badge (name includes count)
+    const themeTab = page.getByRole('button', { name: 'Theme 1' });
+    await expect(themeTab).not.toHaveClass(/opacity-40/);
 
     // Terminal sidebar tab should be dimmed (no matches for "theme")
     const terminalTab = page.getByRole('button', { name: 'Terminal', exact: true }).first();

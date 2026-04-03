@@ -20,16 +20,18 @@ The config directory (`<configDir>`) is platform-specific:
 
 Both panels use a VS Code-style layout: a sidebar with tab navigation on the left and the active settings pane on the right. A search bar at the top filters settings by keyword. Search uses multi-token matching (all tokens must appear in the setting name or description). Results are grouped by tab with match count badges on the sidebar; tabs with zero matches are dimmed. Press Ctrl+F (Cmd+F on macOS) to focus the search bar, Escape to clear the filter.
 
-- **Settings Panel** -- opened via the titlebar gear icon or the gear icon on each project row in the sidebar. A project switcher dropdown in the header allows switching between projects. Sidebar tabs: Appearance, Terminal, Agent, Git, Shortcuts, Behavior, MCP Server, Notifications, Privacy. The first five tabs (above the separator) are per-project settings. Four of them (Appearance, Terminal, Agent, Git) save to `.kangentic/config.json`, while Shortcuts saves to the board config files (`kangentic.json` and `kangentic.local.json`). The last four (Behavior, MCP Server, Notifications, Privacy) are shared settings that apply across all projects, saved to the global config. When no project is open, only the 4 shared tabs appear. Changes save immediately. New projects clone settings from the most recently configured project (falling back to defaults if none exist).
+- **Settings Panel** -- opened via the titlebar gear icon or the gear icon on each project row in the sidebar. A project switcher dropdown in the header allows switching between projects. Sidebar tabs: Theme, Terminal, Agent, Git, Shortcuts, Layout, Behavior, MCP Server, Notifications, Privacy. The first five tabs (above the separator) are per-project settings. Four of them (Theme, Terminal, Agent, Git) save to `.kangentic/config.json`, while Shortcuts saves to the board config files (`kangentic.json` and `kangentic.local.json`). The last five (Layout, Behavior, MCP Server, Notifications, Privacy) are shared settings that apply across all projects, saved to the global config. When no project is open, only the 5 shared tabs appear. Changes save immediately. New projects clone settings from the most recently configured project (falling back to defaults if none exist).
 
 ### App-Only Settings
 
 These settings appear only in App Settings and cannot be overridden per-project:
 
 - `sidebarVisible`, `boardLayout`, `sidebar.width`
+- `cardDensity`, `columnWidth`, `terminalPanelVisible`, `animationsEnabled`, `statusBarVisible`
+- `showBoardSearch`, `restoreWindowPosition`
 - `agent.cliPaths`, `agent.maxConcurrentSessions`, `agent.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
-- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`, `restoreWindowPosition`, `showBoardSearch`
+- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`
 - `contextBar.*` (all context bar visibility toggles)
 - `notifications.*` (all notification settings)
 - `agent.idleTimeoutMinutes`
@@ -52,6 +54,11 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `theme` | ThemeMode | `'dark'` | UI theme. Values: `dark`, `light`, `moon`, `forest`, `ocean`, `ember`, `sand`, `mint`, `sky`, `peach` |
 | `sidebarVisible` | boolean | `true` | Show/hide sidebar. Global-only. |
 | `boardLayout` | `'horizontal'` \| `'vertical'` | `'horizontal'` | Board scroll direction. Global-only. |
+| `cardDensity` | `'compact'` \| `'default'` \| `'comfortable'` | `'default'` | Amount of detail shown on task cards. Global-only. |
+| `columnWidth` | `'narrow'` \| `'default'` \| `'wide'` | `'default'` | Width of board columns. Global-only. |
+| `terminalPanelVisible` | boolean | `true` | Show the terminal panel below the board. Global-only. |
+| `animationsEnabled` | boolean | `true` | Enable CSS keyframe animations (idle pulse, dialog fades, status bar pulses). Global-only. |
+| `statusBarVisible` | boolean | `true` | Show the status bar at the bottom of the window. Global-only. |
 | `skipDeleteConfirm` | boolean | `false` | Skip confirmation dialog on task delete |
 | `autoFocusIdleSession` | boolean | `false` | Auto-switch to session tab when agent goes idle. Idle tabs are always highlighted regardless of this setting. |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Bell, Bot, Check, CircleAlert, GitBranch, Palette, Plug, RefreshCw, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal, Zap } from 'lucide-react';
+import { Bell, Bot, Check, CircleAlert, GitBranch, LayoutGrid, Palette, Plug, RefreshCw, ShieldAlert, ShieldCheck, SlidersHorizontal, Terminal, Zap } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { BranchPicker } from '../dialogs/BranchPicker';
 import { SettingsPanelProvider, SectionHeader, SettingRow, Select, ToggleSwitch, CompactToggleList, INPUT_CLASS, useScopedUpdate, SearchTabGroupHeader, NoSearchResults } from './shared';
@@ -26,13 +26,14 @@ import { ShortcutsTab } from './ShortcutsTab';
  */
 export const APP_TABS: SettingsTabDefinition[] = [
   // -- Per-project settings --
-  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'theme', label: 'Theme', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'agent', label: 'Agent', icon: Bot },
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'shortcuts', label: 'Shortcuts', icon: Zap },
   // -- Shared settings (separator marks the boundary) --
-  { id: 'behavior', label: 'Behavior', icon: SlidersHorizontal, separator: true, tooltip: 'Applies to all projects' },
+  { id: 'layout', label: 'Layout', icon: LayoutGrid, separator: true, tooltip: 'Applies to all projects' },
+  { id: 'behavior', label: 'Behavior', icon: SlidersHorizontal, tooltip: 'Applies to all projects' },
   { id: 'mcpServer', label: 'MCP Server', icon: Plug, tooltip: 'Applies to all projects' },
   { id: 'notifications', label: 'Notifications', icon: Bell, tooltip: 'Applies to all projects' },
   { id: 'privacy', label: 'Privacy', icon: ShieldCheck, tooltip: 'Applies to all projects' },
@@ -129,11 +130,12 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
             <div key={tab.id}>
               <SearchTabGroupHeader tab={tab} first={index === 0} onNavigate={navigateToTab} />
               <div className="space-y-4">
-                {tab.id === 'appearance' && <AppearanceTab config={effectiveConfig} />}
+                {tab.id === 'theme' && <ThemeTab config={effectiveConfig} />}
                 {tab.id === 'terminal' && <TerminalTab config={effectiveConfig} globalConfig={globalConfig} shells={shells} />}
                 {tab.id === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} agentInfo={agentInfo} agentList={agentList} />}
                 {tab.id === 'git' && <GitTab config={effectiveConfig} />}
                 {tab.id === 'shortcuts' && <ShortcutsTab />}
+                {tab.id === 'layout' && <LayoutTab globalConfig={globalConfig} />}
                 {tab.id === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
                 {tab.id === 'mcpServer' && <McpServerTab globalConfig={globalConfig} />}
                 {tab.id === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
@@ -147,15 +149,16 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
       ) : (
         // Normal mode: single active tab
         <>
-          {activeTab === 'appearance' && <AppearanceTab config={effectiveConfig} />}
+          {activeTab === 'theme' && <ThemeTab config={effectiveConfig} />}
           {activeTab === 'terminal' && <TerminalTab config={effectiveConfig} globalConfig={globalConfig} shells={shells} />}
           {activeTab === 'agent' && <AgentTab config={effectiveConfig} globalConfig={globalConfig} agentInfo={agentInfo} agentList={agentList} />}
+          {activeTab === 'git' && <GitTab config={effectiveConfig} />}
+          {activeTab === 'shortcuts' && <ShortcutsTab />}
+          {activeTab === 'layout' && <LayoutTab globalConfig={globalConfig} />}
           {activeTab === 'behavior' && <BehaviorTab globalConfig={globalConfig} />}
           {activeTab === 'mcpServer' && <McpServerTab globalConfig={globalConfig} />}
           {activeTab === 'notifications' && <NotificationsTab globalConfig={globalConfig} />}
           {activeTab === 'privacy' && <PrivacyTab />}
-          {activeTab === 'git' && <GitTab config={effectiveConfig} />}
-          {activeTab === 'shortcuts' && <ShortcutsTab />}
         </>
       )}
     </SettingsPanelProvider>
@@ -164,7 +167,7 @@ export function SettingsContent({ activeTab, isSearching, searchQuery, matchingT
 
 /* ── Tab Components ── */
 
-function AppearanceTab({ config }: { config: AppConfig }) {
+function ThemeTab({ config }: { config: AppConfig }) {
   const updateProject = useScopedUpdate('project');
   return (
     <SettingRow {...settingProps('theme')}>
@@ -188,6 +191,64 @@ function AppearanceTab({ config }: { config: AppConfig }) {
         </optgroup>
       </Select>
     </SettingRow>
+  );
+}
+
+function LayoutTab({ globalConfig }: { globalConfig: AppConfig }) {
+  const updateGlobal = useScopedUpdate('global');
+  return (
+    <>
+      <SettingRow {...settingProps('cardDensity')}>
+        <Select
+          value={globalConfig.cardDensity}
+          onChange={(event) => updateGlobal({ cardDensity: event.target.value as AppConfig['cardDensity'] })}
+        >
+          <option value="compact">Compact</option>
+          <option value="default">Default</option>
+          <option value="comfortable">Comfortable</option>
+        </Select>
+      </SettingRow>
+      <SettingRow {...settingProps('columnWidth')}>
+        <Select
+          value={globalConfig.columnWidth}
+          onChange={(event) => updateGlobal({ columnWidth: event.target.value as AppConfig['columnWidth'] })}
+        >
+          <option value="narrow">Narrow</option>
+          <option value="default">Default</option>
+          <option value="wide">Wide</option>
+        </Select>
+      </SettingRow>
+      <SettingRow {...settingProps('terminalPanelVisible')}>
+        <ToggleSwitch
+          checked={globalConfig.terminalPanelVisible !== false}
+          onChange={(value) => updateGlobal({ terminalPanelVisible: value })}
+        />
+      </SettingRow>
+      <SettingRow {...settingProps('statusBarVisible')}>
+        <ToggleSwitch
+          checked={globalConfig.statusBarVisible !== false}
+          onChange={(value) => updateGlobal({ statusBarVisible: value })}
+        />
+      </SettingRow>
+      <SettingRow {...settingProps('showBoardSearch')}>
+        <ToggleSwitch
+          checked={globalConfig.showBoardSearch}
+          onChange={(value) => updateGlobal({ showBoardSearch: value })}
+        />
+      </SettingRow>
+      <SettingRow {...settingProps('restoreWindowPosition')}>
+        <ToggleSwitch
+          checked={globalConfig.restoreWindowPosition}
+          onChange={(value) => updateGlobal({ restoreWindowPosition: value })}
+        />
+      </SettingRow>
+      <SettingRow {...settingProps('animationsEnabled')}>
+        <ToggleSwitch
+          checked={globalConfig.animationsEnabled}
+          onChange={(value) => updateGlobal({ animationsEnabled: value })}
+        />
+      </SettingRow>
+    </>
   );
 }
 
@@ -417,12 +478,6 @@ function BehaviorTab({ globalConfig }: { globalConfig: AppConfig }) {
           <option value="reject">Reject</option>
         </Select>
       </SettingRow>
-      <SettingRow {...settingProps('showBoardSearch')}>
-        <ToggleSwitch
-          checked={globalConfig.showBoardSearch}
-          onChange={(value) => updateGlobal({ showBoardSearch: value })}
-        />
-      </SettingRow>
       <SettingRow {...settingProps('skipDeleteConfirm')}>
         <ToggleSwitch
           checked={globalConfig.skipDeleteConfirm}
@@ -439,12 +494,6 @@ function BehaviorTab({ globalConfig }: { globalConfig: AppConfig }) {
         <ToggleSwitch
           checked={globalConfig.activateAllProjectsOnStartup}
           onChange={(value) => updateGlobal({ activateAllProjectsOnStartup: value })}
-        />
-      </SettingRow>
-      <SettingRow {...settingProps('restoreWindowPosition')}>
-        <ToggleSwitch
-          checked={globalConfig.restoreWindowPosition}
-          onChange={(value) => updateGlobal({ restoreWindowPosition: value })}
         />
       </SettingRow>
     </>

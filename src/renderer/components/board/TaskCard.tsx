@@ -285,6 +285,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
   // Label display config
   const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
   const taskLabels = task.labels ?? [];
+  const cardDensity = useConfigStore((state) => state.config.cardDensity);
 
   const handleContextDelete = async (dontAskAgain: boolean) => {
     if (dontAskAgain) useConfigStore.getState().updateConfig({ skipDeleteConfirm: true });
@@ -350,6 +351,11 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
   const isIdle = displayState.kind === 'running' && displayState.activity === 'idle';
   const isThinking = displayState.kind === 'running' && displayState.activity !== 'idle';
 
+  // Board-level density: compact prop (from backlog) takes precedence, otherwise use config
+  const boardDensity = compact ? 'compact' : cardDensity;
+  const isCompactDensity = boardDensity === 'compact';
+  const isComfortableDensity = boardDensity === 'comfortable';
+
   return (
     <>
       <div
@@ -360,7 +366,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         data-task-id={task.id}
-        className={`border rounded-md p-2.5 cursor-grab active:cursor-grabbing transition-colors bg-surface-raised ${
+        className={`border rounded-md ${isComfortableDensity ? 'p-3' : 'p-2.5'} cursor-grab active:cursor-grabbing transition-colors bg-surface-raised ${
           isHighlighted ? 'border-[2px] border-fg-faint/60' : isIdle ? 'border-edge/40' : 'border-edge hover:border-edge-input'
         } ${isIdle ? 'animate-pulse-subtle' : ''
         } ${isDragOverlay ? 'shadow-xl' : ''}`}
@@ -375,7 +381,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           <div className="text-sm text-fg font-medium truncate">{task.title}</div>
         </div>
 
-        {task.pr_url && (
+        {!isCompactDensity && task.pr_url && (
           <div className="flex items-center gap-2 mt-1.5">
             <button
               onClick={(event) => {
@@ -391,15 +397,15 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           </div>
         )}
 
-        {task.description && (
-          <div className="text-xs text-fg-faint mt-1 line-clamp-3">{stripMarkdown(task.description)}</div>
+        {!isCompactDensity && task.description && (
+          <div className={`text-xs text-fg-faint mt-1 ${isComfortableDensity ? 'line-clamp-5' : 'line-clamp-3'}`}>{stripMarkdown(task.description)}</div>
         )}
 
-        <div className="mt-1.5">
+        <div className={isCompactDensity ? 'mt-1' : 'mt-1.5'}>
           <LabelPills labels={taskLabels} labelColors={labelColors} />
         </div>
 
-        {task.attachment_count > 0 && displayState.kind === 'none' && (
+        {!isCompactDensity && task.attachment_count > 0 && displayState.kind === 'none' && (
           <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-edge">
             <Paperclip size={15} className="text-fg-faint" />
             <span className="text-xs text-fg-faint">{task.attachment_count}</span>
@@ -407,7 +413,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         )}
 
         {/* Bottom bar -- exhaustive switch on display state */}
-        {(() => {
+        {!isCompactDensity && (() => {
           switch (displayState.kind) {
             case 'running': {
               if (!displayState.usage) return null;

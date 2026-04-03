@@ -7,6 +7,7 @@ import { NewTaskDialog } from '../dialogs/NewTaskDialog';
 import { EditColumnDialog } from '../dialogs/EditColumnDialog';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
 import { useConfigStore } from '../../stores/config-store';
+import { useColumnWidthClass } from './column-width';
 import { CountBadge } from '../CountBadge';
 import type { Swimlane as SwimlaneType, Task } from '../../../shared/types';
 
@@ -26,6 +27,7 @@ export const Swimlane = React.memo(function Swimlane({ swimlane, tasks, dragHand
   });
 
   const hasCompletedFirstRun = useConfigStore((state) => state.config.hasCompletedFirstRun);
+  const widthClass = useColumnWidthClass();
 
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
@@ -40,7 +42,7 @@ export const Swimlane = React.memo(function Swimlane({ swimlane, tasks, dragHand
       data-testid="swimlane"
       data-swimlane-name={swimlane.name}
       data-swimlane-id={swimlane.id}
-      className={`flex-shrink-0 w-72 h-full flex flex-col rounded-lg ${
+      className={`flex-shrink-0 ${widthClass} h-full flex flex-col rounded-lg ${
         isGhost ? 'opacity-50 border-2 border-dashed border-fg-disabled' : ''
       } ${
         isSystemColumn ? 'ring-1 ring-edge/50' : ''

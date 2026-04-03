@@ -178,3 +178,10 @@ useConfigStore.subscribe((state, prevState) => {
     if (state.config.theme !== 'dark') classList.add(`theme-${state.config.theme}`);
   }
 });
+
+// Toggle CSS keyframe animations via .no-motion class on <html>.
+useConfigStore.subscribe((state, prevState) => {
+  if (state.config.animationsEnabled !== prevState.config.animationsEnabled) {
+    document.documentElement.classList.toggle('no-motion', !state.config.animationsEnabled);
+  }
+});

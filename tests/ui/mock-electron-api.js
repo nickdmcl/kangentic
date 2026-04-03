@@ -25,6 +25,11 @@
     theme: 'dark',
     sidebarVisible: true,
     boardLayout: 'horizontal',
+    cardDensity: 'default',
+    columnWidth: 'default',
+    terminalPanelVisible: true,
+    animationsEnabled: true,
+    statusBarVisible: true,
     terminal: {
       shell: null,
       fontFamily: 'Consolas, "Courier New", monospace',

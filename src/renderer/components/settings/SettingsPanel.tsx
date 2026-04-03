@@ -39,7 +39,7 @@ export function SettingsPanel() {
   const [activeTab, setActiveTab] = useState(() => {
     const initialTab = useConfigStore.getState().projectSettingsInitialTab;
     if (initialTab) return initialTab;
-    return hasProject ? 'appearance' : tabs[0].id;
+    return hasProject ? 'theme' : tabs[0].id;
   });
   const [searchQuery, setSearchQuery] = useState('');
 

@@ -527,6 +527,11 @@ export interface AppConfig {
   theme: ThemeMode;
   sidebarVisible: boolean;
   boardLayout: 'horizontal' | 'vertical';
+  cardDensity: 'compact' | 'default' | 'comfortable';
+  columnWidth: 'narrow' | 'default' | 'wide';
+  terminalPanelVisible: boolean;
+  animationsEnabled: boolean;
+  statusBarVisible: boolean;
 
   terminal: {
     shell: string | null; // null = auto-detect
@@ -596,6 +601,11 @@ export const DEFAULT_CONFIG: AppConfig = {
   theme: 'dark',
   sidebarVisible: true,
   boardLayout: 'horizontal',
+  cardDensity: 'default',
+  columnWidth: 'default',
+  terminalPanelVisible: true,
+  animationsEnabled: true,
+  statusBarVisible: true,
   terminal: {
     shell: null,
     fontFamily: 'Menlo, Consolas, "Courier New", monospace',

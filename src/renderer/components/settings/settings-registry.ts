@@ -19,8 +19,17 @@ export interface SettingDefinition {
 
 /** Flat registry array. All settings in display order. */
 export const SETTINGS_REGISTRY: SettingDefinition[] = [
-  // ── Appearance ──
-  { id: 'theme', tabId: 'appearance', label: 'Theme', description: 'Color scheme for the interface', scope: 'project', keywords: ['color', 'dark', 'light'] },
+  // ── Theme ──
+  { id: 'theme', tabId: 'theme', label: 'Theme', description: 'Color scheme for the interface', scope: 'project', keywords: ['color', 'dark', 'light', 'appearance'] },
+
+  // ── Layout ──
+  { id: 'cardDensity', tabId: 'layout', label: 'Card Density', description: 'Amount of detail shown on task cards', scope: 'global', keywords: ['compact', 'comfortable', 'minimal', 'detailed'] },
+  { id: 'columnWidth', tabId: 'layout', label: 'Column Width', description: 'Width of board columns', scope: 'global', keywords: ['narrow', 'wide', 'size'] },
+  { id: 'terminalPanelVisible', tabId: 'layout', label: 'Terminal Panel', description: 'Show the terminal panel below the board', scope: 'global', keywords: ['bottom', 'panel', 'hide', 'terminal', 'visible'] },
+  { id: 'statusBarVisible', tabId: 'layout', label: 'Status Bar', description: 'Show the status bar at the bottom of the window', scope: 'global', keywords: ['bottom', 'bar', 'hide', 'visible'] },
+  { id: 'showBoardSearch', tabId: 'layout', label: 'Board Search Bar', description: 'Display the search bar above board columns. Press Ctrl+F (Cmd+F on Mac) to toggle.', scope: 'global', keywords: ['search', 'filter', 'find', 'board'] },
+  { id: 'restoreWindowPosition', tabId: 'layout', label: 'Restore Window Position', description: 'Remember window size and position between launches', scope: 'global', keywords: ['size', 'bounds', 'remember'] },
+  { id: 'animationsEnabled', tabId: 'layout', label: 'Animations', description: 'Enable transition and motion effects', scope: 'global', keywords: ['motion', 'reduce', 'transition', 'disable', 'accessibility'] },
 
   // ── Terminal ──
   { id: 'terminal.shell', tabId: 'terminal', label: 'Shell', description: 'Terminal shell used for agent sessions', scope: 'project', keywords: ['bash', 'powershell', 'zsh', 'fish'] },
@@ -62,11 +71,9 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { id: 'agent.queueOverflow', tabId: 'behavior', label: 'When Max Sessions Reached', description: 'How new agent requests are handled when all slots are in use', scope: 'global', section: 'Session Limits', keywords: ['overflow', 'queue', 'reject'] },
 
   // ── Behavior ──
-  { id: 'showBoardSearch', tabId: 'behavior', label: 'Show Board Search Bar', description: 'Display the search bar above board columns. Press Ctrl+F (Cmd+F on Mac) to toggle.', scope: 'global', keywords: ['search', 'filter', 'find', 'board'] },
   { id: 'skipDeleteConfirm', tabId: 'behavior', label: 'Skip Task Delete Confirmation', description: 'Delete tasks immediately without a confirmation dialog', scope: 'global', keywords: ['confirm', 'dialog'] },
   { id: 'autoFocusIdleSession', tabId: 'behavior', label: 'Auto-Focus Idle Sessions', description: 'Automatically switch the bottom panel to idle sessions. Idle tabs are always highlighted regardless of this setting.', scope: 'global', keywords: ['switch', 'panel', 'attention'] },
   { id: 'activateAllProjectsOnStartup', tabId: 'behavior', label: 'Launch All Projects on Startup', description: 'Start agents across all projects on launch, not just the current open one', scope: 'global', keywords: ['boot', 'open', 'activate'] },
-  { id: 'restoreWindowPosition', tabId: 'behavior', label: 'Restore Window Position', description: 'Remember window size and position between launches', scope: 'global', keywords: ['size', 'bounds', 'remember'] },
 
   // ── Notifications ──
   { id: 'notifications.onAgentIdle', tabId: 'notifications', label: 'Agent Idle', description: 'When an agent needs attention on a non-visible project', scope: 'global', keywords: ['desktop', 'toast', 'alert'] },
@@ -85,11 +92,12 @@ export const SETTINGS_BY_ID: Record<string, SettingDefinition> = Object.fromEntr
 
 /** Tab label lookup for search matching against tab names. */
 export const TAB_LABELS: Record<string, string> = {
-  appearance: 'Appearance',
+  theme: 'Theme',
   terminal: 'Terminal',
   agent: 'Agent',
   git: 'Git',
   shortcuts: 'Shortcuts',
+  layout: 'Layout',
   behavior: 'Behavior',
   mcpServer: 'MCP Server',
   notifications: 'Notifications',

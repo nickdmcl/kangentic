@@ -92,32 +92,37 @@ export function AppLayout() {
                     <KanbanBoard />
                   </div>
 
-                  {/* Resize handle -- hidden when collapsed */}
-                  {!terminal.collapsed && (
-                    <div
-                      className="resize-handle h-1 bg-edge flex-shrink-0 cursor-row-resize hover:bg-fg-faint transition-colors"
-                      onMouseDown={terminal.onResizeStart}
-                    />
-                  )}
+                  {/* Terminal panel -- completely hidden when disabled in Appearance settings */}
+                  {config.terminalPanelVisible !== false && (
+                    <>
+                      {/* Resize handle -- hidden when collapsed */}
+                      {!terminal.collapsed && (
+                        <div
+                          className="resize-handle h-1 bg-edge flex-shrink-0 cursor-row-resize hover:bg-fg-faint transition-colors"
+                          onMouseDown={terminal.onResizeStart}
+                        />
+                      )}
 
-                  {/* Terminal panel */}
-                  <div
-                    style={{ height: terminal.collapsed ? COLLAPSED_HEIGHT : terminal.height }}
-                    className={`flex-shrink-0 overflow-hidden ${
-                      terminal.ready && !terminal.isResizing ? 'transition-[height] duration-200 ease-in-out' : ''
-                    } ${terminal.isResizing || sidebar.isResizing ? 'pointer-events-none' : ''}`}
-                    onTransitionEnd={(event) => {
-                      if (event.target === event.currentTarget && event.propertyName === 'height') {
-                        terminal.handleTransitionEnd();
-                      }
-                    }}
-                  >
-                    <TerminalPanel
-                      collapsed={terminal.collapsed}
-                      showContent={terminal.showContent}
-                      onToggleCollapse={terminal.onToggleCollapse}
-                    />
-                  </div>
+                      {/* Terminal panel */}
+                      <div
+                        style={{ height: terminal.collapsed ? COLLAPSED_HEIGHT : terminal.height }}
+                        className={`flex-shrink-0 overflow-hidden ${
+                          terminal.ready && !terminal.isResizing ? 'transition-[height] duration-200 ease-in-out' : ''
+                        } ${terminal.isResizing || sidebar.isResizing ? 'pointer-events-none' : ''}`}
+                        onTransitionEnd={(event) => {
+                          if (event.target === event.currentTarget && event.propertyName === 'height') {
+                            terminal.handleTransitionEnd();
+                          }
+                        }}
+                      >
+                        <TerminalPanel
+                          collapsed={terminal.collapsed}
+                          showContent={terminal.showContent}
+                          onToggleCollapse={terminal.onToggleCollapse}
+                        />
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="flex-1 min-h-0 overflow-hidden">
@@ -137,7 +142,7 @@ export function AppLayout() {
         </div>
       </div>
 
-      <StatusBar />
+      {config.statusBarVisible !== false && <StatusBar />}
       {settingsOpen && <SettingsPanel />}
       {commandBar.isOpen && <CommandBarOverlay onClose={commandBar.close} />}
       <ToastContainer />

@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { getSwimlaneIcon } from '../../utils/swimlane-icons';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
+import { useColumnWidthClass } from './column-width';
 import { CountBadge } from '../CountBadge';
 import type { Swimlane as SwimlaneType, Task } from '../../../shared/types';
 
@@ -32,6 +33,7 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
   const clearRecentlyArchived = useBoardStore((state) => state.clearRecentlyArchived);
   const skipDeleteConfirm = useConfigStore((state) => state.config.skipDeleteConfirm);
   const updateConfig = useConfigStore((state) => state.updateConfig);
+  const widthClass = useColumnWidthClass();
 
   const handleDeleteRequest = useCallback((taskId: string) => {
     if (skipDeleteConfirm) {
@@ -71,7 +73,7 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
     <div
       data-testid="swimlane"
       data-swimlane-name={swimlane.name}
-      className="flex-shrink-0 w-72 h-full flex flex-col rounded-lg bg-surface-raised/70 ring-1 ring-edge/50"
+      className={`flex-shrink-0 ${widthClass} h-full flex flex-col rounded-lg bg-surface-raised/70 ring-1 ring-edge/50`}
     >
       {/* Accent bar */}
       <div

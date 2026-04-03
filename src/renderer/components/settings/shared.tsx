@@ -263,7 +263,7 @@ export function SectionHeader({ label, description, prominent, searchIds }: Sect
   }
 
   return (
-    <div className={prominent ? 'pt-4 mt-4 border-t-2 border-edge' : 'pt-3 mt-2'}>
+    <div className={prominent ? 'pt-4 mt-4 border-t-2 border-edge first:pt-0 first:mt-0' : 'pt-3 mt-2 first:pt-0 first:mt-0'}>
       <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-faint">{label}</h3>
       {description && <p className="text-xs text-fg-disabled mt-0.5">{description}</p>}
     </div>
