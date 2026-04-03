@@ -129,14 +129,17 @@ test.describe('EditColumnDialog', () => {
     await closeDialog();
   });
 
-  test('To Do column has auto-spawn locked OFF', async () => {
+  test('To Do column hides agent section entirely', async () => {
     await openEditDialog('To Do');
 
-    const toggle = page.locator('button[role="switch"]');
-    await expect(toggle).toBeDisabled();
-    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    // Agent section should not be visible for To Do column
+    await expect(page.locator('button[role="switch"]')).toHaveCount(0);
+    await expect(page.locator('label:has-text("Permissions")')).toHaveCount(0);
+    await expect(page.locator('label:has-text("Auto-spawn")')).toHaveCount(0);
 
-    await expect(page.locator('text=Tasks in this column do not start agents.')).toBeVisible();
+    // Name, Icon, Color should still be visible
+    await expect(page.locator('label:has-text("Name")')).toBeVisible();
+    await expect(page.locator('label:has-text("Color")')).toBeVisible();
 
     await closeDialog();
   });

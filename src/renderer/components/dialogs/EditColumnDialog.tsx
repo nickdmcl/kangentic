@@ -51,8 +51,6 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const isLocked = swimlane.role !== null;
 
   const isTodoOrDone = swimlane.role === 'todo' || swimlane.role === 'done';
-  const permissionLocked = isTodoOrDone;
-  const autoSpawnLocked = isTodoOrDone;
   const isPlanMode = permissionMode === 'plan';
 
   const effectiveAgent = agentOverride ?? currentProject?.default_agent ?? DEFAULT_AGENT;
@@ -73,8 +71,8 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
       name: name.trim(),
       color,
       icon,
-      permission_mode: permissionLocked ? undefined : permissionMode,
-      auto_spawn: autoSpawnLocked ? undefined : autoSpawn,
+      permission_mode: isTodoOrDone ? undefined : permissionMode,
+      auto_spawn: isTodoOrDone ? undefined : autoSpawn,
       auto_command: isTodoOrDone ? undefined : (autoCommand.trim() || null),
       plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
       agent_override: isTodoOrDone ? undefined : (agentOverride || null),
@@ -293,92 +291,89 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
             )}
           </div>
 
-          {/* Agent section divider */}
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-[11px] text-fg-faint uppercase tracking-wider">Agent</span>
-            <div className="flex-1 border-t border-edge-subtle" />
-          </div>
-
-          {/* Auto-spawn toggle */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-fg-muted">Auto-spawn</label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoSpawn}
-                aria-label="Auto-spawn"
-                onClick={() => { if (!autoSpawnLocked) setAutoSpawn(!autoSpawn); }}
-                disabled={autoSpawnLocked}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  autoSpawn ? 'bg-accent' : 'bg-edge-input'
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                    autoSpawn ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`}
-                />
-              </button>
+          {!isTodoOrDone && (<>
+            {/* Agent section divider */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-[11px] text-fg-faint uppercase tracking-wider">Agent</span>
+              <div className="flex-1 border-t border-edge-subtle" />
             </div>
-            <p className="text-[11px] text-fg-faint mt-1">
-              {isTodoOrDone
-                ? 'Tasks in this column do not start agents.'
-                : 'Start an agent when a task enters this column.'}
-            </p>
-          </div>
 
-          {/* Agent override dropdown */}
-          <div>
-            <label className="text-xs text-fg-muted mb-1.5 block">Agent</label>
-            <select
-              value={agentOverride ?? ''}
-              onChange={(event) => {
-                const newAgent = event.target.value || null;
-                setAgentOverride(newAgent);
-                // Auto-adjust permission if unsupported by the new agent
-                if (permissionMode) {
-                  const newEffectiveAgent = newAgent ?? currentProject?.default_agent ?? DEFAULT_AGENT;
-                  const newAgentPermissions = agentList.find((agent) => agent.name === newEffectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
-                  const adjusted = nearestPermission(newAgentPermissions, permissionMode);
-                  if (adjusted !== permissionMode) setPermissionMode(adjusted);
-                }
-              }}
-              disabled={isTodoOrDone}
-              className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Default (project setting)</option>
-              {agentList.map((agent) => (
-                <option key={agent.name} value={agent.name}>
-                  {agent.displayName ?? agent.name}{agent.found ? '' : ' (not found)'}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-fg-faint mt-1">
-              Override the project default agent for this column.
-            </p>
-          </div>
+            {/* Auto-spawn toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-fg-muted">Auto-spawn</label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoSpawn}
+                  aria-label="Auto-spawn"
+                  onClick={() => setAutoSpawn(!autoSpawn)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    autoSpawn ? 'bg-accent' : 'bg-edge-input'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      autoSpawn ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-[11px] text-fg-faint mt-1">
+                Start an agent when a task enters this column.
+              </p>
+            </div>
 
-          {/* Permissions dropdown */}
-          <div>
-            <label className="text-xs text-fg-muted mb-1.5 block">Permissions</label>
-            <select
-              value={permissionMode ?? ''}
-              onChange={(e) => setPermissionMode(e.target.value ? e.target.value as PermissionMode : null)}
-              disabled={permissionLocked}
-              className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">{getPermissionLabel(agentPermissions, globalPermissionMode)}</option>
-              {agentPermissions
-                .filter((entry) => entry.mode !== globalPermissionMode)
-                .map((entry) => (
-                  <option key={entry.mode} value={entry.mode}>{entry.label}</option>
+            {/* Agent override dropdown */}
+            <div>
+              <label className="text-xs text-fg-muted mb-1.5 block">Agent</label>
+              <select
+                value={agentOverride ?? ''}
+                onChange={(event) => {
+                  const newAgent = event.target.value || null;
+                  setAgentOverride(newAgent);
+                  // Auto-adjust permission if unsupported by the new agent
+                  if (permissionMode) {
+                    const newEffectiveAgent = newAgent ?? currentProject?.default_agent ?? DEFAULT_AGENT;
+                    const newAgentPermissions = agentList.find((agent) => agent.name === newEffectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
+                    const adjusted = nearestPermission(newAgentPermissions, permissionMode);
+                    if (adjusted !== permissionMode) setPermissionMode(adjusted);
+                  }
+                }}
+                className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
+              >
+                <option value="">Default (project setting)</option>
+                {agentList.map((agent) => (
+                  <option key={agent.name} value={agent.name}>
+                    {agent.displayName ?? agent.name}{agent.found ? '' : ' (not found)'}
+                  </option>
                 ))}
-            </select>
-            <p className="text-[11px] text-fg-faint mt-1">
-              Override the global permission mode for new agents spawned in this column.
-            </p>
-          </div>
+              </select>
+              <p className="text-[11px] text-fg-faint mt-1">
+                Override the project default agent for this column.
+              </p>
+            </div>
+
+            {/* Permissions dropdown */}
+            <div>
+              <label className="text-xs text-fg-muted mb-1.5 block">Permissions</label>
+              <select
+                value={permissionMode ?? ''}
+                onChange={(e) => setPermissionMode(e.target.value ? e.target.value as PermissionMode : null)}
+                className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
+              >
+                <option value="">{getPermissionLabel(agentPermissions, globalPermissionMode)}</option>
+                {agentPermissions
+                  .filter((entry) => entry.mode !== globalPermissionMode)
+                  .map((entry) => (
+                    <option key={entry.mode} value={entry.mode}>{entry.label}</option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-fg-faint mt-1">
+                Override the global permission mode for new agents spawned in this column.
+              </p>
+            </div>
+          </>)}
 
           {/* After planning dropdown (only for plan-mode columns) */}
           {isPlanMode && (
