@@ -200,6 +200,9 @@ export class TransitionEngine {
     // Last chance to abort before creating a PTY process
     signal?.throwIfAborted();
 
+    const agentName = config.agent || 'claude';
+    const agentAdapter = agentRegistry.get(agentName);
+
     const session = await this.sessionManager.spawn({
       id: randomUUID(),
       taskId: task.id,
@@ -209,12 +212,13 @@ export class TransitionEngine {
       statusOutputPath,
       eventsOutputPath,
       resuming: !!canResume,
+      agentParser: agentAdapter,
     });
 
     this.taskRepo.update({
       id: task.id,
       session_id: session.id,
-      agent: config.agent || 'claude',
+      agent: agentName,
     });
 
     // Persist session record for resume capability
@@ -226,8 +230,7 @@ export class TransitionEngine {
         });
       }
 
-      const agentName = config.agent || 'claude';
-      const sessionType = agentRegistry.get(agentName)?.sessionType ?? 'claude_agent';
+      const sessionType = agentAdapter?.sessionType ?? 'claude_agent';
       this.sessionRepo.insert({
         task_id: task.id,
         session_type: sessionType,

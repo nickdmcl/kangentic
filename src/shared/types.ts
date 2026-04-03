@@ -908,6 +908,12 @@ export interface ProjectCreateInput {
   github_url?: string;
 }
 
+/** Minimal parsing interface for agent-specific status/event parsing. */
+export interface AgentParser {
+  parseStatus(raw: string): SessionUsage | null;
+  parseEvent(line: string): SessionEvent | null;
+}
+
 export interface SpawnSessionInput {
   /** Caller-provided session ID. When omitted, spawn() generates one via uuidv4(). */
   id?: string;
@@ -922,6 +928,8 @@ export interface SpawnSessionInput {
   resuming?: boolean;
   /** True for ephemeral command terminal sessions. */
   transient?: boolean;
+  /** Agent-specific parser for status/event output. Falls back to ClaudeStatusParser if omitted. */
+  agentParser?: AgentParser;
 }
 
 export interface SpawnTransientSessionInput {

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { ClaudeStatusParser } from '../agent/claude-status-parser';
 import { EventType, EventTypeActivity, AgentTool } from '../../shared/types';
-import type { SessionUsage, ActivityState, SessionEvent } from '../../shared/types';
+import type { SessionUsage, ActivityState, SessionEvent, AgentParser } from '../../shared/types';
 import { matchesPRCommand } from './pr-connectors';
 
 const MAX_EVENTS_PER_SESSION = 500; // Cap rendered events in renderer
@@ -36,6 +36,7 @@ export class UsageTracker {
   private idleTimestamp = new Map<string, number>();
   private lastThinkingSignal = new Map<string, number>();
 
+  private sessionParsers = new Map<string, AgentParser>();
   private eventCache = new Map<string, SessionEvent[]>();
   private _idleTimeoutMinutes = 0;
   private idleTimeoutInterval: ReturnType<typeof setInterval> | null = null;
@@ -138,7 +139,8 @@ export class UsageTracker {
   readAndEmitUsage(sessionId: string, statusOutputPath: string): void {
     try {
       const raw = fs.readFileSync(statusOutputPath, 'utf-8');
-      const usage = ClaudeStatusParser.parseStatus(raw);
+      const parser = this.sessionParsers.get(sessionId);
+      const usage = parser ? parser.parseStatus(raw) : ClaudeStatusParser.parseStatus(raw);
       if (!usage) return;
 
       const previousUsage = this.usageCache.get(sessionId);
@@ -200,8 +202,9 @@ export class UsageTracker {
         this.eventCache.set(sessionId, events);
       }
 
+      const parser = this.sessionParsers.get(sessionId);
       for (const line of lines) {
-        const event = ClaudeStatusParser.parseEvent(line);
+        const event = parser ? parser.parseEvent(line) : ClaudeStatusParser.parseEvent(line);
         if (event) {
           // Any event proves the agent is alive. Reset stale thinking timer.
           if (this.activityCache.get(sessionId) === 'thinking') {
@@ -341,7 +344,10 @@ export class UsageTracker {
    * Initialize tracking state for a new session.
    * Sets default activity to 'idle' and clears all tracking maps.
    */
-  initSession(sessionId: string): void {
+  initSession(sessionId: string, agentParser?: AgentParser): void {
+    if (agentParser) {
+      this.sessionParsers.set(sessionId, agentParser);
+    }
     this.activityCache.set(sessionId, 'idle');
     this.subagentDepth.delete(sessionId);
     this.pendingToolCount.delete(sessionId);
@@ -394,6 +400,7 @@ export class UsageTracker {
     this.idleTimestamp.delete(sessionId);
     this.lastThinkingSignal.delete(sessionId);
     this.eventCache.delete(sessionId);
+    this.sessionParsers.delete(sessionId);
   }
 
   dispose(): void {

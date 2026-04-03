@@ -392,7 +392,7 @@ export class SessionManager extends EventEmitter {
       statusOutputPath: input.statusOutputPath || null,
       eventsOutputPath: input.eventsOutputPath || null,
     });
-    this.usageTracker.initSession(id);
+    this.usageTracker.initSession(id, input.agentParser);
 
     // Batched data output (~60fps)
     ptyProcess.onData((data: string) => {
