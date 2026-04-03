@@ -178,7 +178,7 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
       // Confirmation dialog should appear
-      const dialog = page.locator('text=Move to To Do?');
+      const dialog = page.locator('text=Reset task?');
       await expect(dialog).toBeVisible({ timeout: 3000 });
 
       // Check that the dialog shows pending change counts
@@ -186,7 +186,7 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await expect(page.locator('text=2 unpushed commits')).toBeVisible();
 
       // Check dialog buttons
-      await expect(page.locator('button:has-text("Move to To Do")')).toBeVisible();
+      await expect(page.locator('button:has-text("Reset")')).toBeVisible();
       await expect(page.locator('button:has-text("Keep Working")')).toBeVisible();
     } finally {
       await browser.close();
@@ -204,13 +204,13 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
       // Wait for confirmation dialog
-      await expect(page.locator('text=Move to To Do?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeVisible({ timeout: 3000 });
 
       // Click "Keep Working" to cancel
       await page.locator('button:has-text("Keep Working")').click();
 
       // Dialog should close
-      await expect(page.locator('text=Move to To Do?')).toBeHidden({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeHidden({ timeout: 3000 });
 
       // Task should still be in Executing (not moved)
       const executingColumn = page.locator('[data-swimlane-name="Executing"]');
@@ -231,13 +231,13 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
       // Wait for confirmation dialog
-      await expect(page.locator('text=Move to To Do?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeVisible({ timeout: 3000 });
 
-      // Click "Move to To Do" to confirm
-      await page.locator('button:has-text("Move to To Do")').click();
+      // Click "Reset" to confirm
+      await page.locator('button:has-text("Reset")').click();
 
       // Dialog should close
-      await expect(page.locator('text=Move to To Do?')).toBeHidden({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeHidden({ timeout: 3000 });
 
       // Task should now be in To Do
       const todoColumn = page.locator('[data-swimlane-name="To Do"]');
@@ -258,7 +258,7 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
       // No confirmation dialog should appear
-      await expect(page.locator('text=Move to To Do?')).toBeHidden({ timeout: 2000 });
+      await expect(page.locator('text=Reset task?')).toBeHidden({ timeout: 2000 });
 
       // Task should move directly to To Do
       const todoColumn = page.locator('[data-swimlane-name="To Do"]');
@@ -286,7 +286,7 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
       // Confirmation dialog should still appear (safe default)
-      await expect(page.locator('text=Move to To Do?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeVisible({ timeout: 3000 });
 
       // Should show the fallback warning about unverified changes
       await expect(page.locator('text=Unable to verify pending changes')).toBeVisible();
@@ -305,7 +305,7 @@ test.describe('Move to To Do - Pending Changes Confirmation', () => {
 
       await dragTaskToColumn(page, 'Feature With Changes', 'To Do');
 
-      await expect(page.locator('text=Move to To Do?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Reset task?')).toBeVisible({ timeout: 3000 });
 
       // Worktree-specific message
       await expect(page.locator('text=delete its worktree')).toBeVisible();

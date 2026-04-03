@@ -256,6 +256,9 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
       (boardTask) => boardTask.swimlane_id === targetSwimlaneId,
     );
     await moveTask({ taskId: task.id, targetSwimlaneId, targetPosition: laneTasks.length });
+    // If a confirmation dialog was triggered, moveTask returns early without
+    // moving. Don't show a success toast in that case.
+    if (useBoardStore.getState().pendingMoveConfirm) return;
     useToastStore.getState().addToast({
       message: `Moved "${task.title}" to ${targetName}`,
       variant: 'success',

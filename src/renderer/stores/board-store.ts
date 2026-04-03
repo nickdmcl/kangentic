@@ -649,6 +649,13 @@ const createMoveConfirmSlice: StateCreator<BoardStore, [], [], MoveConfirmSlice>
   confirmPendingMove: async () => {
     const pending = get().pendingMoveConfirm;
     if (!pending) return;
+    // Guard against stale confirmation: if the task was already moved
+    // elsewhere (e.g. dragged while the dialog was open), skip the move.
+    const currentTask = get().tasks.find((task) => task.id === pending.input.taskId);
+    if (!currentTask || currentTask.swimlane_id === pending.input.targetSwimlaneId) {
+      set({ pendingMoveConfirm: null });
+      return;
+    }
     set({ pendingMoveConfirm: null });
     await get().moveTask(pending.input, true);
   },

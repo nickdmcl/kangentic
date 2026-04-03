@@ -142,17 +142,20 @@ export async function handleTaskMove(
   // --- Priority 1: TARGET IS TO DO → full reset (kill session, remove worktree, delete branch) ---
   if (toLane?.role === 'todo') {
     context.commandInjector.cancel(task.id);
-    // Kill any in-flight PTY session spawned by a concurrent move that
-    // hasn't written session_id to the task record yet (race condition
-    // when user quickly moves task back before async spawn completes).
-    context.sessionManager.removeByTaskId(task.id);
+    // Kill (but don't remove from map) any in-flight PTY session spawned
+    // by a concurrent move that hasn't written session_id to the task
+    // record yet. Using killByTaskId instead of removeByTaskId so the
+    // session stays in the map - cleanupTaskResources needs it there for
+    // awaitExit to wait for the process to actually die before removing
+    // the worktree (Windows file handles aren't released until exit).
+    context.sessionManager.killByTaskId(task.id);
     await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
     // Re-read the task to check if worktree_path was actually cleared
     const updatedTask = tasks.getById(task.id);
     if (updatedTask?.worktree_path) {
-      console.warn(`[TASK_MOVE] Partial cleanup for task ${task.id.slice(0, 8)} (moved to Backlog, session removed but worktree directory could not be deleted - will retry on next startup)`);
+      console.warn(`[TASK_MOVE] Partial cleanup for task ${task.id.slice(0, 8)} (moved to To Do, session removed but worktree directory could not be deleted - will retry on next startup)`);
     } else {
-      console.log(`[TASK_MOVE] Full cleanup for task ${task.id.slice(0, 8)} (moved to Backlog, session + worktree + branch removed)`);
+      console.log(`[TASK_MOVE] Full cleanup for task ${task.id.slice(0, 8)} (moved to To Do, session + worktree + branch removed)`);
     }
     return;
   }

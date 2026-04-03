@@ -27,7 +27,10 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [dontAskAgainChecked, setDontAskAgainChecked] = useState(false);
 
+  // Enter to confirm - disabled for danger variant to prevent accidental
+  // destructive actions (e.g. worktree deletion while user is typing elsewhere).
   useEffect(() => {
+    if (variant === 'danger') return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -38,7 +41,7 @@ export function ConfirmDialog({
     // Capture phase so dnd-kit's bubble-phase KeyboardSensor never sees the event
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [onConfirm, dontAskAgainChecked]);
+  }, [variant, onConfirm, dontAskAgainChecked]);
   const confirmStyles = {
     danger: 'bg-red-600 hover:bg-red-500 text-white',
     warning: 'bg-yellow-600 hover:bg-yellow-500 text-white',

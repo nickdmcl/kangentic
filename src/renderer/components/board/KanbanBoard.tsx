@@ -195,7 +195,7 @@ function MoveConfirmMessage({ uncommittedFileCount, unpushedCommitCount, hasWork
   return (
     <div className="space-y-2">
       <p>
-        Moving <span className="font-medium">"{taskTitle}"</span> to To Do will
+        Resetting <span className="font-medium">"{taskTitle}"</span> will
         {hasWorktree ? ' delete its worktree and' : ''} destroy its session history.
       </p>
       {hasSpecificCounts ? (
@@ -396,9 +396,9 @@ export function KanbanBoard() {
 
       {pendingMoveConfirm && (
         <ConfirmDialog
-          title="Move to To Do?"
+          title="Reset task?"
           variant="danger"
-          confirmLabel="Move to To Do"
+          confirmLabel="Reset"
           cancelLabel="Keep Working"
           message={
             <MoveConfirmMessage

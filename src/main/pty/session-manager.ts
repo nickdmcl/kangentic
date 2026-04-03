@@ -537,8 +537,14 @@ export class SessionManager extends EventEmitter {
    */
   awaitExit(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
-    // Already dead or never spawned - resolve immediately
-    if (!session?.pty) return Promise.resolve();
+    // Session doesn't exist, already exited, or suspended - resolve immediately.
+    // IMPORTANT: Do NOT check session.pty here. kill() sets pty=null before
+    // the process actually dies (to prevent double-kill on Windows conpty).
+    // Checking pty would cause awaitExit to resolve before file handles are
+    // released, leading to EPERM/hang during worktree removal on Windows.
+    if (!session || session.status === 'exited' || session.status === 'suspended' || session.status === 'queued') {
+      return Promise.resolve();
+    }
 
     return new Promise<void>((resolve) => {
       const safetyTimeout = setTimeout(() => {
@@ -559,7 +565,8 @@ export class SessionManager extends EventEmitter {
 
       // Re-check after subscribing (process may have exited between the
       // initial check and event registration)
-      if (!this.sessions.get(sessionId)?.pty) {
+      const currentSession = this.sessions.get(sessionId);
+      if (!currentSession || currentSession.status === 'exited' || currentSession.status === 'suspended' || currentSession.status === 'queued') {
         clearTimeout(safetyTimeout);
         this.removeListener('exit', onExit);
         resolve();
