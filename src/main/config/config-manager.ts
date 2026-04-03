@@ -21,8 +21,23 @@ export class ConfigManager {
       this.config = { ...DEFAULT_CONFIG };
     }
 
-    // One-time migration: legacy permission mode values → new names
-    const pm = this.config.claude.permissionMode as string;
+    // One-time migration: claude.* namespace -> agent.* (cliPath -> cliPaths)
+    if (parsed && 'claude' in parsed && !('agent' in parsed)) {
+      const legacy = parsed.claude as Record<string, unknown>;
+      const cliPath = legacy.cliPath;
+      this.config.agent = {
+        permissionMode: (legacy.permissionMode as PermissionMode) ?? this.config.agent.permissionMode,
+        cliPaths: typeof cliPath === 'string' ? { claude: cliPath } : {},
+        maxConcurrentSessions: (legacy.maxConcurrentSessions as number) ?? this.config.agent.maxConcurrentSessions,
+        queueOverflow: (legacy.queueOverflow as 'queue' | 'reject') ?? this.config.agent.queueOverflow,
+        idleTimeoutMinutes: (legacy.idleTimeoutMinutes as number) ?? this.config.agent.idleTimeoutMinutes,
+      };
+      delete (this.config as unknown as Record<string, unknown>).claude;
+      this.save(this.config);
+    }
+
+    // One-time migration: legacy permission mode values -> new names
+    const pm = this.config.agent.permissionMode as string;
     const migrationMap: Record<string, string> = {
       'dangerously-skip': 'bypassPermissions',
       'project-settings': 'default',
@@ -30,11 +45,11 @@ export class ConfigManager {
       'manual': 'default',
     };
     if (pm in migrationMap) {
-      this.config.claude.permissionMode = migrationMap[pm] as PermissionMode;
+      this.config.agent.permissionMode = migrationMap[pm] as PermissionMode;
       this.save(this.config);
     }
 
-    // One-time migration: notifyIdleOnInactiveProject → notifications.desktop.onAgentIdle
+    // One-time migration: notifyIdleOnInactiveProject -> notifications.desktop.onAgentIdle
     if (parsed && 'notifyIdleOnInactiveProject' in parsed) {
       this.config.notifications.desktop.onAgentIdle = Boolean(parsed.notifyIdleOnInactiveProject);
       delete (this.config as unknown as Record<string, unknown>).notifyIdleOnInactiveProject;
@@ -53,12 +68,25 @@ export class ConfigManager {
 
   loadProjectOverrides(projectPath: string): Partial<AppConfig> | null {
     const configPath = path.join(projectPath, '.kangentic', 'config.json');
+    let overrides: Record<string, unknown> | null = null;
     try {
       const raw = fs.readFileSync(configPath, 'utf-8');
-      return JSON.parse(raw);
+      overrides = JSON.parse(raw);
     } catch {
       return null;
     }
+    if (!overrides) return null;
+
+    // One-time migration: claude.* -> agent.* in project overrides
+    if ('claude' in overrides && !('agent' in overrides)) {
+      const legacy = overrides.claude as Record<string, unknown>;
+      overrides.agent = { ...legacy };
+      delete (overrides.agent as Record<string, unknown>).cliPath;
+      delete overrides.claude;
+      this.saveProjectOverrides(projectPath, overrides as Partial<AppConfig>);
+    }
+
+    return overrides as Partial<AppConfig>;
   }
 
   saveProjectOverrides(projectPath: string, overrides: Partial<AppConfig>): void {
@@ -83,8 +111,8 @@ export class ConfigManager {
         scrollbackLines: global.terminal.scrollbackLines,
         cursorStyle: global.terminal.cursorStyle,
       },
-      claude: {
-        permissionMode: global.claude.permissionMode,
+      agent: {
+        permissionMode: global.agent.permissionMode,
       },
       git: {
         worktreesEnabled: global.git.worktreesEnabled,

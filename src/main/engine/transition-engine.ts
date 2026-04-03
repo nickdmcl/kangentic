@@ -132,7 +132,7 @@ export class TransitionEngine {
   private async executeSpawnAgent(config: ActionConfig, task: Task, vars: Record<string, string>, permissionOverride?: PermissionMode | null, resumePrompt?: string, signal?: AbortSignal): Promise<void> {
     const appConfig = this.getConfig();
 
-    // Resolve which agent adapter to use: action override → project default → claude
+    // Resolve which agent adapter to use: action override -> project default -> claude
     const agentName = config.agent || appConfig.defaultAgent || 'claude';
     const adapter = agentRegistry.getOrThrow(agentName);
     const cliPathOverride = appConfig.cliPathOverrides[agentName] ?? null;

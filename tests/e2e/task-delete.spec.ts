@@ -242,7 +242,7 @@ test.describe('Task Delete', () => {
     // Lower max concurrent to 1 so the second move queues
     await page.evaluate(async () => {
       const cfg = await window.electronAPI.config.get();
-      cfg.claude.maxConcurrentSessions = 1;
+      cfg.agent.maxConcurrentSessions = 1;
       await window.electronAPI.config.set(cfg);
     });
 
@@ -347,7 +347,7 @@ test.describe('Task Delete', () => {
     // Clean up: restore maxConcurrentSessions and kill task A's session
     await page.evaluate(async (title) => {
       const cfg = await window.electronAPI.config.get();
-      cfg.claude.maxConcurrentSessions = 5;
+      cfg.agent.maxConcurrentSessions = 5;
       await window.electronAPI.config.set(cfg);
       const tasks = await window.electronAPI.tasks.list();
       const t = tasks.find((tk: any) => tk.title === title);

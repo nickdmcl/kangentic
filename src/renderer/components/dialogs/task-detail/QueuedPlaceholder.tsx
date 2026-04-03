@@ -4,7 +4,7 @@ import { useSessionStore } from '../../../stores/session-store';
 import { Pill } from '../../Pill';
 
 export function QueuedPlaceholder({ sessionId }: { sessionId: string | null }) {
-  const maxConcurrent = useConfigStore((s) => s.config.claude.maxConcurrentSessions);
+  const maxConcurrent = useConfigStore((s) => s.config.agent.maxConcurrentSessions);
   const runningCount = useSessionStore((s) => s.getRunningCount());
   // Split into primitive selectors -- avoids new object refs triggering re-renders
   const queuePosition = useSessionStore((s) => {

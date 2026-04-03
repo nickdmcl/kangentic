@@ -175,7 +175,7 @@ export async function recoverSessions(
 
   // Detect Claude CLI once
   const config = configManager.getEffectiveConfig(projectPath);
-  const claude = await claudeDetector.detect(config.claude.cliPath);
+  const claude = await claudeDetector.detect(config.agent.cliPaths.claude ?? null);
   if (!claude.found || !claude.path) {
     console.warn(
       '[SESSION_RECOVERY] Claude CLI not found -- skipping',
@@ -228,7 +228,7 @@ export async function recoverSessions(
       // Resolution order: lane override → global config.
       // Use the task's current swimlane to resolve permission mode.
       const taskLane = swimlaneRepo.getById(task.swimlane_id);
-      const permissionMode = taskLane?.permission_mode ?? config.claude.permissionMode;
+      const permissionMode = taskLane?.permission_mode ?? config.agent.permissionMode;
 
       // Decide whether to resume or start fresh.
       const canResume = (record.status === 'suspended' || record.status === 'orphaned')
@@ -409,7 +409,7 @@ export async function reconcileSessions(
   );
 
   // Detect Claude CLI once before the loop
-  const claude = await claudeDetector.detect(config.claude.cliPath);
+  const claude = await claudeDetector.detect(config.agent.cliPaths.claude ?? null);
   if (!claude.found || !claude.path) {
     console.warn(
       '[SESSION_RECONCILE] Claude CLI not found -- skipping all tasks',
@@ -486,7 +486,7 @@ export async function reconcileSessions(
 
         // Resolution order: lane override → global setting
         const permissionMode =
-          lane.permission_mode ?? config.claude.permissionMode;
+          lane.permission_mode ?? config.agent.permissionMode;
         let cwd = task.worktree_path || projectPath;
 
         // Guard: CWD must still exist -- fall back to projectPath if worktree was deleted

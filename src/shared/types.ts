@@ -513,9 +513,9 @@ export interface AppConfig {
     cursorStyle: 'block' | 'underline' | 'bar';
   };
 
-  claude: {
+  agent: {
     permissionMode: PermissionMode;
-    cliPath: string | null; // null = auto-detect on PATH
+    cliPaths: Record<string, string | null>; // keyed by agent name, null = auto-detect
     maxConcurrentSessions: number;
     queueOverflow: 'queue' | 'reject';
     idleTimeoutMinutes: number; // 0 = disabled
@@ -579,9 +579,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     scrollbackLines: 5000,
     cursorStyle: 'block',
   },
-  claude: {
+  agent: {
     permissionMode: 'default',
-    cliPath: null,
+    cliPaths: {},
     maxConcurrentSessions: 8,
     queueOverflow: 'queue',
     idleTimeoutMinutes: 0,

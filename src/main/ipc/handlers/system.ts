@@ -30,12 +30,16 @@ export function registerSystemHandlers(context: IpcContext): void {
     context.configManager.save(config);
     // Apply runtime changes
     const effective = context.configManager.getEffectiveConfig(context.currentProjectPath || undefined);
-    context.sessionManager.setMaxConcurrent(effective.claude.maxConcurrentSessions);
+    context.sessionManager.setMaxConcurrent(effective.agent.maxConcurrentSessions);
     context.sessionManager.setShell(effective.terminal.shell);
-    context.sessionManager.setIdleTimeout(effective.claude.idleTimeoutMinutes);
-    // Invalidate cached detection so the next detect() call picks up the new cliPath
-    if (config.claude) {
-      context.claudeDetector.invalidateCache();
+    context.sessionManager.setIdleTimeout(effective.agent.idleTimeoutMinutes);
+    // Invalidate cached detection for all agents so the next detect() call picks up new cliPaths
+    if (config.agent) {
+      import('../../agent/agent-registry').then(({ agentRegistry }) => {
+        for (const agentName of agentRegistry.list()) {
+          agentRegistry.getOrThrow(agentName).invalidateDetectionCache();
+        }
+      });
     }
   });
 
@@ -76,18 +80,14 @@ export function registerSystemHandlers(context: IpcContext): void {
   // === Agent ===
   ipcMain.handle(IPC.AGENT_DETECT, () => {
     const config = context.configManager.load();
-    return context.claudeDetector.detect(config.claude.cliPath);
+    return context.claudeDetector.detect(config.agent.cliPaths.claude ?? null);
   });
 
   // === Agents ===
   ipcMain.handle(IPC.AGENT_LIST, async (): Promise<AgentDetectionInfo[]> => {
     const { agentRegistry } = await import('../../agent/agent-registry');
     const config = context.configManager.load();
-    // Map agent names to user-configured CLI path overrides.
-    // Extend this when adding new agents with configurable paths.
-    const cliPathOverrides: Record<string, string | null> = {
-      claude: config.claude.cliPath,
-    };
+    const cliPathOverrides = config.agent.cliPaths;
     const results: AgentDetectionInfo[] = [];
     for (const agentName of agentRegistry.list()) {
       const adapter = agentRegistry.getOrThrow(agentName);

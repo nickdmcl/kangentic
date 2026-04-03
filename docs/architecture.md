@@ -396,7 +396,7 @@ Shell-specific adaptations:
 
 `src/main/pty/session-queue.ts`
 
-Limits concurrent PTY sessions (default: 5, configurable via `config.claude.maxConcurrentSessions`).
+Limits concurrent PTY sessions (default: 5, configurable via `config.agent.maxConcurrentSessions`).
 
 When a session is requested and the limit is reached, it gets a `queued` status placeholder. When a running session exits or suspends, `notifySlotFreed()` promotes the next queued entry.
 
@@ -481,7 +481,7 @@ Constructs the `claude` CLI invocation:
 ### Permission Mode Resolution (priority order)
 
 1. Swimlane's `permission_mode` (if set)
-2. Global `config.claude.permissionMode`
+2. Global `config.agent.permissionMode`
 
 ### Settings Merge
 

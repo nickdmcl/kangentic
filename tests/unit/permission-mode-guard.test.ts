@@ -105,7 +105,7 @@ describe('Permission mode guard', () => {
   describe('permission mode resolution', () => {
     /**
      * Replicates how currentPermissionMode is resolved:
-     * sessionRecord.permission_mode ?? effectiveConfig.claude.permissionMode
+     * sessionRecord.permission_mode ?? effectiveConfig.agent.permissionMode
      */
     function resolveCurrentMode(
       sessionPermissionMode: string | null | undefined,
@@ -116,7 +116,7 @@ describe('Permission mode guard', () => {
 
     /**
      * Replicates how targetPermissionMode is resolved:
-     * toLane.permission_strategy ?? effectiveConfig.claude.permissionMode
+     * toLane.permission_strategy ?? effectiveConfig.agent.permissionMode
      */
     function resolveTargetMode(
       lanePermissionStrategy: PermissionMode | null,

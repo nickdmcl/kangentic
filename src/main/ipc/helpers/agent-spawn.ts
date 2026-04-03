@@ -45,13 +45,13 @@ export function createTransitionEngine(
       }
       const project = context.projectRepo.getById(projectId);
       return {
-        permissionMode: config.claude.permissionMode,
+        permissionMode: config.agent.permissionMode,
         projectPath,
         projectId,
         gitConfig,
         mcpServerEnabled: config.mcpServer?.enabled ?? true,
         defaultAgent: project?.default_agent ?? 'claude',
-        cliPathOverrides: { claude: config.claude.cliPath },
+        cliPathOverrides: config.agent.cliPaths,
       };
     },
     sessionRepo,

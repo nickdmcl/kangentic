@@ -338,7 +338,7 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
   }
 
   const config = context.configManager.getEffectiveConfig(project.path);
-  context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);
+  context.sessionManager.setMaxConcurrent(config.agent.maxConcurrentSessions);
   context.sessionManager.setShell(config.terminal.shell);
 
   if (!isReopen) {
@@ -445,7 +445,7 @@ export function registerProjectHandlers(context: IpcContext): void {
 
     // Apply project config overrides (always -- config may have changed)
     const config = context.configManager.getEffectiveConfig(project.path);
-    context.sessionManager.setMaxConcurrent(config.claude.maxConcurrentSessions);
+    context.sessionManager.setMaxConcurrent(config.agent.maxConcurrentSessions);
     context.sessionManager.setShell(config.terminal.shell);
 
     if (!isReopen) {

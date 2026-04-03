@@ -283,9 +283,9 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
     // Auto-adjust permission mode if unsupported by the new agent
     const newAgentPermissions = agentList.find((agent) => agent.name === agentName)?.permissions ?? [];
     if (newAgentPermissions.length > 0) {
-      const adjusted = nearestPermission(newAgentPermissions, config.claude.permissionMode);
-      if (adjusted !== config.claude.permissionMode) {
-        updateProject({ claude: { permissionMode: adjusted } });
+      const adjusted = nearestPermission(newAgentPermissions, config.agent.permissionMode);
+      if (adjusted !== config.agent.permissionMode) {
+        updateProject({ agent: { permissionMode: adjusted } });
       }
     }
     await refreshProjects();
@@ -307,38 +307,38 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
           {agentList.length === 0 && <option value={DEFAULT_AGENT}>{agentDisplayName(DEFAULT_AGENT)}</option>}
         </Select>
       </SettingRow>
-      <SettingRow {...settingProps('claude.cliPath')}>
-        <div className="relative">
-          <input
-            type="text"
-            value={globalConfig.claude.cliPath || ''}
-            onChange={(event) => updateGlobal({ claude: { cliPath: event.target.value || null } })}
-            placeholder={agentInfo?.found ? (agentInfo.path ?? undefined) : 'Not found. Enter path manually'}
-            className={`${INPUT_CLASS} pr-8 ${agentInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
-          />
-          {agentInfo && (
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={agentInfo.found ? `Detected: ${agentInfo.version || 'unknown version'}` : `${agentDisplayName(effectiveAgent)} not found`}>
-              {agentInfo.found
+      {agentList.map((agent) => (
+        <SettingRow key={agent.name} {...settingProps('agent.cliPaths')} label={`${agent.displayName} Path`}>
+          <div className="relative">
+            <input
+              type="text"
+              value={globalConfig.agent.cliPaths[agent.name] || ''}
+              onChange={(event) => updateGlobal({ agent: { cliPaths: { ...globalConfig.agent.cliPaths, [agent.name]: event.target.value || null } } })}
+              placeholder={agent.found ? (agent.path ?? undefined) : 'Not found. Enter path manually'}
+              className={`${INPUT_CLASS} pr-8 ${agent.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
+            />
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={agent.found ? `Detected: ${agent.version || 'unknown version'}` : `${agent.displayName} not found`}>
+              {agent.found
                 ? <Check size={16} className="text-green-400" />
                 : <CircleAlert size={16} className="text-red-400" />}
             </div>
-          )}
-        </div>
-      </SettingRow>
-      <SettingRow {...settingProps('claude.idleTimeoutMinutes')}>
+          </div>
+        </SettingRow>
+      ))}
+      <SettingRow {...settingProps('agent.idleTimeoutMinutes')}>
         <input
           type="number"
-          value={globalConfig.claude.idleTimeoutMinutes}
-          onChange={(event) => updateGlobal({ claude: { idleTimeoutMinutes: Number(event.target.value) } })}
+          value={globalConfig.agent.idleTimeoutMinutes}
+          onChange={(event) => updateGlobal({ agent: { idleTimeoutMinutes: Number(event.target.value) } })}
           min={0}
           max={120}
           className={INPUT_CLASS}
         />
       </SettingRow>
-      <SettingRow {...settingProps('claude.permissionMode')}>
+      <SettingRow {...settingProps('agent.permissionMode')}>
         <Select
-          value={config.claude.permissionMode}
-          onChange={(event) => updateProject({ claude: { permissionMode: event.target.value as PermissionMode } })}
+          value={config.agent.permissionMode}
+          onChange={(event) => updateProject({ agent: { permissionMode: event.target.value as PermissionMode } })}
         >
           {agentPermissions.map((entry) => (
             <option key={entry.mode} value={entry.mode}>{entry.label}</option>
@@ -355,21 +355,21 @@ function BehaviorTab({ globalConfig }: { globalConfig: AppConfig }) {
     <>
       <SectionHeader
         label="Session Limits"
-        searchIds={['claude.maxConcurrentSessions', 'claude.queueOverflow']}
+        searchIds={['agent.maxConcurrentSessions', 'agent.queueOverflow']}
       />
-      <SettingRow {...settingProps('claude.maxConcurrentSessions')}>
+      <SettingRow {...settingProps('agent.maxConcurrentSessions')}>
         <input
           type="number"
-          value={globalConfig.claude.maxConcurrentSessions}
-          onChange={(event) => updateGlobal({ claude: { maxConcurrentSessions: Number(event.target.value) } })}
+          value={globalConfig.agent.maxConcurrentSessions}
+          onChange={(event) => updateGlobal({ agent: { maxConcurrentSessions: Number(event.target.value) } })}
           min={1}
           className={INPUT_CLASS}
         />
       </SettingRow>
-      <SettingRow {...settingProps('claude.queueOverflow')}>
+      <SettingRow {...settingProps('agent.queueOverflow')}>
         <Select
-          value={globalConfig.claude.queueOverflow}
-          onChange={(event) => updateGlobal({ claude: { queueOverflow: event.target.value as 'queue' | 'reject' } })}
+          value={globalConfig.agent.queueOverflow}
+          onChange={(event) => updateGlobal({ agent: { queueOverflow: event.target.value as 'queue' | 'reject' } })}
         >
           <option value="queue">Queue</option>
           <option value="reject">Reject</option>

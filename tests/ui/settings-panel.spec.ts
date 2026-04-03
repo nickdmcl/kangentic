@@ -66,7 +66,7 @@ test.describe('Settings Panel', () => {
   test('shows Agent section with CLI Path and Idle Timeout', async () => {
     await openSettings();
     await page.getByRole('button', { name: 'Agent' }).click();
-    await expect(page.locator('text=CLI Path')).toBeVisible();
+    await expect(page.getByText('Claude Code Path')).toBeVisible();
     await expect(page.getByText('Idle Timeout (minutes)')).toBeVisible();
     await closeSettings();
   });
@@ -229,7 +229,7 @@ test.describe('Project Settings via Sidebar', () => {
 
     // Agent tab should show agent-specific settings
     await page.getByRole('button', { name: 'Agent' }).click();
-    await expect(page.locator('text=CLI Path')).toBeVisible();
+    await expect(page.getByText('Claude Code Path')).toBeVisible();
 
     await closeSettings();
   });

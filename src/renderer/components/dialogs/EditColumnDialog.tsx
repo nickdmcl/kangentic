@@ -27,7 +27,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const updateSwimlane = useBoardStore((s) => s.updateSwimlane);
   const deleteSwimlane = useBoardStore((s) => s.deleteSwimlane);
   const tasks = useBoardStore((s) => s.tasks);
-  const globalPermissionMode = useConfigStore((s) => s.config.claude.permissionMode);
+  const globalPermissionMode = useConfigStore((s) => s.config.agent.permissionMode);
   const currentProject = useProjectStore((state) => state.currentProject);
 
   const swimlanes = useBoardStore((s) => s.swimlanes);

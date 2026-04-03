@@ -37,9 +37,9 @@
     sidebar: {
       width: 224,
     },
-    claude: {
+    agent: {
       permissionMode: 'default',
-      cliPath: null,
+      cliPaths: {},
       maxConcurrentSessions: 8,
       queueOverflow: 'queue',
       idleTimeoutMinutes: 0,
@@ -145,8 +145,8 @@
         scrollbackLines: config.terminal.scrollbackLines,
         cursorStyle: config.terminal.cursorStyle,
       },
-      claude: {
-        permissionMode: config.claude.permissionMode,
+      agent: {
+        permissionMode: config.agent.permissionMode,
       },
       git: {
         worktreesEnabled: config.git.worktreesEnabled,

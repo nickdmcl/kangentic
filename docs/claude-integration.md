@@ -8,7 +8,7 @@ Kangentic orchestrates Claude Code CLI sessions through a layered integration: C
 
 On first use, `ClaudeDetector` locates the Claude CLI:
 
-1. If `config.claude.cliPath` is set, use that path directly
+1. If `config.agent.cliPaths.claude` is set, use that path directly
 2. Otherwise, search `PATH` using the `which` package
 3. Run `claude --version` (5s timeout) to capture the version string
 4. Cache the result for the app lifetime (`invalidateCache()` resets)
@@ -52,7 +52,7 @@ claude --settings <mergedSettingsPath> --resume <uuid>
 ### Permission Mode Resolution (Priority Order)
 
 1. Swimlane's `permission_mode` (if set)
-2. Global `config.claude.permissionMode`
+2. Global `config.agent.permissionMode`
 
 ### Non-Interactive Mode
 

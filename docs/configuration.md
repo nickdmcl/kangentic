@@ -27,12 +27,12 @@ Both panels use a VS Code-style layout: a sidebar with tab navigation on the lef
 These settings appear only in App Settings and cannot be overridden per-project:
 
 - `sidebarVisible`, `boardLayout`, `sidebar.width`
-- `claude.cliPath`, `claude.maxConcurrentSessions`, `claude.queueOverflow`
+- `agent.cliPaths`, `agent.maxConcurrentSessions`, `agent.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
 - `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`, `restoreWindowPosition`, `showBoardSearch`
 - `contextBar.*` (all context bar visibility toggles)
 - `notifications.*` (all notification settings)
-- `claude.idleTimeoutMinutes`
+- `agent.idleTimeoutMinutes`
 
 ### Per-Project Overridable Settings
 
@@ -40,7 +40,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 
 - `theme`
 - `terminal.shell`, `terminal.fontSize`, `terminal.fontFamily`, `terminal.scrollbackLines`, `terminal.cursorStyle`
-- `claude.permissionMode`
+- `agent.permissionMode`
 - `git.worktreesEnabled`, `git.autoCleanup`, `git.defaultBaseBranch`, `git.copyFiles`, `git.initScript`
 
 ## Full AppConfig Reference
@@ -75,15 +75,15 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `terminal.scrollbackLines` | number | `5000` | Maximum lines kept in terminal buffer (1000-100000) |
 | `terminal.cursorStyle` | `'block'` \| `'underline'` \| `'bar'` | `'block'` | Terminal cursor appearance |
 
-### claude.*
+### agent.*
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `claude.permissionMode` | PermissionMode | `'default'` | Default permission mode for spawned agents |
-| `claude.cliPath` | string \| null | `null` | Claude CLI path. `null` = auto-detect on PATH. Global-only. |
-| `claude.maxConcurrentSessions` | number | `8` | Max concurrent PTY sessions. Global-only. |
-| `claude.queueOverflow` | `'queue'` \| `'reject'` | `'queue'` | What to do when max sessions reached. Global-only. |
-| `claude.idleTimeoutMinutes` | number | `0` | Auto-suspend sessions after this many minutes idle. 0 = disabled. Global-only. |
+| `agent.permissionMode` | PermissionMode | `'default'` | Default permission mode for spawned agents |
+| `agent.cliPaths` | Record\<string, string \| null\> | `{}` | Per-agent CLI path overrides keyed by agent name. Empty = auto-detect all. Global-only. |
+| `agent.maxConcurrentSessions` | number | `8` | Max concurrent PTY sessions. Global-only. |
+| `agent.queueOverflow` | `'queue'` \| `'reject'` | `'queue'` | What to do when max sessions reached. Global-only. |
+| `agent.idleTimeoutMinutes` | number | `0` | Auto-suspend sessions after this many minutes idle. 0 = disabled. Global-only. |
 
 PermissionMode values:
 
@@ -277,7 +277,7 @@ Config files written by hand (without `id` fields on columns) are treated as add
 ## Permission Mode Resolution (Priority Order)
 
 1. Swimlane's `permission_mode` (if set)
-2. Global `config.claude.permissionMode`
+2. Global `config.agent.permissionMode`
 
 ## IPC
 

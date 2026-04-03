@@ -24,9 +24,9 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
     const projectRoot = resolveProjectRoot(project.path);
     const config = context.configManager.getEffectiveConfig(projectRoot);
 
-    const claude = await context.claudeDetector.detect(config.claude.cliPath);
+    const claude = await context.claudeDetector.detect(config.agent.cliPaths.claude ?? null);
     if (!claude.found || !claude.path) throw new Error('Claude CLI not found. Please install it first.');
-    const permissionMode = config.claude.permissionMode as PermissionMode;
+    const permissionMode = config.agent.permissionMode as PermissionMode;
     const transientTaskId = uuidv4();
 
     // Checkout the requested branch (or default base branch) before spawning
