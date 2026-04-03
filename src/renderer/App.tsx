@@ -491,6 +491,9 @@ export function App() {
 if (import.meta.hot) {
   // @ts-expect-error Vite HMR API not typed under commonjs module resolution
   import.meta.hot.on('vite:afterUpdate', () => {
+    // Cancel stale drop highlights (HMR unmounts DndContext without firing dragEnd)
+    document.querySelectorAll('.drop-highlight').forEach(element => element.classList.remove('drop-highlight'));
+
     useProjectStore.getState().loadProjects();
     useProjectStore.getState().loadGroups();
     useProjectStore.getState().loadCurrent();

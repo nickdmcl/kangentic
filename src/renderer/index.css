@@ -414,14 +414,6 @@
   animation-duration: 0s !important;
 }
 
-/* Pause animations during drag to reduce paint pressure.
-   Uses .dragging class on <html> (toggled by drag handlers) instead of
-   :has(.drag-overlay) which forces expensive upward DOM traversal per frame. */
-.dragging .animate-pulse-subtle,
-.dragging .animate-spin {
-  animation-play-state: paused;
-}
-
 /* Drop-target highlight applied via direct DOM class toggle (no React re-render).
    Uses outline instead of box-shadow so it follows the column's rounded corners. */
 .drop-highlight {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   closestCenter,
   closestCorners,
@@ -225,6 +225,14 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
     hoveringSwimlaneIdRef.current = targetId;
   }, [swimlaneColorMap]);
 
+  // Clean up stale drop highlights on unmount (e.g. HMR replaces this component
+  // mid-drag, so handleDragEnd/handleDragCancel never fire).
+  useEffect(() => {
+    return () => {
+      updateDropHighlight(null);
+    };
+  }, [updateDropHighlight]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
     if (!id.startsWith('column:')) {
@@ -238,7 +246,6 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
           dragOriginRef.current = task.swimlane_id;
         }
       }
-      document.documentElement.classList.add('dragging');
     }
   }, [taskToSwimlane]);
 
@@ -265,7 +272,6 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
     dragOriginRef.current = null;
     setActiveTask(null);
     updateDropHighlight(null);
-    document.documentElement.classList.remove('dragging');
 
     if (!over) {
       // Cancelled - reload from DB to restore original positions
@@ -389,7 +395,6 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);
     updateDropHighlight(null);
-    document.documentElement.classList.remove('dragging');
     dragOriginRef.current = null;
     useBoardStore.getState().loadBoard();
   }, [updateDropHighlight]);
