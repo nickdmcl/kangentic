@@ -2,6 +2,7 @@ import { FolderOpen, FileText, GitBranch, Terminal, CheckCircle, AlertTriangle, 
 import { useProjectStore } from '../../stores/project-store';
 import { useConfigStore } from '../../stores/config-store';
 import { agentDisplayName, agentInstallUrl } from '../../utils/agent-display-name';
+import { DEFAULT_AGENT } from '../../../shared/types';
 import logoSrc from '../../assets/logo-32.png';
 
 /** Pulsing skeleton line shown while detection is in progress */
@@ -122,25 +123,25 @@ export function WelcomeScreen() {
             {/* Claude Code status */}
             <div data-testid="welcome-claude-status">
               {agentInfo === null ? (
-                <DetectionSkeleton label={agentDisplayName('claude')} />
+                <DetectionSkeleton label={agentDisplayName(DEFAULT_AGENT)} />
               ) : agentInfo.found ? (
                 <div className="flex items-center gap-1.5 text-sm text-green-400">
                   <CheckCircle size={14} />
-                  <span>{agentDisplayName('claude')} {agentVersionNumber ? `v${agentVersionNumber}` : ''}</span>
+                  <span>{agentDisplayName(DEFAULT_AGENT)} {agentVersionNumber ? `v${agentVersionNumber}` : ''}</span>
                 </div>
               ) : (
                 <div className="space-y-1 text-left">
                   <div className="flex items-center gap-1.5 text-sm text-amber-400">
                     <AlertTriangle size={14} />
-                    <span>{agentDisplayName('claude')} not found</span>
+                    <span>{agentDisplayName(DEFAULT_AGENT)} not found</span>
                   </div>
                   <p className="text-xs text-fg-faint pl-5">
                     Required for AI agents.{' '}
                     <button
                       className="underline text-amber-400 hover:opacity-80 cursor-pointer"
-                      onClick={() => window.electronAPI.shell.openExternal(agentInstallUrl('claude')!)}
+                      onClick={() => window.electronAPI.shell.openExternal(agentInstallUrl(DEFAULT_AGENT)!)}
                     >
-                      Install {agentDisplayName('claude')}
+                      Install {agentDisplayName(DEFAULT_AGENT)}
                     </button>
                   </p>
                 </div>

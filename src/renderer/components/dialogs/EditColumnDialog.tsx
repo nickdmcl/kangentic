@@ -9,7 +9,7 @@ import { BaseDialog } from './BaseDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconPickerDialog } from './IconPickerDialog';
 import { ICON_REGISTRY, ROLE_DEFAULTS, getUsedIcons } from '../../utils/swimlane-icons';
-import { nearestPermission, getPermissionLabel, CLAUDE_DEFAULT_PERMISSIONS } from '../../../shared/types';
+import { nearestPermission, getPermissionLabel, CLAUDE_DEFAULT_PERMISSIONS, DEFAULT_AGENT } from '../../../shared/types';
 import type { Swimlane, PermissionMode, AgentDetectionInfo } from '../../../shared/types';
 
 const PRESET_COLORS = [
@@ -55,7 +55,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const autoSpawnLocked = isTodoOrDone;
   const isPlanMode = permissionMode === 'plan';
 
-  const effectiveAgent = agentOverride ?? currentProject?.default_agent ?? 'claude';
+  const effectiveAgent = agentOverride ?? currentProject?.default_agent ?? DEFAULT_AGENT;
   const agentPermissions = agentList.find((agent) => agent.name === effectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
 
   const isCustomColor = !PRESET_COLORS.includes(color);
@@ -338,7 +338,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                 setAgentOverride(newAgent);
                 // Auto-adjust permission if unsupported by the new agent
                 if (permissionMode) {
-                  const newEffectiveAgent = newAgent ?? currentProject?.default_agent ?? 'claude';
+                  const newEffectiveAgent = newAgent ?? currentProject?.default_agent ?? DEFAULT_AGENT;
                   const newAgentPermissions = agentList.find((agent) => agent.name === newEffectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
                   const adjusted = nearestPermission(newAgentPermissions, permissionMode);
                   if (adjusted !== permissionMode) setPermissionMode(adjusted);

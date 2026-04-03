@@ -8,7 +8,7 @@ import type { SettingsTabDefinition, SettingScope, SettingsContentProps } from '
 import { useProjectStore } from '../../stores/project-store';
 import type { AgentDetectionInfo } from '../../../shared/types';
 import type { AppConfig, DeepPartial, NotificationConfig, PermissionMode, ThemeMode, AgentPermissionEntry } from '../../../shared/types';
-import { NAMED_THEMES, nearestPermission, CLAUDE_DEFAULT_PERMISSIONS } from '../../../shared/types';
+import { NAMED_THEMES, nearestPermission, CLAUDE_DEFAULT_PERMISSIONS, DEFAULT_AGENT } from '../../../shared/types';
 import { deepMergeConfig } from '../../../shared/object-utils';
 import { agentDisplayName } from '../../utils/agent-display-name';
 import { settingProps } from './settings-registry';
@@ -257,7 +257,7 @@ function TerminalTab({ config, globalConfig, shells }: { config: AppConfig; glob
       />
       <CompactToggleList items={[
         { label: 'Shell', description: 'Detected shell name', checked: globalConfig.contextBar.showShell, onChange: (value) => updateGlobal({ contextBar: { showShell: value } }), searchId: 'contextBar.showShell' },
-        { label: 'Version', description: `${agentDisplayName('claude')} version`, checked: globalConfig.contextBar.showVersion, onChange: (value) => updateGlobal({ contextBar: { showVersion: value } }), searchId: 'contextBar.showVersion' },
+        { label: 'Version', description: 'Agent CLI version', checked: globalConfig.contextBar.showVersion, onChange: (value) => updateGlobal({ contextBar: { showVersion: value } }), searchId: 'contextBar.showVersion' },
         { label: 'Model', description: 'Active model name', checked: globalConfig.contextBar.showModel, onChange: (value) => updateGlobal({ contextBar: { showModel: value } }), searchId: 'contextBar.showModel' },
         { label: 'Cost', description: 'Session API cost', checked: globalConfig.contextBar.showCost, onChange: (value) => updateGlobal({ contextBar: { showCost: value } }), searchId: 'contextBar.showCost' },
         { label: 'Token Counts', description: 'Input / output totals', checked: globalConfig.contextBar.showTokens, onChange: (value) => updateGlobal({ contextBar: { showTokens: value } }), searchId: 'contextBar.showTokens' },
@@ -274,7 +274,7 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
   const currentProject = useProjectStore((state) => state.currentProject);
   const refreshProjects = useProjectStore((state) => state.loadProjects);
 
-  const effectiveAgent = currentProject?.default_agent ?? 'claude';
+  const effectiveAgent = currentProject?.default_agent ?? DEFAULT_AGENT;
   const agentPermissions: AgentPermissionEntry[] = agentList.find((agent) => agent.name === effectiveAgent)?.permissions ?? CLAUDE_DEFAULT_PERMISSIONS;
 
   const handleDefaultAgentChange = async (agentName: string) => {
@@ -304,7 +304,7 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
               {agent.displayName ?? agent.name}{agent.found ? (agent.version ? ` ${agent.version}` : '') : ' (not found)'}
             </option>
           ))}
-          {agentList.length === 0 && <option value="claude">Claude Code</option>}
+          {agentList.length === 0 && <option value={DEFAULT_AGENT}>{agentDisplayName(DEFAULT_AGENT)}</option>}
         </Select>
       </SettingRow>
       <SettingRow {...settingProps('claude.cliPath')}>
@@ -317,7 +317,7 @@ function AgentTab({ config, globalConfig, agentInfo, agentList }: { config: AppC
             className={`${INPUT_CLASS} pr-8 ${agentInfo?.found ? 'placeholder-fg-muted' : 'placeholder-red-400/70'}`}
           />
           {agentInfo && (
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={agentInfo.found ? `Detected: ${agentInfo.version || 'unknown version'}` : `${agentDisplayName('claude')} not found`}>
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2" title={agentInfo.found ? `Detected: ${agentInfo.version || 'unknown version'}` : `${agentDisplayName(effectiveAgent)} not found`}>
               {agentInfo.found
                 ? <Check size={16} className="text-green-400" />
                 : <CircleAlert size={16} className="text-red-400" />}

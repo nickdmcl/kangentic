@@ -287,7 +287,7 @@ test.describe('Settings Search', () => {
 
     // Context bar toggles should be visible
     await expect(page.getByText('Detected shell name')).toBeVisible();
-    await expect(page.getByText('Claude Code version')).toBeVisible();
+    await expect(page.getByText('Agent CLI version')).toBeVisible();
     await expect(page.getByText('Usage bar and percentage')).toBeVisible();
 
     await closeSettings();

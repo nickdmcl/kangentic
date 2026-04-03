@@ -5,6 +5,7 @@ import { useConfigStore } from '../../stores/config-store';
 import { useBoardStore } from '../../stores/board-store';
 import { useProjectStore } from '../../stores/project-store';
 import { agentDisplayName } from '../../utils/agent-display-name';
+import { DEFAULT_AGENT } from '../../../shared/types';
 import { formatTokenCount } from '../../utils/format-tokens';
 import { formatCost } from '../../utils/format-session';
 import { useValuePulse } from '../../hooks/useValuePulse';
@@ -183,7 +184,7 @@ export function StatusBar() {
 
       <div className="flex items-center gap-4">
         {agentInfo && !agentInfo.found && (
-          <span className="text-red-400">{agentDisplayName('claude')} not found</span>
+          <span className="text-red-400">{agentDisplayName(currentProject?.default_agent ?? DEFAULT_AGENT)} not found</span>
         )}
         {appVersion && (
           <Pill className="border border-edge text-fg-muted">v{appVersion}</Pill>

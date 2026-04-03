@@ -429,6 +429,9 @@ export interface AgentPermissionEntry {
   label: string;
 }
 
+/** Default agent identifier - matches the DB schema default for new projects. */
+export const DEFAULT_AGENT = 'claude';
+
 /** Default Claude Code permissions - used as fallback when agent list hasn't loaded yet. */
 export const CLAUDE_DEFAULT_PERMISSIONS: AgentPermissionEntry[] = [
   { mode: 'plan', label: 'Plan (Read-Only)' },
