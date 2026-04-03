@@ -494,6 +494,10 @@ if (import.meta.hot) {
     // Cancel stale drop highlights (HMR unmounts DndContext without firing dragEnd)
     document.querySelectorAll('.drop-highlight').forEach(element => element.classList.remove('drop-highlight'));
 
+    // Snapshot active tab before sync - syncSessions may transiently clear
+    // activeSessionId if the sessions array is briefly empty during re-fetch.
+    const previousActiveSessionId = useSessionStore.getState().activeSessionId;
+
     useProjectStore.getState().loadProjects();
     useProjectStore.getState().loadGroups();
     useProjectStore.getState().loadCurrent();
@@ -503,6 +507,17 @@ if (import.meta.hot) {
     useBacklogStore.getState().loadBacklog();
     useSessionStore.getState().syncSessions().then((applied) => {
       if (!applied) return;
+
+      // Restore active tab if sync cleared it but the session still exists
+      if (previousActiveSessionId && !useSessionStore.getState().activeSessionId) {
+        const sessionStillExists = useSessionStore.getState().sessions.some(
+          (session) => session.id === previousActiveSessionId,
+        );
+        if (sessionStillExists) {
+          useSessionStore.getState().setActiveSession(previousActiveSessionId);
+        }
+      }
+
       const savedPeriod = useConfigStore.getState().config.statusBarPeriod;
       if (savedPeriod && savedPeriod !== useSessionStore.getState().selectedPeriod) {
         useSessionStore.getState().setSelectedPeriod(savedPeriod);

@@ -10,11 +10,28 @@ const MAX_EVENTS_PER_SESSION = 500;
 // @ts-expect-error -- Vite handles import.meta.hot; tsc's "module": "commonjs" doesn't support it
 let syncController: AbortController | null = import.meta.hot?.data?.syncController ?? null;
 
+/** Transient session state preserved across HMR. Without this, the
+ *  transientSessions map resets to {} on module re-evaluation, orphaning
+ *  live PTY processes in the main process and causing duplicate spawns. */
+// @ts-expect-error -- Vite handles import.meta.hot
+const hmrTransientData: Record<string, unknown> | undefined = import.meta.hot?.data?.transientState;
+const preservedTransientState = hmrTransientData as {
+  transientSessions: Record<string, { sessionId: string; branch: string | null }>;
+  transientSessionId: string | null;
+  transientBranch: string | null;
+} | undefined;
+
 // @ts-expect-error -- Vite handles import.meta.hot
 if (import.meta.hot) {
   // @ts-expect-error -- Vite handles import.meta.hot
   import.meta.hot.dispose((data: Record<string, unknown>) => {
     data.syncController = syncController;
+    const state = useSessionStore.getState();
+    data.transientState = {
+      transientSessions: state.transientSessions,
+      transientSessionId: state.transientSessionId,
+      transientBranch: state.transientBranch,
+    };
   });
 }
 
@@ -124,9 +141,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   changesOpenTasks: new Set(),
   changesSelectedFile: {},
   _pendingOpenTaskId: null,
-  transientSessions: {},
-  transientSessionId: null,
-  transientBranch: null,
+  transientSessions: preservedTransientState?.transientSessions ?? {},
+  transientSessionId: preservedTransientState?.transientSessionId ?? null,
+  transientBranch: preservedTransientState?.transientBranch ?? null,
   selectedPeriod: 'live',
   periodStats: null,
 

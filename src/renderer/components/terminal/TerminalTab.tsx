@@ -6,6 +6,7 @@ import { useConfigStore } from '../../stores/config-store';
 import { useSessionStore } from '../../stores/session-store';
 import { useBoardStore } from '../../stores/board-store';
 import { ShimmerOverlay } from '../ShimmerOverlay';
+import { getIsHmrReload } from '../../utils/hmr-flag';
 
 const FIT_DELAY_MS = 100;
 
@@ -123,7 +124,12 @@ export function TerminalTab({ sessionId, taskId, active }: TerminalTabProps) {
     return () => {
       observer?.disconnect();
       initialized.current = false;
-      setTerminalReady(false);
+      // On HMR, don't reset terminalReady - the store still has firstOutput/usage
+      // data, so the shimmer overlay is unnecessary. Resetting it causes a visible
+      // single-frame flash before the overlay-lifting effect restores it.
+      if (!getIsHmrReload()) {
+        setTerminalReady(false);
+      }
     };
   }, [initTerminal]);
 

@@ -16,6 +16,7 @@ import { useToastStore } from '../../stores/toast-store';
 import { resolveShortcutCommand } from '../../../shared/template-vars';
 import { ICON_REGISTRY } from '../../utils/swimlane-icons';
 import { resolveProjectRoot } from '../../../shared/git-utils';
+import { getIsHmrReload } from '../../utils/hmr-flag';
 import type { AgentCommand } from '../../../shared/types';
 
 type Phase = 'entering' | 'visible' | 'exiting';
@@ -85,7 +86,13 @@ export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
   const hasFirstOutput = useSessionStore((state) => sessionId ? !!state.sessionFirstOutput[sessionId] : false);
   const hasUsage = useSessionStore((state) => sessionId ? !!state.sessionUsage[sessionId] : false);
   const hasSessionStarted = hasFirstOutput || hasUsage;
-  const [terminalReady, setTerminalReady] = useState(false);
+  // On HMR remount, skip shimmer if we're reattaching to an existing transient session.
+  // Without this, useState(false) resets terminalReady and flashes the shimmer overlay
+  // even though the session is already running and has output.
+  const [terminalReady, setTerminalReady] = useState(() => {
+    if (!getIsHmrReload()) return false;
+    return !!useSessionStore.getState().transientSessionId;
+  });
 
   // Lift shimmer when TUI activates or usage arrives (Claude Code is ready)
   useEffect(() => {

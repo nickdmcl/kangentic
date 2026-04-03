@@ -10,6 +10,20 @@ import '@xterm/xterm/css/xterm.css';
  *  (Claude Code) only redraws once and scrollback isn't churned. */
 const PTY_RESIZE_DEBOUNCE_MS = 200;
 
+/** Scroll positions saved before xterm dispose, keyed by session ID.
+ *  Preserved across HMR via import.meta.hot.data so terminals restore
+ *  the user's viewport position instead of jumping to the bottom. */
+// @ts-expect-error -- Vite handles import.meta.hot; tsc's "module": "commonjs" doesn't support it
+const savedScrollPositions: Map<string, number> = import.meta.hot?.data?.savedScrollPositions ?? new Map();
+
+// @ts-expect-error -- Vite handles import.meta.hot
+if (import.meta.hot) {
+  // @ts-expect-error -- Vite handles import.meta.hot
+  import.meta.hot.dispose((data: Record<string, unknown>) => {
+    data.savedScrollPositions = savedScrollPositions;
+  });
+}
+
 /** Fixed dark terminal theme -- Claude Code's TUI is designed for dark backgrounds. */
 const TERMINAL_THEME = {
   background: '#18181b',
@@ -42,6 +56,22 @@ interface UseTerminalOptions {
   scrollbackLines?: number;
   cursorStyle?: 'block' | 'underline' | 'bar';
   shellName?: string;
+}
+
+/** Restore a saved scroll position (from HMR) or pin to the bottom.
+ *  Consumes and deletes the saved entry so it's only applied once.
+ *  Returns true if the terminal ended up at the bottom. */
+function restoreScrollPosition(terminal: Terminal, sessionId: string | null): boolean {
+  const savedViewportY = sessionId
+    ? savedScrollPositions.get(sessionId)
+    : undefined;
+  if (savedViewportY !== undefined) {
+    terminal.scrollToLine(savedViewportY);
+    savedScrollPositions.delete(sessionId!);
+    return false;
+  }
+  terminal.scrollToBottom();
+  return true;
 }
 
 export function useTerminal(options: UseTerminalOptions) {
@@ -156,10 +186,9 @@ export function useTerminal(options: UseTerminalOptions) {
             if (fitAddonRef.current) {
               fitAddonRef.current.fit();
             }
-            // Pin to bottom after scrollback replay
+            // Restore saved scroll position (HMR) or pin to bottom (cold start)
             if (xtermRef.current) {
-              xtermRef.current.scrollToBottom();
-              isAtBottomRef.current = true;
+              isAtBottomRef.current = restoreScrollPosition(xtermRef.current, options.sessionId);
             }
             scrollbackPendingRef.current = false;
             // Force an explicit resize to the PTY even if dimensions haven't
@@ -260,6 +289,13 @@ export function useTerminal(options: UseTerminalOptions) {
   useEffect(() => {
     return () => {
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      // Save scroll position before dispose for HMR restoration.
+      // Only save if the user scrolled up; at-bottom is the default.
+      if (xtermRef.current && options.sessionId && !isAtBottomRef.current) {
+        savedScrollPositions.set(options.sessionId, xtermRef.current.buffer.active.viewportY);
+      } else if (options.sessionId) {
+        savedScrollPositions.delete(options.sessionId);
+      }
       xtermRef.current?.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
@@ -307,9 +343,9 @@ export function useTerminal(options: UseTerminalOptions) {
 
         const afterWrite = () => {
           if (fitAddonRef.current) fitAddonRef.current.fit();
+          // Restore saved scroll position (HMR) or pin to bottom
           if (xtermRef.current) {
-            xtermRef.current.scrollToBottom();
-            isAtBottomRef.current = true;
+            isAtBottomRef.current = restoreScrollPosition(xtermRef.current, options.sessionId);
           }
           scrollbackPendingRef.current = false;
           requestAnimationFrame(() => {
