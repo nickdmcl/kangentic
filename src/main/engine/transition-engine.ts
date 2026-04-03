@@ -132,8 +132,13 @@ export class TransitionEngine {
   private async executeSpawnAgent(config: ActionConfig, task: Task, vars: Record<string, string>, permissionOverride?: PermissionMode | null, resumePrompt?: string, signal?: AbortSignal): Promise<void> {
     const appConfig = this.getConfig();
 
-    // Resolve which agent adapter to use: action override -> project default -> claude
-    const agentName = config.agent || appConfig.defaultAgent || 'claude';
+    // Resolve which agent adapter to use:
+    //   1. Action-level override (per-transition config)
+    //   2. Task's current agent (preserves the adapter used to create the session,
+    //      so resume always uses the same CLI that started the conversation)
+    //   3. Project default agent (for fresh spawns)
+    //   4. Hardcoded fallback
+    const agentName = config.agent || task.agent || appConfig.defaultAgent || 'claude';
     const adapter = agentRegistry.getOrThrow(agentName);
     const cliPathOverride = appConfig.cliPathOverrides[agentName] ?? null;
 
