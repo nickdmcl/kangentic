@@ -9,7 +9,7 @@ Eight event types are tracked, all on critical-path actions only:
 | Event | When | Properties |
 |-------|------|------------|
 | `app_launch` | App starts (when analytics is enabled) | platform, arch |
-| `app_heartbeat` | Every 60 minutes while app is running | activeSessions, suspendedSessions, queuedSessions, totalSessions |
+| `app_heartbeat` | Every 30 minutes while app is running | activeSessions, suspendedSessions, queuedSessions, totalSessions |
 | `app_close` | Graceful quit, Ctrl+C, or SIGTERM | durationSeconds |
 | `app_error` | Uncaught exception, unhandled rejection, renderer crash, or React ErrorBoundary | source, message (sanitized), reason (renderer crashes), exitCode (renderer crashes) |
 | `project_create` | User creates a project | (none) |

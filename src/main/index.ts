@@ -383,17 +383,7 @@ app.whenReady().then(async () => {
   // Fire app_launch event (analytics initialized before app.whenReady above).
   // trackEvent is a no-op if analytics is disabled, so no guard needed here.
   trackEvent('app_launch', { platform: process.platform, arch: process.arch });
-  setInterval(() => {
-    const sessionManager = getSessionManager();
-    const counts = sessionManager.getSessionCounts();
-
-    trackEvent('app_heartbeat', {
-      activeSessions: counts.active,
-      suspendedSessions: counts.suspended,
-      queuedSessions: sessionManager.queuedCount,
-      totalSessions: counts.total,
-    });
-  }, 60 * 60 * 1000);
+  setInterval(trackHeartbeat, 30 * 60 * 1000);
 
   // Load React DevTools extension in development (fire-and-forget, after window is visible)
   if (!app.isPackaged) {
@@ -424,6 +414,35 @@ app.on('activate', () => {
   }
 });
 
+/** Send a heartbeat event with current session counts. */
+function trackHeartbeat(): void {
+  const sessionManager = getSessionManager();
+  const counts = sessionManager.getSessionCounts();
+  trackEvent('app_heartbeat', {
+    activeSessions: counts.active,
+    suspendedSessions: counts.suspended,
+    queuedSessions: sessionManager.queuedCount,
+    totalSessions: counts.total,
+  });
+}
+
+/**
+ * Fire-and-forget shutdown analytics. Sends a final heartbeat so Aptabase can
+ * calculate session duration (its "Avg. Duration" metric is the time between
+ * first and last event in a session), then sends the app_close event.
+ *
+ * Wrapped in try-catch so analytics failures never prevent syncShutdownCleanup.
+ */
+function trackShutdownAnalytics(): void {
+  try {
+    trackHeartbeat();
+    const durationSeconds = Math.round((Date.now() - appLaunchTime) / 1000);
+    trackEvent('app_close', { durationSeconds });
+  } catch {
+    // Analytics must never block shutdown cleanup
+  }
+}
+
 /** Build the shutdown dependencies from current module-level state. */
 function getShutdownDependencies() {
   return {
@@ -450,9 +469,7 @@ app.on('before-quit', () => {
   // Hard failsafe: if Electron's normal shutdown hangs, force-kill everything
   startHardShutdownFailsafe();
 
-  // Fire-and-forget shutdown analytics (don't await - must not block quit)
-  const durationSeconds = Math.round((Date.now() - appLaunchTime) / 1000);
-  trackEvent('app_close', { durationSeconds });
+  trackShutdownAnalytics();
 
   // Synchronous cleanup - then let the quit proceed normally so Electron
   // tears down all Chromium child processes (GPU, utility, crashpad, etc.)
@@ -465,6 +482,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     if (isShuttingDown()) return;
     setShuttingDown();
     startHardShutdownFailsafe();
+    trackShutdownAnalytics();
     syncShutdownCleanup(getShutdownDependencies());
     process.exit(0);
   });
