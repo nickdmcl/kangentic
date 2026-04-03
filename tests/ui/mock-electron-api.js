@@ -86,6 +86,7 @@
     activateAllProjectsOnStartup: true,
     restoreWindowPosition: true,
     windowBounds: null,
+    windowMaximized: false,
   }, window.__mockConfigOverrides || {});
 
   function uuid() {

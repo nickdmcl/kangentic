@@ -152,7 +152,7 @@ const createWindow = () => {
 
   mainWindow.once('ready-to-show', () => {
     mark('ready_to_show');
-    if (!isTest && !savedBounds) {
+    if (!isTest && (!savedBounds || savedBounds.maximized)) {
       mainWindow!.maximize();
     }
     mainWindow!.show();
@@ -163,9 +163,13 @@ const createWindow = () => {
   const saveBounds = () => {
     if (boundsTimer) clearTimeout(boundsTimer);
     boundsTimer = setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized() || mainWindow.isMinimized()) return;
-      const bounds = mainWindow.getBounds();
-      windowConfigManager.save({ windowBounds: bounds });
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+      if (mainWindow.isMaximized()) {
+        windowConfigManager.save({ windowMaximized: true });
+      } else {
+        const bounds = mainWindow.getBounds();
+        windowConfigManager.save({ windowBounds: bounds, windowMaximized: false });
+      }
     }, 500);
   };
   mainWindow.on('move', saveBounds);

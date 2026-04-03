@@ -28,7 +28,7 @@ export function resolveIconPath(): string {
 }
 
 /** Read saved window bounds from config, with screen-boundary validation. */
-export function resolveWindowBounds(): { x: number; y: number; width: number; height: number } | null {
+export function resolveWindowBounds(): { x: number; y: number; width: number; height: number; maximized: boolean } | null {
   try {
     const raw = fs.readFileSync(PATHS.configFile, 'utf-8');
     const config = JSON.parse(raw) as Partial<AppConfig>;
@@ -43,7 +43,7 @@ export function resolveWindowBounds(): { x: number; y: number; width: number; he
         && y < displayY + displayHeight && y + height > displayY;
     });
     if (!overlapsDisplay) return null;
-    return { x, y, width, height };
+    return { x, y, width, height, maximized: config.windowMaximized ?? false };
   } catch {
     return null;
   }

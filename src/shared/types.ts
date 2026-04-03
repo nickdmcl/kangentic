@@ -573,6 +573,7 @@ export interface AppConfig {
   activateAllProjectsOnStartup: boolean;
   restoreWindowPosition: boolean;
   windowBounds: { x: number; y: number; width: number; height: number } | null;
+  windowMaximized: boolean;
   statusBarPeriod: UsageTimePeriod;
 }
 
@@ -652,6 +653,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   activateAllProjectsOnStartup: true,
   restoreWindowPosition: true,
   windowBounds: null,
+  windowMaximized: false,
   statusBarPeriod: 'live',
 };
 
