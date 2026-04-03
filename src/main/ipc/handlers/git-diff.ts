@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron';
+import simpleGit from 'simple-git';
 import { IPC } from '../../../shared/ipc-channels';
 import { DiffService } from '../../git/diff-service';
 import { DiffWatcher } from '../../git/diff-watcher';
-import type { GitDiffFilesInput, GitFileContentInput } from '../../../shared/types';
+import type { GitDiffFilesInput, GitFileContentInput, GitPendingChangesInput, GitPendingChangesResult } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
 export function registerGitDiffHandlers(context: IpcContext): void {
@@ -37,6 +38,29 @@ export function registerGitDiffHandlers(context: IpcContext): void {
         context.mainWindow.webContents.send(IPC.GIT_DIFF_CHANGED);
       }
     });
+  });
+
+  ipcMain.handle(IPC.GIT_CHECK_PENDING_CHANGES, async (_, input: GitPendingChangesInput): Promise<GitPendingChangesResult> => {
+    try {
+      const git = simpleGit(input.checkPath);
+      const status = await git.status();
+
+      const uncommittedFileCount = status.files.length;
+
+      let unpushedCommitCount = 0;
+      try {
+        const countOutput = (await git.raw(['rev-list', 'HEAD', '--not', '--remotes', '--count'])).trim();
+        unpushedCommitCount = parseInt(countOutput, 10) || 0;
+      } catch {
+        // No remotes or detached HEAD - treat as 0 unpushed
+      }
+
+      const hasPendingChanges = uncommittedFileCount > 0 || unpushedCommitCount > 0;
+      return { hasPendingChanges, uncommittedFileCount, unpushedCommitCount };
+    } catch {
+      // If git fails (missing directory, corrupted repo, etc.), assume changes exist as safe default
+      return { hasPendingChanges: true, uncommittedFileCount: 0, unpushedCommitCount: 0 };
+    }
   });
 
   ipcMain.on(IPC.GIT_DIFF_UNSUBSCRIBE, (_, worktreePath: string) => {

@@ -990,6 +990,9 @@
       subscribeDiff: function () {},
       unsubscribeDiff: function () {},
       onDiffChanged: function () { return function () {}; },
+      checkPendingChanges: async function () {
+        return { hasPendingChanges: false, uncommittedFileCount: 0, unpushedCommitCount: 0 };
+      },
     },
 
     dialog: {

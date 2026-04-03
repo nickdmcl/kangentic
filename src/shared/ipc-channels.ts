@@ -124,6 +124,7 @@ export const IPC = {
   GIT_DIFF_SUBSCRIBE: 'git:diffSubscribe',
   GIT_DIFF_UNSUBSCRIBE: 'git:diffUnsubscribe',
   GIT_DIFF_CHANGED: 'git:diffChanged',
+  GIT_CHECK_PENDING_CHANGES: 'git:checkPendingChanges',
 
   // Dialog
   DIALOG_SELECT_FOLDER: 'dialog:selectFolder',

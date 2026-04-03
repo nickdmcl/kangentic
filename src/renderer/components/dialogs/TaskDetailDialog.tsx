@@ -264,14 +264,18 @@ export function TaskDetailDialog({ task, onClose, initialEdit }: TaskDetailDialo
 
   const handleMoveTo = async (targetSwimlaneId: string) => {
     const targetName = swimlanes.find((s) => s.id === targetSwimlaneId)?.name ?? 'column';
-    onClose();
     if (isArchived) {
+      onClose();
       await unarchiveTask({ id: task.id, targetSwimlaneId });
     } else {
       const laneTasks = useBoardStore.getState().tasks.filter(
         (t) => t.swimlane_id === targetSwimlaneId,
       );
       await moveTask({ taskId: task.id, targetSwimlaneId, targetPosition: laneTasks.length });
+      // If a confirmation dialog was triggered, moveTask returns early without
+      // moving. Don't close the detail dialog or show a toast in that case.
+      if (useBoardStore.getState().pendingMoveConfirm) return;
+      onClose();
     }
     useToastStore.getState().addToast({
       message: `Moved "${task.title}" to ${targetName}`,

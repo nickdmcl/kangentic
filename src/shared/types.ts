@@ -393,6 +393,17 @@ export interface GitDiffFileEntry {
   binary: boolean;
 }
 
+export interface GitPendingChangesInput {
+  /** Path to check - worktree path or project path */
+  checkPath: string;
+}
+
+export interface GitPendingChangesResult {
+  hasPendingChanges: boolean;
+  uncommittedFileCount: number;
+  unpushedCommitCount: number;
+}
+
 export interface GitDiffFilesInput {
   worktreePath?: string;
   projectPath: string;
@@ -1145,6 +1156,7 @@ export interface ElectronAPI {
     subscribeDiff: (worktreePath: string) => void;
     unsubscribeDiff: (worktreePath: string) => void;
     onDiffChanged: (callback: () => void) => () => void;
+    checkPendingChanges: (input: GitPendingChangesInput) => Promise<GitPendingChangesResult>;
   };
 
   // Dialog

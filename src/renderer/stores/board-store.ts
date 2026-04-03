@@ -24,7 +24,7 @@ interface TaskSlice {
   createTask: (input: TaskCreateInput) => Promise<Task>;
   updateTask: (input: TaskUpdateInput) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
-  moveTask: (input: TaskMoveInput) => Promise<void>;
+  moveTask: (input: TaskMoveInput, skipConfirmation?: boolean) => Promise<void>;
   getTasksBySwimlane: (swimlaneId: string) => Task[];
   reorderTaskInColumn: (taskId: string, swimlaneId: string, activeId: string, overId: string) => Promise<void>;
   updateAttachmentCount: (taskId: string, delta: number) => void;
@@ -78,13 +78,25 @@ interface BoardLifecycleSlice {
   loadShortcuts: () => Promise<void>;
 }
 
+interface MoveConfirmSlice {
+  pendingMoveConfirm: {
+    input: TaskMoveInput;
+    uncommittedFileCount: number;
+    unpushedCommitCount: number;
+    taskTitle: string;
+    hasWorktree: boolean;
+  } | null;
+  confirmPendingMove: () => Promise<void>;
+  cancelPendingMove: () => void;
+}
+
 interface ViewSlice {
   activeView: 'board' | 'backlog';
   setActiveView: (view: 'board' | 'backlog') => void;
 }
 
 type BoardStore = TaskSlice & SwimlaneSlice & ArchiveSlice & CompletionSlice
-  & SearchSlice & BoardConfigSlice & BoardLifecycleSlice & ViewSlice;
+  & SearchSlice & BoardConfigSlice & BoardLifecycleSlice & MoveConfirmSlice & ViewSlice;
 
 // ---------------------------------------------------------------------------
 // Shared module-level state
@@ -137,12 +149,52 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
     }));
   },
 
-  moveTask: async (input) => {
-    const thisGen = ++moveGeneration;
-
+  moveTask: async (input, skipConfirmation?: boolean) => {
     // Capture the task's current session before the move
     const prevTask = get().tasks.find((t) => t.id === input.taskId);
     const prevSessionId = prevTask?.session_id ?? null;
+
+    // --- Pre-check: confirm before destructive move to To Do ---
+    // Runs before incrementing moveGeneration so cancelled confirmations
+    // don't burn generation numbers or interfere with stale-reload guards.
+    if (!skipConfirmation) {
+      const isColumnChange = prevTask?.swimlane_id !== input.targetSwimlaneId;
+      const targetLane = get().swimlanes.find((s) => s.id === input.targetSwimlaneId);
+      if (isColumnChange && targetLane?.role === 'todo' && prevTask && (prevTask.worktree_path || prevTask.branch_name)) {
+        const checkPath = prevTask.worktree_path || useProjectStore.getState().currentProject?.path;
+        if (checkPath) {
+          try {
+            const result = await window.electronAPI.git.checkPendingChanges({ checkPath });
+            if (result.hasPendingChanges) {
+              set({
+                pendingMoveConfirm: {
+                  input,
+                  uncommittedFileCount: result.uncommittedFileCount,
+                  unpushedCommitCount: result.unpushedCommitCount,
+                  taskTitle: prevTask.title,
+                  hasWorktree: !!prevTask.worktree_path,
+                },
+              });
+              return;
+            }
+          } catch {
+            // Git check failed - show confirmation as safe default
+            set({
+              pendingMoveConfirm: {
+                input,
+                uncommittedFileCount: 0,
+                unpushedCommitCount: 0,
+                taskTitle: prevTask.title,
+                hasWorktree: !!prevTask.worktree_path,
+              },
+            });
+            return;
+          }
+        }
+      }
+    }
+
+    const thisGen = ++moveGeneration;
 
     // Optimistic update
     set((s) => {
@@ -581,6 +633,19 @@ const createBoardLifecycleSlice: StateCreator<BoardStore, [], [], BoardLifecycle
 // Store composition
 // ---------------------------------------------------------------------------
 
+const createMoveConfirmSlice: StateCreator<BoardStore, [], [], MoveConfirmSlice> = (set, get) => ({
+  pendingMoveConfirm: null,
+  confirmPendingMove: async () => {
+    const pending = get().pendingMoveConfirm;
+    if (!pending) return;
+    set({ pendingMoveConfirm: null });
+    await get().moveTask(pending.input, true);
+  },
+  cancelPendingMove: () => {
+    set({ pendingMoveConfirm: null });
+  },
+});
+
 const createViewSlice: StateCreator<BoardStore, [], [], ViewSlice> = (set) => ({
   activeView: 'board',
   setActiveView: (view) => set({ activeView: view }),
@@ -594,5 +659,6 @@ export const useBoardStore = create<BoardStore>((...args) => ({
   ...createSearchSlice(...args),
   ...createBoardConfigSlice(...args),
   ...createBoardLifecycleSlice(...args),
+  ...createMoveConfirmSlice(...args),
   ...createViewSlice(...args),
 }));

@@ -193,6 +193,7 @@ const api: ElectronAPI = {
     fileContent: (input) => ipcRenderer.invoke(IPC.GIT_FILE_CONTENT, input),
     subscribeDiff: (worktreePath) => ipcRenderer.send(IPC.GIT_DIFF_SUBSCRIBE, worktreePath),
     unsubscribeDiff: (worktreePath) => ipcRenderer.send(IPC.GIT_DIFF_UNSUBSCRIBE, worktreePath),
+    checkPendingChanges: (input) => ipcRenderer.invoke(IPC.GIT_CHECK_PENDING_CHANGES, input),
     onDiffChanged: (callback) => {
       const handler = () => callback();
       ipcRenderer.on(IPC.GIT_DIFF_CHANGED, handler);

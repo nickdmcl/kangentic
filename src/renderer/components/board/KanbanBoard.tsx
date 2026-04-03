@@ -184,6 +184,38 @@ function ConfigChangeDialog({ projectId, onConfirm, onCancel }: {
   );
 }
 
+/** Message body for the destructive move-to-To Do confirmation dialog. */
+function MoveConfirmMessage({ uncommittedFileCount, unpushedCommitCount, hasWorktree, taskTitle }: {
+  uncommittedFileCount: number;
+  unpushedCommitCount: number;
+  hasWorktree: boolean;
+  taskTitle: string;
+}) {
+  const hasSpecificCounts = uncommittedFileCount > 0 || unpushedCommitCount > 0;
+  return (
+    <div className="space-y-2">
+      <p>
+        Moving <span className="font-medium">"{taskTitle}"</span> to To Do will
+        {hasWorktree ? ' delete its worktree and' : ''} destroy its session history.
+      </p>
+      {hasSpecificCounts ? (
+        <ul className="list-disc list-inside text-red-400 font-medium">
+          {uncommittedFileCount > 0 && (
+            <li>{uncommittedFileCount} uncommitted file{uncommittedFileCount !== 1 ? 's' : ''}</li>
+          )}
+          {unpushedCommitCount > 0 && (
+            <li>{unpushedCommitCount} unpushed commit{unpushedCommitCount !== 1 ? 's' : ''}</li>
+          )}
+        </ul>
+      ) : (
+        <p className="text-red-400 font-medium">
+          Unable to verify pending changes. There may be unsaved work.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Module-level empty array constant to avoid new-reference memo defeats. */
 const EMPTY_TASKS: Task[] = [];
 
@@ -194,6 +226,9 @@ export function KanbanBoard() {
   const pendingConfigChange = useBoardStore((s) => s.pendingConfigChange);
   const applyConfigChange = useBoardStore((s) => s.applyConfigChange);
   const dismissConfigChange = useBoardStore((s) => s.dismissConfigChange);
+  const pendingMoveConfirm = useBoardStore((s) => s.pendingMoveConfirm);
+  const confirmPendingMove = useBoardStore((s) => s.confirmPendingMove);
+  const cancelPendingMove = useBoardStore((s) => s.cancelPendingMove);
   const updateConfig = useConfigStore((s) => s.updateConfig);
   const showBoardSearch = useConfigStore((s) => s.config.showBoardSearch);
   const priorities = useConfigStore((s) => s.config.backlog?.priorities) ?? [
@@ -356,6 +391,25 @@ export function KanbanBoard() {
           projectId={pendingConfigChange}
           onConfirm={handleConfigConfirm}
           onCancel={dismissConfigChange}
+        />
+      )}
+
+      {pendingMoveConfirm && (
+        <ConfirmDialog
+          title="Move to To Do?"
+          variant="danger"
+          confirmLabel="Move to To Do"
+          cancelLabel="Keep Working"
+          message={
+            <MoveConfirmMessage
+              uncommittedFileCount={pendingMoveConfirm.uncommittedFileCount}
+              unpushedCommitCount={pendingMoveConfirm.unpushedCommitCount}
+              hasWorktree={pendingMoveConfirm.hasWorktree}
+              taskTitle={pendingMoveConfirm.taskTitle}
+            />
+          }
+          onConfirm={() => confirmPendingMove()}
+          onCancel={cancelPendingMove}
         />
       )}
     </div>

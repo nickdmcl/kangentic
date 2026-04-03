@@ -221,7 +221,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `shell:openExternal` | invoke | Open URL in default browser |
 | `shell:exec` | invoke | Execute shell command |
 
-### Git (7 channels)
+### Git (8 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `git:detect` | invoke | Detect git installation (path, version, minimum version check) |
@@ -231,6 +231,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `git:diffSubscribe` | send | Subscribe to file-system watcher for live diff updates on a worktree |
 | `git:diffUnsubscribe` | send | Unsubscribe from diff change watcher for a worktree |
 | `git:diffChanged` | on | Debounced event fired when watched worktree files change on disk |
+| `git:checkPendingChanges` | invoke | Check whether a path has uncommitted or unpushed changes |
 
 ### Dialog (1 channel)
 | Channel | Pattern | Purpose |
