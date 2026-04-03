@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 import which from 'which';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import { execVersion } from './exec-version';
 
 // Common install locations that may not be on PATH when Electron launches
 // from Finder/Dock (macOS GUI apps don't inherit shell profile PATH).
@@ -76,10 +73,7 @@ export class ClaudeDetector {
   private async extractVersion(candidatePath: string): Promise<string | null> {
     try {
       if (!fs.existsSync(candidatePath)) return null;
-      const { stdout, stderr } = await execFileAsync(candidatePath, ['--version'], {
-        timeout: 5000,
-        shell: process.platform === 'win32',
-      });
+      const { stdout, stderr } = await execVersion(candidatePath);
       const raw = stdout.trim() || stderr.trim() || null;
       // `claude --version` outputs e.g. "2.1.90 (Claude Code)" - strip the product name suffix
       return raw?.replace(/\s*\(Claude Code\)\s*$/i, '') ?? null;

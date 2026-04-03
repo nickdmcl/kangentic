@@ -8,11 +8,11 @@ import { quoteArg } from '../../src/shared/paths';
 import type { SpawnCommandOptions } from '../../src/main/agent/agent-adapter';
 import type { PermissionMode } from '../../src/shared/types';
 
-// Mock which and child_process before importing adapter
+// Mock which, fs, and exec-version before importing adapter
 let mockWhichResult: string | Error = '/usr/bin/aider';
-let mockExecFileStdout = 'aider v0.50.1\n';
-let mockExecFileShouldFail = false;
-let execFileCallCount = 0;
+let mockExecVersionStdout = 'aider v0.50.1\n';
+let mockExecVersionShouldFail = false;
+let execVersionCallCount = 0;
 
 vi.mock('which', () => ({
   default: async () => {
@@ -32,21 +32,15 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
-vi.mock('node:child_process', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:child_process')>();
-  return {
-    ...original,
-    execFile: (_cmd: string, _args: unknown, _opts: unknown, callback?: Function) => {
-      execFileCallCount++;
-      if (mockExecFileShouldFail) {
-        if (callback) callback(new Error('command not found'), { stdout: '', stderr: '' });
-      } else {
-        if (callback) callback(null, { stdout: mockExecFileStdout, stderr: '' });
-      }
-      return { on: vi.fn(), kill: vi.fn() };
-    },
-  };
-});
+vi.mock('../../src/main/agent/exec-version', () => ({
+  execVersion: async () => {
+    execVersionCallCount++;
+    if (mockExecVersionShouldFail) {
+      throw new Error('command not found');
+    }
+    return { stdout: mockExecVersionStdout, stderr: '' };
+  },
+}));
 
 // Import after mocks are set up
 const { AiderAdapter } = await import('../../src/main/agent/adapters/aider-adapter');
@@ -72,9 +66,9 @@ describe('AiderAdapter', () => {
   beforeEach(() => {
     adapter = new AiderAdapter();
     mockWhichResult = '/usr/bin/aider';
-    mockExecFileStdout = 'aider v0.50.1\n';
-    mockExecFileShouldFail = false;
-    execFileCallCount = 0;
+    mockExecVersionStdout = 'aider v0.50.1\n';
+    mockExecVersionShouldFail = false;
+    execVersionCallCount = 0;
   });
 
   // ── Identity ─────────────────────────────────────────────────────────────
@@ -112,7 +106,7 @@ describe('AiderAdapter', () => {
     });
 
     it('returns found: true with null version when --version fails', async () => {
-      mockExecFileShouldFail = true;
+      mockExecVersionShouldFail = true;
       const result = await adapter.detect('/custom/aider');
       expect(result.found).toBe(true);
       expect(result.path).toBe('/custom/aider');
@@ -124,7 +118,7 @@ describe('AiderAdapter', () => {
       const second = await adapter.detect('/custom/aider');
 
       expect(first).toBe(second); // Same object reference (cached)
-      expect(execFileCallCount).toBe(1);
+      expect(execVersionCallCount).toBe(1);
     });
 
     it('invalidateDetectionCache clears cache', async () => {
@@ -133,7 +127,7 @@ describe('AiderAdapter', () => {
       await adapter.detect('/custom/aider');
 
       // Called twice because cache was invalidated
-      expect(execFileCallCount).toBe(2);
+      expect(execVersionCallCount).toBe(2);
     });
   });
 

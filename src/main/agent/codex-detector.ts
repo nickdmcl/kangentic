@@ -1,10 +1,7 @@
 import fs from 'node:fs';
 import which from 'which';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execVersion } from './exec-version';
 import type { AgentInfo } from './agent-adapter';
-
-const execFileAsync = promisify(execFile);
 
 export class CodexDetector {
   private cached: AgentInfo | null = null;
@@ -38,10 +35,7 @@ export class CodexDetector {
   private async extractVersion(candidatePath: string): Promise<string | null> {
     try {
       if (!fs.existsSync(candidatePath)) return null;
-      const { stdout, stderr } = await execFileAsync(candidatePath, ['--version'], {
-        timeout: 5000,
-        shell: process.platform === 'win32',
-      });
+      const { stdout, stderr } = await execVersion(candidatePath);
       const raw = stdout.trim() || stderr.trim() || null;
       // `codex --version` outputs e.g. "codex-cli 0.118.0" - strip the product name prefix
       return raw?.replace(/^codex-cli\s+/i, '') ?? null;

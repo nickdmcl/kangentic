@@ -13,14 +13,12 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, default: { ...actual, existsSync: vi.fn().mockReturnValue(true) } };
 });
 
-vi.mock('node:child_process', () => ({
-  execFile: vi.fn((_cmd: string, _args: string[], _opts: unknown, cb: (err: Error | null, result: { stdout: string }) => void) => {
-    setTimeout(() => cb(null, { stdout: '1.2.3\n' }), 10);
-  }),
+vi.mock('../../src/main/agent/exec-version', () => ({
+  execVersion: vi.fn().mockResolvedValue({ stdout: '1.2.3\n', stderr: '' }),
 }));
 
 import { GeminiDetector } from '../../src/main/agent/gemini-detector';
-import { execFile } from 'node:child_process';
+import { execVersion } from '../../src/main/agent/exec-version';
 
 describe('GeminiDetector', () => {
   let detector: GeminiDetector;
@@ -38,7 +36,7 @@ describe('GeminiDetector', () => {
     expect(result.version).toBe('1.2.3');
   });
 
-  it('5 concurrent detect() calls invoke execFile exactly once', async () => {
+  it('5 concurrent detect() calls invoke execVersion exactly once', async () => {
     const results = await Promise.all([
       detector.detect(),
       detector.detect(),
@@ -52,27 +50,27 @@ describe('GeminiDetector', () => {
       expect(result.path).toBe('/usr/bin/gemini');
     }
 
-    expect(execFile).toHaveBeenCalledTimes(1);
+    expect(execVersion).toHaveBeenCalledTimes(1);
   });
 
-  it('cached result is returned without new execFile call', async () => {
+  it('cached result is returned without new execVersion call', async () => {
     await detector.detect();
-    vi.mocked(execFile).mockClear();
+    vi.mocked(execVersion).mockClear();
 
     const result = await detector.detect();
 
     expect(result.found).toBe(true);
-    expect(execFile).not.toHaveBeenCalled();
+    expect(execVersion).not.toHaveBeenCalled();
   });
 
   it('invalidateCache clears cache - next detect runs fresh', async () => {
     await detector.detect();
     detector.invalidateCache();
-    vi.mocked(execFile).mockClear();
+    vi.mocked(execVersion).mockClear();
 
     const result = await detector.detect();
     expect(result.found).toBe(true);
-    expect(execFile).toHaveBeenCalledTimes(1);
+    expect(execVersion).toHaveBeenCalledTimes(1);
   });
 
   it('overridePath is used instead of which lookup', async () => {

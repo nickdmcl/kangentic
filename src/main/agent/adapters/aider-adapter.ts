@@ -1,13 +1,10 @@
 import fs from 'node:fs';
 import which from 'which';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execVersion } from '../exec-version';
 import { quoteArg, isUnixLikeShell } from '../../../shared/paths';
 import { interpolateTemplate } from '../command-builder';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../agent-adapter';
 import type { SessionUsage, SessionEvent, AgentPermissionEntry } from '../../../shared/types';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Aider CLI adapter - integrates the Aider AI pair programming tool
@@ -57,10 +54,7 @@ export class AiderAdapter implements AgentAdapter {
   private async extractVersion(candidatePath: string): Promise<string | null> {
     try {
       if (!fs.existsSync(candidatePath)) return null;
-      const { stdout, stderr } = await execFileAsync(candidatePath, ['--version'], {
-        timeout: 5000,
-        shell: process.platform === 'win32',
-      });
+      const { stdout, stderr } = await execVersion(candidatePath);
       const raw = stdout.trim() || stderr.trim() || null;
       // `aider --version` outputs e.g. "aider 86.2" - strip the product name prefix
       return raw?.replace(/^aider\s+/i, '') ?? null;
