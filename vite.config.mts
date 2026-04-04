@@ -24,11 +24,11 @@ export default defineConfig({
   build: {
     // Electron loads from disk, so large chunks are not a performance concern.
     // Split xterm into its own chunk to keep the main bundle smaller.
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          xterm: ['@xterm/xterm', '@xterm/addon-webgl'],
-          monaco: ['monaco-editor'],
+        manualChunks(id: string) {
+          if (id.includes('@xterm/xterm') || id.includes('@xterm/addon-webgl')) return 'xterm';
+          if (id.includes('monaco-editor')) return 'monaco';
         },
       },
     },

@@ -8,7 +8,7 @@ const projectDir = path.resolve(__dirname, '..');
 const esbuildCommon = {
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node24',
   format: 'cjs',
   external: ['electron', 'better-sqlite3', 'node-pty'],
   conditions: ['require'],
@@ -68,7 +68,7 @@ async function build() {
   await esbuild.build({
     bundle: true,
     platform: 'node',
-    target: 'node20',
+    target: 'node24',
     format: 'cjs',
     entryPoints: [path.join(projectDir, 'src/main/agent/mcp-server.ts')],
     outfile: path.join(projectDir, '.vite/build/mcp-server.js'),

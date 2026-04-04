@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
-import { Plus, Search, SquareArrowRight, Trash2, Inbox, Filter, Pencil, X, Github, ExternalLink, GripVertical } from 'lucide-react';
+import { Plus, Search, SquareArrowRight, Trash2, Inbox, Filter, Pencil, X, ExternalLink, GripVertical } from 'lucide-react';
+import { GitHubIcon } from '../icons/GitHubIcon';
 import { formatDistanceToNow } from 'date-fns';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -288,7 +289,7 @@ export function BacklogView() {
                 }}
                 title={`Open in ${item.external_source?.startsWith('github') ? 'GitHub' : item.external_source}`}
               >
-                {item.external_source?.startsWith('github') ? <Github size={13} /> : <ExternalLink size={13} />}
+                {item.external_source?.startsWith('github') ? <GitHubIcon size={13} /> : <ExternalLink size={13} />}
               </button>
             )}
             <span className="text-fg font-medium truncate">{item.title}</span>

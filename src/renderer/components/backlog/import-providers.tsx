@@ -1,5 +1,6 @@
 import React from 'react';
-import { Github, KanbanSquare, CircleDot, Cloud } from 'lucide-react';
+import { KanbanSquare, CircleDot, Cloud } from 'lucide-react';
+import { GitHubIcon } from '../icons/GitHubIcon';
 import type { ExternalSource } from '../../../shared/types';
 
 export interface SourceTypeOption {
@@ -24,7 +25,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: 'github',
     label: 'GitHub',
-    icon: <Github size={18} />,
+    icon: <GitHubIcon size={18} />,
     available: true,
     sourceTypes: [
       {
@@ -85,7 +86,7 @@ export function getSourceIcon(source: ExternalSource, size?: number): React.Reac
       }
     }
   }
-  return <Github size={size ?? 18} />;
+  return <GitHubIcon size={size ?? 18} />;
 }
 
 /** Get the provider's display label (e.g., "GitHub", "Azure DevOps"). */
