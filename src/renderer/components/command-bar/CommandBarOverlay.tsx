@@ -26,7 +26,8 @@ interface CommandBarOverlayProps {
 }
 
 export function CommandBarOverlay({ onClose }: CommandBarOverlayProps) {
-  const [phase, setPhase] = useState<Phase>('entering');
+  // Skip entry animation on HMR remount to avoid flashing
+  const [phase, setPhase] = useState<Phase>(() => getIsHmrReload() ? 'visible' : 'entering');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
