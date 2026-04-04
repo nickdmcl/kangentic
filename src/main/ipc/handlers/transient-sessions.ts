@@ -6,6 +6,8 @@ import simpleGit from 'simple-git';
 import { IPC } from '../../../shared/ipc-channels';
 import { resolveProjectRoot } from '../../../shared/git-utils';
 import { trackEvent } from '../../analytics/analytics';
+import { agentRegistry } from '../../agent/agent-registry';
+import { DEFAULT_AGENT } from '../../../shared/types';
 import type { SpawnTransientSessionInput, PermissionMode } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
@@ -24,8 +26,12 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
     const projectRoot = resolveProjectRoot(project.path);
     const config = context.configManager.getEffectiveConfig(projectRoot);
 
-    const claude = await context.claudeDetector.detect(config.agent.cliPaths.claude ?? null);
-    if (!claude.found || !claude.path) throw new Error('Claude CLI not found. Please install it first.');
+    const agentName = project.default_agent || DEFAULT_AGENT;
+    const adapter = agentRegistry.getOrThrow(agentName);
+    const cliPathOverride = config.agent.cliPaths[agentName] ?? null;
+
+    const detection = await adapter.detect(cliPathOverride);
+    if (!detection.found || !detection.path) throw new Error(`${adapter.displayName} CLI not found. Please install it first.`);
     const permissionMode = config.agent.permissionMode as PermissionMode;
     const transientTaskId = uuidv4();
 
@@ -59,8 +65,8 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
     const statusOutputPath = path.join(sessionDirectory, 'status.json');
     const eventsOutputPath = path.join(sessionDirectory, 'activity.json');
 
-    const command = context.commandBuilder.buildClaudeCommand({
-      cliPath: claude.path,
+    const command = adapter.buildCommand({
+      agentPath: detection.path,
       taskId: transientTaskId,
       cwd: projectRoot,
       permissionMode,
