@@ -107,6 +107,10 @@ export function App() {
 
   useEffect(() => {
     if (currentProject) {
+      // Reset hydration gates before loading new project data
+      useBoardStore.setState({ hydrated: false });
+      useBacklogStore.setState({ hydrated: false });
+
       loadBoard();
       useBacklogStore.getState().loadBacklog();
       loadConfig(); // Re-fetch effective config (global + project overrides)

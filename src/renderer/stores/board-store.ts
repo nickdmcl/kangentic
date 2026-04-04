@@ -73,6 +73,7 @@ interface BoardConfigSlice {
 
 interface BoardLifecycleSlice {
   loading: boolean;
+  hydrated: boolean;
   shortcuts: (ShortcutConfig & { source: 'team' | 'local' })[];
   loadBoard: () => Promise<void>;
   loadShortcuts: () => Promise<void>;
@@ -617,16 +618,22 @@ const createBoardConfigSlice: StateCreator<BoardStore, [], [], BoardConfigSlice>
 
 const createBoardLifecycleSlice: StateCreator<BoardStore, [], [], BoardLifecycleSlice> = (set, get) => ({
   loading: false,
+  hydrated: false,
   shortcuts: [],
 
   loadBoard: async () => {
     set({ loading: true });
-    const [tasks, swimlanes, archivedTasks] = await Promise.all([
-      window.electronAPI.tasks.list(),
-      window.electronAPI.swimlanes.list(),
-      window.electronAPI.tasks.listArchived(),
-    ]);
-    set({ tasks, swimlanes, archivedTasks, loading: false });
+    try {
+      const [tasks, swimlanes, archivedTasks] = await Promise.all([
+        window.electronAPI.tasks.list(),
+        window.electronAPI.swimlanes.list(),
+        window.electronAPI.tasks.listArchived(),
+      ]);
+      set({ tasks, swimlanes, archivedTasks, loading: false, hydrated: true });
+    } catch (error) {
+      console.error('[board-store] Failed to load board:', error);
+      set({ loading: false, hydrated: true });
+    }
 
     // Load shortcuts separately (non-blocking)
     get().loadShortcuts();

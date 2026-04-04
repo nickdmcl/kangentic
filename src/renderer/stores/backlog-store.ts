@@ -12,6 +12,7 @@ import { useToastStore } from './toast-store';
 interface BacklogState {
   items: BacklogTask[];
   loading: boolean;
+  hydrated: boolean;
   selectedIds: Set<string>;
 
   // Data actions
@@ -35,16 +36,17 @@ interface BacklogState {
 export const useBacklogStore = create<BacklogState>((set, get) => ({
   items: [],
   loading: false,
+  hydrated: false,
   selectedIds: new Set(),
 
   loadBacklog: async () => {
     set({ loading: true });
     try {
       const items = await window.electronAPI.backlog.list();
-      set({ items, loading: false });
+      set({ items, loading: false, hydrated: true });
     } catch (error) {
       console.error('[backlog-store] Failed to load backlog:', error);
-      set({ loading: false });
+      set({ loading: false, hydrated: true });
     }
   },
 

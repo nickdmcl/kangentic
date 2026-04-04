@@ -219,6 +219,7 @@ function MoveConfirmMessage({ uncommittedFileCount, unpushedCommitCount, hasWork
 const EMPTY_TASKS: Task[] = [];
 
 export function KanbanBoard() {
+  const hydrated = useBoardStore((s) => s.hydrated);
   const swimlanes = useBoardStore((s) => s.swimlanes);
   const tasks = useBoardStore((s) => s.tasks);
   const archivedTasks = useBoardStore((s) => s.archivedTasks);
@@ -339,6 +340,8 @@ export function KanbanBoard() {
       )}
     </div>
   );
+
+  if (!hydrated) return null;
 
   return (
     <div className="relative h-full overflow-x-auto overflow-y-hidden flex flex-col">

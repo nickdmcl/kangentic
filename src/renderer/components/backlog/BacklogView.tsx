@@ -95,6 +95,7 @@ function RowActions({
 // --- Main component ---
 
 export function BacklogView() {
+  const hydrated = useBacklogStore((state) => state.hydrated);
   const items = useBacklogStore((state) => state.items);
   const selectedIds = useBacklogStore((state) => state.selectedIds);
   const toggleSelected = useBacklogStore((state) => state.toggleSelected);
@@ -365,6 +366,8 @@ export function BacklogView() {
   const emptyMessage = searchQuery || hasActiveFilters
     ? 'No items match your filters'
     : undefined;
+
+  if (!hydrated) return null;
 
   return (
     <div className="h-full flex flex-col" data-testid="backlog-view">
