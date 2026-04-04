@@ -166,6 +166,21 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
     const prevTask = get().tasks.find((t) => t.id === input.taskId);
     const prevSessionId = prevTask?.session_id ?? null;
 
+    // Optimistic update - move card to target column immediately so it
+    // doesn't snap back to the origin while a confirmation dialog is open.
+    set((s) => {
+      const tasks = [...s.tasks];
+      const taskIndex = tasks.findIndex((t) => t.id === input.taskId);
+      if (taskIndex < 0) return s;
+
+      const task = { ...tasks[taskIndex] };
+      task.swimlane_id = input.targetSwimlaneId;
+      task.position = input.targetPosition;
+      tasks[taskIndex] = task;
+
+      return { tasks };
+    });
+
     // --- Pre-check: confirm before destructive move to To Do ---
     // Runs before incrementing moveGeneration so cancelled confirmations
     // don't burn generation numbers or interfere with stale-reload guards.
@@ -207,20 +222,6 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
     }
 
     const thisGen = ++moveGeneration;
-
-    // Optimistic update
-    set((s) => {
-      const tasks = [...s.tasks];
-      const taskIndex = tasks.findIndex((t) => t.id === input.taskId);
-      if (taskIndex < 0) return s;
-
-      const task = { ...tasks[taskIndex] };
-      task.swimlane_id = input.targetSwimlaneId;
-      task.position = input.targetPosition;
-      tasks[taskIndex] = task;
-
-      return { tasks };
-    });
 
     // If the task is changing columns and the target has an auto_command, set
     // pendingCommandLabel so the overlay shows the command name instead of
@@ -665,11 +666,13 @@ const createMoveConfirmSlice: StateCreator<BoardStore, [], [], MoveConfirmSlice>
   confirmPendingMove: async () => {
     const pending = get().pendingMoveConfirm;
     if (!pending) return;
-    // Guard against stale confirmation: if the task was already moved
-    // elsewhere (e.g. dragged while the dialog was open), skip the move.
+    // Guard against stale confirmation: the card was optimistically moved to
+    // the target column on drop. If it's no longer there (e.g. the user dragged
+    // it elsewhere while the dialog was open), the confirmation is stale.
     const currentTask = get().tasks.find((task) => task.id === pending.input.taskId);
-    if (!currentTask || currentTask.swimlane_id === pending.input.targetSwimlaneId) {
+    if (!currentTask || currentTask.swimlane_id !== pending.input.targetSwimlaneId) {
       set({ pendingMoveConfirm: null });
+      await get().loadBoard();
       return;
     }
     set({ pendingMoveConfirm: null });
@@ -677,6 +680,9 @@ const createMoveConfirmSlice: StateCreator<BoardStore, [], [], MoveConfirmSlice>
   },
   cancelPendingMove: () => {
     set({ pendingMoveConfirm: null });
+    // Revert the optimistic update - the move was never sent to the backend,
+    // so loadBoard() restores the card to its original column from the DB.
+    get().loadBoard();
   },
 });
 
