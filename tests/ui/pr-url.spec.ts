@@ -39,8 +39,14 @@ test.describe('PR URL in Edit Form', () => {
     await taskCard('PR URL Test Task').click({ button: 'right' });
     await page.locator('[data-testid="context-move-to"]', { hasText: 'Planning' }).click();
 
-    // Open task in Planning
+    // Wait for the async move to fully settle. The optimistic update sets
+    // spawnProgress (Planning has auto_spawn), which renders a status-bar.
+    // The card must return to kind='none' before click opens edit mode.
     const planning = page.locator('[data-swimlane-name="Planning"]');
+    await planning.locator('text=PR URL Test Task').first().waitFor({ state: 'visible', timeout: 5000 });
+    await expect(planning.locator('[data-testid="status-bar"]')).not.toBeVisible({ timeout: 5000 });
+
+    // Open task in Planning
     await planning.locator('text=PR URL Test Task').first().click();
     await page.locator('input[placeholder="Task title"]').waitFor({ state: 'visible' });
 

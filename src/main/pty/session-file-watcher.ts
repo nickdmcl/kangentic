@@ -211,6 +211,10 @@ export class SessionFileWatcher {
     this.watchers.delete(sessionId);
   }
 
+  getEventsOutputPath(sessionId: string): string | null {
+    return this.watchers.get(sessionId)?.eventsOutputPath ?? null;
+  }
+
   getEventsFileOffset(sessionId: string): number {
     return this.watchers.get(sessionId)?.eventsFileOffset ?? 0;
   }

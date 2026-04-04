@@ -390,6 +390,16 @@ export class UsageTracker {
     this.callbacks.onEvent(sessionId, event);
   }
 
+  /** Check if a PR command was flagged but ToolEnd was never processed. */
+  hasPendingPRCommand(sessionId: string): boolean {
+    return this.pendingPRCommand.get(sessionId) === true;
+  }
+
+  /** Clear the pending PR command flag (used by fallback scan on exit). */
+  clearPendingPRCommand(sessionId: string): void {
+    this.pendingPRCommand.delete(sessionId);
+  }
+
   /** Clear subagent depth and pending state (used by suspend). */
   clearSessionTracking(sessionId: string): void {
     this.subagentDepth.delete(sessionId);

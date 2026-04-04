@@ -227,9 +227,8 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
     // generic "Resuming agent...". Skip within-column reorders.
     const isColumnChange = prevTask?.swimlane_id !== input.targetSwimlaneId;
     const targetLane = get().swimlanes.find((s) => s.id === input.targetSwimlaneId);
-    const targetAutoCommand = isColumnChange ? targetLane?.auto_command?.trim() : undefined;
-    if (targetAutoCommand && targetLane?.auto_spawn) {
-      useSessionStore.getState().setPendingCommandLabel(input.taskId, targetAutoCommand);
+    if (isColumnChange && targetLane?.auto_spawn && targetLane.auto_command?.trim()) {
+      useSessionStore.getState().setPendingCommandLabel(input.taskId, targetLane.auto_command.trim());
     }
 
     // Optimistically show spawn progress for auto-spawn columns.
@@ -270,17 +269,17 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
             : `Agent started for "${movedTask.title}"`,
           variant: 'success',
         });
-      } else if (targetAutoCommand) {
-        // No new session was spawned (e.g. user-paused task moved to auto_command column).
-        // Clear the optimistic pendingCommandLabel to prevent stale shimmer overlay.
+      } else if (isColumnChange && targetLane?.auto_spawn) {
+        // No new session was spawned (e.g. user-paused task moved to auto_spawn column,
+        // or auto_spawn column without auto_command). Clear the optimistic progress
+        // indicators to prevent stuck "Initializing..." state on the card.
         useSessionStore.getState().clearPendingCommandLabel(input.taskId);
         useSessionStore.getState().setSpawnProgress(input.taskId, null);
       }
     } catch (err) {
       if (moveGeneration !== thisGen) return; // Don't clobber newer state on error
-      if (targetAutoCommand) {
-        useSessionStore.getState().clearPendingCommandLabel(input.taskId);
-      }
+      // Clear any optimistic progress indicators set before the IPC call
+      useSessionStore.getState().clearPendingCommandLabel(input.taskId);
       useSessionStore.getState().setSpawnProgress(input.taskId, null);
       await get().loadBoard();
       useToastStore.getState().addToast({

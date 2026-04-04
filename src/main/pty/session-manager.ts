@@ -446,10 +446,27 @@ export class SessionManager extends EventEmitter {
       session.exitCode = exitCode;
       session.pty = null;
 
+      // Final flush: process any unread events written before PTY exited.
+      // Catches the common race where the agent writes ToolEnd just before
+      // the PTY exits, but fs.watch hasn't fired the callback yet.
+      this.flushPendingEvents(id);
+
       // Close watchers but preserve session files on disk - they are needed
       // for crash recovery (startUsageWatcher reads status.json on resume).
       // Files are cleaned up by pruneStaleResources(), remove(), or killAll().
       this.fileWatcher.stopAll(id);
+
+      // Fallback PR scan: if a PR command was flagged (ToolStart seen) but
+      // ToolEnd was never processed (event lost or never written), scan the
+      // scrollback now as a last resort before the session is fully closed.
+      if (this.usageTracker.hasPendingPRCommand(id)) {
+        this.usageTracker.clearPendingPRCommand(id);
+        const scrollback = this.bufferManager.getRawScrollback(id);
+        const detected = detectPR(scrollback);
+        if (detected) {
+          this.emit('pr-detected', id, detected.url, detected.number);
+        }
+      }
 
       this.emit('exit', id, exitCode);
       this.sessionQueue.notifySlotFreed();
@@ -508,6 +525,19 @@ export class SessionManager extends EventEmitter {
     const colsChanged = this.bufferManager.onResize(sessionId, clampedCols);
     session.pty.resize(clampedCols, clampedRows);
     return { colsChanged };
+  }
+
+  /**
+   * Final synchronous read of the events file to catch any unprocessed events.
+   * Called from onExit before watchers are closed so that ToolEnd events
+   * written just before PTY exit are not lost to the fs.watch race.
+   */
+  private flushPendingEvents(sessionId: string): void {
+    const eventsPath = this.fileWatcher.getEventsOutputPath(sessionId);
+    if (!eventsPath) return;
+    const offset = this.fileWatcher.getEventsFileOffset(sessionId);
+    const newOffset = this.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
+    this.fileWatcher.setEventsFileOffset(sessionId, newOffset);
   }
 
   /**
