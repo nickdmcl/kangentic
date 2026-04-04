@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../stores/project-store';
+import { useSessionStore } from '../stores/session-store';
 import { useToastStore } from '../stores/toast-store';
 
 /** Preserved across HMR so the command bar overlay stays mounted during
@@ -29,6 +30,8 @@ export function useCommandBar() {
   // Keep module-scoped tracker in sync for HMR dispose()
   useEffect(() => {
     _lastIsOpen = isOpen;
+    // Sync store so TerminalPanel can include transient session in focus priority
+    useSessionStore.getState().setCommandBarVisible(isOpen);
   }, [isOpen]);
 
   // Close command bar when project changes - it will reattach on next open

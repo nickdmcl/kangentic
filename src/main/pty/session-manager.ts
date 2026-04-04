@@ -39,12 +39,13 @@ export class SessionManager extends EventEmitter {
   private firstOutputEmitted = new Set<string>();
 
   /**
-   * The session currently visible in the renderer's terminal panel.
-   * When set, only this session's PTY data is emitted via IPC - background
-   * sessions accumulate silently in the scrollback buffer. This eliminates
-   * O(N) IPC flooding when many sessions run concurrently.
+   * Sessions currently visible in the renderer (terminal panel + command bar overlay).
+   * Only these sessions' PTY data is emitted via IPC - background sessions
+   * accumulate silently in the scrollback buffer. This eliminates O(N) IPC
+   * flooding when many sessions run concurrently. An empty set means "all
+   * sessions are focused" (no filtering).
    */
-  private focusedSessionId: string | null = null;
+  private focusedSessionIds = new Set<string>();
 
   constructor() {
     super();
@@ -63,9 +64,9 @@ export class SessionManager extends EventEmitter {
           this.firstOutputEmitted.add(sessionId);
           this.emit('first-output', sessionId);
         }
-        // Only emit IPC data for the focused session. Background sessions
+        // Only emit IPC data for focused sessions. Background sessions
         // accumulate in scrollback and reload via getScrollback() on tab switch.
-        if (!this.focusedSessionId || sessionId === this.focusedSessionId) {
+        if (this.focusedSessionIds.size === 0 || this.focusedSessionIds.has(sessionId)) {
           this.emit('data', sessionId, data);
         }
       },
@@ -118,14 +119,14 @@ export class SessionManager extends EventEmitter {
     this.usageTracker.dispose();
   }
 
-  /** Set which session is currently visible in the terminal panel. */
-  setFocusedSession(sessionId: string | null): void {
-    this.focusedSessionId = sessionId;
+  /** Set which sessions are currently visible (terminal panel + command bar overlay). */
+  setFocusedSessions(sessionIds: string[]): void {
+    this.focusedSessionIds = new Set(sessionIds);
   }
 
-  /** Return the currently focused session ID, or null if none. */
-  getFocusedSession(): string | null {
-    return this.focusedSessionId;
+  /** Return the set of currently focused session IDs. */
+  getFocusedSessions(): Set<string> {
+    return this.focusedSessionIds;
   }
 
   setShell(shell: string | null): void {

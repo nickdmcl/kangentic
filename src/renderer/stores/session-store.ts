@@ -99,6 +99,9 @@ interface SessionStore {
   setChangesSelectedFile: (taskId: string, filePath: string | null) => void;
 
   // Transient session (command bar) - per-project map + convenience pointers
+  /** Whether the command bar overlay is currently visible (drives focused-session priority) */
+  commandBarVisible: boolean;
+  setCommandBarVisible: (visible: boolean) => void;
   /** Per-project transient session tracking: projectId -> { sessionId, branch } */
   transientSessions: Record<string, { sessionId: string; branch: string | null }>;
   /** Current project's transient session ID (convenience pointer into transientSessions) */
@@ -143,6 +146,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   changesOpenTasks: new Set(),
   changesSelectedFile: {},
   _pendingOpenTaskId: null,
+  commandBarVisible: false,
+  setCommandBarVisible: (visible) => set({ commandBarVisible: visible }),
   transientSessions: preservedTransientState?.transientSessions ?? {},
   transientSessionId: preservedTransientState?.transientSessionId ?? null,
   transientBranch: preservedTransientState?.transientBranch ?? null,

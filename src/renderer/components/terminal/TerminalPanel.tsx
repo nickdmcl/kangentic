@@ -25,6 +25,8 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const setDetailTaskId = useSessionStore((s) => s.setDetailTaskId);
   const dialogSessionId = useSessionStore((s) => s.dialogSessionId);
+  const commandBarVisible = useSessionStore((s) => s.commandBarVisible);
+  const transientSessionId = useSessionStore((s) => s.transientSessionId);
   const markSingleIdleSessionSeen = useSessionStore((s) => s.markSingleIdleSessionSeen);
 
   // Only show sessions that are actively running.
@@ -83,15 +85,22 @@ export function TerminalPanel({ collapsed = false, showContent = true, onToggleC
     }
   }, [effectiveActiveId, activeSessionId, setActiveSession]);
 
-  // Notify the main process which session is focused so it can suppress
+  // Notify the main process which sessions are focused so it can suppress
   // SESSION_DATA IPC for background sessions (they accumulate in scrollback).
-  // When a dialog owns a session, that session is focused instead.
+  // Multiple sessions can be focused simultaneously (e.g. command bar overlay
+  // + the task terminal visible underneath it).
   useEffect(() => {
-    const focusedId = dialogSessionId
-      ? dialogSessionId
-      : (effectiveActiveId && effectiveActiveId !== ACTIVITY_TAB ? effectiveActiveId : null);
-    window.electronAPI.sessions.setFocused(focusedId);
-  }, [effectiveActiveId, dialogSessionId]);
+    const focusedIds: string[] = [];
+    // The primary terminal: dialog session takes priority over active panel tab
+    const primaryId = dialogSessionId
+      ?? (effectiveActiveId && effectiveActiveId !== ACTIVITY_TAB ? effectiveActiveId : null);
+    if (primaryId) focusedIds.push(primaryId);
+    // Command bar overlay runs alongside the primary terminal
+    if (commandBarVisible && transientSessionId && transientSessionId !== primaryId) {
+      focusedIds.push(transientSessionId);
+    }
+    window.electronAPI.sessions.setFocused(focusedIds);
+  }, [effectiveActiveId, dialogSessionId, commandBarVisible, transientSessionId]);
 
   // Mark the active session as seen when it becomes the selected tab
   useEffect(() => {

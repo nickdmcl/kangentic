@@ -202,12 +202,12 @@ export function registerSessionHandlers(context: IpcContext): void {
     return sessionRepo.getStatsAfter(since);
   });
 
-  // Set which session is visible in the renderer's terminal panel.
+  // Set which sessions are visible in the renderer (terminal panel + command bar overlay).
   // Background sessions stop emitting data IPC (accumulate in scrollback only).
-  ipcMain.handle(IPC.SESSION_SET_FOCUSED, (_, sessionId: string | null) => {
-    context.sessionManager.setFocusedSession(sessionId);
+  ipcMain.handle(IPC.SESSION_SET_FOCUSED, (_, sessionIds: string[]) => {
+    context.sessionManager.setFocusedSessions(sessionIds);
     // Immediately flush any buffered usage/events so the newly focused
-    // session's data is up-to-date without waiting for the 2s timer.
+    // sessions' data is up-to-date without waiting for the 2s timer.
     flushBackgroundBuffer();
   });
 
@@ -221,8 +221,8 @@ export function registerSessionHandlers(context: IpcContext): void {
   let backgroundFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
   function isFocusedSession(sessionId: string): boolean {
-    const focused = context.sessionManager.getFocusedSession();
-    return !focused || sessionId === focused;
+    const focused = context.sessionManager.getFocusedSessions();
+    return focused.size === 0 || focused.has(sessionId);
   }
 
   function scheduleBackgroundFlush(): void {
