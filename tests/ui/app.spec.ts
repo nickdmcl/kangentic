@@ -302,13 +302,12 @@ test.describe('Column Management', () => {
     if (await addColumnBtn.isVisible()) {
       await addColumnBtn.click();
 
+      // New Column dialog opens
+      await expect(page.locator('text=New Column')).toBeVisible({ timeout: 3000 });
       const nameInput = page.locator('input[placeholder="Column name"]');
-      await nameInput.waitFor({ state: 'visible', timeout: 3000 });
-      if (await nameInput.isVisible()) {
-        await nameInput.fill('Custom Stage');
-        await nameInput.press('Enter');
-        await expect(page.locator('[data-swimlane-name="Custom Stage"]')).toBeVisible({ timeout: 3000 });
-      }
+      await nameInput.fill('Custom Stage');
+      await page.locator('button:has-text("Create")').click();
+      await expect(page.locator('[data-swimlane-name="Custom Stage"]')).toBeVisible({ timeout: 3000 });
     }
   });
 });

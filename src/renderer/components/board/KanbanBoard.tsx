@@ -12,7 +12,6 @@ import { AlertTriangle, Filter, X } from 'lucide-react';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
-import { AddColumnButton } from './AddColumnButton';
 import { BoardSearchBar } from './BoardSearchBar';
 import { WelcomeOverlay } from './WelcomeOverlay';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
@@ -371,7 +370,6 @@ export function KanbanBoard() {
                 tasks={tasksPerLane.get(swimlane.id) ?? EMPTY_TASKS}
               />
             ))}
-            <AddColumnButton />
           </div>
         </SortableContext>
 

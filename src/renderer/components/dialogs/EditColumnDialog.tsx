@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Pencil, Lock, Trash2, Palette, ChevronRight, Info, RotateCcw } from 'lucide-react';
+import { Pencil, Plus, Lock, Trash2, Palette, ChevronRight, Info, RotateCcw } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { useBoardStore } from '../../stores/board-store';
 import { useConfigStore } from '../../stores/config-store';
@@ -20,11 +20,23 @@ const PRESET_COLORS = [
 
 interface EditColumnDialogProps {
   swimlane: Swimlane;
+  mode?: never;
   onClose: () => void;
 }
 
-export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
+interface CreateColumnDialogProps {
+  swimlane?: never;
+  mode: 'create';
+  onClose: () => void;
+}
+
+const DEFAULT_COLOR = '#3b82f6';
+
+export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogProps | CreateColumnDialogProps) {
+  const isCreateMode = mode === 'create';
   const updateSwimlane = useBoardStore((s) => s.updateSwimlane);
+  const createSwimlane = useBoardStore((s) => s.createSwimlane);
+  const reorderSwimlanes = useBoardStore((s) => s.reorderSwimlanes);
   const deleteSwimlane = useBoardStore((s) => s.deleteSwimlane);
   const tasks = useBoardStore((s) => s.tasks);
   const globalPermissionMode = useConfigStore((s) => s.config.agent.permissionMode);
@@ -32,25 +44,25 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
 
   const swimlanes = useBoardStore((s) => s.swimlanes);
 
-  const [name, setName] = useState(swimlane.name);
-  const [color, setColor] = useState(swimlane.color.toLowerCase());
-  const [icon, setIcon] = useState<string | null>(swimlane.icon);
+  const [name, setName] = useState(swimlane?.name ?? '');
+  const [color, setColor] = useState((swimlane?.color ?? DEFAULT_COLOR).toLowerCase());
+  const [icon, setIcon] = useState<string | null>(swimlane?.icon ?? null);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
-  const [hexInput, setHexInput] = useState(swimlane.color.toLowerCase());
-  const [permissionMode, setPermissionMode] = useState<PermissionMode | null>(swimlane.permission_mode);
-  const [autoSpawn, setAutoSpawn] = useState(swimlane.auto_spawn);
-  const [autoCommand, setAutoCommand] = useState(swimlane.auto_command || '');
-  const [planExitTargetId, setPlanExitTargetId] = useState<string | null>(swimlane.plan_exit_target_id);
-  const [agentOverride, setAgentOverride] = useState<string | null>(swimlane.agent_override);
+  const [hexInput, setHexInput] = useState((swimlane?.color ?? DEFAULT_COLOR).toLowerCase());
+  const [permissionMode, setPermissionMode] = useState<PermissionMode | null>(swimlane?.permission_mode ?? null);
+  const [autoSpawn, setAutoSpawn] = useState(swimlane?.auto_spawn ?? true);
+  const [autoCommand, setAutoCommand] = useState(swimlane?.auto_command || '');
+  const [planExitTargetId, setPlanExitTargetId] = useState<string | null>(swimlane?.plan_exit_target_id ?? null);
+  const [agentOverride, setAgentOverride] = useState<string | null>(swimlane?.agent_override ?? null);
   const [agentList, setAgentList] = useState<AgentDetectionInfo[]>(() => useConfigStore.getState().agentList);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const taskCount = tasks.filter((t) => t.swimlane_id === swimlane.id).length;
-  const isLocked = swimlane.role !== null;
+  const taskCount = swimlane ? tasks.filter((t) => t.swimlane_id === swimlane.id).length : 0;
+  const isLocked = swimlane?.role !== null && swimlane?.role !== undefined;
 
-  const isTodoOrDone = swimlane.role === 'todo' || swimlane.role === 'done';
+  const isTodoOrDone = swimlane?.role === 'todo' || swimlane?.role === 'done';
   const isPlanMode = permissionMode === 'plan';
 
   const projectDefaultAgent = currentProject?.default_agent ?? DEFAULT_AGENT;
@@ -59,30 +71,60 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   const agentPermissions = agentList.find((agent) => agent.name === effectiveAgent)?.permissions ?? DEFAULT_PERMISSIONS;
 
   const isCustomColor = !PRESET_COLORS.includes(color);
-  const usedIcons = getUsedIcons(swimlanes, swimlane.id);
+  const usedIcons = getUsedIcons(swimlanes, swimlane?.id);
 
   useEffect(() => {
-    inputRef.current?.select();
+    if (isCreateMode) {
+      inputRef.current?.focus();
+    } else {
+      inputRef.current?.select();
+    }
     window.electronAPI.agents.list().then(setAgentList).catch(() => {});
-  }, []);
+  }, [isCreateMode]);
 
   const handleSave = async () => {
     if (!name.trim()) return;
-    await updateSwimlane({
-      id: swimlane.id,
-      name: name.trim(),
-      color,
-      icon,
-      permission_mode: isTodoOrDone ? undefined : permissionMode,
-      auto_spawn: isTodoOrDone ? undefined : autoSpawn,
-      auto_command: isTodoOrDone ? undefined : (autoCommand.trim() || null),
-      plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
-      agent_override: isTodoOrDone ? undefined : (agentOverride || null),
-    });
+    if (isCreateMode) {
+      const created = await createSwimlane({
+        name: name.trim(),
+        color,
+        icon,
+        permission_mode: permissionMode,
+        auto_spawn: autoSpawn,
+        auto_command: autoCommand.trim() || null,
+        plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
+        agent_override: agentOverride || null,
+      });
+      // Reorder to place before the Done column (use fresh store state after create)
+      const currentSwimlanes = useBoardStore.getState().swimlanes;
+      const doneIndex = currentSwimlanes.findIndex((lane) => lane.role === 'done');
+      if (doneIndex >= 0) {
+        const reordered = currentSwimlanes.filter((lane) => lane.id !== created.id);
+        reordered.splice(doneIndex, 0, created);
+        await reorderSwimlanes(reordered.map((lane) => lane.id));
+      }
+      useToastStore.getState().addToast({
+        message: `Created column "${created.name}"`,
+        variant: 'info',
+      });
+    } else {
+      await updateSwimlane({
+        id: swimlane!.id,
+        name: name.trim(),
+        color,
+        icon,
+        permission_mode: isTodoOrDone ? undefined : permissionMode,
+        auto_spawn: isTodoOrDone ? undefined : autoSpawn,
+        auto_command: isTodoOrDone ? undefined : (autoCommand.trim() || null),
+        plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
+        agent_override: isTodoOrDone ? undefined : (agentOverride || null),
+      });
+    }
     onClose();
   };
 
   const handleDelete = async (_dontAskAgain: boolean) => {
+    if (!swimlane) return;
     if (taskCount > 0) {
       useToastStore.getState().addToast({
         message: `Cannot delete "${swimlane.name}". Move or delete all ${taskCount} task${taskCount > 1 ? 's' : ''} first.`,
@@ -114,7 +156,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
         title="Delete column"
         message={<>
           <p>Are you sure you want to delete this column?</p>
-          <p className="text-fg-secondary bg-surface rounded px-3 py-2 truncate" title={swimlane.name}>{swimlane.name}</p>
+          <p className="text-fg-secondary bg-surface rounded px-3 py-2 truncate" title={swimlane?.name}>{swimlane?.name}</p>
         </>}
         confirmLabel="Delete"
         variant="danger"
@@ -127,8 +169,8 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
   return (
     <BaseDialog
       onClose={onClose}
-      title="Edit Column"
-        icon={<Pencil size={14} className="text-fg-muted" />}
+      title={isCreateMode ? 'New Column' : 'Edit Column'}
+        icon={isCreateMode ? <Plus size={14} className="text-fg-muted" /> : <Pencil size={14} className="text-fg-muted" />}
         headerRight={isLocked ? (
           <span className="text-xs text-fg-faint flex items-center gap-1 flex-shrink-0">
             <Lock size={12} />
@@ -138,7 +180,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
         footer={
           <div className="flex items-center">
             <div className="flex-1">
-              {!isLocked && (
+              {!isCreateMode && !isLocked && (
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -163,7 +205,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                 disabled={!name.trim()}
                 className="px-4 py-1.5 text-xs bg-accent-emphasis hover:bg-accent text-accent-on rounded transition-colors disabled:opacity-50"
               >
-                Save
+                {isCreateMode ? 'Create' : 'Save'}
               </button>
             </div>
           </div>
@@ -199,7 +241,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                     const IconComp = ICON_REGISTRY.get(icon);
                     if (IconComp) return <IconComp size={14} strokeWidth={1.75} style={{ color }} />;
                   }
-                  if (swimlane.role) {
+                  if (swimlane?.role) {
                     const RoleIcon = ROLE_DEFAULTS[swimlane.role];
                     return <RoleIcon size={14} strokeWidth={1.75} style={{ color }} />;
                   }
@@ -212,7 +254,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
                 })()}
               </div>
               <span className="text-xs text-fg-tertiary flex-1 text-left truncate">
-                {icon ?? (swimlane.role ? `Default (${swimlane.role})` : 'None')}
+                {icon ?? (swimlane?.role ? `Default (${swimlane.role})` : 'None')}
               </span>
               <ChevronRight size={14} className="text-fg-faint group-hover:text-fg-muted flex-shrink-0" />
             </button>
@@ -422,7 +464,7 @@ export function EditColumnDialog({ swimlane, onClose }: EditColumnDialogProps) {
               >
                 <option value="">Nowhere -- stay in column</option>
                 {swimlanes
-                  .filter((s) => s.id !== swimlane.id && s.role !== 'todo' && s.role !== 'done')
+                  .filter((s) => s.id !== swimlane?.id && s.role !== 'todo' && s.role !== 'done')
                   .map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))
