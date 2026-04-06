@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import simpleGit from 'simple-git';
 import { IPC } from '../../../shared/ipc-channels';
 import { resolveProjectRoot } from '../../../shared/git-utils';
+import { fetchIfStale } from '../../git/worktree-manager';
 import { trackEvent } from '../../analytics/analytics';
 import { agentRegistry } from '../../agent/agent-registry';
 import { DEFAULT_AGENT } from '../../../shared/types';
@@ -35,9 +36,14 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
     const permissionMode = config.agent.permissionMode as PermissionMode;
     const transientTaskId = uuidv4();
 
-    // Checkout the requested branch (or default base branch) before spawning
+    // Fetch latest from origin and checkout the requested branch before spawning.
+    // This ensures Claude Code loads up-to-date commands/skills from the remote.
     const git = simpleGit(projectRoot);
     const targetBranch = input.branch || config.git.defaultBaseBranch || 'main';
+
+    // Best-effort fetch from origin (throttled, network-failure-safe)
+    const startPoint = await fetchIfStale(git, projectRoot, targetBranch);
+
     let branch = targetBranch;
     let checkoutError: string | undefined;
     try {
@@ -46,6 +52,15 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
         await git.checkout(targetBranch);
       }
       branch = targetBranch;
+
+      // Fast-forward merge to incorporate fetched remote changes
+      if (startPoint.startsWith('origin/')) {
+        try {
+          await git.merge([startPoint, '--ff-only']);
+        } catch {
+          // ff-only failed (dirty tree, diverged history) - use local state
+        }
+      }
     } catch (error) {
       // Checkout may fail (dirty working tree, branch doesn't exist locally)
       // Fall back to whatever branch is currently checked out
