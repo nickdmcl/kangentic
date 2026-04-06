@@ -80,7 +80,7 @@ test.describe('EditColumnDialog', () => {
   test('custom column shows editable auto-spawn toggle (ON)', async () => {
     await openEditDialog('Code Review');
 
-    const toggle = page.locator('button[role="switch"]');
+    const toggle = page.getByRole('switch', { name: 'Auto-spawn' });
     await expect(toggle).toBeEnabled();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
@@ -103,7 +103,7 @@ test.describe('EditColumnDialog', () => {
   test('Planning column has editable auto-spawn ON', async () => {
     await openEditDialog('Planning');
 
-    const toggle = page.locator('button[role="switch"]');
+    const toggle = page.getByRole('switch', { name: 'Auto-spawn' });
     await expect(toggle).toBeEnabled();
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
@@ -166,7 +166,7 @@ test.describe('EditColumnDialog', () => {
     await permSelect.selectOption('plan');
 
     // Toggle auto-spawn OFF
-    const toggle = page.locator('button[role="switch"]');
+    const toggle = page.getByRole('switch', { name: 'Auto-spawn' });
     await toggle.click();
     await page.waitForTimeout(100);
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -182,7 +182,7 @@ test.describe('EditColumnDialog', () => {
     const valueAfter = await permSelectAfter.inputValue();
     expect(valueAfter).toBe('plan');
 
-    const toggleAfter = page.locator('button[role="switch"]');
+    const toggleAfter = page.getByRole('switch', { name: 'Auto-spawn' });
     await expect(toggleAfter).toHaveAttribute('aria-checked', 'false');
 
     // Plan exit target dropdown should now be visible (since permissions = plan)

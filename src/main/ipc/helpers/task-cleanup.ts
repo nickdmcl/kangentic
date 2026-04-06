@@ -46,10 +46,10 @@ export async function cleanupTaskSession(
     // Best-effort disk cleanup (non-fatal -- DB records are the source of truth)
     if (resolvedProjectPath) {
       const records = db.prepare(
-        'SELECT agent_session_id FROM sessions WHERE task_id = ? AND agent_session_id IS NOT NULL'
-      ).all(task.id) as Array<{ agent_session_id: string }>;
-      for (const { agent_session_id } of records) {
-        const sessionDir = path.join(resolvedProjectPath, '.kangentic', 'sessions', agent_session_id);
+        'SELECT id FROM sessions WHERE task_id = ?'
+      ).all(task.id) as Array<{ id: string }>;
+      for (const { id } of records) {
+        const sessionDir = path.join(resolvedProjectPath, '.kangentic', 'sessions', id);
         try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch { /* may not exist */ }
       }
     }

@@ -224,7 +224,7 @@ export async function pruneOrphanedDirectories(
     ...allTasks.map(task => task.id),
     ...allTasks.map(task => task.session_id).filter((sessionId): sessionId is string => Boolean(sessionId)),
     ...sessionManager.listSessions().map(session => session.id),
-    ...sessionRepo.listAllAgentSessionIds(),
+    ...sessionRepo.listAllSessionIds(),
   ]);
   await pruneDirectory(
     path.join(kangenticDir, 'sessions'),

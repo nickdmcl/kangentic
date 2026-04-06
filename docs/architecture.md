@@ -142,7 +142,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `transition:set` | invoke | Set action chain for lane A→B |
 | `transition:getFor` | invoke | Get transitions for lane pair (exact match, then wildcard) |
 
-### Sessions (26 channels)
+### Sessions (27 channels)
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `session:spawn` | invoke | Spawn PTY session (may queue) |
@@ -158,6 +158,7 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | `session:getActivity` | invoke | Fetch activity state (thinking/idle). Optional `projectId` scopes to one project. |
 | `session:getEvents` | invoke | Fetch activity log events for one session |
 | `session:getEventsCache` | invoke | Fetch cached event arrays. Optional `projectId` scopes to one project. |
+| `session:setFocused` | invoke | Set which sessions are visible in the renderer (optimizes IPC traffic) |
 | `session:data` | on | Terminal output available (includes `projectId`) |
 | `session:firstOutput` | on | Alternate screen buffer detected - TUI ready (includes `projectId`) |
 | `session:exit` | on | Session exited (includes `projectId`) |
@@ -212,6 +213,11 @@ All channels defined in `src/shared/ipc-channels.ts`. The preload bridge in `src
 | Channel | Pattern | Purpose |
 |---------|---------|---------|
 | `agent:list` | invoke | List all detected agent CLIs as `AgentDetectionInfo` (name, displayName, found, path, version) |
+
+### Handoffs (1 channel)
+| Channel | Pattern | Purpose |
+|---------|---------|---------|
+| `handoff:list` | handle | List handoff records for a task |
 
 ### Shell (5 channels)
 | Channel | Pattern | Purpose |
@@ -300,8 +306,22 @@ Created on project open. Stored in the global config directory (not inside the p
 - **task_attachments** -- File attachments (images, etc.) stored on disk, metadata in DB
 - **backlog_tasks** -- Staging area tasks (Backlog View). Pre-board tasks with priority, labels, and optional external source tracking.
 - **backlog_attachments** -- File attachments for backlog tasks, mirroring `task_attachments`. Copied to `task_attachments` on promote.
+- **session_transcripts** -- ANSI-stripped PTY output per session. Written by `TranscriptWriter` with 30s debounced flush. Used for cross-agent handoff context. No FK; cascade via DELETE trigger on sessions.
+- **handoffs** -- Cross-agent handoff records. Tracks from/to agents and sessions, stores serialized `ContextPacket` (transcript excluded). FK on task_id with CASCADE delete.
 
 Repositories follow a simple pattern -- one class per table, all queries are synchronous (better-sqlite3). Transactions used for position shifts (task move, swimlane reorder).
+
+## Agent Resolution
+
+`src/main/engine/agent-resolver.ts`
+
+`resolveTargetAgent()` determines which agent CLI to use when spawning a session. Resolution priority:
+
+1. **Column `agent_override`** - the target swimlane's per-column agent override (if set)
+2. **Project `default_agent`** - the project-level default agent setting
+3. **Global fallback** - `'claude'`
+
+This function is used by task-move (to detect cross-agent handoff), session-recovery (to respawn with the correct agent), and agent-spawn (to build the right CLI command).
 
 ## Transition Engine
 
@@ -543,7 +563,7 @@ IPC channels for import are in the Backlog Import group (6 channels): `backlog:i
 ## See Also
 
 - [Session Lifecycle](session-lifecycle.md) -- Full state machine, spawn flow, queue, crash recovery
-- [Claude Integration](claude-integration.md) -- Command building, settings merge, hooks, trust management
+- [Agent Integration](agent-integration.md) -- Adapter interface, per-agent CLI details, permission modes, hooks, trust
 - [Transition Engine](transition-engine.md) -- Action types, templates, priority rules
 - [Database](database.md) -- Full schema reference, migrations, repository pattern
 - [Configuration](configuration.md) -- Config cascade, all settings keys

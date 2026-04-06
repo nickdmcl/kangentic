@@ -1,6 +1,6 @@
 # Documentation
 
-Kangentic is a cross-platform desktop Kanban for Claude Code agents. Drag tasks between columns to spawn, suspend, and resume Claude Code sessions automatically.
+Kangentic is a cross-platform desktop Kanban for AI coding agents. Drag tasks between columns to spawn, suspend, and resume agent sessions automatically. Supports Claude Code, Codex, Gemini CLI, and Aider with automatic context handoff between agents.
 
 ## Start Here
 
@@ -23,11 +23,12 @@ Kangentic is a cross-platform desktop Kanban for Claude Code agents. Drag tasks 
 ### Architecture
 - [Architecture](architecture.md) -- Process model, data flow, IPC channels, stores
 - [Session Lifecycle](session-lifecycle.md) -- State machine, spawn flow, queue, suspend, resume, crash recovery
-- [Transition Engine](transition-engine.md) -- Action types, templates, execution flow, priority rules
-- [Database](database.md) -- Schema, migrations, repository pattern, connection management
+- [Transition Engine](transition-engine.md) -- Action types, templates, execution flow, priority rules, cross-agent handoff
+- [Database](database.md) -- Schema (including session_transcripts and handoffs tables), migrations, repository pattern, connection management
 
 ### Integration
-- [Claude Integration](claude-integration.md) -- CLI detection, command building, settings merge, hooks, trust
+- [Agent Integration](agent-integration.md) -- Adapter interface, Claude/Codex/Gemini/Aider CLI details, permission modes, detection, command building
+- [Handoff](handoff.md) -- Cross-agent context transfer: extraction, packaging, markdown rendering, prompt delivery
 - [MCP Server](mcp-server.md) -- Board management tools for agents, file-based command queue, .mcp.json safety
 - [Activity Detection](activity-detection.md) -- Event pipeline, thinking/idle state, subagent-aware transitions
 - [Worktree Strategy](worktree-strategy.md) -- Branch naming, sparse-checkout, hook delivery, cleanup

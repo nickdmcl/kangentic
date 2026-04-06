@@ -8,10 +8,12 @@ import { SessionQueue } from './session-queue';
 import { PtyBufferManager } from './pty-buffer-manager';
 import { SessionFileWatcher } from './session-file-watcher';
 import { UsageTracker } from './usage-tracker';
+import { TranscriptWriter } from './transcript-writer';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { isShuttingDown } from '../shutdown-state';
+import type { TranscriptRepository } from '../db/repositories/transcript-repository';
 import type { Session, SessionStatus, SessionUsage, ActivityState, SessionEvent, SpawnSessionInput } from '../../shared/types';
 
 interface ManagedSession {
@@ -28,6 +30,8 @@ interface ManagedSession {
   transient: boolean;
   /** Sequence of strings to write to PTY for graceful exit before force-killing. */
   exitSequence: string[];
+  /** Agent parser for adapter-specific behavior (readiness detection, parsing). */
+  agentParser?: import('../../shared/types').AgentParser;
 }
 
 export class SessionManager extends EventEmitter {
@@ -48,6 +52,7 @@ export class SessionManager extends EventEmitter {
    * sessions are focused" (no filtering).
    */
   private focusedSessionIds = new Set<string>();
+  private transcriptWriter: TranscriptWriter | null = null;
 
   constructor() {
     super();
@@ -59,12 +64,18 @@ export class SessionManager extends EventEmitter {
 
     this.bufferManager = new PtyBufferManager({
       onFlush: (sessionId, data) => {
-        // Detect alternate screen buffer activation (Claude Code's TUI entering
-        // full-screen mode) and emit a one-time event per session. This fires
-        // ~500ms-1.5s after spawn, much earlier than the status.json hook (~2-5s).
-        if (!this.firstOutputEmitted.has(sessionId) && data.includes('\x1b[?1049h')) {
-          this.firstOutputEmitted.add(sessionId);
-          this.emit('first-output', sessionId);
+        // Detect first meaningful output using the adapter's detection logic.
+        // Claude checks for alternate screen buffer (\x1b[?1049h), other agents
+        // default to any non-empty output. This lifts the shimmer overlay.
+        if (!this.firstOutputEmitted.has(sessionId)) {
+          const session = this.sessions.get(sessionId);
+          const isReady = session?.agentParser
+            ? session.agentParser.detectFirstOutput(data)
+            : data.length > 0;
+          if (isReady) {
+            this.firstOutputEmitted.add(sessionId);
+            this.emit('first-output', sessionId);
+          }
         }
         // Only emit IPC data for focused sessions. Background sessions
         // accumulate in scrollback and reload via getScrollback() on tab switch.
@@ -91,11 +102,13 @@ export class SessionManager extends EventEmitter {
         }
       },
       onAgentSessionId: (sessionId, agentReportedId) => {
-        // Stale ID recovery: if a resuming session reports a different session_id
-        // than expected, --resume failed silently and Claude created a fresh session.
-        // Emit an event so the DB can be updated with the correct UUID for next resume.
+        // Agent session ID capture covers two cases:
+        // 1. Fresh capture: agent_session_id was null (Codex/Gemini), now captured from hooks/PTY output.
+        // 2. Stale recovery: agent_session_id was pre-specified (Claude --resume) but the agent
+        //    created a different session (--resume failed silently). DB needs the correct ID.
+        // recoverStaleSessionId() handles both cases - emit unconditionally.
         const session = this.sessions.get(sessionId);
-        if (session?.resuming) {
+        if (session) {
           this.emit('agent-session-id', sessionId, session.taskId, session.projectId, agentReportedId);
         }
       },
@@ -126,8 +139,18 @@ export class SessionManager extends EventEmitter {
     this.usageTracker.setIdleTimeout(minutes);
   }
 
+  /**
+   * Enable transcript capture by providing a TranscriptRepository.
+   * Called after the project DB is available. Without this, PTY output
+   * is not persisted (only kept in the in-memory ring buffer).
+   */
+  setTranscriptRepository(transcriptRepo: TranscriptRepository): void {
+    this.transcriptWriter = new TranscriptWriter(transcriptRepo);
+  }
+
   dispose(): void {
     this.usageTracker.dispose();
+    this.transcriptWriter?.finalizeAll();
   }
 
   /** Set which sessions are currently visible (terminal panel + command bar overlay). */
@@ -201,6 +224,7 @@ export class SessionManager extends EventEmitter {
         resuming: input.resuming ?? false,
         transient: input.transient ?? false,
         exitSequence: input.exitSequence ?? ['\x03'],
+        agentParser: input.agentParser,
       };
       this.sessions.set(id, session);
       this.sessionQueue.enqueue(inputWithId);
@@ -395,6 +419,7 @@ export class SessionManager extends EventEmitter {
         resuming: input.resuming ?? false,
         transient: input.transient ?? false,
         exitSequence: input.exitSequence ?? ['\x03'],
+        agentParser: input.agentParser,
       };
       this.sessions.set(id, failedSession);
       // Initialize buffer manager with diagnostic scrollback for failed sessions
@@ -416,6 +441,7 @@ export class SessionManager extends EventEmitter {
       resuming: input.resuming ?? false,
       transient: input.transient ?? false,
       exitSequence: input.exitSequence ?? ['\x03'],
+      agentParser: input.agentParser,
     };
 
     this.sessions.set(id, session);
@@ -432,8 +458,25 @@ export class SessionManager extends EventEmitter {
     this.usageTracker.initSession(id, input.agentParser);
 
     // Batched data output (~60fps)
+    let sessionIdCapturedFromOutput = false;
     ptyProcess.onData((data: string) => {
       this.bufferManager.onData(id, data);
+      // Transient sessions (command terminal) have no DB row - the
+      // TranscriptWriter's lazy init will fail silently on first flush
+      // (caught by try/catch in flush()), so we skip them entirely.
+      if (!session.transient) {
+        this.transcriptWriter?.onData(id, data);
+      }
+      // Per-adapter session ID capture from PTY output (e.g. Codex prints
+      // "To continue this session, run: codex resume thr_..."). Stops
+      // scanning after first successful capture.
+      if (!sessionIdCapturedFromOutput && input.agentParser?.captureSessionIdFromOutput) {
+        const capturedId = input.agentParser.captureSessionIdFromOutput(data);
+        if (capturedId) {
+          sessionIdCapturedFromOutput = true;
+          this.usageTracker.notifyAgentSessionId(id, capturedId);
+        }
+      }
     });
 
     ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
@@ -445,6 +488,9 @@ export class SessionManager extends EventEmitter {
       }
       session.exitCode = exitCode;
       session.pty = null;
+
+      // Flush transcript to DB before closing out the session
+      this.transcriptWriter?.finalize(id);
 
       // Final flush: process any unread events written before PTY exited.
       // Catches the common race where the agent writes ToolEnd just before
@@ -552,6 +598,7 @@ export class SessionManager extends EventEmitter {
     this.fileWatcher.cleanupAndRemove(sessionId);
     this.sessions.delete(sessionId);
     this.bufferManager.removeSession(sessionId);
+    this.transcriptWriter?.remove(sessionId);
     this.usageTracker.removeSession(sessionId);
     this.firstOutputEmitted.delete(sessionId);
   }
@@ -664,6 +711,9 @@ export class SessionManager extends EventEmitter {
     // cleanup skips file deletion - files persist for resume
     this.fileWatcher.nullifyPaths(sessionId);
 
+    // Flush transcript to DB before killing PTY
+    this.transcriptWriter?.finalize(sessionId);
+
     // Synthetic session_end before we kill - Claude Code's hook won't fire
     this.usageTracker.emitSessionEnd(sessionId);
 
@@ -746,6 +796,11 @@ export class SessionManager extends EventEmitter {
   /** Return cached events for a specific session (survives renderer reloads). */
   getEventsForSession(sessionId: string): SessionEvent[] {
     return this.usageTracker.getEventsForSession(sessionId);
+  }
+
+  /** Return the transcript writer instance (if enabled). */
+  getTranscriptWriter(): TranscriptWriter | null {
+    return this.transcriptWriter;
   }
 
   /** Return cached events for all sessions (survives renderer reloads). */

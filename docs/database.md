@@ -81,6 +81,8 @@ All queries are synchronous via **better-sqlite3** -- they block the Node.js eve
 | auto_command | TEXT | | NULL |
 | plan_exit_target_id | TEXT | | NULL |
 | is_ghost | INTEGER | NOT NULL | 0 |
+| agent_override | TEXT | | NULL |
+| handoff_context | INTEGER | NOT NULL | 0 |
 | created_at | TEXT | NOT NULL | |
 
 Valid role values: `todo`, `done`, or NULL (custom column).
@@ -228,6 +230,38 @@ Index: `idx_backlog_attachments_task_id` on (backlog_task_id).
 
 Mirrors `task_attachments` for backlog tasks. Files stored at `.kangentic/backlog/<backlogTaskId>/attachments/`. When a backlog task is promoted to a task, attachments are copied to `task_attachments` and backlog attachment files are cleaned up.
 
+### session_transcripts table
+
+| Column | Type | Constraints | Default |
+|--------|------|-------------|---------|
+| session_id | TEXT | PRIMARY KEY | |
+| transcript | TEXT | NOT NULL | '' |
+| size_bytes | INTEGER | NOT NULL | 0 |
+| created_at | TEXT | NOT NULL | |
+| updated_at | TEXT | NOT NULL | |
+
+No foreign key constraint on `session_id`. Cascade cleanup is handled via a DELETE trigger on the `sessions` table. The `TranscriptWriter` in `src/main/pty/transcript-writer.ts` strips ANSI escape sequences from PTY output and debounces writes to this table every 30 seconds.
+
+### handoffs table
+
+| Column | Type | Constraints | Default |
+|--------|------|-------------|---------|
+| id | TEXT | PRIMARY KEY | |
+| task_id | TEXT | NOT NULL, FK->tasks ON DELETE CASCADE | |
+| from_session_id | TEXT | FK->sessions ON DELETE SET NULL | |
+| to_session_id | TEXT | FK->sessions ON DELETE SET NULL | |
+| from_agent | TEXT | NOT NULL | |
+| to_agent | TEXT | NOT NULL | |
+| trigger | TEXT | NOT NULL | |
+| packet_json | TEXT | NOT NULL | |
+| created_at | TEXT | NOT NULL | |
+
+Index: `idx_handoffs_task_id` on (task_id).
+
+Two TypeScript types map to this table:
+- `HandoffRecord` in `src/shared/types.ts` - IPC-safe shape without `packet_json` (used in renderer)
+- `HandoffRecordFull` in `src/main/db/repositories/handoff-repository.ts` - full shape with `packet_json` (used in main process)
+
 ## Migration Strategy
 
 Migrations run automatically on database open via `runGlobalMigrations()` (from `src/main/db/migrations/global-schema.ts`) and `runProjectMigrations()` (from `src/main/db/migrations/project-schema.ts`). Default swimlane and action seeding lives in `src/main/db/migrations/default-data.ts`. The strategy uses three approaches depending on the change:
@@ -270,6 +304,10 @@ Listed in execution order within `runProjectMigrations()`:
 24. **`display_id` column on tasks** -- adds a human-readable sequential integer ID for tasks. Backfills existing tasks with sequential IDs ordered by `created_at ASC`. Creates a unique index on `display_id`.
 25. **`labels` and `priority` columns on tasks** -- adds label and priority support to board tasks (mirroring backlog_tasks). Labels default to `'[]'` (JSON array), priority defaults to `0`. Preserved during promote from backlog.
 26. **`claude_session_id` renamed to `agent_session_id`** -- renames the `claude_session_id` column to `agent_session_id` on the `sessions` table. Generalizes the column name to support multiple agent adapters.
+27. **`session_transcripts` table** -- creates the table for storing ANSI-stripped PTY transcripts. No FK constraint; uses a DELETE trigger on `sessions` for cascade cleanup.
+28. **`handoffs` table** -- creates the table for tracking cross-agent context handoffs. FK on `task_id` with CASCADE delete, FKs on `from_session_id` and `to_session_id` with SET NULL. Indexed on `task_id`.
+29. **`agent_override` column on swimlanes** -- adds per-column agent override support. When set, tasks moving into this column use the specified agent instead of the project default.
+30. **`handoff_context` column on swimlanes** -- adds per-column toggle for cross-agent handoff context packaging. Default `0` (off) - users must opt in. When enabled, agent transitions package transcript, git diff, and metrics for the target agent.
 
 ### Key Migrations (Global DB)
 
@@ -348,7 +386,7 @@ Operates on a per-project DB.
 
 | Method | Description |
 |--------|-------------|
-| `insert(record)` | Insert a new session record (ID is auto-generated) |
+| `insert(record)` | Insert a new session record. Caller provides the `id` (PTY session ID = DB primary key, enabling unified session identity across the in-memory PTY layer and the database). |
 | `updateStatus(id, status, extra?)` | Update session status with optional `exit_code`, `suspended_at`, `exited_at`, `suspended_by` |
 | `getResumable()` | Get suspended agent sessions that can be resumed (any `session_type` except `run_script`) |
 | `markAllRunningAsOrphaned()` | Mark all `running` sessions as `orphaned` (crash recovery on startup) |
@@ -357,7 +395,7 @@ Operates on a per-project DB.
 | `deleteByTaskId(taskId)` | Delete all session records for a given task |
 | `getLatestForTask(taskId)` | Find the most recent session record for a task (by `started_at` DESC) |
 | `getUserPausedTaskIds()` | Get task IDs whose latest session was user-paused (`suspended_by = 'user'`) |
-| `listAllAgentSessionIds()` | Get all distinct `agent_session_id` values (for stale session directory cleanup) |
+| `listAllSessionIds()` | Get all distinct session record IDs (for stale session directory cleanup) |
 
 ### AttachmentRepository
 
@@ -389,6 +427,27 @@ Operates on a per-project DB. Manages items in the Backlog View staging area.
 | `renameLabel(oldName, newName)` | Rename a label across all items |
 | `deleteLabel(name)` | Remove a label from all items |
 | `remapPriorities(mapping)` | Remap priority values across all items using a mapping |
+
+### TranscriptRepository
+
+Operates on a per-project DB. Manages ANSI-stripped session transcripts.
+
+| Method | Description |
+|--------|-------------|
+| `upsert(sessionId, transcript, sizeBytes)` | Insert or update a transcript record |
+| `getBySessionId(sessionId)` | Get the transcript for a session |
+| `getByTaskId(taskId)` | Get the transcript for a task's latest session |
+
+### HandoffRepository
+
+Operates on a per-project DB. Tracks cross-agent context handoffs.
+
+| Method | Description |
+|--------|-------------|
+| `insert(record)` | Insert a new handoff record |
+| `updateToSession(id, toSessionId)` | Update the target session ID after the handoff spawn completes |
+| `listByTaskId(taskId)` | List all handoff records for a task (ordered by `created_at` ASC) |
+| `getById(id)` | Get a single handoff record by ID (includes `packet_json`) |
 
 ### BacklogAttachmentRepository
 

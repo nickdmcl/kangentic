@@ -44,13 +44,13 @@ describe('Codex Adapter', () => {
   });
 
   describe('buildCommand - new session', () => {
-    it('builds basic command with working directory and approval mode', () => {
+    it('builds basic command with working directory and approval flags', () => {
       const command = adapter.buildCommand(makeOptions());
       expect(command).toContain('/usr/bin/codex');
       expect(command).toContain('-C');
       expect(command).toContain('/home/dev/project');
-      expect(command).toContain('--approval-mode');
-      expect(command).toContain('suggest');
+      expect(command).toContain('--sandbox');
+      expect(command).toContain('--ask-for-approval');
     });
 
     it('includes prompt as positional argument', () => {
@@ -100,21 +100,38 @@ describe('Codex Adapter', () => {
   });
 
   describe('buildCommand - permission mode mapping', () => {
-    const permissionCases: Array<{ mode: PermissionMode; expectedFlag: string }> = [
-      { mode: 'default', expectedFlag: 'suggest' },
-      { mode: 'plan', expectedFlag: 'suggest' },
-      { mode: 'dontAsk', expectedFlag: 'suggest' },
-      { mode: 'acceptEdits', expectedFlag: 'auto-edit' },
-      { mode: 'auto', expectedFlag: 'auto-edit' },
-      { mode: 'bypassPermissions', expectedFlag: 'full-auto' },
-    ];
+    it("maps 'plan' to --sandbox read-only --ask-for-approval on-request", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'plan' }));
+      expect(command).toContain('--sandbox read-only');
+      expect(command).toContain('--ask-for-approval on-request');
+    });
 
-    for (const { mode, expectedFlag } of permissionCases) {
-      it(`maps '${mode}' to '--approval-mode ${expectedFlag}'`, () => {
-        const command = adapter.buildCommand(makeOptions({ permissionMode: mode }));
-        expect(command).toContain(`--approval-mode ${expectedFlag}`);
-      });
-    }
+    it("maps 'dontAsk' to --sandbox read-only --ask-for-approval never", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'dontAsk' }));
+      expect(command).toContain('--sandbox read-only');
+      expect(command).toContain('--ask-for-approval never');
+    });
+
+    it("maps 'default' to --sandbox workspace-write --ask-for-approval untrusted", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'default' }));
+      expect(command).toContain('--sandbox workspace-write');
+      expect(command).toContain('--ask-for-approval untrusted');
+    });
+
+    it("maps 'acceptEdits' to --full-auto", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'acceptEdits' }));
+      expect(command).toContain('--full-auto');
+    });
+
+    it("maps 'auto' to --full-auto", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'auto' }));
+      expect(command).toContain('--full-auto');
+    });
+
+    it("maps 'bypassPermissions' to --dangerously-bypass-approvals-and-sandbox", () => {
+      const command = adapter.buildCommand(makeOptions({ permissionMode: 'bypassPermissions' }));
+      expect(command).toContain('--dangerously-bypass-approvals-and-sandbox');
+    });
   });
 
   describe('buildCommand - shell-aware quoting', () => {

@@ -3,6 +3,11 @@
 # Per-project data (runtime databases, sessions, worktrees)
 .kangentic/
 
+# Agent runtime config directories (injected hooks, settings)
+.codex/
+.gemini/
+.aider/
+
 # Build output
 dist/
 

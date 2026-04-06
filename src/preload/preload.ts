@@ -185,6 +185,10 @@ const api: ElectronAPI = {
     list: () => ipcRenderer.invoke(IPC.AGENT_LIST),
   },
 
+  handoffs: {
+    list: (taskId: string) => ipcRenderer.invoke(IPC.HANDOFF_LIST, taskId),
+  },
+
   shell: {
     getAvailable: () => ipcRenderer.invoke(IPC.SHELL_GET_AVAILABLE),
     getDefault: () => ipcRenderer.invoke(IPC.SHELL_GET_DEFAULT),

@@ -216,6 +216,21 @@ export class UsageTracker {
 
       const parser = this.sessionParsers.get(sessionId);
       for (const line of lines) {
+        // Extract agent session ID from hookContext (written by event-bridge.js).
+        // Each adapter's extractSessionId() parses agent-specific fields.
+        if (!this.agentSessionIdChecked.has(sessionId) && parser?.extractSessionId) {
+          try {
+            const rawEvent = JSON.parse(line);
+            if (rawEvent.hookContext) {
+              const capturedId = parser.extractSessionId(rawEvent.hookContext);
+              if (capturedId) {
+                this.agentSessionIdChecked.add(sessionId);
+                this.callbacks.onAgentSessionId?.(sessionId, capturedId);
+              }
+            }
+          } catch { /* best effort - line may not be valid JSON */ }
+        }
+
         const event = parser?.parseEvent(line) ?? null;
         if (event) {
           // Any event proves the agent is alive. Reset stale thinking timer.
@@ -368,6 +383,19 @@ export class UsageTracker {
     this.idleTimestamp.set(sessionId, Date.now());
     this.lastThinkingSignal.delete(sessionId);
     this.callbacks.onActivityChange(sessionId, 'idle', false);
+  }
+
+  /**
+   * Notify that an agent session ID was captured from PTY output.
+   * Called by SessionManager when an adapter's captureSessionIdFromOutput
+   * returns a non-null value. Delegates to the same callback used for
+   * hook-based and status.json-based capture.
+   */
+  notifyAgentSessionId(sessionId: string, agentReportedId: string): void {
+    if (!this.agentSessionIdChecked.has(sessionId)) {
+      this.agentSessionIdChecked.add(sessionId);
+      this.callbacks.onAgentSessionId?.(sessionId, agentReportedId);
+    }
   }
 
   /**

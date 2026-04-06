@@ -14,7 +14,9 @@ import {
   createTransitionEngine,
   cleanupTaskResources,
   spawnAgent,
+  buildAutoCommandVars,
 } from '../helpers';
+import { interpolateTemplate } from '../../agent/shared';
 import { trackEvent } from '../../analytics/analytics';
 import { captureSessionMetrics } from './session-metrics';
 import { markRecordExited, markRecordSuspended } from '../../engine/session-lifecycle';
@@ -22,6 +24,7 @@ import type { IpcContext } from '../ipc-context';
 import { isAbortError } from '../../../shared/abort-utils';
 import { abortBacklogPromotion } from './backlog';
 import { emitSpawnProgress, clearSpawnProgress, createProgressCallback } from '../../engine/spawn-progress';
+import { resolveTargetAgent } from '../../engine/agent-resolver';
 import type { Task } from '../../../shared/types';
 
 /**
@@ -237,17 +240,23 @@ export async function handleTaskMove(
   }
 
   // --- Priority 3: TASK HAS ACTIVE SESSION ---
-  // If the target column has an auto_command, we must suspend and resume so
-  // the command can be injected as the resume prompt. Otherwise keep alive.
-  // Permission mode differences alone do NOT trigger a suspend/resume cycle.
-  // Claude CLI handles permission transitions internally (e.g. plan -> default
-  // on ExitPlanMode), so column-level permission changes don't require a
-  // session restart. Moves without auto_command keep the session alive.
+  // Three sub-cases:
+  //   a) Agent change (handoff): suspend + fall through to spawnAgent
+  //   b) Same agent + auto_command: inject command directly into running session
+  //   c) Same agent, no auto_command: keep session alive (no-op)
   if (task.session_id) {
     context.commandInjector.cancel(task.id);
 
-    if (toLane?.auto_command?.trim()) {
-      // Suspend session. Will resume with preloaded command.
+    const project = context.projectRepo.getById(resolvedProjectId);
+    const { agent: effectiveTargetAgent, isHandoff: isAgentChange } = resolveTargetAgent({
+      columnAgent: toLane?.agent_override ?? null,
+      taskAgent: task.agent,
+      projectDefaultAgent: project?.default_agent ?? null,
+    });
+
+    if (isAgentChange) {
+      // (a) Cross-agent handoff: suspend and fall through to spawnAgent.
+      // Cross-agent resume is impossible (agent_session_id is agent-specific).
       const sessionRecord = sessionRepo.getLatestForTask(task.id);
       if (sessionRecord && sessionRecord.agent_session_id
           && (sessionRecord.status === 'running' || sessionRecord.status === 'exited')) {
@@ -260,15 +269,27 @@ export async function handleTaskMove(
       tasks.update({ id: task.id, session_id: null });
       console.log(
         `[TASK_MOVE] Suspending session for task ${task.id.slice(0, 8)}`
-        + ` (auto_command: ${toLane.auto_command}).`
-        + ` Will resume with preloaded command.`,
+        + ` (agent change: ${task.agent} -> ${effectiveTargetAgent}).`
+        + ` Will handoff to new agent.`,
       );
-      // Fall through to Priority 4 (resume with preloaded command)
+      // Fall through to Priority 4 (handoff spawn)
+    } else if (toLane?.auto_command?.trim()) {
+      // (b) Same agent + auto_command: inject directly into the running session.
+      // No suspend/resume needed. commandInjector sends Ctrl+C to clear any
+      // in-progress input, then types the command.
+      const vars = buildAutoCommandVars(task);
+      const interpolated = interpolateTemplate(toLane.auto_command, vars);
+      context.commandInjector.schedule(task.id, task.session_id, interpolated);
+      console.log(
+        `[TASK_MOVE] Injecting auto_command for task ${task.id.slice(0, 8)}`
+        + ` into running session: ${toLane.auto_command}`,
+      );
+      return;
     } else {
-      // No auto_command. Keep session alive.
+      // (c) Same agent, no auto_command. Keep session alive.
       console.log(
         `[TASK_MOVE] Task ${task.id.slice(0, 8)} already has active session`
-        + ` (no auto_command). Keeping session alive.`,
+        + ` (no auto_command, same agent). Keeping session alive.`,
       );
       return;
     }
@@ -341,8 +362,13 @@ export async function handleTaskMove(
     emitSpawnProgress(context.mainWindow, task.id, 'starting-agent');
     const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, resolvedProjectId, resolvedProjectPath);
     if (toLane) {
-      await spawnAgent({ context, engine, tasks, sessionRepo, task, fromSwimlaneId, toLane, skipPromptTemplate, signal });
+      await spawnAgent({ context, engine, tasks, sessionRepo, task, fromSwimlaneId, toLane, skipPromptTemplate, signal, projectId: resolvedProjectId, projectPath: resolvedProjectPath });
     }
+
+    // Always clear spawn progress after spawnAgent returns. The session-changed
+    // event should clear it via upsertSession, but in fast-starting agents (Codex)
+    // the events can race with the renderer's state updates.
+    clearSpawnProgress(context.mainWindow, task.id);
   } catch (error) {
     clearSpawnProgress(context.mainWindow, task.id);
     if (isAbortError(error)) {

@@ -196,6 +196,7 @@ Each swimlane has its own overrides (stored in the per-project DB):
 | `auto_command` | string \| null | null | Command injected into running session on task arrival |
 | `plan_exit_target_id` | string \| null | null | Target column when plan-mode agent exits |
 | `agent_override` | string \| null | null | Agent CLI override for sessions spawned in this column |
+| `handoff_context` | boolean | false | When enabled, cross-agent transitions package prior session context for the target agent |
 
 ## Board Configuration
 
@@ -249,6 +250,7 @@ Ghost columns are invisible on the board but still exist in the database. Once a
       "autoCommand": null,
       "planExitTarget": null,
       "agentOverride": null,
+      "handoffContext": false,
       "archived": false
     }
   ],

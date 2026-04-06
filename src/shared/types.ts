@@ -111,6 +111,7 @@ export interface Swimlane {
   auto_command: string | null;
   plan_exit_target_id: string | null;
   agent_override: string | null;
+  handoff_context: boolean;
   created_at: string;
 }
 
@@ -215,6 +216,18 @@ export interface SessionRecord {
   lines_added: number | null;
   lines_removed: number | null;
   files_changed: number | null;
+}
+
+/** Record of a cross-agent context handoff. */
+export interface HandoffRecord {
+  id: string;
+  task_id: string;
+  from_session_id: string | null;
+  to_session_id: string | null;
+  from_agent: string;
+  to_agent: string;
+  trigger: string;
+  created_at: string;
 }
 
 export interface SessionSummary {
@@ -913,6 +926,7 @@ export interface SwimlaneCreateInput {
   auto_command?: string | null;
   plan_exit_target_id?: string | null;
   agent_override?: string | null;
+  handoff_context?: boolean;
 }
 
 export interface SwimlaneUpdateInput {
@@ -928,6 +942,7 @@ export interface SwimlaneUpdateInput {
   auto_command?: string | null;
   plan_exit_target_id?: string | null;
   agent_override?: string | null;
+  handoff_context?: boolean;
 }
 
 export interface ActionCreateInput {
@@ -954,6 +969,19 @@ export interface ProjectCreateInput {
 export interface AgentParser {
   parseStatus(raw: string): SessionUsage | null;
   parseEvent(line: string): SessionEvent | null;
+  /**
+   * Detect whether the agent has produced its first meaningful output.
+   * Called on each PTY data flush. Return true to emit the 'first-output'
+   * event that lifts the shimmer overlay in the renderer.
+   */
+  detectFirstOutput(data: string): boolean;
+  /** Extract the agent's real CLI session ID from raw hook context JSON.
+   * Each adapter implements agent-specific parsing. Optional - not all agents support resume. */
+  extractSessionId?(hookContext: string): string | null;
+  /** Extract the agent's real CLI session ID from raw PTY output.
+   * Called on each data chunk until captured. Used by agents that expose
+   * their session ID in terminal output (e.g. Codex). */
+  captureSessionIdFromOutput?(data: string): string | null;
 }
 
 export interface SpawnSessionInput {
@@ -1003,6 +1031,7 @@ export interface BoardColumnConfig {
   archived?: boolean;
   autoCommand?: string | null;
   agentOverride?: string | null;
+  handoffContext?: boolean;
 }
 
 export interface BoardActionConfig {
@@ -1171,6 +1200,11 @@ export interface ElectronAPI {
   // Agents
   agents: {
     list: () => Promise<AgentDetectionInfo[]>;
+  };
+
+  // Handoffs
+  handoffs: {
+    list: (taskId: string) => Promise<HandoffRecord[]>;
   };
 
   // Shell

@@ -10,9 +10,10 @@ import { SessionManager } from '../pty/session-manager';
 import { ConfigManager } from '../config/config-manager';
 import type { AgentAdapter } from '../agent/agent-adapter';
 import type { SessionRecord, ActionConfig, Task, PermissionMode } from '../../shared/types';
-import { DEFAULT_AGENT } from '../../shared/types';
 import { agentRegistry } from '../agent/agent-registry';
-import { retireRecord, canResume as checkCanResume } from './session-lifecycle';
+import { resolveTargetAgent } from './agent-resolver';
+import { isResumeEligible } from './spawn-intent';
+import { retireRecord } from './session-lifecycle';
 import { isShuttingDown } from '../shutdown-state';
 import { sessionOutputPaths } from './session-paths';
 import { app } from 'electron';
@@ -42,6 +43,7 @@ export async function recoverSessions(
   projectPath: string,
   sessionManager: SessionManager,
   configManager: ConfigManager,
+  projectDefaultAgent?: string | null,
 ): Promise<void> {
   if (isShuttingDown()) return;
 
@@ -187,7 +189,8 @@ export async function recoverSessions(
     adapter: AgentAdapter;
     command: string;
     cwd: string;
-    agentSessionId: string;
+    sessionRecordId: string;
+    agentSessionId: string | null;
     canResume: boolean;
     prompt: string | undefined;
     permissionMode: string;
@@ -213,8 +216,13 @@ export async function recoverSessions(
         continue;
       }
 
-      // Resolve the agent adapter for this task
-      const agentName = task.agent || DEFAULT_AGENT;
+      // Resolve the agent adapter for this task (respects column agent_override)
+      const taskSwimlane = swimlaneRepo.getById(task.swimlane_id);
+      const { agent: agentName } = resolveTargetAgent({
+        columnAgent: taskSwimlane?.agent_override ?? null,
+        taskAgent: task.agent,
+        projectDefaultAgent: projectDefaultAgent ?? null,
+      });
       const adapter = agentRegistry.get(agentName);
       if (!adapter) {
         console.warn(`[SESSION_RECOVERY] Unknown agent "${agentName}" for task ${task.id.slice(0, 8)} -- skipping`);
@@ -241,24 +249,30 @@ export async function recoverSessions(
       const taskLane = swimlaneRepo.getById(task.swimlane_id);
       const permissionMode = taskLane?.permission_mode ?? config.agent.permissionMode;
 
-      // Decide whether to resume or start fresh. Uses agent_session_id
-      // existence (not status) to determine resumability.
-      const resumeCheck = checkCanResume(record.task_id, sessionRepo);
-      const canResume = resumeCheck.resumable;
+      // Decide whether to resume or start fresh. Uses type-aware lookup
+      // so cross-agent resume mismatches are structurally impossible.
+      const typeMatch = sessionRepo.getLatestForTaskByType(record.task_id, adapter.sessionType);
+      const canResume = isResumeEligible(typeMatch);
 
       let prompt: string | undefined;
-      let agentSessionId: string;
+      let agentSessionId: string | null;
 
-      if (canResume && resumeCheck.agentSessionId) {
-        agentSessionId = resumeCheck.agentSessionId;
+      if (canResume) {
+        agentSessionId = typeMatch!.agent_session_id!;
         prompt = undefined;
       } else {
-        agentSessionId = randomUUID();
+        // Only pre-generate a UUID for agents that accept caller-specified IDs (Claude).
+        // Others (Codex/Gemini) get null - their real ID is captured from hooks later.
+        agentSessionId = adapter.supportsCallerSessionId ? randomUUID() : null;
         prompt = undefined;
       }
 
-      // Ensure the per-session directory exists
-      const sessionDir = path.join(projectPath, '.kangentic', 'sessions', agentSessionId);
+      // Pre-generate the session record ID (PK) for the directory name.
+      // This ID will be used as the PTY session ID at spawn time.
+      const sessionRecordId = randomUUID();
+
+      // Ensure the per-session directory exists (keyed by record ID, not agent session ID)
+      const sessionDir = path.join(projectPath, '.kangentic', 'sessions', sessionRecordId);
       fs.mkdirSync(sessionDir, { recursive: true });
       const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
 
@@ -269,7 +283,7 @@ export async function recoverSessions(
         cwd: record.cwd,
         permissionMode: permissionMode as PermissionMode,
         projectRoot: projectPath,
-        sessionId: agentSessionId,
+        sessionId: agentSessionId ?? undefined,
         resume: canResume,
         statusOutputPath,
         eventsOutputPath,
@@ -279,7 +293,7 @@ export async function recoverSessions(
 
       spawnInputs.push({
         record, task, adapter, command, cwd: record.cwd,
-        agentSessionId, canResume, prompt, permissionMode,
+        sessionRecordId, agentSessionId, canResume, prompt, permissionMode,
         statusOutputPath, eventsOutputPath,
       });
     } catch (err) {
@@ -307,7 +321,7 @@ export async function recoverSessions(
   const spawnResults = await Promise.allSettled(
     spawnInputs.map(async (input) => {
       const newSession = await sessionManager.spawn({
-        id: randomUUID(),
+        id: input.sessionRecordId,
         taskId: input.task.id,
         projectId,
         command: input.command,
@@ -331,6 +345,7 @@ export async function recoverSessions(
       retireRecord(sessionRepo, input.record.id);
 
       sessionRepo.insert({
+        id: newSession.id,
         task_id: input.task.id,
         session_type: input.record.session_type,
         agent_session_id: input.agentSessionId,
@@ -391,6 +406,7 @@ export async function reconcileSessions(
   projectPath: string,
   sessionManager: SessionManager,
   configManager: ConfigManager,
+  projectDefaultAgent?: string | null,
 ): Promise<void> {
   if (isShuttingDown()) return;
 
@@ -435,7 +451,8 @@ export async function reconcileSessions(
     adapter: AgentAdapter;
     command: string;
     cwd: string;
-    agentSessionId: string;
+    sessionRecordId: string;
+    agentSessionId: string | null;
     prompt: string | undefined;
     permissionMode: string;
     agent: string;
@@ -504,8 +521,12 @@ export async function reconcileSessions(
           continue;
         }
 
-        // Resolve the agent adapter for this task
-        const agentName = actionConfig?.agent || task.agent || DEFAULT_AGENT;
+        // Resolve the agent adapter for this task (respects column agent_override)
+        const { agent: agentName } = resolveTargetAgent({
+          columnAgent: lane.agent_override ?? null,
+          taskAgent: task.agent,
+          projectDefaultAgent: projectDefaultAgent ?? null,
+        });
         const adapter = agentRegistry.get(agentName);
         if (!adapter) {
           console.warn(`[SESSION_RECONCILE] Unknown agent "${agentName}" for task ${task.id.slice(0, 8)} -- skipping`);
@@ -523,12 +544,16 @@ export async function reconcileSessions(
         // Pre-populate trust so the agent doesn't block on the trust dialog
         await adapter.ensureTrust(cwd);
 
-        // Generate an agent session ID upfront so recovery can resume
-        const agentSessionId = randomUUID();
+        // Only pre-generate a UUID for agents that accept caller-specified IDs (Claude).
+        // Others (Codex/Gemini) get null - their real ID is captured from hooks later.
+        const agentSessionId = adapter.supportsCallerSessionId ? randomUUID() : null;
         const prompt = undefined;
 
-        // Ensure the per-session directory exists
-        const sessionDir = path.join(projectPath, '.kangentic', 'sessions', agentSessionId);
+        // Pre-generate the session record ID (PK) for the directory name.
+        const sessionRecordId = randomUUID();
+
+        // Ensure the per-session directory exists (keyed by record ID, not agent session ID)
+        const sessionDir = path.join(projectPath, '.kangentic', 'sessions', sessionRecordId);
         fs.mkdirSync(sessionDir, { recursive: true });
         const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
 
@@ -539,7 +564,7 @@ export async function reconcileSessions(
           cwd,
           permissionMode: permissionMode as PermissionMode,
           projectRoot: projectPath,
-          sessionId: agentSessionId,
+          sessionId: agentSessionId ?? undefined,
           statusOutputPath,
           eventsOutputPath,
           shell: resolvedShell,
@@ -547,7 +572,7 @@ export async function reconcileSessions(
         });
 
         spawnInputs.push({
-          task, adapter, command, cwd, agentSessionId, prompt, permissionMode,
+          task, adapter, command, cwd, sessionRecordId, agentSessionId, prompt, permissionMode,
           agent: agentName,
           statusOutputPath, eventsOutputPath,
         });
@@ -569,7 +594,7 @@ export async function reconcileSessions(
   const spawnResults = await Promise.allSettled(
     spawnInputs.map(async (input) => {
       const newSession = await sessionManager.spawn({
-        id: randomUUID(),
+        id: input.sessionRecordId,
         taskId: input.task.id,
         projectId,
         command: input.command,
@@ -599,6 +624,7 @@ export async function reconcileSessions(
 
       const sessionType = input.adapter.sessionType;
       sessionRepo.insert({
+        id: newSession.id,
         task_id: input.task.id,
         session_type: sessionType,
         agent_session_id: input.agentSessionId,

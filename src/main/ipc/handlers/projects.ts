@@ -7,6 +7,7 @@ import { SessionRepository } from '../../db/repositories/session-repository';
 import { recoverSessions, reconcileSessions } from '../../engine/session-recovery';
 import { cleanupStaleResources } from '../../engine/resource-cleanup';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
+import { TranscriptRepository } from '../../db/repositories/transcript-repository';
 import { WorktreeManager, isGitRepo, isInsideWorktree, isKangenticWorktree } from '../../git/worktree-manager';
 import { agentRegistry } from '../../agent/agent-registry';
 import { getProjectDb, closeProjectDb } from '../../db/database';
@@ -369,6 +370,9 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
   context.sessionManager.setMaxConcurrent(config.agent.maxConcurrentSessions);
   context.sessionManager.setShell(config.terminal.shell);
 
+  // Enable transcript capture for cross-agent handoffs
+  context.sessionManager.setTranscriptRepository(new TranscriptRepository(getProjectDb(project.id)));
+
   if (!isReopen) {
     // Async fire-and-forget: resource cleanup then session recovery, serialized.
     const db = getProjectDb(project.id);
@@ -376,9 +380,9 @@ export async function openProjectByPath(context: IpcContext, projectPath: string
     const sessionRepo = new SessionRepository(db);
     const swimlaneRepo = new SwimlaneRepository(db);
     cleanupStaleResources(project.path, taskRepo, swimlaneRepo, sessionRepo, context.sessionManager)
-      .then(() => recoverSessions(project.id, project.path, context.sessionManager, context.configManager))
+      .then(() => recoverSessions(project.id, project.path, context.sessionManager, context.configManager, project.default_agent))
       .catch((err) => console.error('[PROJECT_OPEN] Session recovery failed:', err))
-      .then(() => reconcileSessions(project.id, project.path, context.sessionManager, context.configManager))
+      .then(() => reconcileSessions(project.id, project.path, context.sessionManager, context.configManager, project.default_agent))
       .catch((err) => console.error('[PROJECT_OPEN] Session reconciliation failed:', err));
   }
 
@@ -409,8 +413,8 @@ export async function activateAllProjects(context: IpcContext): Promise<void> {
       const sessionRepo = new SessionRepository(db);
       const swimlaneRepo = new SwimlaneRepository(db);
       await cleanupStaleResources(project.path, taskRepo, swimlaneRepo, sessionRepo, context.sessionManager);
-      await recoverSessions(project.id, project.path, context.sessionManager, context.configManager);
-      await reconcileSessions(project.id, project.path, context.sessionManager, context.configManager);
+      await recoverSessions(project.id, project.path, context.sessionManager, context.configManager, project.default_agent);
+      await reconcileSessions(project.id, project.path, context.sessionManager, context.configManager, project.default_agent);
     }),
   );
 
@@ -482,9 +486,9 @@ export function registerProjectHandlers(context: IpcContext): void {
       const sessionRepo = new SessionRepository(db);
       const swimlaneRepo = new SwimlaneRepository(db);
       cleanupStaleResources(project.path, taskRepo, swimlaneRepo, sessionRepo, context.sessionManager)
-        .then(() => recoverSessions(id, project.path, context.sessionManager, context.configManager))
+        .then(() => recoverSessions(id, project.path, context.sessionManager, context.configManager, project.default_agent))
         .catch((err) => console.error('[PROJECT_OPEN] Session recovery failed:', err))
-        .then(() => reconcileSessions(id, project.path, context.sessionManager, context.configManager))
+        .then(() => reconcileSessions(id, project.path, context.sessionManager, context.configManager, project.default_agent))
         .catch((err) => console.error('[PROJECT_OPEN] Session reconciliation failed:', err));
     }
   });

@@ -394,7 +394,15 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         {!isCompactDensity && (() => {
           switch (displayState.kind) {
             case 'running': {
-              if (!displayState.usage) return null;
+              if (!displayState.usage) {
+                // Agents without structured status (Codex, Gemini, Aider):
+                // show agent name so the card isn't blank.
+                return (
+                  <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
+                    <span className="text-xs text-fg-faint">{agentShortName(task.agent)}</span>
+                  </div>
+                );
+              }
               const pct = Math.round(displayState.usage.contextWindow.usedPercentage);
               const progressColor = getProgressColor(pct);
               return (

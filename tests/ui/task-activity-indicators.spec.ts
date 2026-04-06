@@ -144,57 +144,49 @@ test.describe('Task Activity Indicators', () => {
       await browser?.close();
     });
 
-    test('initializing task shows no title icon, only bottom bar', async () => {
-      const card = page.locator('text=Test Initializing Task').first();
-      await expect(card).toBeVisible();
+    test('running idle without usage shows mail icon and usage bar', async () => {
+      // Wait for the usage-bar to appear (confirms running state loaded)
+      await expect(page.locator('[data-testid="usage-bar"]').first()).toBeVisible({ timeout: 10000 });
 
-      // During initializing, no title icon should appear (matches Queued/Suspended)
-      const titleRow = card.locator('..');
-      await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
-      await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
-
-      // The initializing bottom bar should be shown
-      await expect(page.locator('[data-testid="status-bar"]')).toBeVisible();
+      // After activity sync, idle activity shows mail icon (no spinner)
+      const title = page.locator('text=Test Initializing Task').first();
+      const titleRow = title.locator('..');
+      await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible({ timeout: 10000 });
+      await expect(titleRow.locator('.lucide-mail')).toBeVisible({ timeout: 10000 });
     });
 
-    test('task with events but no usage still shows initializing (usage required)', async () => {
-      // This test needs its own state (withEvents: true), so launch separately
+    test('running idle with events but no usage shows mail icon and usage bar', async () => {
       const { browser: eventBrowser, page: eventPage } = await launchWithState(
         makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, withEvents: true })
       );
 
       try {
         await eventPage.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
-        const card = eventPage.locator('text=Test Initializing Task').first();
-        await expect(card).toBeVisible();
+        await expect(eventPage.locator('[data-testid="usage-bar"]').first()).toBeVisible({ timeout: 10000 });
 
-        const titleRow = card.locator('..');
-        await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
-        await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
-
-        await expect(eventPage.locator('[data-testid="status-bar"]')).toBeVisible();
-        await expect(eventPage.locator('[data-testid="status-bar"]').locator('text=Starting agent...')).toBeVisible();
+        const title = eventPage.locator('text=Test Initializing Task').first();
+        const titleRow = title.locator('..');
+        await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible({ timeout: 10000 });
+        await expect(titleRow.locator('.lucide-mail')).toBeVisible({ timeout: 10000 });
       } finally {
         await eventBrowser.close();
       }
     });
 
-    test('task with events and thinking activity still shows initializing without usage', async () => {
+    test('running thinking without usage shows spinner icon and usage bar', async () => {
       const { browser: thinkBrowser, page: thinkPage } = await launchWithState(
         makePreConfig({ sessionStatus: 'running', activity: 'thinking', withUsage: false, withEvents: true })
       );
 
       try {
         await thinkPage.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
-        const card = thinkPage.locator('text=Test Initializing Task').first();
-        await expect(card).toBeVisible();
+        await expect(thinkPage.locator('[data-testid="usage-bar"]').first()).toBeVisible({ timeout: 10000 });
 
-        const titleRow = card.locator('..');
-        await expect(titleRow.locator('.lucide-loader-circle')).not.toBeVisible();
+        // Thinking activity: spinner icon in title row
+        const title = thinkPage.locator('text=Test Initializing Task').first();
+        const titleRow = title.locator('..');
+        await expect(titleRow.locator('.lucide-loader-circle')).toBeVisible();
         await expect(titleRow.locator('.lucide-mail')).not.toBeVisible();
-
-        await expect(thinkPage.locator('[data-testid="status-bar"]')).toBeVisible();
-        await expect(thinkPage.locator('[data-testid="status-bar"]').locator('text=Starting agent...')).toBeVisible();
       } finally {
         await thinkBrowser.close();
       }

@@ -38,6 +38,15 @@ export interface AgentAdapter {
   /** The session_type value stored in the sessions DB table. */
   readonly sessionType: SessionRecord['session_type'];
 
+  /**
+   * Whether the agent CLI accepts a caller-specified session ID on creation
+   * (e.g. Claude's `--session-id <uuid>`). When true, the stored agent_session_id
+   * matches the CLI's actual session ID, enabling `--resume <id>`. When false,
+   * the CLI generates its own ID internally and resume is not possible via the
+   * stored ID.
+   */
+  readonly supportsCallerSessionId: boolean;
+
   /** Supported permission modes with agent-specific labels. */
   readonly permissions: AgentPermissionEntry[];
 
@@ -72,6 +81,13 @@ export interface AgentAdapter {
   clearSettingsCache(): void;
 
   /**
+   * Detect whether the agent has produced its first meaningful output.
+   * Called on each PTY data flush. Return true to emit the 'first-output'
+   * event that lifts the shimmer overlay in the renderer.
+   */
+  detectFirstOutput(data: string): boolean;
+
+  /**
    * Return the sequence of strings to write to the PTY for a graceful exit.
    * Called by SessionManager.suspend() before force-killing the PTY.
    * Ctrl+C (\x03) interrupts in-progress work; the exit command triggers
@@ -80,4 +96,32 @@ export interface AgentAdapter {
    * Default (if not implemented): ['\x03'] (Ctrl+C only).
    */
   getExitSequence?(): string[];
+
+  /**
+   * Transform the handoff prompt for this specific agent's needs.
+   * Called after the generic prompt is built, before injection.
+   *
+   * Use this to add agent-specific hints (e.g. MCP tool reference for Claude,
+   * --read flags for Aider).
+   */
+  transformHandoffPrompt(prompt: string, contextFilePath: string): string;
+
+  /**
+   * Extract the agent's real CLI session ID from raw hook context JSON.
+   * Called by usage-tracker when processing JSONL events that include hook
+   * context data. Each adapter implements agent-specific parsing logic.
+   *
+   * Returns the session ID string if found, null otherwise.
+   * Not implemented for agents without session resume (e.g. Aider).
+   */
+  extractSessionId?(hookContext: string): string | null;
+
+  /**
+   * Extract the agent's real CLI session ID from raw PTY output.
+   * Called on each PTY data chunk until a non-null value is returned.
+   * Used by agents that expose their session ID in terminal output
+   * (e.g. Codex prints "To continue this session, run: codex resume thr_...").
+   * Not needed for agents that expose IDs via hooks or status files.
+   */
+  captureSessionIdFromOutput?(data: string): string | null;
 }

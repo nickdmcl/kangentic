@@ -18,9 +18,12 @@ export class AiderAdapter implements AgentAdapter {
   readonly name = 'aider';
   readonly displayName = 'Aider';
   readonly sessionType = 'aider_agent';
+  readonly supportsCallerSessionId = false;
   readonly permissions: AgentPermissionEntry[] = [
-    { mode: 'default', label: 'Interactive (Confirm)' },
-    { mode: 'bypassPermissions', label: 'Auto-Approve (--yes)' },
+    { mode: 'plan', label: 'Ask (Read-Only Questions)' },
+    { mode: 'default', label: 'Code (Confirm Changes)' },
+    { mode: 'acceptEdits', label: 'Architect (Two-Model Design)' },
+    { mode: 'bypassPermissions', label: 'Auto Yes (Skip Confirmations)' },
   ];
   readonly defaultPermission: PermissionMode = 'bypassPermissions';
 
@@ -87,14 +90,16 @@ export class AiderAdapter implements AgentAdapter {
       parts.push('--message', quoteArg(safePrompt, shell));
     }
 
-    // Permission mode: bypassPermissions/dontAsk/acceptEdits/auto map to --yes;
-    // plan/default leave Aider interactive for user confirmation
-    if (
-      options.permissionMode === 'bypassPermissions' ||
-      options.permissionMode === 'dontAsk' ||
-      options.permissionMode === 'acceptEdits' ||
-      options.permissionMode === 'auto'
-    ) {
+    // Chat mode: plan → ask (read-only), acceptEdits → architect (two-model)
+    // default and bypassPermissions use the default code mode (no flag needed)
+    if (options.permissionMode === 'plan' || options.permissionMode === 'dontAsk') {
+      parts.push('--chat-mode', 'ask');
+    } else if (options.permissionMode === 'acceptEdits' || options.permissionMode === 'auto') {
+      parts.push('--architect');
+    }
+
+    // Auto-approve: --yes skips all confirmation prompts
+    if (options.permissionMode === 'bypassPermissions') {
       parts.push('--yes');
     }
 
@@ -127,5 +132,17 @@ export class AiderAdapter implements AgentAdapter {
   getExitSequence(): string[] {
     // Aider has no session resume mechanism. Ctrl+C exits cleanly.
     return ['\x03'];
+  }
+
+  detectFirstOutput(data: string): boolean {
+    // Aider writes output immediately (no alternate screen buffer).
+    // Any non-empty data means the agent is ready.
+    return data.length > 0;
+  }
+
+  transformHandoffPrompt(prompt: string, contextFilePath: string): string {
+    // Aider supports --read for reference files. Include the path inline
+    // since Aider can't be given extra flags mid-session.
+    return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
   }
 }

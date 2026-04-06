@@ -34,23 +34,26 @@ describe('PtyBufferManager', () => {
     });
   });
 
-  describe('onResize clears buffer when cols change', () => {
-    it('discards stale escape sequences on width change', () => {
+  describe('onResize tracks col changes', () => {
+    it('reports colsChanged when width changes', () => {
+      const { manager } = createManager();
+
+      // Resize to different cols
+      const colsChanged = manager.onResize(SESSION, 120);
+      expect(colsChanged).toBe(true);
+    });
+
+    it('preserves scrollback when cols change (read-time strip, no write-time clear)', () => {
       vi.useFakeTimers();
       const { manager, onFlush } = createManager();
 
-      manager.onData(SESSION, '\x1b[1;1Hcontent at old width');
-
-      // Resize to different cols before flush
-      const colsChanged = manager.onResize(SESSION, 120);
-      expect(colsChanged).toBe(true);
-
-      // Advance past the 16ms timer
+      manager.onData(SESSION, 'content at old width');
       vi.advanceTimersByTime(20);
-      expect(onFlush).not.toHaveBeenCalled();
+      expect(onFlush).toHaveBeenCalled();
 
-      // Scrollback should also be cleared
-      expect(manager.getScrollback(SESSION)).toBe('');
+      // Resize to different cols - scrollback preserved
+      manager.onResize(SESSION, 120);
+      expect(manager.getScrollback(SESSION)).toContain('content at old width');
 
       vi.useRealTimers();
     });
@@ -112,7 +115,7 @@ describe('PtyBufferManager', () => {
       expect(manager.getScrollback(SESSION)).toContain('previous session output');
     });
 
-    it('clears scrollback on second resize with different cols', () => {
+    it('preserves scrollback on second resize with different cols', () => {
       const onFlush = vi.fn();
       const manager = new PtyBufferManager({ onFlush });
       manager.initSession(SESSION, 'previous session output', 0);
@@ -124,9 +127,10 @@ describe('PtyBufferManager', () => {
       manager.onData(SESSION, 'live data');
 
       // Second resize: user resizes window to different width
+      // Scrollback is no longer cleared on resize (KISS read-time strip)
       const colsChanged = manager.onResize(SESSION, 200);
       expect(colsChanged).toBe(true);
-      expect(manager.getScrollback(SESSION)).toBe('');
+      expect(manager.getScrollback(SESSION)).toContain('previous session output');
     });
 
     it('does not clear scrollback on second resize with same cols', () => {

@@ -47,7 +47,8 @@ export class GeminiCommandBuilder {
       this.createMergedSettings(options);
     }
 
-    // Permission mode mapping to Gemini CLI --approval-mode flags
+    // Permission mode mapping to Gemini CLI --approval-mode flags.
+    // Gemini CLI choices: default, auto_edit, yolo, plan
     switch (options.permissionMode) {
       case 'plan':
       case 'dontAsk':
@@ -55,13 +56,14 @@ export class GeminiCommandBuilder {
         break;
       case 'acceptEdits':
       case 'auto':
-        parts.push('--approval-mode', 'autoEdit');
+        parts.push('--approval-mode', 'auto_edit');
         break;
       case 'bypassPermissions':
         parts.push('--approval-mode', 'yolo');
         break;
       case 'default':
       default:
+        // 'default' is Gemini's default - no flag needed
         break;
     }
 

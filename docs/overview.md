@@ -2,21 +2,25 @@
 
 ## What is Kangentic?
 
-Kangentic is a cross-platform desktop Kanban application purpose-built for orchestrating Claude Code CLI agents. It gives developers a visual board where dragging a task card between columns can spawn, suspend, resume, or terminate Claude Code sessions - turning a familiar Kanban workflow into a powerful agent control plane.
+Kangentic is a cross-platform desktop Kanban application purpose-built for orchestrating AI coding agents. It supports Claude Code, Codex, Gemini CLI, and Aider. Dragging a task card between columns can spawn, suspend, resume, or terminate agent sessions - turning a familiar Kanban workflow into a powerful multi-agent control plane.
 
 ## The Problem
 
-Working with multiple Claude Code CLI sessions simultaneously is difficult. Developers juggle terminal tabs, manually start and stop sessions, lose track of which agent is working on what, and struggle to coordinate parallel work across branches. There is no visual layer for managing agent lifecycle at scale.
+Working with multiple AI coding agent sessions simultaneously is difficult. Developers juggle terminal tabs, manually start and stop sessions, lose track of which agent is working on what, and struggle to coordinate parallel work across branches. When switching between different agent CLIs, context is lost entirely. There is no visual layer for managing agent lifecycle at scale.
 
 ## The Solution
 
-Kangentic replaces terminal tab chaos with a drag-and-drop board. Each task card represents a unit of work. Moving a card into a column triggers configurable actions - spawning a Claude Code agent, sending it a command, suspending it, or tearing it down. The board becomes the single interface for seeing what every agent is doing and controlling what happens next.
+Kangentic replaces terminal tab chaos with a drag-and-drop board. Each task card represents a unit of work. Moving a card into a column triggers configurable actions - spawning an agent, sending it a command, suspending it, or tearing it down. Different columns can use different agents, and context is automatically handed off when a task moves between agents. The board becomes the single interface for seeing what every agent is doing and controlling what happens next.
 
 ## Key Features
 
+### Multi-Agent Support
+
+Orchestrate Claude Code, Codex, Gemini CLI, and Aider from a single board. Set a default agent per project, or override it per column. When a task moves between columns with different agents, Kangentic automatically packages the outgoing agent's context (transcript, git changes, metrics) and hands it off to the incoming agent. No manual copy-paste between tools.
+
 ### Visual Agent Orchestration
 
-Drag a task card into an active column to spawn a Claude Code agent. Drag it to Done to terminate the session. Drag it back to To Do to suspend. Every column transition is an orchestration event.
+Drag a task card into an active column to spawn an agent. Drag it to Done to terminate the session. Drag it back to To Do to suspend. Every column transition is an orchestration event.
 
 ### Backlog & Import
 
@@ -91,9 +95,9 @@ Ten built-in themes: Dark, Light, Moon, Forest, Ocean, Ember, Sand, Mint, Sky, a
 
 - **Not a task tracker.** It is not Jira, Linear, or Trello. There are no sprints, story points, or grooming features. The board exists to control agents, not to manage project management metadata.
 - **Not a CI system.** It does not run pipelines, deploy artifacts, or manage environments. It orchestrates interactive Claude Code sessions on your local machine.
-- **Not a wrapper around a web API.** Kangentic works with the Claude Code CLI directly. It spawns real terminal sessions with full PTY support.
+- **Not a wrapper around a web API.** Kangentic works with agent CLIs directly. It spawns real terminal sessions with full PTY support.
 
-Kangentic is an **agent orchestration desktop app** - a visual control surface for running multiple Claude Code agents in parallel.
+Kangentic is an **agent orchestration desktop app** - a visual control surface for running multiple AI coding agents in parallel.
 
 ## Tech Stack
 
@@ -108,4 +112,4 @@ Kangentic is an **agent orchestration desktop app** - a visual control surface f
 
 ## Target Audience
 
-Kangentic is built for developers who use Claude Code and want to run multiple agents concurrently with visual oversight. Whether you are parallelizing feature work across branches, running review agents alongside coding agents, or simply want a better interface than a wall of terminal tabs - Kangentic gives you a board to see and control it all.
+Kangentic is built for developers who use AI coding agents and want to run multiple agents concurrently with visual oversight. Whether you are parallelizing feature work across branches, running review agents alongside coding agents, handing off between Claude Code and Codex mid-task, or simply want a better interface than a wall of terminal tabs - Kangentic gives you a board to see and control it all.

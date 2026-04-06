@@ -446,6 +446,86 @@ export function runProjectMigrations(db: Database.Database): void {
     db.exec('ALTER TABLE swimlanes ADD COLUMN agent_override TEXT DEFAULT NULL');
   }
 
+  // Migration: add handoff_context column to swimlanes for per-column handoff toggle
+  const hasHandoffContext = (db.pragma('table_info(swimlanes)') as Array<{ name: string }>)
+    .some((col) => col.name === 'handoff_context');
+  if (!hasHandoffContext) {
+    db.exec('ALTER TABLE swimlanes ADD COLUMN handoff_context INTEGER NOT NULL DEFAULT 0');
+  }
+
+  // Migration: session_transcripts table for agent-agnostic PTY output capture.
+  // No FK on session_id - the transcript row may be created before the sessions
+  // row exists (PTY data arrives during spawn, before executeSpawnAgent inserts
+  // the DB record). Cleanup is handled by a DELETE trigger on sessions instead.
+  //
+  // If the table already exists with a FK (from an earlier migration), drop and
+  // recreate it without the FK. Safe because the table is new and has no
+  // production data yet.
+  const hasTranscriptTable = (db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='session_transcripts'",
+  ).get() as { name: string } | undefined) !== undefined;
+  if (hasTranscriptTable) {
+    // Check if the existing table has a FK constraint (old version)
+    const foreignKeys = db.pragma("foreign_key_list('session_transcripts')") as Array<{ table: string }>;
+    if (foreignKeys.length > 0) {
+      db.exec('DROP TABLE session_transcripts');
+    }
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS session_transcripts (
+      session_id TEXT PRIMARY KEY,
+      transcript TEXT NOT NULL DEFAULT '',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_sessions_delete_transcript
+    AFTER DELETE ON sessions
+    BEGIN
+      DELETE FROM session_transcripts WHERE session_id = OLD.id;
+    END
+  `);
+
+  // Migration: handoffs table for cross-agent context transfer provenance
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS handoffs (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      from_session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+      to_session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+      from_agent TEXT NOT NULL,
+      to_agent TEXT NOT NULL,
+      trigger TEXT NOT NULL,
+      packet_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_handoffs_task_id ON handoffs(task_id)');
+
+  // Migration: remove hardcoded agent from spawn_agent action configs.
+  // The default seed data previously set agent:'claude' which overrides the
+  // project's default agent and column agent_override settings. Clear it so
+  // the agent resolution chain respects user configuration.
+  const hardcodedAgentActions = db.prepare(
+    "SELECT id, config_json FROM actions WHERE type = 'spawn_agent'",
+  ).all() as Array<{ id: string; config_json: string }>;
+  for (const action of hardcodedAgentActions) {
+    try {
+      const config = JSON.parse(action.config_json);
+      if (config.agent === 'claude') {
+        delete config.agent;
+        db.prepare('UPDATE actions SET config_json = ? WHERE id = ?').run(
+          JSON.stringify(config),
+          action.id,
+        );
+      }
+    } catch {
+      // Skip malformed configs
+    }
+  }
+
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)
   const laneCount = db.prepare('SELECT COUNT(*) as c FROM swimlanes').get() as { c: number };
   if (laneCount.c === 0) {

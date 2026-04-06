@@ -1,16 +1,23 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { ActionRepository } from '../../db/repositories/action-repository';
 import { AttachmentRepository } from '../../db/repositories/attachment-repository';
 import { SessionRepository } from '../../db/repositories/session-repository';
+import { TranscriptRepository } from '../../db/repositories/transcript-repository';
+import { HandoffRepository } from '../../db/repositories/handoff-repository';
 import { TransitionEngine } from '../../engine/transition-engine';
 import { getProjectDb } from '../../db/database';
 import { interpolateTemplate } from '../../agent/shared';
+import { HandoffOrchestrator } from '../../agent/handoff';
 import { DEFAULT_AGENT } from '../../../shared/types';
 import type { Task, Swimlane } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 import { isAbortError } from '../../../shared/abort-utils';
+import { resolveTargetAgent } from '../../engine/agent-resolver';
 import { canResume as checkCanResume } from '../../engine/session-lifecycle';
+import { emitSpawnProgress } from '../../engine/spawn-progress';
 import { ensureTaskWorktree, ensureTaskBranchCheckout } from './task-git';
 import { getProjectRepos } from './project-repos';
 
@@ -71,6 +78,10 @@ export interface AgentSpawnOptions {
   toLane: Swimlane;
   skipPromptTemplate?: boolean;
   signal?: AbortSignal;
+  /** Project ID for handoff context resolution. Resolved from caller's context. */
+  projectId?: string;
+  /** Project filesystem path for handoff context resolution. */
+  projectPath?: string | null;
 }
 
 /**
@@ -99,47 +110,175 @@ export async function spawnAgent(options: AgentSpawnOptions): Promise<void> {
     return;
   }
 
-  // Step 1: execute configured transition actions (may fire spawn_agent)
-  // Error-isolated: a broken/missing transition must not prevent fallback spawn
+  // --- Resolve target agent ONCE (single source of truth) ---
+  const project = options.projectId ? context.projectRepo.getById(options.projectId) : null;
+  const { agent: targetAgent, isHandoff } = resolveTargetAgent({
+    columnAgent: toLane.agent_override,
+    taskAgent: task.agent,
+    projectDefaultAgent: project?.default_agent ?? null,
+  });
+
+  // Handoff also requires a previous session to exist, a project context,
+  // and the target column's handoff_context toggle to be enabled (default: false).
+  // When disabled (default), the agent change is still detected but no context
+  // is packaged - the new agent starts fresh with just the task title/description.
+  const hasHandoffContext = toLane.handoff_context !== false
+    && isHandoff
+    && options.projectId !== undefined
+    && sessionRepo.getLatestForTask(task.id) !== null;
+
+  console.log(`[spawnAgent] task=${task.id.slice(0, 8)} targetAgent=${targetAgent} isHandoff=${isHandoff} hasHandoffContext=${hasHandoffContext}`);
+
+  // --- Handoff path: package context and spawn target agent directly ---
+  if (hasHandoffContext) {
+    // Guard: hasHandoffContext implies isHandoff which implies task.agent !== null
+    const sourceAgent = task.agent!;
+    console.log(`[spawnAgent] Handoff: ${sourceAgent} -> ${targetAgent} for task ${task.id.slice(0, 8)}`);
+    emitSpawnProgress(context.mainWindow, task.id, 'packaging-handoff');
+    signal?.throwIfAborted();
+
+    let handoffId: string | undefined;
+    let handoffPromptPrefix: string | undefined;
+    let handoffMarkdown: string | undefined;
+    const handoffProjectId = options.projectId!;
+    const handoffProjectPath = options.projectPath ?? null;
+    const handoffDb = getProjectDb(handoffProjectId);
+
+    try {
+      // Flush pending transcript data to DB before extraction.
+      // TranscriptWriter is keyed by PTY session ID (task.session_id from
+      // the in-memory session manager), not the sessions DB record ID.
+      if (task.session_id) {
+        context.sessionManager.getTranscriptWriter()?.finalize(task.session_id);
+      }
+      const latestSessionRecord = sessionRepo.getLatestForTask(task.id);
+
+      const transcriptRepo = new TranscriptRepository(handoffDb);
+      const handoffRepo = new HandoffRepository(handoffDb);
+      const orchestrator = new HandoffOrchestrator(sessionRepo, transcriptRepo, handoffRepo);
+
+      const resolvedProjectPath = handoffProjectPath ?? process.cwd();
+      const resolvedConfig = context.configManager.getEffectiveConfig(handoffProjectPath || undefined);
+      const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
+      const baseBranch = task.base_branch
+        ?? boardDefaultBranch
+        ?? resolvedConfig.git.defaultBaseBranch
+        ?? 'main';
+
+      const events = latestSessionRecord
+        ? context.sessionManager.getEventsForSession(latestSessionRecord.id)
+        : null;
+
+      const handoffResult = await orchestrator.prepareHandoff({
+        task,
+        sourceAgent,
+        targetAgent,
+        projectRoot: resolvedProjectPath,
+        baseBranch,
+        events,
+      });
+
+      handoffId = handoffResult.handoffId;
+      handoffPromptPrefix = handoffResult.promptPrefix;
+      handoffMarkdown = handoffResult.markdown;
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      console.error('[spawnAgent] Handoff packaging failed (continuing without context):', error);
+    }
+
+    emitSpawnProgress(context.mainWindow, task.id, 'detecting-agent');
+
+    try {
+      await engine.resumeSuspendedSession(
+        task, toLane.permission_mode, skipPromptTemplate, undefined, signal,
+        targetAgent,
+        handoffPromptPrefix,
+      );
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      console.error('[spawnAgent] Failed to start handoff session:', error);
+      return;
+    }
+
+    // Post-spawn: link handoff record and write handoff-context.md.
+    // The file is written after spawn but before the agent can read it -
+    // CLI startup (detect, trust, command build) takes 1-3s while this
+    // runs synchronously (fs.writeFileSync) in ~1ms.
+    let currentTask = tasks.getById(task.id);
+    if (currentTask?.session_id) {
+      const resolvedProjectPath = handoffProjectPath ?? process.cwd();
+      try {
+        if (handoffId) {
+          const handoffRepo = new HandoffRepository(handoffDb);
+          const targetSessionRecord = sessionRepo.getLatestForTask(currentTask.id);
+          if (targetSessionRecord) {
+            handoffRepo.updateToSession(handoffId, targetSessionRecord.id);
+          }
+        }
+
+        if (handoffMarkdown) {
+          const latestRecord = sessionRepo.getLatestForTask(currentTask.id);
+          if (latestRecord?.id) {
+            const sessionDir = path.join(resolvedProjectPath, '.kangentic', 'sessions', latestRecord.id);
+            const contextFilePath = path.join(sessionDir, 'handoff-context.md');
+            try {
+              fs.writeFileSync(contextFilePath, handoffMarkdown);
+            } catch (writeError) {
+              console.error('[spawnAgent] Failed to write handoff-context.md:', writeError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[spawnAgent] Failed to finalize handoff:', error);
+      }
+
+      if (toLane.auto_command?.trim()) {
+        const vars = buildAutoCommandVars(currentTask);
+        const interpolated = interpolateTemplate(toLane.auto_command, vars);
+        context.commandInjector.schedule(currentTask.id, currentTask.session_id, interpolated, { freshlySpawned: true });
+      }
+    }
+
+    return;
+  }
+
+  // --- Normal path: execute transition actions then fallback ---
+  // targetAgent is passed through so spawn_agent actions use the correct agent.
+
   try {
-    await engine.executeTransition(task, fromSwimlaneId, toLane.id, toLane.permission_mode, skipPromptTemplate, signal);
+    await engine.executeTransition(task, fromSwimlaneId, toLane.id, toLane.permission_mode, skipPromptTemplate, signal, targetAgent);
   } catch (error) {
     if (isAbortError(error)) throw error;
     console.error('[spawnAgent] Transition engine error (continuing to fallback):', error);
   }
 
-  // Verify: re-read from DB - don't assume transition succeeded or failed
   let currentTask = tasks.getById(task.id);
-
-  // Guard: session exists (transition spawned) or task deleted - no-op
   if (!currentTask || currentTask.session_id) return;
 
-  // Step 2: no session after transitions - resume suspended or spawn fresh
-  console.log(`[spawnAgent] No session after transitions, spawning for task ${task.id.slice(0, 8)}`);
+  // Fallback: no transition spawned a session - resume or spawn fresh
+  console.log(`[spawnAgent] No session after transitions, spawning ${targetAgent} for task ${task.id.slice(0, 8)}`);
 
-  // Determine resume vs fresh spawn for auto_command handling.
-  // Uses agent_session_id existence (not status) to check resumability.
   const resumeCheck = checkCanResume(task.id, sessionRepo);
-
-  // Resume path: preload auto_command as initial resume prompt
-  // Fresh path: auto_command scheduled via commandInjector after spawn
   const resumePrompt = (toLane.auto_command?.trim() && resumeCheck.resumable)
     ? interpolateTemplate(toLane.auto_command, buildAutoCommandVars(currentTask))
     : undefined;
 
   try {
-    await engine.resumeSuspendedSession(currentTask, toLane.permission_mode, skipPromptTemplate, resumePrompt, signal);
+    // Always pass targetAgent so the column's agent_override is respected.
+    // Without this, first-time spawns (task.agent=null, isHandoff=false)
+    // would fall through to the project default or 'claude' hardcoded fallback.
+    await engine.resumeSuspendedSession(
+      currentTask, toLane.permission_mode, skipPromptTemplate, resumePrompt, signal,
+      targetAgent,
+    );
   } catch (error) {
     if (isAbortError(error)) throw error;
     console.error('[spawnAgent] Failed to start session:', error);
     return;
   }
 
-  // Verify: re-read to confirm spawn actually worked
   currentTask = tasks.getById(task.id);
 
-  // Step 3: schedule auto_command for fresh spawns only
-  // (resumes already have it preloaded as the resume prompt)
   if (currentTask?.session_id && toLane.auto_command?.trim() && !resumePrompt) {
     const vars = buildAutoCommandVars(currentTask);
     const interpolated = interpolateTemplate(toLane.auto_command, vars);
@@ -209,7 +348,7 @@ export async function autoSpawnForTask(
     const sessionRepo = new SessionRepository(db);
     const engine = createTransitionEngine(context, actions, tasks, sessionRepo, attachments, projectId, projectPath);
 
-    await spawnAgent({ context, engine, tasks, sessionRepo, task: fullTask, fromSwimlaneId: '*', toLane });
+    await spawnAgent({ context, engine, tasks, sessionRepo, task: fullTask, fromSwimlaneId: '*', toLane, projectId, projectPath });
 
     console.log(`[MCP auto-spawn] Spawned agent for "${task.title}" in ${toLane.name}`);
   } catch (err) {

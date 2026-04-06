@@ -204,7 +204,7 @@ describe('Scrollback clearing on resize', () => {
     expect(scrollback).toContain('hello world');
   });
 
-  it('clears scrollback when cols change', async () => {
+  it('preserves scrollback when cols change (no write-time clearing)', async () => {
     const { session, feedData } = await spawnSession();
 
     feedData('hello world');
@@ -214,14 +214,14 @@ describe('Scrollback clearing on resize', () => {
     expect(result).toEqual({ colsChanged: true });
 
     const scrollback = manager.getScrollback(session.id);
-    // getScrollback returns '' for empty scrollback
-    expect(scrollback).toBe('');
+    // Scrollback is preserved on resize (KISS read-time strip approach)
+    expect(scrollback).toContain('hello world');
   });
 
   it('tracks lastCols correctly across multiple resizes', async () => {
     const { session, feedData } = await spawnSession();
 
-    // Resize to 80 cols (clears scrollback from initial 120)
+    // Resize to 80 cols
     manager.resize(session.id, 80, 24);
 
     // Feed new data at 80 cols
@@ -231,9 +231,9 @@ describe('Scrollback clearing on resize', () => {
     manager.resize(session.id, 80, 30);
     expect(manager.getScrollback(session.id)).toContain('data at 80 cols');
 
-    // Resize to different cols (should clear)
+    // Resize to different cols - scrollback preserved (no write-time clearing)
     manager.resize(session.id, 100, 30);
-    expect(manager.getScrollback(session.id)).toBe('');
+    expect(manager.getScrollback(session.id)).toContain('data at 80 cols');
   });
 
   it('clamps cols to minimum of 2', async () => {
@@ -269,19 +269,19 @@ describe('Scrollback clearing on resize', () => {
     expect(mockPty.resize).toHaveBeenCalledWith(80, 24);
   });
 
-  it('accumulates new scrollback after clearing', async () => {
+  it('accumulates scrollback across col changes', async () => {
     const { session, feedData } = await spawnSession();
 
     feedData('old data');
 
-    // Change cols to clear
+    // Change cols - scrollback preserved
     manager.resize(session.id, 80, 24);
-    expect(manager.getScrollback(session.id)).toBe('');
+    expect(manager.getScrollback(session.id)).toContain('old data');
 
-    // New data arrives at 80 cols
+    // New data arrives at new width
     feedData('new data');
     expect(manager.getScrollback(session.id)).toContain('new data');
-    expect(manager.getScrollback(session.id)).not.toContain('old data');
+    expect(manager.getScrollback(session.id)).toContain('old data');
   });
 });
 

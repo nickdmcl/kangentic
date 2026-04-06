@@ -1,10 +1,13 @@
-import { v4 as uuidv4 } from 'uuid';
 import type Database from 'better-sqlite3';
 import type { SessionRecord, SessionRecordStatus, SessionSummary, SuspendedBy, PeriodUsageStats } from '../../../shared/types';
 
-/** Fields accepted by insert(). Excludes `id` (auto-generated) and metric columns (set via updateMetrics). */
+/**
+ * Fields accepted by insert(). Caller must provide `id` (the PTY session ID)
+ * to unify the DB record key with the SessionManager/TranscriptWriter key.
+ * Excludes metric columns (set via updateMetrics).
+ */
 type SessionInsertInput = Omit<SessionRecord,
-  'id' | 'total_cost_usd' | 'total_input_tokens' | 'total_output_tokens' | 'model_id' | 'model_display_name' | 'total_duration_ms' | 'tool_call_count' | 'lines_added' | 'lines_removed' | 'files_changed'
+  'total_cost_usd' | 'total_input_tokens' | 'total_output_tokens' | 'model_id' | 'model_display_name' | 'total_duration_ms' | 'tool_call_count' | 'lines_added' | 'lines_removed' | 'files_changed'
 >;
 
 export interface SessionMetricsInput {
@@ -21,12 +24,11 @@ export class SessionRepository {
   constructor(private db: Database.Database) {}
 
   insert(record: SessionInsertInput): SessionRecord {
-    const id = uuidv4();
     this.db.prepare(`
       INSERT INTO sessions (id, task_id, session_type, agent_session_id, command, cwd, permission_mode, prompt, status, exit_code, started_at, suspended_at, exited_at, suspended_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id,
+      record.id,
       record.task_id,
       record.session_type,
       record.agent_session_id,
@@ -42,7 +44,6 @@ export class SessionRepository {
       record.suspended_by,
     );
     return {
-      id,
       ...record,
       total_cost_usd: null,
       total_input_tokens: null,
@@ -162,6 +163,13 @@ export class SessionRepository {
     ).get(taskId) as SessionRecord | undefined;
   }
 
+  /** Find the latest session record for a given task filtered by session_type. */
+  getLatestForTaskByType(taskId: string, sessionType: string): SessionRecord | undefined {
+    return this.db.prepare(
+      `SELECT * FROM sessions WHERE task_id = ? AND session_type = ? ORDER BY started_at DESC LIMIT 1`
+    ).get(taskId, sessionType) as SessionRecord | undefined;
+  }
+
   /** Get task IDs whose latest session was user-paused (for reconciliation). */
   getUserPausedTaskIds(): Set<string> {
     const rows = this.db.prepare(`
@@ -175,12 +183,12 @@ export class SessionRepository {
     return new Set(rows.map(r => r.task_id));
   }
 
-  /** Get all distinct agent session IDs (for stale directory cleanup). */
-  listAllAgentSessionIds(): string[] {
+  /** Get all distinct session record IDs (for stale directory cleanup). */
+  listAllSessionIds(): string[] {
     const rows = this.db.prepare(
-      `SELECT DISTINCT agent_session_id FROM sessions WHERE agent_session_id IS NOT NULL`
-    ).all() as Array<{ agent_session_id: string }>;
-    return rows.map(r => r.agent_session_id);
+      `SELECT DISTINCT id FROM sessions`
+    ).all() as Array<{ id: string }>;
+    return rows.map(r => r.id);
   }
 
   /** Update the 7 metric columns for a session record. */

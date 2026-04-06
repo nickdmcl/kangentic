@@ -6,7 +6,9 @@ import { app, ipcMain, Notification, dialog, shell } from 'electron';
 import { IPC } from '../../../shared/ipc-channels';
 import { WorktreeManager, isGitRepo } from '../../git/worktree-manager';
 import { deepMergeConfig } from '../../../shared/object-utils';
-import type { NotificationInput, AgentCommand, AgentDetectionInfo } from '../../../shared/types';
+import { getProjectDb } from '../../db/database';
+import { HandoffRepository } from '../../db/repositories/handoff-repository';
+import type { NotificationInput, AgentCommand, AgentDetectionInfo, HandoffRecord } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
 
 export function registerSystemHandlers(context: IpcContext): void {
@@ -363,5 +365,15 @@ export function registerSystemHandlers(context: IpcContext): void {
     const filePath = path.join(tempDir, filename);
     fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
     return filePath;
+  });
+
+  // === Handoffs ===
+  ipcMain.handle(IPC.HANDOFF_LIST, (_, taskId: string): HandoffRecord[] => {
+    const projectId = context.currentProjectId;
+    if (!projectId) return [];
+    const db = getProjectDb(projectId);
+    const handoffRepo = new HandoffRepository(db);
+    // Use summary query to exclude large packet_json from IPC transfer
+    return handoffRepo.listSummaryByTaskId(taskId);
   });
 }

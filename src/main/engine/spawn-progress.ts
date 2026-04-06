@@ -13,6 +13,7 @@ import { IPC } from '../../shared/ipc-channels';
 //   Custom branch task: fetching → switching-branch  → starting-agent
 //   Base branch task:   starting-agent
 //   Has worktree:       starting-agent
+//   Cross-agent:        packaging-handoff → detecting-agent → starting-agent
 // ---------------------------------------------------------------------------
 
 /** Valid spawn progress phases. */
@@ -20,7 +21,9 @@ export type SpawnPhase =
   | 'fetching'
   | 'creating-worktree'
   | 'switching-branch'
-  | 'starting-agent';
+  | 'starting-agent'
+  | 'packaging-handoff'
+  | 'detecting-agent';
 
 /** Phase → user-facing label (single source of truth for display text). */
 const PHASE_LABELS: Record<SpawnPhase, string> = {
@@ -28,6 +31,8 @@ const PHASE_LABELS: Record<SpawnPhase, string> = {
   'creating-worktree': 'Creating worktree...',
   'switching-branch': 'Switching branch...',
   'starting-agent': 'Starting agent...',
+  'packaging-handoff': 'Packaging handoff context...',
+  'detecting-agent': 'Detecting agent...',
 };
 
 /** Get the user-facing label for a spawn phase. */

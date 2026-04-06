@@ -12,10 +12,13 @@ export class CodexAdapter implements AgentAdapter {
   readonly name = 'codex';
   readonly displayName = 'Codex CLI';
   readonly sessionType = 'codex_agent';
+  readonly supportsCallerSessionId = false;
   readonly permissions: AgentPermissionEntry[] = [
-    { mode: 'plan', label: 'Suggest (Read-Only)' },
-    { mode: 'acceptEdits', label: 'Auto-Edit' },
-    { mode: 'bypassPermissions', label: 'Full Auto (Sandboxed)' },
+    { mode: 'plan', label: 'Safe Read-Only Browsing' },
+    { mode: 'dontAsk', label: 'Read-Only Non-Interactive (CI)' },
+    { mode: 'default', label: 'Automatically Edit, Ask for Untrusted' },
+    { mode: 'acceptEdits', label: 'Auto (Preset)' },
+    { mode: 'bypassPermissions', label: 'Dangerous Full Access' },
   ];
   readonly defaultPermission: PermissionMode = 'acceptEdits';
 
@@ -71,5 +74,32 @@ export class CodexAdapter implements AgentAdapter {
     // Codex sessions are API-backed (server-side threads) - no local
     // conversation state to flush. Ctrl+C is sufficient.
     return ['\x03'];
+  }
+
+  detectFirstOutput(data: string): boolean {
+    // Codex CLI hides the cursor when its TUI takes over the terminal.
+    // Detecting ESC[?25l fires after the shell prompt noise but before
+    // the TUI draws the startup banner. This keeps the shell command
+    // hidden behind the shimmer overlay.
+    return data.includes('\x1b[?25l');
+  }
+
+  transformHandoffPrompt(prompt: string, contextFilePath: string): string {
+    return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
+  }
+
+  extractSessionId(hookContext: string): string | null {
+    try {
+      const context = JSON.parse(hookContext);
+      const threadId = context.thread_id ?? context.threadId;
+      return typeof threadId === 'string' ? threadId : null;
+    } catch { return null; }
+  }
+
+  captureSessionIdFromOutput(data: string): string | null {
+    // Codex prints "To continue this session, run: codex resume thr_..."
+    // in its terminal output. Extract the thread ID from this line.
+    const match = data.match(/codex\s+resume\s+(thr_\S+)/);
+    return match ? match[1] : null;
   }
 }

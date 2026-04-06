@@ -179,6 +179,26 @@ Sessions from non-active projects must not interfere with the active project's t
 
 **Sidebar exception:** Activity state (`thinking`/`idle`) is always forwarded and stored regardless of project, so the sidebar can show badge counts for all projects. Auto-focus and sync triggers are gated to the current project only.
 
+## Transcript Capture
+
+PTY output is captured for two purposes: terminal display (via the scrollback buffer) and persistent transcript storage (via `TranscriptWriter`).
+
+`TranscriptWriter` (`src/main/pty/transcript-writer.ts`) receives raw PTY data, strips ANSI escape sequences, and debounces writes to the `session_transcripts` table every 30 seconds. This provides a clean, searchable text transcript of the session without terminal formatting noise.
+
+The transcript is used during cross-agent handoff: when a task moves to a column with a different agent, the `HandoffOrchestrator` reads the transcript from the database, combines it with git diff and session metrics, and packages it as handoff context for the new agent.
+
+## Cross-Agent Handoff
+
+When a task moves to a column where `resolveTargetAgent()` returns a different agent than the current session:
+
+1. The current session is suspended (Priority 3a in the [Transition Engine](transition-engine.md))
+2. The `HandoffOrchestrator` packages context: session transcript (from `session_transcripts`), git diff (changed files), and session metrics (tokens, cost, duration)
+3. A new session is spawned with the target agent, receiving a `handoffPromptPrefix` summarizing the previous agent's work
+4. A `handoff-context.md` file is written to the new session directory for reference
+5. A `handoffs` record is inserted in the database tracking the from/to agents, sessions, and the full context packet
+
+The handoff is transparent to the user - the task card shows spawn progress phases (`packaging-handoff`, `detecting-agent`, `starting-agent`) and the shimmer overlay lifts when the new agent's TUI is ready.
+
 ## Output Streaming
 
 - PTY `onData` accumulates into a per-session buffer.
@@ -248,6 +268,6 @@ This ensures consistent behavior across keyboard shortcuts and context menu past
 ## See Also
 
 - [Configuration](configuration.md) -- permission modes and session limits
-- [Claude Integration](claude-integration.md) -- command building and hook injection
+- [Agent Integration](agent-integration.md) -- command building, hook injection, per-agent CLI details
 - [Transition Engine](transition-engine.md) -- what triggers spawns and suspends
 - [Activity Detection](activity-detection.md) -- thinking/idle state from hooks

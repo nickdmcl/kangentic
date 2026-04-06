@@ -104,6 +104,13 @@ process.stdin.on('end', () => {
     if (reason) event.detail = String(reason).slice(0, 200);
   }
 
+  // Include raw hook stdin as hookContext for adapter-specific session ID extraction.
+  // Only on session_start events (where the ID first appears) to avoid bloating
+  // the JSONL file on every hook invocation. Truncated to 2KB for safety.
+  if (eventType === 'session_start' && input && input.length > 0) {
+    event.hookContext = input.slice(0, 2048);
+  }
+
   try {
     fs.appendFileSync(outputPath, JSON.stringify(event) + '\n');
   } catch {

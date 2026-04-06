@@ -7,7 +7,8 @@ import { SessionManager } from '../pty/session-manager';
 import { interpolateTemplate } from '../agent/shared';
 import { WorktreeManager } from '../git/worktree-manager';
 import { agentRegistry } from '../agent/agent-registry';
-import { canResume as checkCanResume, retireRecord, markRecordSuspended } from './session-lifecycle';
+import { retireRecord, markRecordSuspended } from './session-lifecycle';
+import { resolveSpawnIntent } from './spawn-intent';
 import { sessionOutputPaths } from './session-paths';
 import type { ActionRepository } from '../db/repositories/action-repository';
 import type { TaskRepository } from '../db/repositories/task-repository';
@@ -38,7 +39,7 @@ export class TransitionEngine {
    * Resume a suspended session for a task. Used when moving out of
    * Backlog/Done into a non-agent column (no spawn_agent transition fires).
    */
-  async resumeSuspendedSession(task: Task, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, resumePrompt?: string, signal?: AbortSignal): Promise<void> {
+  async resumeSuspendedSession(task: Task, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, resumePrompt?: string, signal?: AbortSignal, agentOverride?: string, handoffPromptPrefix?: string): Promise<void> {
     signal?.throwIfAborted();
     const attachmentPaths = this.attachmentRepo?.getPathsForTask(task.id) ?? [];
     const cleanTitle = sanitizeForPty(task.title);
@@ -56,10 +57,10 @@ export class TransitionEngine {
       attachments: attachmentPaths.length > 0
         ? `\n${attachmentPaths.join('\n')}`
         : '',
-    }, permissionOverride, resumePrompt, signal);
+    }, permissionOverride, resumePrompt, signal, agentOverride, handoffPromptPrefix);
   }
 
-  async executeTransition(task: Task, fromSwimlaneId: string, toSwimlaneId: string, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, signal?: AbortSignal): Promise<void> {
+  async executeTransition(task: Task, fromSwimlaneId: string, toSwimlaneId: string, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, signal?: AbortSignal, agentOverride?: string): Promise<void> {
     const transitions = this.actionRepo.getTransitionsFor(fromSwimlaneId, toSwimlaneId);
     if (transitions.length === 0) return;
 
@@ -68,11 +69,11 @@ export class TransitionEngine {
       const action = this.actionRepo.getById(transition.action_id);
       if (!action) continue;
 
-      await this.executeAction(action, task, permissionOverride, skipPromptTemplate, signal);
+      await this.executeAction(action, task, permissionOverride, skipPromptTemplate, signal, agentOverride);
     }
   }
 
-  private async executeAction(action: Action, task: Task, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, signal?: AbortSignal): Promise<void> {
+  private async executeAction(action: Action, task: Task, permissionOverride?: PermissionMode | null, skipPromptTemplate?: boolean, signal?: AbortSignal, agentOverride?: string): Promise<void> {
     let config: ActionConfig;
     try {
       config = JSON.parse(action.config_json);
@@ -101,7 +102,7 @@ export class TransitionEngine {
         if (skipPromptTemplate) {
           config.promptTemplate = undefined;
         }
-        await this.executeSpawnAgent(config, task, templateVars, permissionOverride, undefined, signal);
+        await this.executeSpawnAgent(config, task, templateVars, permissionOverride, undefined, signal, agentOverride);
         break;
 
       case 'send_command':
@@ -130,23 +131,23 @@ export class TransitionEngine {
     }
   }
 
-  private async executeSpawnAgent(config: ActionConfig, task: Task, vars: Record<string, string>, permissionOverride?: PermissionMode | null, resumePrompt?: string, signal?: AbortSignal): Promise<void> {
+  private async executeSpawnAgent(config: ActionConfig, task: Task, vars: Record<string, string>, permissionOverride?: PermissionMode | null, resumePrompt?: string, signal?: AbortSignal, agentOverride?: string, handoffPromptPrefix?: string): Promise<void> {
     const appConfig = this.getConfig();
 
-    // Resolve which agent adapter to use:
-    //   1. Action-level override (per-transition config)
-    //   2. Task's current agent (preserves the adapter used to create the session,
-    //      so resume always uses the same CLI that started the conversation)
-    //   3. Project default agent (for fresh spawns)
-    //   4. Hardcoded fallback
-    const agentName = config.agent || task.agent || appConfig.defaultAgent || 'claude';
+    // Resolve which agent adapter to use.
+    // agentOverride is always populated by the caller (from resolveTargetAgent).
+    // config.agent is a legacy field kept for user-customized actions.
+    // appConfig.defaultAgent is the project-level fallback.
+    const agentName = agentOverride ?? config.agent ?? appConfig.defaultAgent ?? 'claude';
     const adapter = agentRegistry.getOrThrow(agentName);
     const cliPathOverride = appConfig.cliPathOverrides[agentName] ?? null;
 
+    console.log(`[spawnAgent] Detecting ${agentName} CLI...`);
     const detection = await adapter.detect(cliPathOverride);
     if (!detection.found || !detection.path) {
       throw new Error(`${adapter.displayName} CLI not found on PATH`);
     }
+    console.log(`[spawnAgent] ${agentName} CLI found at ${detection.path} (v${detection.version})`);
 
     // Resolution order: swimlane override → global setting
     const permissionMode = permissionOverride ?? appConfig.permissionMode;
@@ -156,45 +157,65 @@ export class TransitionEngine {
     // This covers both worktree paths and the main project path (important
     // for demo mode where the project has never been opened in Claude Code).
     await adapter.ensureTrust(cwd);
+    console.log(`[spawnAgent] Trust ensured for ${cwd}`);
 
-    // Check for a previous session to resume. Uses agent_session_id existence
-    // (not status) to determine resumability - any session that started Claude
-    // and got an agent_session_id has a JSONL transcript that --resume can use.
-    const previousSession = this.sessionRepo?.getLatestForTask(task.id);
-    const resumeCheck = this.sessionRepo
-      ? checkCanResume(task.id, this.sessionRepo)
-      : { resumable: false, agentSessionId: null };
-    const canResume = resumeCheck.resumable;
+    // Resolve whether to resume an existing session or spawn fresh.
+    // The intent resolver queries by adapter.sessionType, so cross-agent
+    // resume mismatches are structurally impossible (no guard needed).
+    // Resume is only attempted when agent_session_id is non-null (real CLI
+    // session ID has been captured or pre-specified).
+    const intent = resolveSpawnIntent({
+      taskId: task.id,
+      sessionType: adapter.sessionType,
+      sessionRepo: this.sessionRepo,
+      promptTemplate: config.promptTemplate,
+      templateVars: vars,
+      resumePrompt,
+    });
+
+    const canResume = intent.mode === 'resume';
+
+    // agent_session_id: the agent CLI's real session ID for --resume/--session-id.
+    // - Resume: use the captured/specified ID from the DB record
+    // - Fresh + Claude (supportsCallerSessionId): generate UUID, pass via --session-id
+    // - Fresh + Codex/Gemini: null (CLI generates its own ID, captured later via hooks)
+    const agentSessionId = canResume
+      ? intent.agentSessionId
+      : (adapter.supportsCallerSessionId ? randomUUID() : null);
+
+    let prompt = intent.prompt;
+
+    // Generate PTY session ID upfront (used for directory naming, DB primary key).
+    // This is Kangentic's internal ID, separate from the agent CLI's session ID.
+    const ptySessionId = randomUUID();
 
     console.log(
-      `[spawn_agent] task=${task.id.slice(0, 8)} previousSession=${previousSession ? `{id=${previousSession.id.slice(0, 8)}, status=${previousSession.status}, agent_id=${previousSession.agent_session_id?.slice(0, 8)}}` : 'none'} canResume=${canResume}`,
+      `[spawnAgent] task=${task.id.slice(0, 8)} intent=${intent.mode}`
+      + ` agent=${agentName} ptySessionId=${ptySessionId.slice(0, 8)}`
+      + (agentSessionId ? ` agentSessionId=${agentSessionId.slice(0, 8)}` : '')
+      + (intent.retireRecordId ? ` retiring=${intent.retireRecordId.slice(0, 8)}` : ''),
     );
 
-    let prompt: string | undefined;
-    let agentSessionId: string;
-
-    if (canResume && resumeCheck.agentSessionId) {
-      // Resume the previous agent conversation, optionally with a preloaded command
-      agentSessionId = resumeCheck.agentSessionId;
-      prompt = resumePrompt;
-      console.log(`[spawn_agent] RESUMING with agent_session_id=${agentSessionId.slice(0, 8)}${resumePrompt ? ` prompt="${resumePrompt.slice(0, 40)}"` : ''}`);
-    } else {
-      // Fresh session: generate an agent session ID upfront so we can
-      // resume with --session-id on recovery. The agent CLI accepts
-      // --session-id <id> "prompt" to create a new session with a given ID.
-      agentSessionId = randomUUID();
-      prompt = config.promptTemplate
-        ? interpolateTemplate(config.promptTemplate, vars)
-        : undefined;
+    // Handoff context overlay (separate from the resume/fresh decision).
+    // Prepends a brief pointer to handoff-context.md with prior work summary.
+    // Uses ptySessionId for directory naming (agent-agnostic internal path).
+    if (handoffPromptPrefix) {
+      const contextPath = `.kangentic/sessions/${ptySessionId}/handoff-context.md`;
+      let resolvedPrefix = handoffPromptPrefix.replace('{{handoffContextPath}}', contextPath);
+      resolvedPrefix = adapter.transformHandoffPrompt(resolvedPrefix, contextPath);
+      prompt = prompt
+        ? resolvedPrefix + '\n\n' + prompt
+        : resolvedPrefix;
     }
 
-    // Ensure the per-session directory exists and compute output paths
+    // Ensure the per-session directory exists and compute output paths.
+    // Directory is named by ptySessionId (internal), NOT agentSessionId (CLI-specific).
     const projectRoot = appConfig.projectPath || cwd;
-    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', agentSessionId);
+    const sessionDir = path.join(projectRoot, '.kangentic', 'sessions', ptySessionId);
     try {
       fs.mkdirSync(sessionDir, { recursive: true });
     } catch (err) {
-      console.error(`[spawn_agent] Failed to create session directory: ${sessionDir}`, err);
+      console.error(`[spawnAgent] Failed to create session directory: ${sessionDir}`, err);
       throw new Error(`Cannot create session directory at ${sessionDir}: ${(err as Error).message}`);
     }
     const { statusOutputPath, eventsOutputPath } = sessionOutputPaths(sessionDir);
@@ -207,8 +228,8 @@ export class TransitionEngine {
       cwd,
       permissionMode: permissionMode as PermissionMode,
       projectRoot: appConfig.projectPath || undefined,
-      sessionId: agentSessionId,
-      resume: !!canResume,
+      sessionId: agentSessionId ?? undefined,
+      resume: canResume,
       nonInteractive: config.nonInteractive ?? false,
       statusOutputPath,
       eventsOutputPath,
@@ -216,21 +237,26 @@ export class TransitionEngine {
       mcpServerEnabled: appConfig.mcpServerEnabled,
     });
 
+    console.log(`[spawnAgent] Command: ${command.slice(0, 120)}...`);
+
     // Last chance to abort before creating a PTY process
     signal?.throwIfAborted();
 
+    console.log(`[spawnAgent] Spawning PTY session for ${agentName}...`);
     const session = await this.sessionManager.spawn({
-      id: randomUUID(),
+      id: ptySessionId,
       taskId: task.id,
       projectId: appConfig.projectId,
       command,
       cwd,
       statusOutputPath,
       eventsOutputPath,
-      resuming: !!canResume,
+      resuming: canResume,
       agentParser: adapter,
       exitSequence: adapter.getExitSequence?.() ?? ['\x03'],
     });
+
+    console.log(`[spawnAgent] PTY session created: id=${session.id.slice(0, 8)} status=${session.status}`);
 
     this.taskRepo.update({
       id: task.id,
@@ -240,15 +266,18 @@ export class TransitionEngine {
 
     // Persist session record for resume capability
     if (this.sessionRepo) {
-      // Retire the old record if we're resuming (suspended/orphaned → exited)
-      if (canResume && previousSession) {
-        retireRecord(this.sessionRepo, previousSession.id);
+      // Retire the old same-type record if resuming (suspended/orphaned -> exited).
+      // Type-scoped: only retires the matching agent's record, preserving
+      // other agents' suspended sessions for future resume.
+      if (intent.retireRecordId) {
+        retireRecord(this.sessionRepo, intent.retireRecordId);
       }
 
       this.sessionRepo.insert({
+        id: ptySessionId,
         task_id: task.id,
         session_type: adapter.sessionType,
-        agent_session_id: agentSessionId,
+        agent_session_id: agentSessionId ?? null,
         command,
         cwd,
         permission_mode: permissionMode,

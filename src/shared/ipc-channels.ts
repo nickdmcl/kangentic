@@ -109,6 +109,9 @@ export const IPC = {
   // Agents
   AGENT_LIST: 'agent:list',
 
+  // Handoffs
+  HANDOFF_LIST: 'handoff:list',
+
   // Shell
   SHELL_GET_AVAILABLE: 'shell:getAvailable',
   SHELL_GET_DEFAULT: 'shell:getDefault',

@@ -1,5 +1,5 @@
 /**
- * Unit tests for getTaskProgress -- the pure function that derives
+ * Unit tests for getTaskProgress - the pure function that derives
  * the discriminated-union display state from raw session, usage,
  * activity, and spawn progress data. Covers all state kinds plus edge cases.
  */
@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { getTaskProgress } from '../../src/renderer/utils/task-progress';
 import type { Session, SessionUsage, ActivityState } from '../../src/shared/types';
 
-/** Minimal session factory -- only fields that matter for the function. */
+/** Minimal session factory - only fields that matter for the function. */
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
     id: 'sess-1',
@@ -55,7 +55,7 @@ describe('getTaskProgress', () => {
   it('ignores spawn progress once session exists', () => {
     const session = makeSession({ status: 'running' });
     const result = getTaskProgress({ session, spawnProgressLabel: 'Fetching latest...' });
-    expect(result.kind).toBe('initializing');
+    expect(result.kind).toBe('running');
   });
 
   it('returns { kind: "exited" } with explicit exitCode', () => {
@@ -82,34 +82,22 @@ describe('getTaskProgress', () => {
       .toEqual({ kind: 'queued' });
   });
 
-  it('returns { kind: "initializing" } with default label when running with no usage', () => {
+  it('returns { kind: "running" } with default activity when running with no usage', () => {
     const session = makeSession({ status: 'running' });
     expect(getTaskProgress({ session }))
-      .toEqual({ kind: 'initializing', label: 'Starting agent...' });
+      .toEqual({ kind: 'running', activity: 'thinking', usage: null });
   });
 
-  it('returns "Resuming..." label when session is resuming', () => {
+  it('returns { kind: "running" } when session is resuming (no usage)', () => {
     const session = makeSession({ status: 'running', resuming: true });
     expect(getTaskProgress({ session }))
-      .toEqual({ kind: 'initializing', label: 'Resuming...' });
+      .toEqual({ kind: 'running', activity: 'thinking', usage: null });
   });
 
-  it('returns "Running command..." label when pending command label is set', () => {
-    const session = makeSession({ status: 'running' });
-    expect(getTaskProgress({ session, pendingCommandLabel: '/code-review' }))
-      .toEqual({ kind: 'initializing', label: 'Running command...' });
-  });
-
-  it('pending command label takes priority over resuming', () => {
-    const session = makeSession({ status: 'running', resuming: true });
-    expect(getTaskProgress({ session, pendingCommandLabel: '/test' }))
-      .toEqual({ kind: 'initializing', label: 'Running command...' });
-  });
-
-  it('returns { kind: "initializing" } when running with activity but no usage', () => {
+  it('returns { kind: "running" } when running with activity but no usage', () => {
     const session = makeSession({ status: 'running' });
     expect(getTaskProgress({ session, activity: 'idle' as ActivityState }))
-      .toEqual({ kind: 'initializing', label: 'Starting agent...' });
+      .toEqual({ kind: 'running', activity: 'idle', usage: null });
   });
 
   it('returns { kind: "running" } when running with usage', () => {

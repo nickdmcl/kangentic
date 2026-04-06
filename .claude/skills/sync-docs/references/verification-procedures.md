@@ -107,6 +107,6 @@ When an anchor maps to multiple target docs, one doc is the **canonical** locati
 
 1. Read `src/shared/template-vars.ts`
 2. Extract all exported template variable names and their descriptions
-3. Read `docs/transition-engine.md` and `docs/claude-integration.md`
+3. Read `docs/transition-engine.md` and `docs/agent-integration.md`
 4. Find sections documenting template variables
 5. Compare: report missing variables

@@ -55,6 +55,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
   const [autoCommand, setAutoCommand] = useState(swimlane?.auto_command || '');
   const [planExitTargetId, setPlanExitTargetId] = useState<string | null>(swimlane?.plan_exit_target_id ?? null);
   const [agentOverride, setAgentOverride] = useState<string | null>(swimlane?.agent_override ?? null);
+  const [handoffContext, setHandoffContext] = useState(swimlane?.handoff_context ?? false);
   const [agentList, setAgentList] = useState<AgentDetectionInfo[]>(() => useConfigStore.getState().agentList);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +95,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
         auto_command: autoCommand.trim() || null,
         plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
         agent_override: agentOverride || null,
+        handoff_context: handoffContext,
       });
       // Reorder to place before the Done column (use fresh store state after create)
       const currentSwimlanes = useBoardStore.getState().swimlanes;
@@ -118,6 +120,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
         auto_command: isTodoOrDone ? undefined : (autoCommand.trim() || null),
         plan_exit_target_id: isPlanMode ? (planExitTargetId || null) : undefined,
         agent_override: isTodoOrDone ? undefined : (agentOverride || null),
+        handoff_context: isTodoOrDone ? undefined : handoffContext,
       });
     }
     onClose();
@@ -415,6 +418,32 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
               </select>
               <p className="text-[11px] text-fg-faint mt-1">
                 Override the project default agent for this column.
+              </p>
+            </div>
+
+            {/* Handoff context toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-fg-muted">Handoff context</label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={handoffContext}
+                  aria-label="Handoff context"
+                  onClick={() => setHandoffContext(!handoffContext)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    handoffContext ? 'bg-accent' : 'bg-edge-input'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      handoffContext ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-[11px] text-fg-faint mt-1">
+                When a task arrives from a different agent, pass the prior session's context.
               </p>
             </div>
 

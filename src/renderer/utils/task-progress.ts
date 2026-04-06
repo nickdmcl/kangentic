@@ -12,33 +12,16 @@ import type { Session, SessionUsage, ActivityState, SessionDisplayState } from '
 // and TerminalTab.tsx (deriveOverlayLabel).
 //
 // Display lifecycle:
-//   preparing → initializing → running → exited
-//                                      → suspended
+//   preparing → running → exited
+//                       → suspended
 //
 // - preparing:    Pre-session phase (worktree creation, branch checkout)
-// - initializing: PTY spawned, waiting for first usage report
-// - running:      Claude CLI active with usage data
+// - running:      Agent CLI active (usage data optional)
 // - queued:       Waiting for a concurrency slot
 // - suspended:    Session paused
 // - exited:       PTY process terminated
 // - none:         No session, no progress
 // ---------------------------------------------------------------------------
-
-/**
- * Derive the initializing label when the PTY is spawned but usage hasn't
- * arrived yet. Priority chain (highest first):
- *   1. Pending command label ("Running command...")
- *   2. Resuming session ("Resuming...")
- *   3. Default ("Starting agent...")
- */
-function deriveInitializingLabel(
-  pendingCommandLabel: string | null | undefined,
-  isResuming: boolean,
-): string {
-  if (pendingCommandLabel) return 'Running command...';
-  if (isResuming) return 'Resuming...';
-  return 'Starting agent...';
-}
 
 /**
  * Derive the terminal overlay label. Extends the initializing label with
@@ -74,9 +57,8 @@ export function getTaskProgress(inputs: {
   usage?: SessionUsage;
   activity?: ActivityState;
   spawnProgressLabel?: string | null;
-  pendingCommandLabel?: string | null;
 }): SessionDisplayState {
-  const { session, usage, activity, spawnProgressLabel, pendingCommandLabel } = inputs;
+  const { session, usage, activity, spawnProgressLabel } = inputs;
 
   // Pre-session: spawn progress from main process (worktree creation, etc.)
   if (spawnProgressLabel && !session) {
@@ -93,16 +75,13 @@ export function getTaskProgress(inputs: {
     case 'queued':
       return { kind: 'queued' };
     case 'running': {
-      if (!usage) {
-        return {
-          kind: 'initializing',
-          label: deriveInitializingLabel(pendingCommandLabel, session.resuming),
-        };
-      }
+      // Session is running - show as running regardless of usage data.
+      // Usage enriches the display (model, cost, context %) but its
+      // absence doesn't mean the agent isn't running.
       return {
         kind: 'running',
         activity: activity ?? 'thinking',
-        usage,
+        usage: usage ?? null,
       };
     }
   }
@@ -110,7 +89,7 @@ export function getTaskProgress(inputs: {
 
 /**
  * React hook for TaskCard progress state. Subscribes to minimal store slices.
- * Replaces useSessionDisplayState + deriveInitializingLabel + manual subscriptions.
+ * Replaces useSessionDisplayState + manual subscriptions.
  */
 export function useTaskProgress(taskId: string, sessionId: string | undefined): SessionDisplayState {
   const taskSession = useSessionStore(
@@ -141,23 +120,14 @@ export function useTaskProgress(taskId: string, sessionId: string | undefined): 
       [taskId],
     ),
   );
-  const pendingCommandLabel = useSessionStore(
-    useCallback(
-      (s: ReturnType<typeof useSessionStore.getState>) =>
-        s.pendingCommandLabel[taskId] ?? null,
-      [taskId],
-    ),
-  );
-
   return useMemo(
     () => getTaskProgress({
       session: taskSession,
       usage,
       activity,
       spawnProgressLabel,
-      pendingCommandLabel,
     }),
-    [taskSession, usage, activity, spawnProgressLabel, pendingCommandLabel],
+    [taskSession, usage, activity, spawnProgressLabel],
   );
 }
 

@@ -60,14 +60,14 @@ describe('GeminiCommandBuilder', () => {
       expect(command).toContain('--approval-mode plan');
     });
 
-    it('acceptEdits maps to --approval-mode autoEdit', () => {
+    it('acceptEdits maps to --approval-mode auto_edit', () => {
       const command = buildCommand({ permissionMode: 'acceptEdits' });
-      expect(command).toContain('--approval-mode autoEdit');
+      expect(command).toContain('--approval-mode auto_edit');
     });
 
-    it('auto maps to --approval-mode autoEdit', () => {
+    it('auto maps to --approval-mode auto_edit', () => {
       const command = buildCommand({ permissionMode: 'auto' });
-      expect(command).toContain('--approval-mode autoEdit');
+      expect(command).toContain('--approval-mode auto_edit');
     });
 
     it('bypassPermissions maps to --approval-mode yolo', () => {

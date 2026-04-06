@@ -16,11 +16,15 @@ When a task moves from one column to another, the IPC handler (`task:move`) chec
 | 3 | Task has **active session** | If target has `auto_command`, suspend and respawn with command as resume prompt. Otherwise keep alive (permission mode differences alone do not trigger suspend/resume). |
 | 4 | Task has **no session** | Resume suspended session (with `auto_command` preloaded as resume prompt) OR create worktree (if enabled) + execute transition action chain |
 
-### Priority 3: Permission Mode Guard
+### Priority 3: Active Session Handling
 
-When a task with an active session moves to a column that has an `auto_command` configured, the session is suspended and resumed with the command as the resume prompt. During this transition, a shimmer overlay appears in the terminal UI while the new session starts.
+Priority 3 has three sub-cases, checked in order:
 
-Permission mode differences alone do not trigger suspend/resume. If the target column has no `auto_command`, the session stays alive with no interruption regardless of permission mode.
+**a) Agent change (handoff):** If `resolveTargetAgent()` returns a different agent than the current session's agent, the session is suspended and the engine falls through to the `spawnAgent` path. The `agentOverride` parameter is set on the spawn request to prevent the new session from resuming the old agent's session. If the target column has `handoff_context` enabled, prior work context (transcript, git diff, metrics) is packaged and delivered to the new agent. If disabled (the default), the new agent starts fresh with just the task title/description. See [Cross-Agent Handoff](#cross-agent-handoff) below.
+
+**b) Same agent + auto_command:** If the target column has an `auto_command` configured, the command is injected directly into the running session via `CommandInjector`. No suspend/resume cycle occurs.
+
+**c) Same agent, no auto_command:** The session stays alive with no interruption. Permission mode differences alone do not trigger suspend/resume.
 
 Transition action chains (priority 4) only fire when a task has no active session.
 
@@ -202,9 +206,22 @@ New projects get:
 - Transition: `* → Planning` = Kill Session (order 0), Start Planning Agent (order 1)
 - Transition: `* → Done` = Kill Session (order 0)
 
+## Cross-Agent Handoff
+
+When a task moves to a column with a different agent (detected by `resolveTargetAgent()` in `src/main/engine/agent-resolver.ts`), a cross-agent handoff occurs:
+
+1. **Agent resolution** detects agent change: `resolveTargetAgent()` checks column `agent_override`, then project `default_agent`, then global fallback (`'claude'`). If the resolved agent differs from the current session's agent, a handoff is triggered.
+2. **Task-move Priority 3** suspends the current session.
+3. **spawnAgent handoff path** - the `agentOverride` parameter is passed to `executeSpawnAgent()`, which prevents resume of the wrong agent's session.
+4. **HandoffOrchestrator** packages context from the previous session: transcript (from `session_transcripts`), git diff, and session metrics.
+5. **Transition engine** spawns the new agent with a `handoffPromptPrefix` that summarizes the handoff context.
+6. **Post-spawn** - a `handoff-context.md` file is written to the session directory for the new agent to reference.
+
+Spawn progress phases during handoff: `packaging-handoff` (while context is being assembled), `detecting-agent` (while the target agent CLI is detected), then `starting-agent`.
+
 ## See Also
 
 - [Session Lifecycle](session-lifecycle.md) -- spawn flow, queue, suspend, resume
-- [Claude Integration](claude-integration.md) -- command building, permission modes
+- [Agent Integration](agent-integration.md) -- command building, permission modes, per-agent CLI details
 - [Worktree Strategy](worktree-strategy.md) -- worktree creation details
 - [Database](database.md) -- schema for actions, transitions, swimlanes

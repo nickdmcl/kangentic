@@ -14,10 +14,11 @@ export class GeminiAdapter implements AgentAdapter {
   readonly name = 'gemini';
   readonly displayName = 'Gemini CLI';
   readonly sessionType = 'gemini_agent';
+  readonly supportsCallerSessionId = false;
   readonly permissions: AgentPermissionEntry[] = [
-    { mode: 'plan', label: 'Plan (Read-Only)' },
-    { mode: 'default', label: 'Default (Interactive)' },
-    { mode: 'acceptEdits', label: 'Auto-Edit' },
+    { mode: 'plan', label: 'Plan (Read-Only Research)' },
+    { mode: 'default', label: 'Default (Confirm Actions)' },
+    { mode: 'acceptEdits', label: 'Auto Edit (Auto-Approve Edits)' },
     { mode: 'bypassPermissions', label: 'YOLO (Auto-Approve All)' },
   ];
   readonly defaultPermission: PermissionMode = 'acceptEdits';
@@ -64,5 +65,24 @@ export class GeminiAdapter implements AgentAdapter {
 
   getExitSequence(): string[] {
     return ['\x03', '/quit\r'];
+  }
+
+  detectFirstOutput(data: string): boolean {
+    // Gemini CLI hides the cursor when its TUI takes over the terminal.
+    // Detecting ESC[?25l fires after the shell prompt noise but before
+    // the TUI draws the startup banner. This keeps the shell command
+    // hidden behind the shimmer overlay.
+    return data.includes('\x1b[?25l');
+  }
+
+  transformHandoffPrompt(prompt: string, contextFilePath: string): string {
+    return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
+  }
+
+  extractSessionId(hookContext: string): string | null {
+    try {
+      const context = JSON.parse(hookContext);
+      return typeof context.session_id === 'string' ? context.session_id : null;
+    } catch { return null; }
   }
 }

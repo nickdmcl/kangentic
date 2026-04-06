@@ -275,6 +275,7 @@ export class BoardConfigManager {
             auto_spawn: (isTodo || isDone) ? false : (columnConfig.autoSpawn ?? existing.auto_spawn),
             auto_command: columnConfig.autoCommand ?? existing.auto_command,
             agent_override: (isTodo || isDone) ? null : (columnConfig.agentOverride ?? existing.agent_override),
+            handoff_context: columnConfig.handoffContext ?? existing.handoff_context,
           });
         } else {
           // Create new column (pass config id if provided, otherwise repo generates UUID)
@@ -290,6 +291,7 @@ export class BoardConfigManager {
             auto_spawn: (isTodo || isDone) ? false : (columnConfig.autoSpawn ?? true),
             auto_command: columnConfig.autoCommand ?? null,
             agent_override: (isTodo || isDone) ? null : (columnConfig.agentOverride ?? null),
+            handoff_context: columnConfig.handoffContext ?? false,
             position: index,
           });
         }
@@ -628,6 +630,7 @@ export class BoardConfigManager {
           if (lane.is_archived && lane.role !== 'done') column.archived = true;
           if (lane.auto_command) column.autoCommand = lane.auto_command;
           if (lane.agent_override) column.agentOverride = lane.agent_override;
+          if (lane.handoff_context) column.handoffContext = true;
 
           // Resolve plan_exit_target_id to target column name
           if (lane.plan_exit_target_id) {

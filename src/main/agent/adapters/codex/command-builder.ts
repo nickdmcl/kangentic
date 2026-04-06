@@ -19,18 +19,29 @@ export interface CodexCommandOptions {
   mcpServerEnabled?: boolean;
 }
 
-/** Map Kangentic's PermissionMode to Codex CLI approval-mode flags. */
+/**
+ * Map Kangentic's PermissionMode to Codex CLI sandbox + approval flags.
+ * Each combination matches a documented Codex preset exactly:
+ *   plan        → Safe read-only browsing
+ *   dontAsk     → Read-only non-interactive (CI)
+ *   default     → Automatically edit, ask for untrusted commands
+ *   acceptEdits → Auto (preset)
+ *   auto        → Auto (preset)
+ *   bypass      → Dangerous full access (--yolo)
+ */
 function mapPermissionMode(mode: PermissionMode): string[] {
   switch (mode) {
     case 'plan':
-    case 'default':
+      return ['--sandbox', 'read-only', '--ask-for-approval', 'on-request'];
     case 'dontAsk':
-      return ['--approval-mode', 'suggest'];
+      return ['--sandbox', 'read-only', '--ask-for-approval', 'never'];
+    case 'default':
+      return ['--sandbox', 'workspace-write', '--ask-for-approval', 'untrusted'];
     case 'acceptEdits':
     case 'auto':
-      return ['--approval-mode', 'auto-edit'];
+      return ['--full-auto'];
     case 'bypassPermissions':
-      return ['--approval-mode', 'full-auto'];
+      return ['--dangerously-bypass-approvals-and-sandbox'];
   }
 }
 

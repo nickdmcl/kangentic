@@ -107,10 +107,14 @@ export function promoteRecord(
 }
 
 /**
- * Handle stale session ID recovery. When a resuming session reports a
- * different session_id (from status.json) than the agent_session_id stored
- * in the DB, --resume failed silently and the agent created a fresh session.
- * Update the DB so the next resume uses the agent's actual UUID.
+ * Handle agent session ID capture or stale recovery. Called when an agent
+ * reports its real session ID (from status.json for Claude, from hooks for
+ * Gemini/Codex). Updates the DB record so the ID can be used for --resume.
+ *
+ * Two scenarios:
+ * 1. Fresh capture: agent_session_id was null (Codex/Gemini), now captured.
+ * 2. Stale recovery: agent_session_id was pre-specified (Claude) but the
+ *    agent created a different session (--resume failed silently).
  */
 export function recoverStaleSessionId(
   sessionRepo: SessionRepository,
@@ -118,12 +122,25 @@ export function recoverStaleSessionId(
   agentReportedId: string,
 ): boolean {
   const record = sessionRepo.getLatestForTask(taskId);
-  if (record && record.agent_session_id && record.agent_session_id !== agentReportedId) {
+  if (!record) return false;
+
+  // Fresh capture: agent_session_id was null, now we have the real ID
+  if (!record.agent_session_id) {
+    console.log(
+      `[SESSION_LIFECYCLE] Captured agent session ID for task ${taskId.slice(0, 8)}: ${agentReportedId.slice(0, 8)}`,
+    );
+    sessionRepo.updateAgentSessionId(record.id, agentReportedId);
+    return true;
+  }
+
+  // Stale recovery: ID was pre-specified but agent reports a different one
+  if (record.agent_session_id !== agentReportedId) {
     console.log(
       `[SESSION_LIFECYCLE] Stale ID recovery: task ${taskId.slice(0, 8)} expected agent_session_id=${record.agent_session_id.slice(0, 8)} but agent reported ${agentReportedId.slice(0, 8)}. Updating DB.`,
     );
     sessionRepo.updateAgentSessionId(record.id, agentReportedId);
     return true;
   }
+
   return false;
 }

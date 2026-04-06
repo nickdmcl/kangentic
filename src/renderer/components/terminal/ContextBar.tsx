@@ -42,7 +42,20 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const pctRef = useValuePulse(usage ? Math.round(usage.contextWindow.usedPercentage) : 0);
   const fractionRef = useValuePulse(usage?.contextWindow.usedTokens);
 
-  if (!usage) return null;
+  // When there's no usage data (agents without structured status output),
+  // still show the agent name so the user knows which agent is running.
+  if (!usage) {
+    const agentLabel = agentDisplayName(taskAgent);
+    if (!agentLabel) return null;
+    return (
+      <div
+        className="h-8 bg-surface/80 border-t border-edge flex items-center px-3 gap-2 text-xs flex-shrink-0"
+        data-testid="usage-bar"
+      >
+        <span className={`${pill} text-fg-muted`}>{agentLabel}</span>
+      </div>
+    );
+  }
 
   const pct = Math.round(usage.contextWindow.usedPercentage);
   const progressColor = getProgressColor(pct);

@@ -16,7 +16,8 @@ Each doc file and the source files that are its authority:
 | `architecture.md` | `src/shared/ipc-channels.ts`, `src/preload/preload.ts`, `src/renderer/stores/`, `src/main/pty/session-manager.ts` |
 | `session-lifecycle.md` | `src/main/pty/session-manager.ts`, `src/main/pty/session-queue.ts`, `src/main/engine/session-recovery.ts` |
 | `configuration.md` | `src/shared/types.ts` (AppConfig, DEFAULT_CONFIG, GLOBAL_ONLY_PATHS), `src/main/config/config-manager.ts` |
-| `claude-integration.md` | `src/main/agent/adapters/claude/command-builder.ts`, `src/main/agent/adapters/claude/hook-manager.ts`, `src/main/agent/adapters/claude/trust-manager.ts`, `src/main/agent/adapters/claude/detector.ts` |
+| `agent-integration.md` | `src/main/agent/agent-adapter.ts`, `src/main/agent/adapters/claude/command-builder.ts`, `src/main/agent/adapters/claude/hook-manager.ts`, `src/main/agent/adapters/claude/trust-manager.ts`, `src/main/agent/adapters/codex/command-builder.ts`, `src/main/agent/adapters/gemini/command-builder.ts`, `src/main/agent/adapters/aider/aider-adapter.ts`, `src/main/engine/agent-resolver.ts` |
+| `handoff.md` | `src/main/agent/handoff/`, `src/main/ipc/helpers/agent-spawn.ts` (handoff path) |
 | `transition-engine.md` | `src/main/engine/transition-engine.ts`, `src/shared/types.ts` (ActionType, ActionConfig) |
 | `database.md` | `src/main/db/migrations.ts`, `src/main/db/database.ts`, `src/main/db/repositories/*.ts` |
 | `cross-platform.md` | `src/main/pty/shell-resolver.ts`, `electron-builder.yml`, `scripts/build.js` |
@@ -85,7 +86,7 @@ Anchors are enumerable source-code structures that must be exhaustively listed i
 | `SuspendedBy` | Union variants | database.md |
 | `ThemeMode` | Union variants | configuration.md |
 | `EventType` | Object keys | activity-detection.md |
-| `HookEvent` | Object keys | claude-integration.md |
+| `HookEvent` | Object keys | agent-integration.md |
 | `EventTypeActivity` | Mapping entries | activity-detection.md |
 | `AppConfig` / `DEFAULT_CONFIG` | Flattened dot-paths + defaults | configuration.md |
 | `BoardConfig` | Interface fields | configuration.md |
@@ -113,11 +114,27 @@ Anchors are enumerable source-code structures that must be exhaustively listed i
 | Settings tabs | `src/renderer/components/settings/AppSettingsPanel.tsx` tab array | user-guide.md, configuration.md |
 | Settings registry | `src/renderer/components/settings/settings-registry.ts` entries | configuration.md |
 
+### Agent Adapter Anchors
+
+| Anchor | Source file(s) | Target doc |
+|--------|---------------|------------|
+| AgentAdapter interface methods | `src/main/agent/agent-adapter.ts` | agent-integration.md (interface table) |
+| AgentAdapter required properties | `src/main/agent/agent-adapter.ts` | agent-integration.md (properties table) |
+| Supported agents table | `src/main/agent/adapters/*/` (one adapter per agent) | agent-integration.md (supported agents table) |
+| Per-agent permission modes | `src/main/agent/adapters/claude/claude-adapter.ts`, `src/main/agent/adapters/codex/codex-adapter.ts`, `src/main/agent/adapters/gemini/gemini-adapter.ts`, `src/main/agent/adapters/aider/aider-adapter.ts` | agent-integration.md (per-agent permission tables) |
+| Per-agent CLI flag mappings | `src/main/agent/adapters/codex/command-builder.ts`, `src/main/agent/adapters/gemini/command-builder.ts`, `src/main/agent/adapters/aider/aider-adapter.ts` | agent-integration.md (per-agent permission tables) |
+| First-output detection strategies | All adapter files (`detectFirstOutput` method) | agent-integration.md (first-output detection table) |
+| Exit sequences | All adapter files (`getExitSequence` method) | agent-integration.md (exit sequences table) |
+| Handoff prompt transforms | All adapter files (`transformHandoffPrompt` method) | agent-integration.md (handoff prompt transform table) |
+| ContextPacket fields | `src/main/agent/handoff/context-packet.ts` | handoff.md (context packet section) |
+| HandoffMetrics fields | `src/main/agent/handoff/context-packet.ts` | handoff.md (metrics table) |
+| Handoff DB columns | `src/main/db/repositories/handoff-repository.ts` | handoff.md (database storage table) |
+
 ### Template Anchors
 
 | Anchor | Source file | Target doc |
 |--------|-----------|------------|
-| Template variables | `src/shared/template-vars.ts` | configuration.md (canonical), transition-engine.md and claude-integration.md (cross-reference only) |
+| Template variables | `src/shared/template-vars.ts` | configuration.md (canonical), transition-engine.md and agent-integration.md (cross-reference only) |
 
 ### Verification Procedures
 
@@ -159,6 +176,10 @@ Check if any changed source files are anchor sources (see Anchor Points section 
 - `src/renderer/components/settings/AppSettingsPanel.tsx`
 - `src/renderer/components/settings/settings-registry.ts`
 - `src/shared/template-vars.ts`
+- `src/main/agent/agent-adapter.ts`
+- `src/main/agent/adapters/*/` (any adapter file)
+- `src/main/agent/handoff/context-packet.ts`
+- `src/main/db/repositories/handoff-repository.ts`
 
 If any anchor source files appear in the changed-file list:
 

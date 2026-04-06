@@ -62,14 +62,13 @@ function seedActionsAndTransitions(db: Database.Database, now: string): void {
     'INSERT INTO actions (id, name, type, config_json, created_at) VALUES (?, ?, ?, ?, ?)'
   );
 
-  // Planning agent: launches Claude in plan mode
+  // Planning agent: launches the project's default agent (or column override)
   const planActionId = uuidv4();
   insertAction.run(
     planActionId,
     'Start Planning Agent',
     'spawn_agent',
     JSON.stringify({
-      agent: 'claude',
       promptTemplate: '{{title}}{{description}}{{attachments}}',
     }),
     now,

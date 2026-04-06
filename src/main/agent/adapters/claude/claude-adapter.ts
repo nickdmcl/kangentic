@@ -15,6 +15,7 @@ export class ClaudeAdapter implements AgentAdapter {
   readonly name = 'claude';
   readonly displayName = 'Claude Code';
   readonly sessionType = 'claude_agent';
+  readonly supportsCallerSessionId = true;
   readonly permissions: AgentPermissionEntry[] = [
     { mode: 'plan', label: 'Plan (Read-Only)' },
     { mode: 'dontAsk', label: "Don't Ask (Deny Unless Allowed)" },
@@ -68,5 +69,17 @@ export class ClaudeAdapter implements AgentAdapter {
 
   getExitSequence(): string[] {
     return ['\x03', '/exit\r'];
+  }
+
+  detectFirstOutput(data: string): boolean {
+    // Claude Code hides the cursor when its TUI takes over the terminal.
+    // Detecting ESC[?25l fires after the shell prompt noise but before
+    // the TUI draws the startup banner, keeping the shell command hidden
+    // behind the shimmer overlay.
+    return data.includes('\x1b[?25l');
+  }
+
+  transformHandoffPrompt(prompt: string, _contextFilePath: string): string {
+    return prompt + '\n\nYou can also use the `kangentic_get_handoff_context` MCP tool for structured access to the prior work context.';
   }
 }

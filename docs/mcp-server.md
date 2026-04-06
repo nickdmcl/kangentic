@@ -189,6 +189,32 @@ Move backlog tasks to the board, creating tasks in the specified column.
 
 Attachments on promoted backlog tasks are automatically copied to the new task.
 
+### kangentic_get_handoff_context
+
+Get full handoff context for a task, including transcript, git changes, and session metrics. Used during cross-agent handoff to package context from one agent's session for another.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskId` | string | Yes | Task ID |
+| `section` | string | No | Which section to return: `all` (default), `decisions`, `changes`, `transcript`, or `metrics` |
+
+### kangentic_get_transcript
+
+Get the ANSI-stripped session transcript for a task or session. At least one of `taskId` or `sessionId` must be provided.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskId` | string | No | Task ID (returns transcript for the task's latest session) |
+| `sessionId` | string | No | Session ID (returns transcript for a specific session) |
+
+### kangentic_query_db
+
+Run a read-only SQL query against the project database. The connection uses `PRAGMA query_only = ON` to prevent any write operations.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `sql` | string | Yes | SQL query to execute |
+
 ## Configuration
 
 ### Project Setting

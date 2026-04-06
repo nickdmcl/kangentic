@@ -168,10 +168,12 @@ export function useTerminal(options: UseTerminalOptions) {
 
       // Immediate resize to sync PTY dimensions
       window.electronAPI.sessions.resize(sid, cols, rows)
-        .then(({ colsChanged }) => {
-          // Cols changed: scrollback is stale (old width). Skip it.
-          // CLI redraws via SIGWINCH; live onData populates the terminal.
-          if (colsChanged || suppressScrollback) return null;
+        .then(() => {
+          // Skip scrollback when the overlay is suppressing data (shimmer showing).
+          // The shimmer-lift effect will call reloadScrollback() when ready.
+          if (suppressScrollback) return null;
+          // Always fetch scrollback regardless of cols change.
+          // getScrollback() strips pre-TUI noise at read time.
           return window.electronAPI.sessions.getScrollback(sid);
         })
         .then((scrollback) => {
@@ -328,10 +330,10 @@ export function useTerminal(options: UseTerminalOptions) {
     const sessionId = options.sessionId;
 
     window.electronAPI.sessions.resize(sessionId, cols, rows)
-      .then(({ colsChanged }) => {
-        // Cols changed: scrollback is stale (old width). Skip it.
-        // CLI redraws via SIGWINCH; live onData populates the terminal.
-        if (colsChanged) return null;
+      .then(() => {
+        // Always replay scrollback. getScrollback() strips pre-TUI noise
+        // (shell command) at read time. Wrong-width content may briefly
+        // flash but the SIGWINCH redraw corrects it immediately.
         return window.electronAPI.sessions.getScrollback(sessionId);
       })
       .then((scrollback) => {

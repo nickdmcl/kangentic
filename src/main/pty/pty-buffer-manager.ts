@@ -15,6 +15,10 @@ interface BufferState {
    *  The initial resize must NOT clear scrollback - it contains carried-over
    *  history from a previous session that hasn't been replayed yet. */
   initialized: boolean;
+  /** Position of the first \x1b[2J (clear screen) in the scrollback, or -1
+   *  if not found yet. Set once and cached. Used by getScrollback() to strip
+   *  shell command noise that precedes the agent TUI's first draw. */
+  tuiStartIndex: number;
 }
 
 /**
@@ -38,6 +42,7 @@ export class PtyBufferManager {
       scrollback: previousScrollback,
       lastCols: initialCols,
       initialized: false,
+      tuiStartIndex: previousScrollback ? 0 : -1,
     });
   }
 
@@ -46,7 +51,6 @@ export class PtyBufferManager {
     if (!state) return;
 
     state.buffer += data;
-    // Accumulate scrollback for late-connecting terminals
     state.scrollback += data;
     if (state.scrollback.length > MAX_SCROLLBACK) {
       state.scrollback = state.scrollback.slice(-MAX_SCROLLBACK);
@@ -54,6 +58,8 @@ export class PtyBufferManager {
       if (safeStart > 0) {
         state.scrollback = state.scrollback.slice(safeStart);
       }
+      // Reset cached index after truncation
+      state.tuiStartIndex = -1;
     }
     if (!state.flushScheduled) {
       state.flushScheduled = true;
@@ -70,24 +76,19 @@ export class PtyBufferManager {
   }
 
   /**
-   * When column width changes, clear scrollback. TUI escape sequences
-   * (absolute cursor positioning, colored bars) garble when replayed
-   * at a different width. Claude Code redraws via SIGWINCH within ~50-100ms.
+   * When column width changes, report it so the renderer can decide whether
+   * to skip scrollback replay (TUI escape sequences garble at wrong width).
    *
    * The FIRST resize after initSession is special: it establishes the real
    * terminal dimensions (the renderer fits to its container). We must NOT
-   * clear scrollback on this initial resize because it may contain
+   * report cols changed on this initial resize because it may contain
    * carried-over history from a suspended session that hasn't been replayed
-   * to the xterm instance yet. Clearing it would lose all terminal history.
+   * to the xterm instance yet.
    */
   onResize(sessionId: string, cols: number): boolean {
     const state = this.buffers.get(sessionId);
     if (!state) return false;
 
-    // First resize: establish real dimensions without clearing scrollback.
-    // The renderer calls resize immediately after creating the xterm, before
-    // fetching scrollback. If we cleared here, the scrollback would be gone
-    // before the renderer ever reads it.
     if (!state.initialized) {
       state.initialized = true;
       state.lastCols = cols;
@@ -95,10 +96,6 @@ export class PtyBufferManager {
     }
 
     const colsChanged = cols !== state.lastCols;
-    if (colsChanged) {
-      state.scrollback = '';
-      state.buffer = '';
-    }
     state.lastCols = cols;
     return colsChanged;
   }
@@ -111,7 +108,23 @@ export class PtyBufferManager {
     // both buffer and scrollback by onData() would be delivered twice:
     // once via the scrollback replay and again by the stale flush.
     state.buffer = '';
-    return '\x1b[0m' + state.scrollback;
+
+    let scrollback = state.scrollback;
+
+    // Strip pre-TUI noise (shell command line) on first read.
+    // The \x1b[2J (clear screen) marks where the agent TUI took over.
+    // Best-effort heuristic: agents without a TUI (e.g. Aider) don't emit
+    // [2J, so their shell command stays in scrollback.
+    // Cache the index so subsequent reads don't re-scan.
+    if (state.tuiStartIndex === -1) {
+      const clearIdx = scrollback.indexOf('\x1b[2J');
+      state.tuiStartIndex = clearIdx > 0 ? clearIdx : 0;
+    }
+    if (state.tuiStartIndex > 0) {
+      scrollback = scrollback.slice(state.tuiStartIndex);
+    }
+
+    return '\x1b[0m' + scrollback;
   }
 
   /** Return raw scrollback for carry-over on respawn. */

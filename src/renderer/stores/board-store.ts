@@ -232,9 +232,10 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
       useSessionStore.getState().setPendingCommandLabel(input.taskId, targetLane.auto_command.trim());
     }
 
-    // Optimistically show spawn progress for auto-spawn columns.
-    // Main process will overwrite with real phase labels once processing starts.
-    if (isColumnChange && targetLane?.auto_spawn) {
+    // Optimistically show spawn progress for auto-spawn columns, but only
+    // when the task doesn't already have a running session. Same-agent moves
+    // with auto_command inject directly without restarting the session.
+    if (isColumnChange && targetLane?.auto_spawn && !prevSessionId) {
       useSessionStore.getState().setSpawnProgress(input.taskId, 'Initializing...');
     }
 
@@ -263,6 +264,9 @@ const createTaskSlice: StateCreator<BoardStore, [], [], TaskSlice> = (set, get) 
       const movedTask = tasks.find((t) => t.id === input.taskId);
       if (movedTask?.session_id && movedTask.session_id !== prevSessionId) {
         useSessionStore.setState({ activeSessionId: movedTask.session_id });
+        // Explicitly clear spawn progress - the session-changed IPC push event
+        // may not have been processed yet (races with the TASK_MOVE response).
+        useSessionStore.getState().setSpawnProgress(input.taskId, null);
         const isResume = prevSessionId !== null;
         useToastStore.getState().addToast({
           message: isResume

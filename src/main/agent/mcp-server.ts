@@ -629,6 +629,84 @@ server.registerTool(
   },
 );
 
+// --- kangentic_get_handoff_context ---
+server.registerTool(
+  'kangentic_get_handoff_context',
+  {
+    description: 'Get the full handoff context for a task. Call this when you are continuing work started by a previous agent. Returns the prior session transcript, git changes, commit messages, and metrics. Use this for structured access to the prior agent\'s work.',
+    inputSchema: z.object({
+      taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
+      section: z.enum(['all', 'decisions', 'changes', 'transcript', 'metrics']).optional()
+        .describe('Which section to retrieve. "all" returns everything. "decisions" returns commit messages. "changes" returns file change list. "transcript" returns the full session transcript. "metrics" returns cost/token/duration stats. Defaults to "all".'),
+    }),
+  },
+  async ({ taskId, section }) => {
+    try {
+      const response = await sendCommand('get_handoff_context', {
+        taskId: taskId ?? null,
+        section: section ?? 'all',
+      });
+      if (!response.success) {
+        return { content: [{ type: 'text' as const, text: `Failed to get handoff context: ${response.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: response.message ?? JSON.stringify(response.data) }] };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text' as const, text: `Error getting handoff context: ${errorMessage}` }], isError: true };
+    }
+  },
+);
+
+// --- kangentic_get_transcript ---
+server.registerTool(
+  'kangentic_get_transcript',
+  {
+    description: 'Get the full ANSI-stripped session transcript for a task. Returns the complete terminal output from the agent session, useful for reviewing what an agent did, debugging issues, or auditing work. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
+    inputSchema: z.object({
+      taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). Returns transcript from the most recent session for this task.'),
+      sessionId: z.string().optional().describe('Session UUID for a specific session. Use kangentic_get_session_history to find session IDs.'),
+    }),
+  },
+  async ({ taskId, sessionId }) => {
+    try {
+      const response = await sendCommand('get_transcript', {
+        taskId: taskId ?? null,
+        sessionId: sessionId ?? null,
+      });
+      if (!response.success) {
+        return { content: [{ type: 'text' as const, text: `Failed to get transcript: ${response.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: response.message ?? 'No transcript available.' }] };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text' as const, text: `Error getting transcript: ${errorMessage}` }], isError: true };
+    }
+  },
+);
+
+// --- kangentic_query_db ---
+server.registerTool(
+  'kangentic_query_db',
+  {
+    description: 'Run a read-only SQL query against the current project database. Only SELECT, PRAGMA, and WITH (CTE) statements are allowed. Returns up to 100 rows as a markdown table. Useful for debugging, inspecting internal state, and answering questions about sessions, tasks, transcripts, handoffs, and other project data. Key tables: tasks, swimlanes, sessions, session_transcripts, handoffs, actions, swimlane_transitions, backlog_items.',
+    inputSchema: z.object({
+      sql: z.string().describe('SQL query to execute. Must be a SELECT, PRAGMA, or WITH statement. Examples: "SELECT * FROM session_transcripts", "SELECT name, sql FROM sqlite_master WHERE type=\'table\'", "PRAGMA table_info(sessions)"'),
+    }),
+  },
+  async ({ sql }) => {
+    try {
+      const response = await sendCommand('query_db', { sql });
+      if (!response.success) {
+        return { content: [{ type: 'text' as const, text: `Query error: ${response.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: response.message ?? 'No results.' }] };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text' as const, text: `Error running query: ${errorMessage}` }], isError: true };
+    }
+  },
+);
+
 // Start the server
 async function main() {
   const transport = new StdioServerTransport();

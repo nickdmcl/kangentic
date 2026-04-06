@@ -252,10 +252,13 @@ Click the column header's settings icon. You can configure:
 | **Name** | Column display name |
 | **Color** | Header accent color |
 | **Icon** | Lucide icon name (e.g., `square-terminal`, `code`, `flask-conical`) |
+| **Agent** | Override the project's default agent for this column (e.g., use Codex for code review) |
 | **Permission Mode** | Override the global permission mode for agents in this column |
 | **Auto Spawn** | Whether moving a task here spawns an agent (default: on) |
 | **Auto Command** | Command injected into running sessions when tasks arrive |
 | **Plan Exit Target** | For plan-mode columns: where tasks move when planning completes |
+
+When a column's agent override differs from the current session's agent, moving a task into that column triggers a cross-agent handoff. The outgoing agent's context (transcript, git changes, metrics) is automatically packaged and delivered to the incoming agent.
 
 ### Reorder Columns
 
@@ -313,12 +316,12 @@ The context bar is a status line displayed below the terminal showing session me
 
 | Setting | Description |
 |---------|-------------|
-| Default Agent | Which agent CLI to use for new sessions in this project (per-project) |
+| Default Agent | Which agent CLI to use for new sessions in this project. Supported agents: Claude Code, Codex, Gemini CLI, Aider. Per-project setting. |
 | CLI Path | Path to agent CLI binary (auto-detected if empty) |
 | Idle Timeout (minutes) | Auto-suspend sessions after N minutes idle; 0 to disable |
 | Permissions | Default permission mode for all sessions. Options vary by agent (e.g., Claude Code has Plan, Don't Ask, Default, Accept Edits, Auto, and Bypass; Aider has Interactive and Auto-Approve) |
 
-All permission modes are available in both the global App Settings dropdown and the per-column Edit Column dialog. The dropdown shows only the modes supported by the active agent. Each column can also override the project default agent via the Edit Column dialog.
+All permission modes are available in both the global App Settings dropdown and the per-column Edit Column dialog. The dropdown shows only the modes supported by the active agent. Each column can override the project default agent via the Edit Column dialog. When a task moves between columns with different agents, a context handoff occurs automatically - see [Column Management](#column-management) above.
 
 ### Git Settings
 
