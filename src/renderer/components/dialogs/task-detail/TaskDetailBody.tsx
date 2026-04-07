@@ -177,6 +177,17 @@ export function TaskDetailBody({
         </div>
       );
     }
+    // When not toggling, we're in this branch only because isSuspended is true,
+    // so the resting state is always "Resume session" with a Play icon. While
+    // toggling, the direction depends on the current session status.
+    const toggleIcon = toggling
+      ? <Loader2 size={16} className="animate-spin" />
+      : <Play size={16} />;
+    const toggleLabel = !toggling
+      ? 'Resume session'
+      : isSuspended
+        ? 'Resuming agent...'
+        : 'Pausing agent...';
     return (
       <div className="flex-1 min-h-0 flex">
         <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} flex flex-col items-center justify-center gap-3 bg-surface/50`}>
@@ -185,12 +196,8 @@ export function TaskDetailBody({
             disabled={toggling}
             className="flex items-center gap-2.5 px-6 py-3 rounded-lg bg-accent/20 border border-accent/40 text-base text-accent-fg hover:bg-accent/30 transition-colors disabled:opacity-50"
           >
-            {toggling ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Play size={16} />
-            )}
-            {toggling ? 'Resuming agent...' : 'Resume session'}
+            {toggleIcon}
+            {toggleLabel}
           </button>
           {resumeFailed && onResetSession && (
             <div className="flex flex-col items-center gap-2 mt-1">
