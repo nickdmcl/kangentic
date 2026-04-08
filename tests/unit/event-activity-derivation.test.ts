@@ -1531,7 +1531,7 @@ describe('Event-derived activity state', () => {
       expect(states).toEqual(['thinking']);
     });
 
-    it('does not mark pre-usage sessions as stale during nucleation', async () => {
+    it('does not mark pre-usage sessions as stale during nucleation window', async () => {
       const { session, eventsPath } = await spawnWithEventsFake();
       const states = collectActivity(fakeManager, session.id);
 
@@ -1540,10 +1540,26 @@ describe('Event-derived activity state', () => {
       triggerEventRead(fakeManager, session.id, eventsPath);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
 
-      // Advance well past threshold -- should NOT go idle (no usage data yet = nucleating)
-      vi.advanceTimersByTime(120_000);
+      // Advance within the 45s nucleation window - should stay thinking
+      vi.advanceTimersByTime(30_000);
       expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
       expect(states).toEqual(['thinking']);
+    });
+
+    it('marks session as stale after nucleation window expires without activity', async () => {
+      const { session, eventsPath } = await spawnWithEventsFake();
+      const states = collectActivity(fakeManager, session.id);
+
+      // Transition to thinking via prompt
+      appendEvent(eventsPath, { ts: Date.now(), type: EventType.Prompt });
+      triggerEventRead(fakeManager, session.id, eventsPath);
+      expect(fakeManager.getActivityCache()[session.id]).toBe('thinking');
+
+      // Advance past nucleation window (45s) + stale threshold (45s) + check interval (15s)
+      // After nucleation expires, the next stale check should transition to idle
+      vi.advanceTimersByTime(120_000);
+      expect(fakeManager.getActivityCache()[session.id]).toBe('idle');
+      expect(states).toContain('idle');
     });
   });
 });

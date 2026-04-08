@@ -351,4 +351,71 @@ describe('Codex Adapter', () => {
       expect(() => adapter.clearSettingsCache()).not.toThrow();
     });
   });
+
+  describe('captureSessionIdFromOutput', () => {
+    it('captures UUID from Codex v0.118+ startup header', () => {
+      const output = 'session id: 019d60ac-b67c-7a22-bcbb-af55c8295c38\n--------';
+      expect(adapter.runtime.sessionId!.fromOutput!(output)).toBe('019d60ac-b67c-7a22-bcbb-af55c8295c38');
+    });
+
+    it('captures UUID from multi-line startup header block', () => {
+      const output = [
+        'OpenAI Codex v0.118.0 (research preview)',
+        '--------',
+        'workdir: C:\\Users\\dev\\project',
+        'model: gpt-5.3-codex',
+        'session id: 019d60ac-b67c-7a22-bcbb-af55c8295c38',
+        '--------',
+      ].join('\n');
+      expect(adapter.runtime.sessionId!.fromOutput!(output)).toBe('019d60ac-b67c-7a22-bcbb-af55c8295c38');
+    });
+
+    it('captures legacy thr_ format from resume hint', () => {
+      const output = 'To continue this session, run: codex resume thr_abc123def';
+      expect(adapter.runtime.sessionId!.fromOutput!(output)).toBe('thr_abc123def');
+    });
+
+    it('prefers UUID header over legacy thr_ format', () => {
+      const output = [
+        'session id: 019d60ac-b67c-7a22-bcbb-af55c8295c38',
+        'codex resume thr_oldformat',
+      ].join('\n');
+      expect(adapter.runtime.sessionId!.fromOutput!(output)).toBe('019d60ac-b67c-7a22-bcbb-af55c8295c38');
+    });
+
+    it('returns null for unrelated output', () => {
+      expect(adapter.runtime.sessionId!.fromOutput!('Hello world')).toBeNull();
+      expect(adapter.runtime.sessionId!.fromOutput!('')).toBeNull();
+    });
+  });
+
+  describe('extractSessionId', () => {
+    it('extracts thread_id from hookContext JSON', () => {
+      const hookContext = JSON.stringify({ thread_id: 'thr_abc123' });
+      expect(adapter.runtime.sessionId!.fromHook!(hookContext)).toBe('thr_abc123');
+    });
+
+    it('extracts threadId (camelCase) from hookContext JSON', () => {
+      const hookContext = JSON.stringify({ threadId: '019d60ac-b67c-7a22-bcbb-af55c8295c38' });
+      expect(adapter.runtime.sessionId!.fromHook!(hookContext)).toBe('019d60ac-b67c-7a22-bcbb-af55c8295c38');
+    });
+
+    it('prefers thread_id over threadId', () => {
+      const hookContext = JSON.stringify({ thread_id: 'preferred', threadId: 'fallback' });
+      expect(adapter.runtime.sessionId!.fromHook!(hookContext)).toBe('preferred');
+    });
+
+    it('returns null when hookContext has no thread ID fields', () => {
+      const hookContext = JSON.stringify({ session_id: 'not-a-thread' });
+      expect(adapter.runtime.sessionId!.fromHook!(hookContext)).toBeNull();
+    });
+
+    it('returns null for invalid JSON', () => {
+      expect(adapter.runtime.sessionId!.fromHook!('not json')).toBeNull();
+    });
+
+    it('returns null for empty string', () => {
+      expect(adapter.runtime.sessionId!.fromHook!('')).toBeNull();
+    });
+  });
 });

@@ -158,10 +158,14 @@ test.describe('Task Delete', () => {
     await dragTaskToColumn(title, 'Code Review');
     await waitForSession(title);
 
-    // Wait for the renderer to reflect the session (status bar appears on the card)
-    // Without this, the dialog may open in edit mode instead of view mode
+    // Wait for the renderer to reflect the running session (usage-bar appears
+    // on the card). TaskCard renders status-bar only for preparing/initializing/
+    // queued/suspended states; once waitForSession() returns (session is running)
+    // the card switches to rendering usage-bar instead. Without this wait the
+    // dialog may open in edit mode because displayState.kind === 'none' until
+    // the renderer catches up.
     const codeReviewColumn = page.locator('[data-swimlane-name="Code Review"]');
-    await codeReviewColumn.locator('[data-testid="status-bar"]').waitFor({ state: 'visible', timeout: 10000 });
+    await codeReviewColumn.locator('[data-testid="usage-bar"]').waitFor({ state: 'visible', timeout: 10000 });
 
     // Click on the task card to open the detail dialog
     const card = codeReviewColumn.locator(`text=${title}`).first();
@@ -171,21 +175,25 @@ test.describe('Task Delete', () => {
     // Open kebab menu and click Archive (no confirmation needed)
     const dialog = page.locator('.fixed.inset-0');
     await clickKebabAction(dialog, 'Archive');
-    await page.waitForTimeout(1000);
 
     // Verify the app is still alive (board is visible)
     await waitForBoard(page);
 
+    // Poll for the archive to complete in the DB. The renderer click is fire-
+    // and-forget; on the main process, handleTaskMove suspends the active PTY
+    // (up to 1500ms graceful exit) before calling tasks.archive(). A fixed
+    // timeout would be racy -- poll the IPC until the task appears in the
+    // archived list, with 5s budget to cover suspend + DB write.
+    await expect.poll(async () => {
+      return page.evaluate(async (taskTitle) => {
+        const archived = await window.electronAPI.tasks.listArchived();
+        return archived.some((archivedTask: { title: string }) => archivedTask.title === taskTitle);
+      }, title);
+    }, { timeout: 5000 }).toBe(true);
+
     // Verify the task is gone from active columns (archived tasks appear in Done's "Completed" section)
     const activeColumns = page.locator('[data-testid="swimlane"]:not([data-swimlane-name="Done"])');
     await expect(activeColumns.locator(`text=${title}`)).toHaveCount(0);
-
-    // Verify the task was archived (not deleted)
-    const taskArchived = await page.evaluate(async (t) => {
-      const archived = await window.electronAPI.tasks.listArchived();
-      return archived.some((tk: any) => tk.title === t);
-    }, title);
-    expect(taskArchived).toBe(true);
   });
 
   test('archive task with exited session from detail dialog', async () => {

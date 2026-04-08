@@ -145,6 +145,7 @@ export class GeminiCommandBuilder {
 
     const settingsPath = path.join(geminiDir, 'settings.json');
     fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2));
+    console.log(`[gemini] Wrote hooks to ${settingsPath} (${Object.keys(merged.hooks || {}).length} event types, events -> ${eventsPath})`);
   }
 }
 

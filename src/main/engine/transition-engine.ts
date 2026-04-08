@@ -253,6 +253,7 @@ export class TransitionEngine {
       eventsOutputPath,
       resuming: canResume,
       agentParser: adapter,
+      agentName: adapter.name,
       exitSequence: adapter.getExitSequence?.() ?? ['\x03'],
     });
 

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { EventType, EventTypeActivity, AgentTool } from '../../shared/types';
 import type { SessionUsage, ActivityState, SessionEvent, AgentParser } from '../../shared/types';
 import { matchesPRCommand } from './pr-connectors';
+import { PtyActivityTracker } from './pty-activity-tracker';
 
 const MAX_EVENTS_PER_SESSION = 500; // Cap rendered events in renderer
 const STALE_THINKING_THRESHOLD_MS = 45_000;
@@ -36,6 +37,7 @@ export class UsageTracker {
   private permissionIdle = new Map<string, boolean>();
   private idleTimestamp = new Map<string, number>();
   private lastThinkingSignal = new Map<string, number>();
+  private firstThinkingTimestamp = new Map<string, number>();
 
   private sessionParsers = new Map<string, AgentParser>();
   private agentSessionIdChecked = new Set<string>();
@@ -45,9 +47,16 @@ export class UsageTracker {
   private staleThinkingInterval: ReturnType<typeof setInterval> | null = null;
 
   private callbacks: UsageTrackerCallbacks;
+  private ptyTracker: PtyActivityTracker;
 
   constructor(callbacks: UsageTrackerCallbacks) {
     this.callbacks = callbacks;
+    this.ptyTracker = new PtyActivityTracker({
+      onThinking: (sessionId) => this.handlePtyThinking(sessionId),
+      onIdle: (sessionId, detail) => this.handlePtyIdle(sessionId, detail),
+      getActivity: (sessionId) => this.activityCache.get(sessionId),
+      isSessionRunning: (sessionId) => callbacks.isSessionRunning(sessionId),
+    });
     this.staleThinkingInterval = setInterval(
       () => this.checkStaleThinking(),
       STALE_THINKING_CHECK_MS,
@@ -100,10 +109,12 @@ export class UsageTracker {
       if (activity !== 'thinking') continue;
       if (!this.callbacks.isSessionRunning(sessionId)) continue;
 
-      // Skip sessions that haven't received usage data yet (still nucleating).
-      // During nucleation, Claude Code reads local context before making API calls.
-      // No hooks fire and no status.json exists, so the 45s threshold doesn't apply.
-      if (!this.usageCache.has(sessionId)) continue;
+      // Skip sessions still in nucleation (first 45s after entering thinking).
+      // During nucleation, agents read local context before making API calls.
+      // No hooks fire initially, so the stale threshold doesn't apply yet.
+      // Time-based guard works for all agents (not just Claude Code which has usageCache).
+      const firstThinking = this.firstThinkingTimestamp.get(sessionId);
+      if (firstThinking && (now - firstThinking) < STALE_THINKING_THRESHOLD_MS) continue;
 
       const lastSignal = this.lastThinkingSignal.get(sessionId);
       if (lastSignal && (now - lastSignal) > STALE_THINKING_THRESHOLD_MS) {
@@ -217,12 +228,13 @@ export class UsageTracker {
       const parser = this.sessionParsers.get(sessionId);
       for (const line of lines) {
         // Extract agent session ID from hookContext (written by event-bridge.js).
-        // Each adapter's extractSessionId() parses agent-specific fields.
-        if (!this.agentSessionIdChecked.has(sessionId) && parser?.extractSessionId) {
+        // Each adapter's runtime.sessionId.fromHook() parses agent-specific fields.
+        const fromHook = parser?.runtime?.sessionId?.fromHook;
+        if (!this.agentSessionIdChecked.has(sessionId) && fromHook) {
           try {
             const rawEvent = JSON.parse(line);
             if (rawEvent.hookContext) {
-              const capturedId = parser.extractSessionId(rawEvent.hookContext);
+              const capturedId = fromHook(rawEvent.hookContext);
               if (capturedId) {
                 this.agentSessionIdChecked.add(sessionId);
                 this.callbacks.onAgentSessionId?.(sessionId, capturedId);
@@ -299,6 +311,17 @@ export class UsageTracker {
           // against multiple hooks firing the same state).
           const newActivity = EventTypeActivity[event.type];
 
+          // For 'hooks_and_pty' agents, suppress PTY detection once hooks
+          // prove they work (by delivering at least one thinking event).
+          // Pure 'pty' agents never get hook events; pure 'hooks' agents
+          // don't have PTY detection enabled.
+          if (newActivity === 'thinking') {
+            const parser = this.sessionParsers.get(sessionId);
+            if (parser?.runtime?.activity?.kind === 'hooks_and_pty') {
+              this.ptyTracker.suppress(sessionId);
+            }
+          }
+
           // Clear pending idle flag when the main agent resumes thinking
           // (prompt or subagent_start), even if deduped.
           if (newActivity === 'thinking'
@@ -345,6 +368,9 @@ export class UsageTracker {
               this.idleTimestamp.set(sessionId, Date.now());
             } else if (newActivity === 'thinking') {
               this.lastThinkingSignal.set(sessionId, Date.now());
+              if (!this.firstThinkingTimestamp.has(sessionId)) {
+                this.firstThinkingTimestamp.set(sessionId, Date.now());
+              }
               this.permissionIdle.delete(sessionId);
               this.idleTimestamp.delete(sessionId);
             }
@@ -382,12 +408,19 @@ export class UsageTracker {
     this.permissionIdle.delete(sessionId);
     this.idleTimestamp.set(sessionId, Date.now());
     this.lastThinkingSignal.delete(sessionId);
+    this.firstThinkingTimestamp.delete(sessionId);
+    this.ptyTracker.clearSession(sessionId);
     this.callbacks.onActivityChange(sessionId, 'idle', false);
+  }
+
+  /** True if an agent session ID has already been captured for this session. */
+  hasAgentSessionId(sessionId: string): boolean {
+    return this.agentSessionIdChecked.has(sessionId);
   }
 
   /**
    * Notify that an agent session ID was captured from PTY output.
-   * Called by SessionManager when an adapter's captureSessionIdFromOutput
+   * Called by SessionManager when an adapter's runtime.sessionId.fromOutput
    * returns a non-null value. Delegates to the same callback used for
    * hook-based and status.json-based capture.
    */
@@ -437,6 +470,8 @@ export class UsageTracker {
     this.permissionIdle.delete(sessionId);
     this.idleTimestamp.delete(sessionId);
     this.lastThinkingSignal.delete(sessionId);
+    this.firstThinkingTimestamp.delete(sessionId);
+    this.ptyTracker.clearSession(sessionId);
   }
 
   /** Delete all maps for a session (full removal). */
@@ -449,9 +484,59 @@ export class UsageTracker {
     this.permissionIdle.delete(sessionId);
     this.idleTimestamp.delete(sessionId);
     this.lastThinkingSignal.delete(sessionId);
+    this.firstThinkingTimestamp.delete(sessionId);
+    this.ptyTracker.clearSession(sessionId);
     this.eventCache.delete(sessionId);
     this.sessionParsers.delete(sessionId);
     this.agentSessionIdChecked.delete(sessionId);
+  }
+
+  // -- PTY-based activity detection (delegated to PtyActivityTracker) --------
+
+  /** Forward PTY data to the tracker. Called by SessionManager for agents
+   *  with 'pty' or 'hooks_and_pty' activity strategies. */
+  notifyPtyData(sessionId: string): void {
+    this.ptyTracker.onData(sessionId);
+  }
+
+  /** Forward definitive idle signal to the tracker. */
+  notifyPtyIdle(sessionId: string): void {
+    this.ptyTracker.onIdleDetected(sessionId);
+  }
+
+  /** Callback from PtyActivityTracker: PTY data indicates agent is working. */
+  private handlePtyThinking(sessionId: string): void {
+    this.activityCache.set(sessionId, 'thinking');
+    this.lastThinkingSignal.set(sessionId, Date.now());
+    if (!this.firstThinkingTimestamp.has(sessionId)) {
+      this.firstThinkingTimestamp.set(sessionId, Date.now());
+    }
+    this.idleTimestamp.delete(sessionId);
+    this.permissionIdle.delete(sessionId);
+
+    const event: SessionEvent = { ts: Date.now(), type: EventType.Prompt, detail: 'pty-activity' };
+    this.pushEvent(sessionId, event);
+    this.callbacks.onActivityChange(sessionId, 'thinking', false);
+  }
+
+  /** Callback from PtyActivityTracker: silence or prompt detected. */
+  private handlePtyIdle(sessionId: string, detail: string): void {
+    this.activityCache.set(sessionId, 'idle');
+    this.permissionIdle.set(sessionId, false);
+    this.idleTimestamp.set(sessionId, Date.now());
+    this.lastThinkingSignal.delete(sessionId);
+
+    const event: SessionEvent = { ts: Date.now(), type: EventType.Idle, detail };
+    this.pushEvent(sessionId, event);
+    this.callbacks.onActivityChange(sessionId, 'idle', false);
+  }
+
+  /** Append an event to the session cache and notify listeners. */
+  private pushEvent(sessionId: string, event: SessionEvent): void {
+    let events = this.eventCache.get(sessionId);
+    if (!events) { events = []; this.eventCache.set(sessionId, events); }
+    events.push(event);
+    this.callbacks.onEvent(sessionId, event);
   }
 
   dispose(): void {
@@ -463,6 +548,7 @@ export class UsageTracker {
       clearInterval(this.staleThinkingInterval);
       this.staleThinkingInterval = null;
     }
+    this.ptyTracker.dispose();
   }
 
   /** Return cached usage data for all sessions. */

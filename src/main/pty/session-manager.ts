@@ -9,6 +9,7 @@ import { PtyBufferManager } from './pty-buffer-manager';
 import { SessionFileWatcher } from './session-file-watcher';
 import { UsageTracker } from './usage-tracker';
 import { TranscriptWriter } from './transcript-writer';
+import { SessionIdScanner } from './session-id-scanner';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
@@ -30,8 +31,19 @@ interface ManagedSession {
   transient: boolean;
   /** Sequence of strings to write to PTY for graceful exit before force-killing. */
   exitSequence: string[];
-  /** Agent parser for adapter-specific behavior (readiness detection, parsing). */
+  /** Agent adapter for adapter-specific behavior (readiness detection, parsing,
+   *  runtime strategy, exit sequence, etc.). Typed as AgentParser for historical
+   *  reasons but the actual value is always the full AgentAdapter instance. */
   agentParser?: import('../../shared/types').AgentParser;
+  /** Human-readable adapter name captured at spawn time (e.g. "claude",
+   *  "gemini"). Used for diagnostic logs - survives minification unlike
+   *  `agentParser.constructor.name`. */
+  agentName?: string;
+  /** Per-session session-ID scanner (rolling buffer + ANSI strip). Reset on
+   *  first successful capture. */
+  sessionIdScanner?: import('./session-id-scanner').SessionIdScanner;
+  /** One-shot timer that warns if session-ID capture fails within the timeout. */
+  sessionIdCaptureTimer?: ReturnType<typeof setTimeout>;
 }
 
 export class SessionManager extends EventEmitter {
@@ -43,6 +55,13 @@ export class SessionManager extends EventEmitter {
   private fileWatcher: SessionFileWatcher;
   private usageTracker: UsageTracker;
   private firstOutputEmitted = new Set<string>();
+
+  /** Rolling buffer size for session-ID capture. Must be at least 2x the max
+   *  PTY chunk size so any UUID straddling a single chunk boundary is preserved
+   *  after slicing. Windows ConPTY flushes at 4KB, so 8KB gives a safe margin. */
+  private static readonly SESSION_ID_BUFFER_MAX = 8192;
+  /** Capture diagnostic timeout: warn if session-ID capture hasn't fired by then. */
+  private static readonly SESSION_ID_CAPTURE_TIMEOUT_MS = 30_000;
 
   /**
    * Sessions currently visible in the renderer (terminal panel + command bar overlay).
@@ -291,6 +310,12 @@ export class SessionManager extends EventEmitter {
     // status, and events files all resolve to the same path.
     if (existing) {
       this.fileWatcher.nullifyPaths(existing.id);
+      // Cancel the old session's diagnostic timer so it can't fire a
+      // spurious "session ID not captured" warning 30s after respawn.
+      if (existing.sessionIdCaptureTimer) {
+        clearTimeout(existing.sessionIdCaptureTimer);
+        existing.sessionIdCaptureTimer = undefined;
+      }
     }
 
     // Carry over previous scrollback BEFORE removing state so scroll history
@@ -452,6 +477,7 @@ export class SessionManager extends EventEmitter {
       transient: input.transient ?? false,
       exitSequence: input.exitSequence ?? ['\x03'],
       agentParser: input.agentParser,
+      agentName: input.agentName ?? 'agent',
     };
 
     this.sessions.set(id, session);
@@ -467,8 +493,28 @@ export class SessionManager extends EventEmitter {
     });
     this.usageTracker.initSession(id, input.agentParser);
 
+    // Arm diagnostic timer: if the agent supports session-ID capture but
+    // nothing fires by the timeout, something upstream is broken (wrong regex,
+    // hook delivery failure, TUI rendering that defeats our scan). Surface
+    // it in logs so dogfooding catches regressions early.
+    const hasCapturePath = !!(input.agentParser?.runtime?.sessionId?.fromHook
+      || input.agentParser?.runtime?.sessionId?.fromOutput);
+    if (hasCapturePath) {
+      session.sessionIdCaptureTimer = setTimeout(() => {
+        session.sessionIdCaptureTimer = undefined;
+        if (!this.usageTracker.hasAgentSessionId(id)) {
+          console.warn(
+            `[session-manager] ${session.agentName} session ID not captured after `
+            + `${SessionManager.SESSION_ID_CAPTURE_TIMEOUT_MS / 1000}s for session `
+            + `${id.slice(0, 8)} - --resume will not work. `
+            + `Check hook delivery and fromOutput regex.`,
+          );
+        }
+      }, SessionManager.SESSION_ID_CAPTURE_TIMEOUT_MS);
+      session.sessionIdCaptureTimer.unref();
+    }
+
     // Batched data output (~60fps)
-    let sessionIdCapturedFromOutput = false;
     ptyProcess.onData((data: string) => {
       this.bufferManager.onData(id, data);
       // Transient sessions (command terminal) have no DB row - the
@@ -477,14 +523,29 @@ export class SessionManager extends EventEmitter {
       if (!session.transient) {
         this.transcriptWriter?.onData(id, data);
       }
-      // Per-adapter session ID capture from PTY output (e.g. Codex prints
-      // "To continue this session, run: codex resume thr_..."). Stops
-      // scanning after first successful capture.
-      if (!sessionIdCapturedFromOutput && input.agentParser?.captureSessionIdFromOutput) {
-        const capturedId = input.agentParser.captureSessionIdFromOutput(data);
+      // Per-adapter session ID capture from PTY output. The scanner handles
+      // chunk-boundary safety (rolling buffer) and ANSI stripping (Windows
+      // ConPTY cursor-positioning that defeats raw regexes).
+      const fromOutput = input.agentParser?.runtime?.sessionId?.fromOutput;
+      if (fromOutput && !this.usageTracker.hasAgentSessionId(id)) {
+        if (!session.sessionIdScanner) {
+          session.sessionIdScanner = new SessionIdScanner(SessionManager.SESSION_ID_BUFFER_MAX);
+        }
+        const capturedId = session.sessionIdScanner.scanChunk(data, fromOutput);
         if (capturedId) {
-          sessionIdCapturedFromOutput = true;
+          session.sessionIdScanner.reset();
           this.usageTracker.notifyAgentSessionId(id, capturedId);
+        }
+      }
+      // PTY-based activity detection for agents using 'pty' or 'hooks_and_pty'
+      // strategies. For 'hooks_and_pty', yields to hook-based detection once
+      // hooks deliver a thinking event.
+      const strategy = input.agentParser?.runtime?.activity;
+      if (strategy && strategy.kind !== 'hooks') {
+        if (strategy.detectIdle?.(data)) {
+          this.usageTracker.notifyPtyIdle(id);
+        } else if (data.length > 0) {
+          this.usageTracker.notifyPtyData(id);
         }
       }
     });
@@ -498,6 +559,10 @@ export class SessionManager extends EventEmitter {
       }
       session.exitCode = exitCode;
       session.pty = null;
+      if (session.sessionIdCaptureTimer) {
+        clearTimeout(session.sessionIdCaptureTimer);
+        session.sessionIdCaptureTimer = undefined;
+      }
 
       // Flush transcript to DB before closing out the session
       this.transcriptWriter?.finalize(id);
@@ -604,6 +669,11 @@ export class SessionManager extends EventEmitter {
   remove(sessionId: string): void {
     // kill() may emit 'exit' events that depend on the session still being
     // in the map (the exit handler looks up the session by ID). Delete AFTER.
+    const session = this.sessions.get(sessionId);
+    if (session?.sessionIdCaptureTimer) {
+      clearTimeout(session.sessionIdCaptureTimer);
+      session.sessionIdCaptureTimer = undefined;
+    }
     this.kill(sessionId);
     this.fileWatcher.cleanupAndRemove(sessionId);
     this.sessions.delete(sessionId);
@@ -770,6 +840,21 @@ export class SessionManager extends EventEmitter {
         const ptyRef = session.pty;
         session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
         ptyRef.kill();
+      }
+    }
+
+    // Last-resort: scan full scrollback for agent session ID if not yet
+    // captured. Handles Gemini printing session ID at shutdown, Codex
+    // startup header missed by streaming handler, etc.
+    const scrollbackFromOutput = session.agentParser?.runtime?.sessionId?.fromOutput;
+    if (!this.usageTracker.hasAgentSessionId(sessionId) && scrollbackFromOutput) {
+      // Use getRawScrollback() (not getScrollback()) so pre-TUI content like
+      // Codex's startup header "session id: <uuid>" remains in scope.
+      const rawScrollback = this.bufferManager.getRawScrollback(sessionId);
+      const scanner = session.sessionIdScanner ?? new SessionIdScanner();
+      const capturedId = scanner.scanScrollback(rawScrollback, scrollbackFromOutput);
+      if (capturedId) {
+        this.usageTracker.notifyAgentSessionId(sessionId, capturedId);
       }
     }
 

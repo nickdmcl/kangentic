@@ -295,7 +295,7 @@ Choose from 10 themes:
 | Shell | Override the auto-detected shell |
 | Font Size | Terminal text size in pixels |
 | Font Family | CSS font-family for the terminal |
-| Scrollback Lines | Maximum lines kept in terminal buffer (1000 to 100000, default 5000) |
+| Scrollback Lines | Lines kept in the visible scrollback (1000 to 100000, default 5000). Full session history is preserved for replay regardless of this value. |
 | Cursor Style | Terminal cursor appearance (block, underline, or bar) |
 
 ### Context Bar

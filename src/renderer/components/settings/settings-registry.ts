@@ -35,7 +35,7 @@ export const SETTINGS_REGISTRY: SettingDefinition[] = [
   { id: 'terminal.shell', tabId: 'terminal', label: 'Shell', description: 'Terminal shell used for agent sessions', scope: 'project', keywords: ['bash', 'powershell', 'zsh', 'fish'] },
   { id: 'terminal.fontSize', tabId: 'terminal', label: 'Font Size', description: 'Terminal text size in pixels', scope: 'project', keywords: ['px', 'text size'] },
   { id: 'terminal.fontFamily', tabId: 'terminal', label: 'Font Family', description: 'CSS font-family for the terminal', scope: 'project', keywords: ['monospace', 'typeface'] },
-  { id: 'terminal.scrollbackLines', tabId: 'terminal', label: 'Scrollback Lines', description: 'Maximum lines kept in terminal buffer', scope: 'project', keywords: ['buffer', 'history'] },
+  { id: 'terminal.scrollbackLines', tabId: 'terminal', label: 'Scrollback Lines', description: 'Lines kept in the visible scrollback. Full session history is preserved for replay regardless of this value.', scope: 'project', keywords: ['buffer', 'history'] },
   { id: 'terminal.cursorStyle', tabId: 'terminal', label: 'Cursor Style', description: 'Terminal cursor appearance', scope: 'project', keywords: ['block', 'underline', 'bar'] },
 
   // ── Terminal > Context Bar ──

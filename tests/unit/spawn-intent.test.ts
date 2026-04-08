@@ -150,6 +150,30 @@ describe('resolveSpawnIntent', () => {
     expect(intent.agentSessionId).toBe('thr_abc123');
   });
 
+  it('resumes Codex session with UUID format session ID', () => {
+    const record = mockSessionRecord({ status: 'suspended', session_type: 'codex_agent', agent_session_id: '019d60ac-b67c-7a22-bcbb-af55c8295c38' });
+    const intent = resolveSpawnIntent({
+      ...baseOptions,
+      sessionType: 'codex_agent',
+      sessionRepo: mockSessionRepo(record),
+    });
+
+    expect(intent.mode).toBe('resume');
+    expect(intent.agentSessionId).toBe('019d60ac-b67c-7a22-bcbb-af55c8295c38');
+  });
+
+  it('resumes Gemini session when agent_session_id was captured from hooks', () => {
+    const record = mockSessionRecord({ status: 'suspended', session_type: 'gemini_agent', agent_session_id: '4231e6aa-5409-4749-9272-270e9aab079b' });
+    const intent = resolveSpawnIntent({
+      ...baseOptions,
+      sessionType: 'gemini_agent',
+      sessionRepo: mockSessionRepo(record),
+    });
+
+    expect(intent.mode).toBe('resume');
+    expect(intent.agentSessionId).toBe('4231e6aa-5409-4749-9272-270e9aab079b');
+  });
+
   it('spawns fresh when agent_session_id was never captured (null)', () => {
     const record = mockSessionRecord({ status: 'suspended', agent_session_id: null });
     const intent = resolveSpawnIntent({

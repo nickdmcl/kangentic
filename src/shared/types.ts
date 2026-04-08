@@ -274,35 +274,6 @@ export const EventType = {
 } as const;
 export type EventType = (typeof EventType)[keyof typeof EventType];
 
-/** All Claude Code hook event names (settings.json keys). */
-export const HookEvent = {
-  // Tool lifecycle
-  PreToolUse: 'PreToolUse',
-  PostToolUse: 'PostToolUse',
-  PostToolUseFailure: 'PostToolUseFailure',
-  // Session lifecycle
-  SessionStart: 'SessionStart',
-  SessionEnd: 'SessionEnd',
-  // Agent stop
-  Stop: 'Stop',
-  SubagentStart: 'SubagentStart',
-  SubagentStop: 'SubagentStop',
-  // User interaction
-  UserPromptSubmit: 'UserPromptSubmit',
-  PermissionRequest: 'PermissionRequest',
-  Notification: 'Notification',
-  // Context management
-  PreCompact: 'PreCompact',
-  // Agent teams
-  TeammateIdle: 'TeammateIdle',
-  TaskCompleted: 'TaskCompleted',
-  // Configuration
-  ConfigChange: 'ConfigChange',
-  // Worktree operations
-  WorktreeCreate: 'WorktreeCreate',
-  WorktreeRemove: 'WorktreeRemove',
-} as const;
-export type HookEvent = (typeof HookEvent)[keyof typeof HookEvent];
 
 /** Agent tool names we detect/react to. */
 export const AgentTool = {
@@ -975,13 +946,73 @@ export interface AgentParser {
    * event that lifts the shimmer overlay in the renderer.
    */
   detectFirstOutput(data: string): boolean;
-  /** Extract the agent's real CLI session ID from raw hook context JSON.
-   * Each adapter implements agent-specific parsing. Optional - not all agents support resume. */
-  extractSessionId?(hookContext: string): string | null;
-  /** Extract the agent's real CLI session ID from raw PTY output.
-   * Called on each data chunk until captured. Used by agents that expose
-   * their session ID in terminal output (e.g. Codex). */
-  captureSessionIdFromOutput?(data: string): string | null;
+  /** How this agent exposes runtime state (activity detection + session ID capture). */
+  runtime: AdapterRuntimeStrategy;
+}
+
+/**
+ * Declares how an agent's activity (thinking vs idle) is detected.
+ *
+ * - `hooks` - Activity events arrive via event-bridge hooks (JSONL).
+ *   Used by Claude Code. No PTY-based fallback.
+ *
+ * - `pty` - Activity is inferred from PTY output patterns. Primary
+ *   mechanism for agents without hooks (Aider) or with broken hooks (Codex).
+ *   Optional `detectIdle` provides instant idle detection via prompt regex;
+ *   otherwise falls back to a silence timer.
+ *
+ * - `hooks_and_pty` - Hooks are the primary mechanism, but PTY-based
+ *   detection acts as a fallback if hooks fail to fire. Once hooks deliver
+ *   a thinking event, PTY detection is automatically suppressed.
+ *   Used by Gemini (hook format verified, but runtime issues possible).
+ */
+export type ActivityDetectionStrategy =
+  | { readonly kind: 'hooks' }
+  | { readonly kind: 'pty'; detectIdle?(data: string): boolean }
+  | { readonly kind: 'hooks_and_pty'; detectIdle?(data: string): boolean };
+
+/**
+ * Factory functions for constructing ActivityDetectionStrategy values.
+ * Prefer these over inline object literals at adapter sites - they give
+ * autocompleted, descriptive call-sites and enforce the correct shape
+ * per variant (e.g. `hooks()` can't accidentally get a `detectIdle`).
+ */
+export const ActivityDetection = {
+  /** Hooks are the sole source of activity truth (Claude Code). */
+  hooks: (): ActivityDetectionStrategy => ({ kind: 'hooks' }),
+  /** PTY-only detection. Optional detectIdle for instant prompt-regex idle. */
+  pty: (detectIdle?: (data: string) => boolean): ActivityDetectionStrategy =>
+    ({ kind: 'pty', detectIdle }),
+  /** Hooks primary with PTY fallback if hooks fail to fire. */
+  hooksAndPty: (detectIdle?: (data: string) => boolean): ActivityDetectionStrategy =>
+    ({ kind: 'hooks_and_pty', detectIdle }),
+} as const;
+
+/**
+ * Declares how an agent exposes runtime state to Kangentic.
+ * One location per adapter for activity detection + session ID capture,
+ * so everything about how we interact with a given CLI at runtime
+ * lives in a single scannable block.
+ */
+export interface AdapterRuntimeStrategy {
+  /** How thinking vs idle is detected (hooks, PTY patterns, or both). */
+  readonly activity: ActivityDetectionStrategy;
+
+  /**
+   * How the agent's real CLI session ID is captured for resume support.
+   * Omit entirely for agents that don't support resume (e.g. Aider) or
+   * that use caller-owned IDs via --session-id (e.g. Claude Code).
+   */
+  readonly sessionId?: {
+    /** Parse session ID from hook stdin JSON. Fires once on session_start
+     *  when the agent's hooks deliver metadata (Gemini, Codex via env var). */
+    fromHook?(hookContext: string): string | null;
+    /** Parse session ID from raw PTY output. Scanned on every data chunk,
+     *  plus one final scrollback scan when suspend() runs. Used for agents
+     *  that print their session ID in terminal output (Codex startup header,
+     *  Gemini shutdown summary). */
+    fromOutput?(data: string): string | null;
+  };
 }
 
 export interface SpawnSessionInput {
@@ -1000,6 +1031,9 @@ export interface SpawnSessionInput {
   transient?: boolean;
   /** Agent-specific parser for status/event output. Falls back to ClaudeStatusParser if omitted. */
   agentParser?: AgentParser;
+  /** Human-readable agent name for diagnostic logs (e.g. "claude", "gemini").
+   *  Survives production minification unlike `agentParser.constructor.name`. */
+  agentName?: string;
   /** Sequence of strings to write to PTY before killing for graceful exit (e.g. ['\x03', '/exit\r']). */
   exitSequence?: string[];
 }

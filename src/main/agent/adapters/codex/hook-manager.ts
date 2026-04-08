@@ -3,6 +3,7 @@ import path from 'node:path';
 import { toForwardSlash } from '../../../../shared/paths';
 import { EventType } from '../../../../shared/types';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
+import { isKangenticHookCommand, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
 
 /** A single entry in Codex's .codex/hooks.json array. */
 export interface CodexHookEntry {
@@ -12,24 +13,27 @@ export interface CodexHookEntry {
 }
 
 /**
- * Codex hook event names mapped to the event-bridge event types
- * that our agent-agnostic event-bridge.js understands.
+ * Codex hook events mapped to event-bridge event types with extraction
+ * directives. Directives tell event-bridge how to extract fields from
+ * Codex's hook stdin JSON format.
  */
-export const CODEX_HOOK_EVENTS: Array<{ event: string; bridgeEventType: EventType }> = [
-  { event: 'SessionStart', bridgeEventType: EventType.SessionStart },
+export const CODEX_HOOK_EVENTS: Array<{
+  event: string;
+  bridgeEventType: EventType;
+  /** Extraction directives for event-bridge (tool:, detail:, env:, etc). */
+  directives?: string[];
+}> = [
+  {
+    event: 'SessionStart',
+    bridgeEventType: EventType.SessionStart,
+    // Codex injects CODEX_THREAD_ID into child process env (openai/codex#10096).
+    directives: ['env:thread_id=CODEX_THREAD_ID'],
+  },
   { event: 'UserPromptSubmit', bridgeEventType: EventType.Prompt },
-  { event: 'PreToolUse', bridgeEventType: EventType.ToolStart },
-  { event: 'PostToolUse', bridgeEventType: EventType.ToolEnd },
+  { event: 'PreToolUse', bridgeEventType: EventType.ToolStart, directives: ['tool:tool_name'] },
+  { event: 'PostToolUse', bridgeEventType: EventType.ToolEnd, directives: ['tool:tool_name'] },
   { event: 'Stop', bridgeEventType: EventType.Idle },
 ];
-
-/** True if this hook entry was injected by Kangentic. */
-function isKangenticCodexHook(entry: CodexHookEntry): boolean {
-  const command = entry.command || '';
-  return command.includes('.kangentic') && (
-    command.includes('activity-bridge') || command.includes('event-bridge')
-  );
-}
 
 /** Path to .codex/hooks.json for a given project directory. */
 function codexHooksPath(directory: string): string {
@@ -53,7 +57,7 @@ export function writeCodexHooks(projectRoot: string, eventsOutputPath: string): 
     const parsed: unknown = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       existingHooks = (parsed as CodexHookEntry[]).filter(
-        entry => !isKangenticCodexHook(entry),
+        entry => !isKangenticHookCommand(entry.command),
       );
     }
   } catch {
@@ -61,9 +65,9 @@ export function writeCodexHooks(projectRoot: string, eventsOutputPath: string): 
   }
 
   // Build our hook entries
-  const kangenticHooks: CodexHookEntry[] = CODEX_HOOK_EVENTS.map(({ event, bridgeEventType }) => ({
+  const kangenticHooks: CodexHookEntry[] = CODEX_HOOK_EVENTS.map(({ event, bridgeEventType, directives }) => ({
     event,
-    command: `node "${eventBridge}" "${eventsPath}" ${bridgeEventType}`,
+    command: buildBridgeCommand(eventBridge, eventsPath, bridgeEventType, ...(directives || [])),
     timeout_secs: 10,
   }));
 
@@ -79,47 +83,12 @@ export function writeCodexHooks(projectRoot: string, eventsOutputPath: string): 
 /**
  * Strip ALL Kangentic hook entries from .codex/hooks.json at the given
  * directory. Preserves all other user hooks.
- *
- * Safety: backs up before write, validates JSON round-trip, restores on error.
  */
 export function stripCodexHooks(directory: string): void {
-  const hooksFile = codexHooksPath(directory);
-  if (!fs.existsSync(hooksFile)) return;
-
-  const backupPath = hooksFile + '.kangentic-bak';
-  let backedUp = false;
-
-  try {
-    const raw = fs.readFileSync(hooksFile, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-
+  safelyUpdateSettingsFile(codexHooksPath(directory), (parsed) => {
+    if (!Array.isArray(parsed)) return null;
     const hooks = parsed as CodexHookEntry[];
-    const filtered = hooks.filter(entry => !isKangenticCodexHook(entry));
-
-    if (filtered.length === hooks.length) return; // nothing changed
-
-    // Back up original before writing
-    fs.copyFileSync(hooksFile, backupPath);
-    backedUp = true;
-
-    if (filtered.length === 0) {
-      // No hooks left - remove the file
-      fs.unlinkSync(hooksFile);
-      try { fs.rmdirSync(path.dirname(hooksFile)); } catch { /* not empty or already gone */ }
-    } else {
-      const output = JSON.stringify(filtered, null, 2);
-      JSON.parse(output); // verify round-trip integrity
-      fs.writeFileSync(hooksFile, output);
-    }
-
-    // Success - remove backup
-    try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-  } catch (error) {
-    if (backedUp) {
-      try { fs.copyFileSync(backupPath, hooksFile); } catch { /* can't recover */ }
-      try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-    }
-    console.error(`[stripCodexHooks] Failed to clean hooks at ${hooksFile}:`, error);
-  }
+    const filtered = hooks.filter(entry => !isKangenticHookCommand(entry.command));
+    return filtered.length === hooks.length ? null : filtered;
+  }, 'stripCodexHooks');
 }

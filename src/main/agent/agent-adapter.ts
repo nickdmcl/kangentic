@@ -1,4 +1,4 @@
-import type { SessionUsage, SessionEvent, SessionRecord, AgentPermissionEntry, PermissionMode } from '../../shared/types';
+import type { SessionUsage, SessionEvent, SessionRecord, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../shared/types';
 
 /** CLI detection result returned by all agent detectors. */
 export interface AgentInfo {
@@ -107,21 +107,9 @@ export interface AgentAdapter {
   transformHandoffPrompt(prompt: string, contextFilePath: string): string;
 
   /**
-   * Extract the agent's real CLI session ID from raw hook context JSON.
-   * Called by usage-tracker when processing JSONL events that include hook
-   * context data. Each adapter implements agent-specific parsing logic.
-   *
-   * Returns the session ID string if found, null otherwise.
-   * Not implemented for agents without session resume (e.g. Aider).
+   * How this agent exposes runtime state (activity detection + session ID capture).
+   * One location per adapter for everything about how we interact with the agent
+   * at runtime. See AdapterRuntimeStrategy for details.
    */
-  extractSessionId?(hookContext: string): string | null;
-
-  /**
-   * Extract the agent's real CLI session ID from raw PTY output.
-   * Called on each PTY data chunk until a non-null value is returned.
-   * Used by agents that expose their session ID in terminal output
-   * (e.g. Codex prints "To continue this session, run: codex resume thr_...").
-   * Not needed for agents that expose IDs via hooks or status files.
-   */
-  captureSessionIdFromOutput?(data: string): string | null;
+  readonly runtime: AdapterRuntimeStrategy;
 }

@@ -1,37 +1,37 @@
 #!/usr/bin/env node
 /**
- * Event Bridge for Claude Code hooks → Kangentic Activity Log
+ * Event Bridge - Generic hook-to-JSONL bridge for all agent adapters.
  *
- * Claude Code invokes this script via hooks. Appends a single JSON line
- * to the events log.
+ * Agent CLIs invoke this script via hooks. Appends a single JSON line
+ * to the events log. All agent-specific knowledge (field names, event
+ * types, stdin formats) is passed via command-line directives from each
+ * adapter's hook-manager.
  *
  * Usage:
- *   node event-bridge.js <events-file-path> <event-type>
+ *   node event-bridge.js <events-file-path> <event-type> [directives...]
  *
- * Event types:
- *   tool_start      -- from PreToolUse hook (reads tool name + input from stdin)
- *   tool_end        -- from PostToolUse hook (reads tool name from stdin)
- *   tool_failure    -- from PostToolUseFailure hook (reads tool name + is_interrupt from stdin)
- *   prompt          -- from UserPromptSubmit hook
- *   idle            -- from Stop / PermissionRequest hooks
- *   session_start   -- from SessionStart hook
- *   session_end     -- from SessionEnd hook
- *   subagent_start  -- from SubagentStart hook (reads agent_type from stdin)
- *   subagent_stop   -- from SubagentStop hook (reads agent_type from stdin)
- *   notification    -- from Notification hook (reads message from stdin)
- *   compact         -- from PreCompact hook
- *   teammate_idle   -- from TeammateIdle hook
- *   task_completed  -- from TaskCompleted hook
- *   config_change   -- from ConfigChange hook
- *   worktree_create -- from WorktreeCreate hook (reads name/path from stdin)
- *   worktree_remove -- from WorktreeRemove hook (reads name/path from stdin)
+ * Directives:
+ *   tool:<field>                   Extract event.tool from ctx[field]
+ *   detail:<f1>,<f2>,...           Extract event.detail from first non-null ctx[f]
+ *   nested-detail:<p>:<f1>,<f2>,.. Extract event.detail from first non-null ctx[p][f]
+ *   env:<key>=<ENV_VAR>            Capture env var into hookContext as key
+ *   remap:<field>:<value>:<type>   If ctx[field]==value, change event.type to type
+ *   arg-detail                     Use argv[next] as event.detail (for inline values)
  *
- * Stdin: Claude Code pipes hook context as JSON. We parse it to extract
- * relevant fields for each event type.
+ * Stdin: Agent CLIs pipe hook context as JSON. Directives control which
+ * fields are extracted for each event type.
  */
+// Stdout guard: Gemini CLI rejects any stdout output from hook scripts as
+// malformed JSON (docs: "Strict JSON" rule). Codex/Claude tolerate noise on
+// stdout but it still gets logged as hook output. We explicitly suppress
+// stdout so a stray console.log added during debugging can never silently
+// break hook parsing. All diagnostics must go to stderr.
+process.stdout.write = () => true;
+
 const fs = require('fs');
 const outputPath = process.argv[2];
 const eventType = process.argv[3] || 'idle';
+const directives = process.argv.slice(4);
 
 let input = '';
 process.stdin.setEncoding('utf8');
@@ -41,79 +41,104 @@ process.stdin.on('end', () => {
 
   const event = { ts: Date.now(), type: eventType };
 
-  // Parse stdin JSON to extract tool info
-  if (eventType === 'tool_failure') {
-    try {
-      const ctx = JSON.parse(input);
-      event.type = ctx.is_interrupt ? 'interrupted' : 'tool_end';
-      if (ctx.tool_name) event.tool = ctx.tool_name;
-      if (event.type === 'interrupted' && ctx.error) {
-        event.detail = String(ctx.error).slice(0, 200);
-      }
-    } catch {
-      event.type = 'tool_end';
-    }
-  } else if (eventType === 'tool_start' || eventType === 'tool_end') {
-    try {
-      const ctx = JSON.parse(input);
-      // Claude Code hook context has tool_name at top level
-      if (ctx.tool_name) event.tool = ctx.tool_name;
-      // Extract a short detail from the tool input (first useful field)
-      if (eventType === 'tool_start' && ctx.tool_input) {
-        const ti = ctx.tool_input;
-        // Common tool input patterns: file_path, command, query, pattern
-        const detail = ti.file_path || ti.command || ti.query || ti.pattern
-          || ti.url || ti.description || ti.content?.slice?.(0, 80);
-        if (detail) event.detail = String(detail).slice(0, 200);
-      }
-    } catch {
-      // Stdin wasn't valid JSON -- still write the event without tool info
-    }
-  } else if (eventType === 'subagent_start' || eventType === 'subagent_stop') {
-    try {
-      const ctx = JSON.parse(input);
-      const detail = ctx.agent_type || ctx.subagent_type;
-      if (detail) event.detail = String(detail).slice(0, 200);
-    } catch { /* best effort */ }
-  } else if (eventType === 'notification') {
-    try {
-      const ctx = JSON.parse(input);
-      const detail = ctx.message || ctx.notification;
-      if (detail) event.detail = String(detail).slice(0, 200);
-    } catch { /* best effort */ }
-  } else if (eventType === 'worktree_create' || eventType === 'worktree_remove') {
-    try {
-      const ctx = JSON.parse(input);
-      const detail = ctx.name || ctx.path;
-      if (detail) event.detail = String(detail).slice(0, 200);
-    } catch { /* best effort */ }
-  } else if (eventType === 'task_completed') {
-    try {
-      const ctx = JSON.parse(input);
-      const detail = ctx.task || ctx.description || ctx.name;
-      if (detail) event.detail = String(detail).slice(0, 200);
-    } catch { /* best effort */ }
-  } else if (eventType === 'teammate_idle') {
-    try {
-      const ctx = JSON.parse(input);
-      const detail = ctx.agent || ctx.teammate || ctx.name;
-      if (detail) event.detail = String(detail).slice(0, 200);
-    } catch { /* best effort */ }
-  } else if (eventType === 'idle') {
-    const reason = process.argv[4];
-    if (reason) event.detail = String(reason).slice(0, 200);
+  // Parse stdin JSON once for all directives
+  let ctx = null;
+  if (input && input.length > 0) {
+    try { ctx = JSON.parse(input); } catch { /* stdin not valid JSON */ }
   }
 
-  // Include raw hook stdin as hookContext for adapter-specific session ID extraction.
-  // Only on session_start events (where the ID first appears) to avoid bloating
-  // the JSONL file on every hook invocation. Truncated to 2KB for safety.
-  if (eventType === 'session_start' && input && input.length > 0) {
-    event.hookContext = input.slice(0, 2048);
+  // Process directives
+  for (let i = 0; i < directives.length; i++) {
+    const directive = directives[i];
+
+    if (directive.startsWith('tool:')) {
+      // tool:<field> - extract event.tool from ctx[field]
+      const field = directive.slice(5);
+      if (ctx && ctx[field] != null) event.tool = ctx[field];
+
+    } else if (directive.startsWith('nested-detail:')) {
+      // nested-detail:<parent>:<f1>,<f2>,... - extract detail from ctx[parent][f]
+      const rest = directive.slice(14);
+      const colonIndex = rest.indexOf(':');
+      if (colonIndex > 0 && ctx) {
+        const parent = rest.slice(0, colonIndex);
+        const fields = rest.slice(colonIndex + 1).split(',');
+        const container = ctx[parent];
+        if (container && typeof container === 'object') {
+          for (const field of fields) {
+            const value = container[field];
+            if (value != null) {
+              event.detail = String(value).slice(0, 200);
+              break;
+            }
+          }
+        }
+      }
+
+    } else if (directive.startsWith('detail:')) {
+      // detail:<f1>,<f2>,... - extract detail from first non-null ctx[f]
+      if (!event.detail) {
+        const fields = directive.slice(7).split(',');
+        if (ctx) {
+          for (const field of fields) {
+            if (ctx[field] != null) {
+              event.detail = String(ctx[field]).slice(0, 200);
+              break;
+            }
+          }
+        }
+      }
+
+    } else if (directive === 'arg-detail') {
+      // arg-detail - use next argv as event.detail
+      if (i + 1 < directives.length) {
+        event.detail = String(directives[++i]).slice(0, 200);
+      }
+
+    } else if (directive.startsWith('remap:')) {
+      // remap:<field>:<value>:<new-type> - conditionally change event.type.
+      // Field and value cannot contain ':' but new-type can (uses last 2 colons).
+      const rest = directive.slice(6);
+      const firstColon = rest.indexOf(':');
+      const secondColon = rest.indexOf(':', firstColon + 1);
+      if (firstColon > 0 && secondColon > firstColon && ctx) {
+        const field = rest.slice(0, firstColon);
+        const value = rest.slice(firstColon + 1, secondColon);
+        const newType = rest.slice(secondColon + 1);
+        if (String(ctx[field]) === value) {
+          event.type = newType;
+        }
+      }
+    }
+    // env: directives are handled below in the session_start block
+  }
+
+  // Build hookContext for adapter-specific session ID extraction.
+  // Only on session_start events to avoid bloating the JSONL file.
+  if (eventType === 'session_start') {
+    const hookCtx = ctx ? { ...ctx } : {};
+    // Capture env vars specified as env:<key>=<ENV_VAR> directives.
+    for (const directive of directives) {
+      if (directive.startsWith('env:')) {
+        const rest = directive.slice(4);
+        const eqIndex = rest.indexOf('=');
+        if (eqIndex > 0) {
+          const targetKey = rest.slice(0, eqIndex);
+          const envName = rest.slice(eqIndex + 1);
+          if (envName && process.env[envName] && !hookCtx[targetKey]) {
+            hookCtx[targetKey] = process.env[envName];
+          }
+        }
+      }
+    }
+    if (Object.keys(hookCtx).length > 0) {
+      event.hookContext = JSON.stringify(hookCtx).slice(0, 2048);
+    }
   }
 
   try {
     fs.appendFileSync(outputPath, JSON.stringify(event) + '\n');
   } catch {
-    // Best effort -- file may be locked or path may not exist
+    // Best effort - file may be locked or path may not exist
   }
 });

@@ -100,6 +100,7 @@ export function registerTransientSessionHandlers(context: IpcContext): void {
       eventsOutputPath,
       transient: true,
       agentParser: adapter,
+      agentName: adapter.name,
       exitSequence: adapter.getExitSequence?.() ?? ['\x03'],
     });
 

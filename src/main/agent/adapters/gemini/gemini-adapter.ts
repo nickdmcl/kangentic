@@ -3,7 +3,8 @@ import { GeminiCommandBuilder } from './command-builder';
 import { GeminiStatusParser } from './status-parser';
 import { stripGeminiKangenticHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode } from '../../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import { ActivityDetection } from '../../../../shared/types';
 
 /**
  * Gemini CLI adapter - wraps GeminiDetector, GeminiCommandBuilder,
@@ -55,6 +56,45 @@ export class GeminiAdapter implements AgentAdapter {
     return GeminiStatusParser.parseEvent(line);
   }
 
+  /**
+   * Runtime strategy: how Gemini exposes activity state and session IDs.
+   *
+   * - Activity: hook-based primary (Gemini's documented base hook schema
+   *   includes activity events), with PTY silence-timer fallback if hooks
+   *   fail at runtime.
+   * - Session ID (fromHook): Gemini's base hook input schema includes
+   *   `session_id` (and sometimes camelCase `sessionId`) on every hook stdin.
+   * - Session ID (fromOutput): Gemini prints "gemini --resume '<uuid>'" and
+   *   "Session ID: <uuid>" in the shutdown summary. Used as a scrollback
+   *   fallback by session-manager.suspend() if hooks never fired.
+   */
+  readonly runtime: AdapterRuntimeStrategy = {
+    activity: ActivityDetection.hooksAndPty(),
+    sessionId: {
+      fromHook(hookContext) {
+        try {
+          const context = JSON.parse(hookContext);
+          const sessionId = context.session_id ?? context.sessionId;
+          if (typeof sessionId === 'string' && sessionId.length > 0) {
+            console.log(`[gemini] Captured session ID from hook: ${sessionId.slice(0, 16)}...`);
+            return sessionId;
+          }
+          console.warn(`[gemini] SessionStart hookContext missing session_id. Keys: ${Object.keys(context).join(', ')}`);
+          return null;
+        } catch {
+          console.warn('[gemini] Failed to parse SessionStart hookContext');
+          return null;
+        }
+      },
+      fromOutput(data) {
+        const resumeMatch = data.match(/gemini\s+--resume\s+'?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'?/);
+        if (resumeMatch) return resumeMatch[1];
+        const headerMatch = data.match(/Session ID:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
+        return headerMatch ? headerMatch[1] : null;
+      },
+    },
+  };
+
   stripHooks(directory: string): void {
     stripGeminiKangenticHooks(directory);
   }
@@ -77,12 +117,5 @@ export class GeminiAdapter implements AgentAdapter {
 
   transformHandoffPrompt(prompt: string, contextFilePath: string): string {
     return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
-  }
-
-  extractSessionId(hookContext: string): string | null {
-    try {
-      const context = JSON.parse(hookContext);
-      return typeof context.session_id === 'string' ? context.session_id : null;
-    } catch { return null; }
   }
 }

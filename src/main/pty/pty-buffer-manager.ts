@@ -127,7 +127,17 @@ export class PtyBufferManager {
     return '\x1b[0m' + scrollback;
   }
 
-  /** Return raw scrollback for carry-over on respawn. */
+  /**
+   * Return raw unsliced scrollback, preserving pre-TUI content.
+   *
+   * Two callers:
+   * 1. Carry-over on respawn - feeds the new PTY's scrollback buffer.
+   * 2. Session-ID scrollback-scan fallback in session-manager.suspend() -
+   *    unlike getScrollback() (which strips everything before the first
+   *    \x1b[2J for clean terminal replay), this preserves agent startup
+   *    headers. Codex prints "session id: <uuid>" BEFORE entering its
+   *    TUI alt-screen, so the header would otherwise be sliced away.
+   */
   getRawScrollback(sessionId: string): string {
     return this.buffers.get(sessionId)?.scrollback || '';
   }

@@ -1,0 +1,87 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * Identify a hook command string as Kangentic-injected.
+ *
+ * Matches both current (`event-bridge`) and legacy (`activity-bridge`, removed
+ * 2026-03-01) bridge script references AND requires `.kangentic` in the path,
+ * so user-defined hooks that happen to mention our script names without
+ * pointing at our worktree are not swept up.
+ */
+export function isKangenticHookCommand(command: string | undefined): boolean {
+  if (typeof command !== 'string') return false;
+  return command.includes('.kangentic') && (
+    command.includes('activity-bridge') || command.includes('event-bridge')
+  );
+}
+
+/**
+ * Build a `node <bridge> <events> <eventType> [directives...]` command string.
+ * Used by all hook-managers when wiring bridge entries.
+ */
+export function buildBridgeCommand(
+  eventBridge: string,
+  eventsPath: string,
+  eventType: string,
+  ...directives: string[]
+): string {
+  const parts = [`node "${eventBridge}" "${eventsPath}" ${eventType}`];
+  parts.push(...directives);
+  return parts.join(' ');
+}
+
+/**
+ * Transactionally update a JSON settings file with backup-on-write and
+ * restore-on-error. Guarantees the file is never left in a corrupt state.
+ *
+ * Behavior:
+ * - If the file doesn't exist, this is a no-op.
+ * - Reads + parses the file, calls `transform(parsed)` to produce the new value.
+ * - If `transform` returns `null`, signals "no change" and the file is not touched.
+ * - Otherwise writes a .kangentic-bak copy, validates the new content round-trips
+ *   through JSON, then atomically replaces the file. On any error restores
+ *   from backup. The backup is removed on success.
+ * - If `transform` returns `{}` (empty object), the file is deleted entirely,
+ *   and the containing directory is removed if it's now empty.
+ */
+export function safelyUpdateSettingsFile(
+  filePath: string,
+  transform: (parsed: unknown) => unknown | null,
+  label: string,
+): void {
+  if (!fs.existsSync(filePath)) return;
+
+  const backupPath = filePath + '.kangentic-bak';
+  let backedUp = false;
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const parsed: unknown = JSON.parse(raw);
+    const next = transform(parsed);
+    if (next === null) return; // no change requested
+
+    fs.copyFileSync(filePath, backupPath);
+    backedUp = true;
+
+    const isEmpty = typeof next === 'object' && next !== null
+      && !Array.isArray(next) && Object.keys(next as object).length === 0;
+
+    if (isEmpty || (Array.isArray(next) && next.length === 0)) {
+      fs.unlinkSync(filePath);
+      try { fs.rmdirSync(path.dirname(filePath)); } catch { /* not empty or already gone */ }
+    } else {
+      const output = JSON.stringify(next, null, 2);
+      JSON.parse(output); // round-trip validation
+      fs.writeFileSync(filePath, output);
+    }
+
+    try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
+  } catch (error) {
+    if (backedUp) {
+      try { fs.copyFileSync(backupPath, filePath); } catch { /* can't recover */ }
+      try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
+    }
+    console.error(`[${label}] Failed to update ${filePath}:`, error);
+  }
+}

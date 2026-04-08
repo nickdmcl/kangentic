@@ -2,9 +2,11 @@ import fs from 'node:fs';
 import which from 'which';
 import { execVersion } from '../../shared/exec-version';
 import { interpolateTemplate } from '../../shared/template-utils';
-import { quoteArg, isUnixLikeShell } from '../../../../shared/paths';
+import { quoteArg, isUnixLikeShell, toForwardSlash } from '../../../../shared/paths';
+import { resolveBridgeScript } from '../../shared/bridge-utils';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode } from '../../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import { ActivityDetection } from '../../../../shared/types';
 
 /**
  * Aider CLI adapter - integrates the Aider AI pair programming tool
@@ -106,6 +108,16 @@ export class AiderAdapter implements AgentAdapter {
     // Prevent Aider from auto-committing (Kangentic manages git)
     parts.push('--no-auto-commits');
 
+    // Inject --notifications-command to write idle events via event-bridge.
+    // Aider fires this when the LLM finishes generating and is waiting for input.
+    if (options.eventsOutputPath) {
+      const eventBridge = toForwardSlash(resolveBridgeScript('event-bridge'));
+      const eventsPath = toForwardSlash(options.eventsOutputPath);
+      parts.push('--notifications');
+      parts.push('--notifications-command',
+        quoteArg(`node "${eventBridge}" "${eventsPath}" idle`, shell));
+    }
+
     return parts.join(' ');
   }
 
@@ -122,6 +134,20 @@ export class AiderAdapter implements AgentAdapter {
   parseEvent(_line: string): SessionEvent | null {
     return null;
   }
+
+  /**
+   * Runtime strategy: Aider has no hooks and no session resume.
+   *
+   * - Activity: PTY-only. Idle is detected via prompt regex matching
+   *   "> ", "aider> ", or "architect> " at end of output.
+   * - Session ID: omitted - Aider has no resume mechanism.
+   */
+  readonly runtime: AdapterRuntimeStrategy = {
+    activity: ActivityDetection.pty((data: string) => {
+      const clean = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      return /(?:^|\n)\s*(?:aider|architect)?>\s*$/.test(clean);
+    }),
+  };
 
   // Aider does not use hooks - no-op
   stripHooks(_directory: string): void {}

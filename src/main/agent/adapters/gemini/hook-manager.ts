@@ -1,6 +1,6 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { EventType } from '../../../../shared/types';
+import { isKangenticHookCommand, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
 
 /** Hook entry in Gemini CLI's settings.json. */
 export interface GeminiHookEntry {
@@ -28,38 +28,21 @@ export const GeminiHookEvent = {
 } as const;
 export type GeminiHookEvent = (typeof GeminiHookEvent)[keyof typeof GeminiHookEvent];
 
-/**
- * Identify a hook sub-entry injected by Kangentic.
- * Matches a known bridge script name AND `.kangentic` in the command string.
- */
-function isKangenticHook(hook: { command?: string }): boolean {
-  if (typeof hook.command !== 'string') return false;
-  const command = hook.command;
-  return command.includes('.kangentic') && (
-    command.includes('activity-bridge') || command.includes('event-bridge')
-  );
-}
-
-/**
- * Filter out Kangentic-injected entries from a Gemini hook event array.
- * Returns only entries whose inner hooks are NOT ours.
- */
+/** Filter out Kangentic-injected entries from a Gemini hook event array. */
 function filterOurHooks(entries: GeminiHookEntry[] | undefined): GeminiHookEntry[] {
   return (entries || []).filter(
-    (entry) => !entry?.hooks?.some?.(isKangenticHook),
+    (entry) => !entry?.hooks?.some?.((hook) => isKangenticHookCommand(hook.command)),
   );
 }
 
-/**
- * Build a single Gemini hook entry for the event bridge.
- */
-function bridgeEntry(eventBridge: string, eventsPath: string, eventType: string): GeminiHookEntry {
+/** Build a single Gemini hook entry for the event bridge. */
+function bridgeEntry(eventBridge: string, eventsPath: string, eventType: string, ...directives: string[]): GeminiHookEntry {
   return {
     matcher: '*',
     hooks: [{
       name: `kangentic-${eventType}`,
       type: 'command',
-      command: `node "${eventBridge}" "${eventsPath}" ${eventType}`,
+      command: buildBridgeCommand(eventBridge, eventsPath, eventType, ...directives),
     }],
   };
 }
@@ -73,39 +56,46 @@ export function buildGeminiEventHooks(
   eventsPath: string,
   existingHooks: Record<string, GeminiHookEntry[]>,
 ): Record<string, GeminiHookEntry[]> {
+  // Gemini CLI stdin field extraction directives:
+  // - tool_name: tool identifier at top level
+  // - tool_input: nested object with file_path, content, etc.
+  // - message: notification text
+  const H = GeminiHookEvent;
+  const E = EventType;
   return {
     ...existingHooks,
-    [GeminiHookEvent.BeforeTool]: [
-      ...(existingHooks[GeminiHookEvent.BeforeTool] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.ToolStart),
+    [H.BeforeTool]: [
+      ...(existingHooks[H.BeforeTool] || []),
+      bridgeEntry(eventBridge, eventsPath, E.ToolStart,
+        'tool:tool_name', 'nested-detail:tool_input:file_path,command,query'),
     ],
-    [GeminiHookEvent.AfterTool]: [
-      ...(existingHooks[GeminiHookEvent.AfterTool] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.ToolEnd),
+    [H.AfterTool]: [
+      ...(existingHooks[H.AfterTool] || []),
+      bridgeEntry(eventBridge, eventsPath, E.ToolEnd, 'tool:tool_name'),
     ],
-    [GeminiHookEvent.SessionStart]: [
-      ...(existingHooks[GeminiHookEvent.SessionStart] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.SessionStart),
+    [H.SessionStart]: [
+      ...(existingHooks[H.SessionStart] || []),
+      bridgeEntry(eventBridge, eventsPath, E.SessionStart),
     ],
-    [GeminiHookEvent.SessionEnd]: [
-      ...(existingHooks[GeminiHookEvent.SessionEnd] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.SessionEnd),
+    [H.SessionEnd]: [
+      ...(existingHooks[H.SessionEnd] || []),
+      bridgeEntry(eventBridge, eventsPath, E.SessionEnd),
     ],
-    [GeminiHookEvent.AfterAgent]: [
-      ...(existingHooks[GeminiHookEvent.AfterAgent] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.Idle),
+    [H.AfterAgent]: [
+      ...(existingHooks[H.AfterAgent] || []),
+      bridgeEntry(eventBridge, eventsPath, E.Idle),
     ],
-    [GeminiHookEvent.BeforeAgent]: [
-      ...(existingHooks[GeminiHookEvent.BeforeAgent] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.Prompt),
+    [H.BeforeAgent]: [
+      ...(existingHooks[H.BeforeAgent] || []),
+      bridgeEntry(eventBridge, eventsPath, E.Prompt),
     ],
-    [GeminiHookEvent.Notification]: [
-      ...(existingHooks[GeminiHookEvent.Notification] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.Notification),
+    [H.Notification]: [
+      ...(existingHooks[H.Notification] || []),
+      bridgeEntry(eventBridge, eventsPath, E.Notification, 'detail:message,notification'),
     ],
-    [GeminiHookEvent.PreCompress]: [
-      ...(existingHooks[GeminiHookEvent.PreCompress] || []),
-      bridgeEntry(eventBridge, eventsPath, EventType.Compact),
+    [H.PreCompress]: [
+      ...(existingHooks[H.PreCompress] || []),
+      bridgeEntry(eventBridge, eventsPath, E.Compact),
     ],
   };
 }
@@ -121,24 +111,17 @@ function geminiSettingsPath(directory: string): string {
  * Strip ALL Kangentic hook entries from `.gemini/settings.json` at the
  * given directory. Preserves all other user hooks and settings.
  *
- * Safety guarantees (same as Claude hook stripping):
- * - Only removes entries matching a known bridge AND `.kangentic`
- * - Backs up the original file before any modification
- * - Validates the result is valid JSON before writing
- * - Restores from backup on any error
- * - If the file becomes empty `{}`, deletes it
+ * Known race: Gemini has no `--settings <path>` flag (unlike Claude), so we
+ * must write to the project-level `.gemini/settings.json` in the cwd.
+ * Concurrent Gemini sessions in the same project race on this file, and
+ * an abnormal termination may leave orphan Kangentic hook entries behind.
+ * This stripper is the cleanup path on normal shutdown + project deletion.
+ * See follow-up task to submit an upstream Gemini PR for per-session settings.
  */
 export function stripGeminiKangenticHooks(directory: string): void {
-  const settingsPath = geminiSettingsPath(directory);
-  if (!fs.existsSync(settingsPath)) return;
-
-  const backupPath = settingsPath + '.kangentic-bak';
-  let backedUp = false;
-
-  try {
-    const raw = fs.readFileSync(settingsPath, 'utf-8');
-    const settings = JSON.parse(raw);
-    if (!settings.hooks || typeof settings.hooks !== 'object') return;
+  safelyUpdateSettingsFile(geminiSettingsPath(directory), (parsed) => {
+    const settings = parsed as { hooks?: Record<string, GeminiHookEntry[]> };
+    if (!settings?.hooks || typeof settings.hooks !== 'object') return null;
 
     let changed = false;
     for (const key of Object.keys(settings.hooks)) {
@@ -148,33 +131,9 @@ export function stripGeminiKangenticHooks(directory: string): void {
       if (settings.hooks[key].length !== before) changed = true;
       if (settings.hooks[key].length === 0) delete settings.hooks[key];
     }
-
-    if (!changed) return;
-
-    // Back up original before writing any changes
-    fs.copyFileSync(settingsPath, backupPath);
-    backedUp = true;
+    if (!changed) return null;
 
     if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
-
-    if (Object.keys(settings).length === 0) {
-      fs.unlinkSync(settingsPath);
-      // Remove the .gemini/ directory if it's now empty
-      try { fs.rmdirSync(path.dirname(settingsPath)); } catch { /* not empty or already gone */ }
-    } else {
-      const output = JSON.stringify(settings, null, 2);
-      JSON.parse(output); // verify round-trip integrity
-      fs.writeFileSync(settingsPath, output);
-    }
-
-    // Success - remove backup
-    try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-  } catch (error) {
-    // Restore from backup if anything went wrong
-    if (backedUp) {
-      try { fs.copyFileSync(backupPath, settingsPath); } catch { /* can't recover */ }
-      try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-    }
-    console.error(`[stripGeminiKangenticHooks] Failed to clean hooks at ${settingsPath}:`, error);
-  }
+    return settings;
+  }, 'stripGeminiKangenticHooks');
 }

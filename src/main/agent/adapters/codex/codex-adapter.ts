@@ -2,7 +2,8 @@ import { CodexDetector } from './detector';
 import { CodexCommandBuilder } from './command-builder';
 import { stripCodexHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode } from '../../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import { ActivityDetection } from '../../../../shared/types';
 
 /**
  * Codex CLI adapter - wraps CodexDetector, CodexCommandBuilder, and
@@ -61,6 +62,43 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 
+  /**
+   * Runtime strategy: how Codex exposes activity state and session IDs.
+   *
+   * - Activity: PTY silence timer only. Codex's Rust CLI doesn't read
+   *   .codex/hooks.json at the moment, so hook events never arrive.
+   * - Session ID (fromHook): CODEX_THREAD_ID env var (openai/codex#10096)
+   *   captured via hook-manager's `env:thread_id=CODEX_THREAD_ID` directive.
+   * - Session ID (fromOutput): Codex v0.118+ prints "session id: <uuid>" in
+   *   the startup header; older versions printed "codex resume thr_..." at exit.
+   */
+  readonly runtime: AdapterRuntimeStrategy = {
+    activity: ActivityDetection.pty(),
+    sessionId: {
+      fromHook(hookContext) {
+        try {
+          const context = JSON.parse(hookContext);
+          const threadId = context.thread_id ?? context.threadId;
+          if (typeof threadId === 'string') {
+            console.log(`[codex] Captured thread ID from hook: ${threadId.slice(0, 16)}...`);
+            return threadId;
+          }
+          console.warn(`[codex] SessionStart hookContext missing thread_id. Keys: ${Object.keys(context).join(', ')}`);
+          return null;
+        } catch {
+          console.warn('[codex] Failed to parse SessionStart hookContext');
+          return null;
+        }
+      },
+      fromOutput(data) {
+        const headerMatch = data.match(/session id:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+        if (headerMatch) return headerMatch[1];
+        const resumeMatch = data.match(/codex\s+resume\s+(thr_\S+)/);
+        return resumeMatch ? resumeMatch[1] : null;
+      },
+    },
+  };
+
   stripHooks(directory: string): void {
     stripCodexHooks(directory);
   }
@@ -86,20 +124,5 @@ export class CodexAdapter implements AgentAdapter {
 
   transformHandoffPrompt(prompt: string, contextFilePath: string): string {
     return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
-  }
-
-  extractSessionId(hookContext: string): string | null {
-    try {
-      const context = JSON.parse(hookContext);
-      const threadId = context.thread_id ?? context.threadId;
-      return typeof threadId === 'string' ? threadId : null;
-    } catch { return null; }
-  }
-
-  captureSessionIdFromOutput(data: string): string | null {
-    // Codex prints "To continue this session, run: codex resume thr_..."
-    // in its terminal output. Extract the thread ID from this line.
-    const match = data.match(/codex\s+resume\s+(thr_\S+)/);
-    return match ? match[1] : null;
   }
 }

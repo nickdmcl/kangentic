@@ -4,7 +4,8 @@ import { ClaudeStatusParser } from './status-parser';
 import { ensureWorktreeTrust, ensureMcpServerTrust } from './trust-manager';
 import { stripKangenticHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode } from '../../../../shared/types';
+import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import { ActivityDetection } from '../../../../shared/types';
 
 /**
  * Claude Code adapter - wraps ClaudeDetector, CommandBuilder,
@@ -58,6 +59,11 @@ export class ClaudeAdapter implements AgentAdapter {
   parseEvent(line: string): SessionEvent | null {
     return ClaudeStatusParser.parseEvent(line);
   }
+
+  // Claude uses caller-owned session IDs via --session-id, so no capture needed.
+  readonly runtime: AdapterRuntimeStrategy = {
+    activity: ActivityDetection.hooks(),
+  };
 
   stripHooks(directory: string): void {
     stripKangenticHooks(directory);

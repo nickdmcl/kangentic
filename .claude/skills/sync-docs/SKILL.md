@@ -86,8 +86,9 @@ Anchors are enumerable source-code structures that must be exhaustively listed i
 | `SuspendedBy` | Union variants | database.md |
 | `ThemeMode` | Union variants | configuration.md |
 | `EventType` | Object keys | activity-detection.md |
-| `HookEvent` | Object keys | agent-integration.md |
 | `EventTypeActivity` | Mapping entries | activity-detection.md |
+| `ActivityDetectionStrategy` | Discriminated union variants | activity-detection.md |
+| `AdapterRuntimeStrategy` | Interface fields | agent-integration.md |
 | `AppConfig` / `DEFAULT_CONFIG` | Flattened dot-paths + defaults | configuration.md |
 | `BoardConfig` | Interface fields | configuration.md |
 | `BoardColumnConfig` | Interface fields | configuration.md |

@@ -2,7 +2,45 @@
 
 ## Overview
 
-Kangentic tracks whether each Claude Code agent is **thinking** (actively using tools) or **idle** (waiting for input or stopped). This state drives the task card spinner in the Kanban board UI.
+Kangentic tracks whether each agent session is **thinking** (actively using tools) or **idle** (waiting for input or stopped). This state drives the task card spinner in the Kanban board UI.
+
+Each adapter declares an `ActivityDetectionStrategy` on its `runtime.activity` field that selects between hook-based events, PTY pattern detection, or both. The Claude Code pipeline (hooks-only) is described first because it's the richest source of activity information. PTY-based detection for agents without reliable hooks is documented in [Strategies](#strategies).
+
+## Strategies
+
+`src/shared/types.ts` - `ActivityDetectionStrategy` discriminated union
+
+| `kind` | Used by | Behavior |
+|--------|---------|----------|
+| `'hooks'` | Claude Code | Hook events are the sole source of activity truth. PTY data does not influence activity state. |
+| `'pty'` | Aider, Codex | Activity is inferred from PTY output patterns. The optional `detectIdle(data)` callback returns true on a definitive idle signal (e.g. an `aider>` prompt). Without `detectIdle`, a 10-second silence timer determines idle. |
+| `'hooks_and_pty'` | Gemini | Hooks are primary, with PTY-based detection as a fallback if hooks fail to fire. Once hooks deliver a `thinking` event, `PtyActivityTracker.suppress()` permanently disables PTY detection for that session. |
+
+### `ActivityDetection` factory
+
+`src/shared/types.ts`
+
+Adapters construct strategy values via factory functions rather than inline object literals. The factories enforce per-variant shape (e.g. `hooks()` cannot accidentally receive a `detectIdle` callback) and give descriptive call sites:
+
+```ts
+import { ActivityDetection } from '../../../../shared/types';
+
+// Claude Code: hooks are the only source
+runtime = { activity: ActivityDetection.hooks() };
+
+// Codex: PTY only, no prompt-pattern shortcut (silence timer fallback)
+runtime = { activity: ActivityDetection.pty() };
+
+// Aider: PTY with prompt-regex detectIdle for instant transitions
+runtime = { activity: ActivityDetection.pty((data) => /(?:^|\n)\s*aider>\s*$/.test(data)) };
+
+// Gemini: hooks primary, PTY fallback with silence timer
+runtime = { activity: ActivityDetection.hooksAndPty() };
+```
+
+`PtyActivityTracker` (`src/main/pty/pty-activity-tracker.ts`) owns the silence-timer state and the suppress flag. It exposes `onData()`, `onIdleDetected()`, `suppress()`, and `clearSession()` callbacks consumed by `UsageTracker`.
+
+## Claude Code Pipeline
 
 Activity detection uses a single pipeline: Claude Code hooks write structured events to a JSONL file, the main process watches that file, and the renderer derives the display state from event types.
 

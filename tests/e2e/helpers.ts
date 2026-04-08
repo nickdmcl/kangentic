@@ -70,18 +70,35 @@ export async function launchApp(options?: {
   // generate one from the Playwright worker index to avoid collisions.
   const dataDir = options?.dataDir || getTestDataDir(`worker-${process.pid}`);
 
-  // Ensure hasCompletedFirstRun is true so the WelcomeOverlay doesn't block tests.
-  // Tests may pre-write their own config.json (e.g. with mock Claude CLI paths),
-  // so merge into existing config rather than overwriting.
+  // Ensure hasCompletedFirstRun is true so the WelcomeOverlay doesn't block
+  // tests, and suppress all desktop notifications + toasts so killing mock
+  // sessions during tests (e.g. archive flows, exit handling) doesn't fire
+  // spurious "Session crashed" desktop notifications on the developer's
+  // machine. Tests may pre-write their own config.json (e.g. with mock Claude
+  // CLI paths), so merge rather than overwrite.
   const configPath = path.join(dataDir, 'config.json');
+  const notificationDefaults = {
+    desktop: { onAgentIdle: false, onAgentCrash: false, onPlanComplete: false },
+    toasts: { onAgentIdle: false, onAgentCrash: false, onPlanComplete: false, durationSeconds: 4, maxCount: 5 },
+    cooldownSeconds: 60,
+  };
   try {
     const existing = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    let changed = false;
     if (!existing.hasCompletedFirstRun) {
       existing.hasCompletedFirstRun = true;
-      fs.writeFileSync(configPath, JSON.stringify(existing));
+      changed = true;
     }
+    if (!existing.notifications) {
+      existing.notifications = notificationDefaults;
+      changed = true;
+    }
+    if (changed) fs.writeFileSync(configPath, JSON.stringify(existing));
   } catch {
-    fs.writeFileSync(configPath, JSON.stringify({ hasCompletedFirstRun: true }));
+    fs.writeFileSync(configPath, JSON.stringify({
+      hasCompletedFirstRun: true,
+      notifications: notificationDefaults,
+    }));
   }
 
   const args = [mainEntry];

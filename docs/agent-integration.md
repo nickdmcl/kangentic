@@ -17,6 +17,7 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 | `interpolateTemplate(template, variables)` | Replace `{{key}}` placeholders in prompt templates |
 | `parseStatus(raw)` | Parse agent-specific status data into `SessionUsage` |
 | `parseEvent(line)` | Parse a single JSONL event line into `SessionEvent` |
+| `runtime` | `AdapterRuntimeStrategy` declaring activity detection + session ID capture (see below) |
 | `stripHooks(directory)` | Remove monitoring hooks on cleanup |
 | `clearSettingsCache()` | Clear cached merged settings |
 | `detectFirstOutput(data)` | Detect when the agent TUI is ready (lifts shimmer overlay) |
@@ -30,8 +31,30 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 | `name` | `string` | Unique identifier (`'claude'`, `'codex'`, `'gemini'`, `'aider'`) |
 | `displayName` | `string` | Human-readable product name |
 | `sessionType` | `SessionRecord['session_type']` | Value stored in the sessions DB table |
+| `supportsCallerSessionId` | `boolean` | True when the CLI accepts a caller-supplied session ID via `--session-id` (Claude). When false, Kangentic captures the agent's own ID via `runtime.sessionId` for `--resume`. |
 | `permissions` | `AgentPermissionEntry[]` | Supported permission modes with agent-specific labels |
 | `defaultPermission` | `PermissionMode` | Recommended default permission mode |
+| `runtime` | `AdapterRuntimeStrategy` | Activity detection + session ID capture (see below) |
+
+### `AdapterRuntimeStrategy`
+
+`src/shared/types.ts`
+
+One scannable block per adapter for activity-state derivation and session ID capture:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `activity` | `ActivityDetectionStrategy` | How thinking-vs-idle is detected. See [Activity Detection](activity-detection.md) for the discriminated union variants and the `ActivityDetection.hooks() / pty() / hooksAndPty()` factories. |
+| `sessionId.fromHook?(hookContext)` | `(string) => string \| null` | Parse the agent's CLI session ID from hook stdin JSON. Fires once on `session_start`. Used by Gemini (`session_id` field) and Codex (`thread_id` via the `CODEX_THREAD_ID` env var captured by event-bridge). |
+| `sessionId.fromOutput?(data)` | `(string) => string \| null` | Parse the agent's CLI session ID from raw PTY output. Scanned on every data chunk by `SessionIdScanner` (chunk-boundary-safe rolling buffer with ANSI stripping), plus a final scrollback scan in `suspend()`. Used for Codex's startup header and Gemini's shutdown summary. |
+
+Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--session-id`) or that have no resume mechanism (Aider).
+
+### `SpawnSessionInput` extras
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `agentName?` | `string` | Human-readable agent name (`'claude'`, `'gemini'`, etc.) captured at spawn time. Used in diagnostic logs - survives production minification unlike `agentParser.constructor.name`. |
 
 ## Supported Agents
 

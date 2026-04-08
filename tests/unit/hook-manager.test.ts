@@ -44,10 +44,11 @@ describe('hook-manager', () => {
       expect(hooks.PostToolUse[0].matcher).toBe('');
       expect(hooks.PostToolUse[0].hooks[0].command).toContain('tool_end');
 
-      // PostToolUseFailure: tool_failure
+      // PostToolUseFailure: tool_end with remap directive for interrupts
       expect(hooks.PostToolUseFailure).toHaveLength(1);
       expect(hooks.PostToolUseFailure[0].matcher).toBe('');
-      expect(hooks.PostToolUseFailure[0].hooks[0].command).toContain('tool_failure');
+      expect(hooks.PostToolUseFailure[0].hooks[0].command).toContain('tool_end');
+      expect(hooks.PostToolUseFailure[0].hooks[0].command).toContain('remap:is_interrupt:true:interrupted');
 
       // UserPromptSubmit: prompt
       expect(hooks.UserPromptSubmit).toHaveLength(1);

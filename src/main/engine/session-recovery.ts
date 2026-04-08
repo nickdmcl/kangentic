@@ -329,6 +329,7 @@ export async function recoverSessions(
         statusOutputPath: input.statusOutputPath,
         eventsOutputPath: input.eventsOutputPath,
         agentParser: input.adapter,
+        agentName: input.adapter.name,
         exitSequence: input.adapter.getExitSequence?.() ?? ['\x03'],
       });
       return { input, newSession };
@@ -602,6 +603,7 @@ export async function reconcileSessions(
         statusOutputPath: input.statusOutputPath,
         eventsOutputPath: input.eventsOutputPath,
         agentParser: input.adapter,
+        agentName: input.adapter.name,
         exitSequence: input.adapter.getExitSequence?.() ?? ['\x03'],
       });
       return { input, newSession };

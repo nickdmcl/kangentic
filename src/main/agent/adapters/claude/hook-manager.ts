@@ -1,6 +1,36 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { EventType, HookEvent } from '../../../../shared/types';
+import { EventType } from '../../../../shared/types';
+import { isKangenticHookCommand, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
+
+/** All Claude Code hook event names (settings.json keys). */
+export const ClaudeHookEvent = {
+  // Tool lifecycle
+  PreToolUse: 'PreToolUse',
+  PostToolUse: 'PostToolUse',
+  PostToolUseFailure: 'PostToolUseFailure',
+  // Session lifecycle
+  SessionStart: 'SessionStart',
+  SessionEnd: 'SessionEnd',
+  // Agent stop
+  Stop: 'Stop',
+  SubagentStart: 'SubagentStart',
+  SubagentStop: 'SubagentStop',
+  // User interaction
+  UserPromptSubmit: 'UserPromptSubmit',
+  PermissionRequest: 'PermissionRequest',
+  Notification: 'Notification',
+  // Context management
+  PreCompact: 'PreCompact',
+  // Agent teams
+  TeammateIdle: 'TeammateIdle',
+  TaskCompleted: 'TaskCompleted',
+  // Configuration
+  ConfigChange: 'ConfigChange',
+  // Worktrees
+  WorktreeCreate: 'WorktreeCreate',
+  WorktreeRemove: 'WorktreeRemove',
+} as const;
+export type ClaudeHookEvent = (typeof ClaudeHookEvent)[keyof typeof ClaudeHookEvent];
 
 /** Hook entry in Claude Code's settings.json. */
 export interface ClaudeHookEntry {
@@ -9,114 +39,117 @@ export interface ClaudeHookEntry {
 }
 
 /**
- * Identify a hook entry injected by Kangentic.
- * Matches a known bridge script name AND `.kangentic` in the command string
- * to ensure we never touch user-defined hooks.
- */
-function isKangenticHook(h: { command?: string }): boolean {
-  if (typeof h.command !== 'string') return false;
-  const cmd = h.command;
-  return cmd.includes('.kangentic') && (
-    cmd.includes('activity-bridge') || cmd.includes('event-bridge')
-  );
-}
-
-/**
  * Filter out ALL Kangentic-injected entries from a hook event array.
  * Returns only entries that are NOT ours (any bridge type).
  */
 function filterOurHooks(entries: ClaudeHookEntry[] | undefined): ClaudeHookEntry[] {
   return (entries || []).filter(
-    (e) => !e?.hooks?.some?.(isKangenticHook),
+    (entry) => !entry?.hooks?.some?.((hook) => isKangenticHookCommand(hook.command)),
   );
 }
 
-/**
- * Return the path to `.claude/settings.local.json` for the given directory.
- */
+/** Return the path to `.claude/settings.local.json` for the given directory. */
 function settingsLocalPath(dir: string): string {
   return path.join(dir, '.claude', 'settings.local.json');
 }
 
-/**
- * Build event-bridge hook entries to merge into Claude Code settings.
- * Takes the resolved bridge script path, events output path, and existing
- * hooks, and returns the merged hooks object with event-bridge entries appended.
- */
 export function buildEventHooks(
   eventBridge: string,
   eventsPath: string,
   existingHooks: Record<string, ClaudeHookEntry[]>,
 ): Record<string, ClaudeHookEntry[]> {
+  const H = ClaudeHookEvent;
+  const E = EventType;
+
+  // Claude Code stdin field extraction directives:
+  // - tool_name: tool identifier at top level
+  // - tool_input: nested object with file_path, command, query, pattern, url, description
+  // - is_interrupt / error: PostToolUseFailure context
+  // - agent_type / subagent_type: subagent context
+  // - message / notification: notification text
+  // - task / description / name: task completion info
+  // - agent / teammate / name: teammate info
+  // - name / path: worktree info
   return {
     ...existingHooks,
-    [HookEvent.PreToolUse]: [
-      ...(existingHooks[HookEvent.PreToolUse] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.ToolStart}` }] },
+    [H.PreToolUse]: [
+      ...(existingHooks[H.PreToolUse] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.ToolStart,
+        'tool:tool_name', 'nested-detail:tool_input:file_path,command,query,pattern,url,description') }] },
     ],
-    [HookEvent.PostToolUse]: [
-      ...(existingHooks[HookEvent.PostToolUse] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.ToolEnd}` }] },
+    [H.PostToolUse]: [
+      ...(existingHooks[H.PostToolUse] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.ToolEnd,
+        'tool:tool_name') }] },
     ],
-    [HookEvent.PostToolUseFailure]: [
-      ...(existingHooks[HookEvent.PostToolUseFailure] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" tool_failure` }] },
+    [H.PostToolUseFailure]: [
+      ...(existingHooks[H.PostToolUseFailure] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.ToolEnd,
+        'tool:tool_name', 'remap:is_interrupt:true:interrupted', 'detail:error') }] },
     ],
-    [HookEvent.UserPromptSubmit]: [
-      ...(existingHooks[HookEvent.UserPromptSubmit] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.Prompt}` }] },
+    [H.UserPromptSubmit]: [
+      ...(existingHooks[H.UserPromptSubmit] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.Prompt) }] },
     ],
-    [HookEvent.Stop]: [
-      ...(existingHooks[HookEvent.Stop] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.Idle}` }] },
+    [H.Stop]: [
+      ...(existingHooks[H.Stop] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.Idle) }] },
     ],
-    [HookEvent.PermissionRequest]: [
-      ...(existingHooks[HookEvent.PermissionRequest] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.Idle} permission` }] },
+    [H.PermissionRequest]: [
+      ...(existingHooks[H.PermissionRequest] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.Idle,
+        'arg-detail', 'permission') }] },
     ],
-    [HookEvent.SessionStart]: [
-      ...(existingHooks[HookEvent.SessionStart] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.SessionStart}` }] },
+    [H.SessionStart]: [
+      ...(existingHooks[H.SessionStart] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.SessionStart) }] },
     ],
-    [HookEvent.SessionEnd]: [
-      ...(existingHooks[HookEvent.SessionEnd] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.SessionEnd}` }] },
+    [H.SessionEnd]: [
+      ...(existingHooks[H.SessionEnd] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.SessionEnd) }] },
     ],
-    [HookEvent.SubagentStart]: [
-      ...(existingHooks[HookEvent.SubagentStart] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.SubagentStart}` }] },
+    [H.SubagentStart]: [
+      ...(existingHooks[H.SubagentStart] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.SubagentStart,
+        'detail:agent_type,subagent_type') }] },
     ],
-    [HookEvent.SubagentStop]: [
-      ...(existingHooks[HookEvent.SubagentStop] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.SubagentStop}` }] },
+    [H.SubagentStop]: [
+      ...(existingHooks[H.SubagentStop] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.SubagentStop,
+        'detail:agent_type,subagent_type') }] },
     ],
-    [HookEvent.Notification]: [
-      ...(existingHooks[HookEvent.Notification] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.Notification}` }] },
+    [H.Notification]: [
+      ...(existingHooks[H.Notification] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.Notification,
+        'detail:message,notification') }] },
     ],
-    [HookEvent.PreCompact]: [
-      ...(existingHooks[HookEvent.PreCompact] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.Compact}` }] },
+    [H.PreCompact]: [
+      ...(existingHooks[H.PreCompact] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.Compact) }] },
     ],
-    [HookEvent.TeammateIdle]: [
-      ...(existingHooks[HookEvent.TeammateIdle] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.TeammateIdle}` }] },
+    [H.TeammateIdle]: [
+      ...(existingHooks[H.TeammateIdle] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.TeammateIdle,
+        'detail:agent,teammate,name') }] },
     ],
-    [HookEvent.TaskCompleted]: [
-      ...(existingHooks[HookEvent.TaskCompleted] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.TaskCompleted}` }] },
+    [H.TaskCompleted]: [
+      ...(existingHooks[H.TaskCompleted] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.TaskCompleted,
+        'detail:task,description,name') }] },
     ],
-    [HookEvent.ConfigChange]: [
-      ...(existingHooks[HookEvent.ConfigChange] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.ConfigChange}` }] },
+    [H.ConfigChange]: [
+      ...(existingHooks[H.ConfigChange] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.ConfigChange) }] },
     ],
-    [HookEvent.WorktreeCreate]: [
-      ...(existingHooks[HookEvent.WorktreeCreate] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.WorktreeCreate}` }] },
+    [H.WorktreeCreate]: [
+      ...(existingHooks[H.WorktreeCreate] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.WorktreeCreate,
+        'detail:name,path') }] },
     ],
-    [HookEvent.WorktreeRemove]: [
-      ...(existingHooks[HookEvent.WorktreeRemove] || []),
-      { matcher: '', hooks: [{ type: 'command', command: `node "${eventBridge}" "${eventsPath}" ${EventType.WorktreeRemove}` }] },
+    [H.WorktreeRemove]: [
+      ...(existingHooks[H.WorktreeRemove] || []),
+      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.WorktreeRemove,
+        'detail:name,path') }] },
     ],
   };
 }
@@ -130,26 +163,11 @@ export function buildEventHooks(
  * writes hooks to `.claude/settings.local.json`. This function is kept
  * for backward compatibility - existing worktrees created before the
  * change may still have our hooks in their settings.local.json.
- * Called by `cleanupProject()` during project deletion.
- *
- * Safety guarantees:
- * - Only removes entries matching a known bridge AND `.kangentic`
- * - Backs up the original file before any modification
- * - Validates the result is valid JSON before writing
- * - Restores from backup on any error
- * - If the file becomes empty `{}`, deletes it (and the backup)
  */
 export function stripKangenticHooks(dir: string): void {
-  const p = settingsLocalPath(dir);
-  if (!fs.existsSync(p)) return;
-
-  const backupPath = p + '.kangentic-bak';
-  let backedUp = false;
-
-  try {
-    const raw = fs.readFileSync(p, 'utf-8');
-    const settings = JSON.parse(raw);
-    if (!settings.hooks || typeof settings.hooks !== 'object') return;
+  safelyUpdateSettingsFile(settingsLocalPath(dir), (parsed) => {
+    const settings = parsed as { hooks?: Record<string, ClaudeHookEntry[]> };
+    if (!settings?.hooks || typeof settings.hooks !== 'object') return null;
 
     let changed = false;
     for (const key of Object.keys(settings.hooks)) {
@@ -159,33 +177,9 @@ export function stripKangenticHooks(dir: string): void {
       if (settings.hooks[key].length !== before) changed = true;
       if (settings.hooks[key].length === 0) delete settings.hooks[key];
     }
-
-    if (!changed) return;
-
-    // Back up original before writing any changes
-    fs.copyFileSync(p, backupPath);
-    backedUp = true;
+    if (!changed) return null;
 
     if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
-
-    if (Object.keys(settings).length === 0) {
-      fs.unlinkSync(p);
-      // Remove the .claude/ directory if it's now empty (we may have created it)
-      try { fs.rmdirSync(path.dirname(p)); } catch { /* not empty or already gone */ }
-    } else {
-      const output = JSON.stringify(settings, null, 2);
-      JSON.parse(output); // verify round-trip integrity
-      fs.writeFileSync(p, output);
-    }
-
-    // Success - remove backup
-    try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-  } catch (err) {
-    // Restore from backup if anything went wrong
-    if (backedUp) {
-      try { fs.copyFileSync(backupPath, p); } catch { /* can't recover */ }
-      try { fs.unlinkSync(backupPath); } catch { /* best effort */ }
-    }
-    console.error(`[stripKangenticHooks] Failed to clean hooks at ${p}:`, err);
-  }
+    return settings;
+  }, 'stripKangenticHooks');
 }

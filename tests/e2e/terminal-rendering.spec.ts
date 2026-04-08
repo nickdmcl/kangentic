@@ -253,11 +253,12 @@ test.describe('Terminal Rendering', () => {
     await sessionTab.click();
     await page.waitForTimeout(300);
 
-    // With multiple sessions, each terminal pane is display:none unless active.
-    // Select the xterm inside the visible pane (display: block).
+    // TerminalPanel only renders the active session's <div class="absolute inset-0">
+    // (filtered at render time, not toggled via display style). The activity tab
+    // uses display:block/none but contains no .xterm. So .xterm in the panel
+    // unambiguously identifies the active session pane.
     const terminalPanel = page.locator('.resize-handle ~ div');
-    const activePane = terminalPanel.locator('div.absolute.inset-0[style*="display: block"]');
-    await expect(activePane.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
+    await expect(terminalPanel.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
 
     // --- Part 1: Scrollback preservation ---
     const scrollbackBefore = await page.evaluate(async () => {
@@ -295,7 +296,7 @@ test.describe('Terminal Rendering', () => {
     expect(scrollbackAfter).toBe(scrollbackBefore);
 
     // --- Part 2: xterm refits after resize ---
-    const xtermScreen = activePane.locator('.xterm-screen').first();
+    const xtermScreen = terminalPanel.locator('.xterm-screen').first();
     const boxBefore = await xtermScreen.boundingBox();
     expect(boxBefore).toBeTruthy();
 
