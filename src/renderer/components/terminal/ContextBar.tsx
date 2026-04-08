@@ -1,11 +1,11 @@
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { useBoardStore } from '../../stores/board-store';
 import { useSessionStore } from '../../stores/session-store';
 import { useConfigStore } from '../../stores/config-store';
 import { getProgressColor } from '../../utils/color-lerp';
 import { formatTokenCount } from '../../utils/format-tokens';
 import { formatCost } from '../../utils/format-session';
-import { agentDisplayName, agentShortName } from '../../utils/agent-display-name';
+import { agentDisplayName } from '../../utils/agent-display-name';
 import { shellDisplayName } from '../../utils/shell-display-name';
 import { useValuePulse } from '../../hooks/useValuePulse';
 
@@ -26,9 +26,9 @@ const pill = 'px-2 py-0.5 rounded bg-surface-raised whitespace-nowrap select-non
  */
 export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const usage = useSessionStore((s) => s.sessionUsage[sessionId]);
-  const sessionShell = useSessionStore((s) =>
-    s.sessions.find((sess) => sess.id === sessionId)?.shell,
-  );
+  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
+  const sessionShell = session?.shell;
+  const isResuming = session?.resuming ?? false;
   const taskAgent = useBoardStore((s) => s.tasks.find((t) => t.session_id === sessionId)?.agent ?? null);
   const agentVersionNumber = useConfigStore((s) => s.agentVersionNumber);
   const contextBarConfig = useConfigStore((s) => s.config.contextBar);
@@ -42,17 +42,22 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const pctRef = useValuePulse(usage ? Math.round(usage.contextWindow.usedPercentage) : 0);
   const fractionRef = useValuePulse(usage?.contextWindow.usedTokens);
 
-  // When there's no usage data (agents without structured status output),
-  // still show the agent name so the user knows which agent is running.
-  if (!usage) {
-    const agentLabel = agentDisplayName(taskAgent);
-    if (!agentLabel) return null;
+  // Model is "resolved" only when the CLI status line has reported a real
+  // displayName. Until then we show a single spinner pill instead of flashing
+  // through "Agent" -> "Claude" -> "Opus 4.6 (1M Context)" as data trickles in.
+  const resolvedModelName = usage?.model.displayName || null;
+
+  if (!usage || !resolvedModelName) {
+    const spinnerLabel = isResuming ? 'Resuming agent...' : 'Starting agent...';
     return (
       <div
         className="h-8 bg-surface/80 border-t border-edge flex items-center px-3 gap-2 text-xs flex-shrink-0"
         data-testid="usage-bar"
       >
-        <span className={`${pill} text-fg-muted`}>{agentLabel}</span>
+        <span className={`${pill} text-fg-muted flex items-center gap-1.5`}>
+          <Loader2 size={12} className="animate-spin" />
+          {spinnerLabel}
+        </span>
       </div>
     );
   }
@@ -60,7 +65,7 @@ export function ContextBar({ sessionId, compact = false }: ContextBarProps) {
   const pct = Math.round(usage.contextWindow.usedPercentage);
   const progressColor = getProgressColor(pct);
 
-  const modelName = usage.model.displayName || agentShortName(taskAgent);
+  const modelName = resolvedModelName;
 
   // Fallback to 0 for fields that may be absent from older main-process sessions
   const usedTokens = usage.contextWindow.usedTokens ?? 0;

@@ -12,7 +12,6 @@ import { useBacklogStore } from '../../stores/backlog-store';
 import { useConfigStore } from '../../stores/config-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useTaskProgress } from '../../utils/task-progress';
-import { agentShortName } from '../../utils/agent-display-name';
 import { getProgressColor } from '../../utils/color-lerp';
 import { LabelPills } from '../Pill';
 import type { Task, Swimlane } from '../../../shared/types';
@@ -178,6 +177,13 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
     ),
   );
   const displayState = useTaskProgress(task.id, sessionId);
+  const isResuming = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        s._sessionByTaskId.get(task.id)?.resuming ?? false,
+      [task.id],
+    ),
+  );
 
   const {
     attributes,
@@ -394,12 +400,18 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         {!isCompactDensity && (() => {
           switch (displayState.kind) {
             case 'running': {
-              if (!displayState.usage) {
-                // Agents without structured status (Codex, Gemini, Aider):
-                // show agent name so the card isn't blank.
+              const resolvedModelName = displayState.usage?.model.displayName || null;
+              if (!displayState.usage || !resolvedModelName) {
+                // Until the CLI status line reports a real model displayName,
+                // show a single spinner pill instead of flashing intermediate
+                // labels ("Agent" -> "Claude" -> "Opus 4.6 (1M Context)").
+                const spinnerLabel = isResuming ? 'Resuming agent...' : 'Starting agent...';
                 return (
                   <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
-                    <span className="text-xs text-fg-faint">{agentShortName(task.agent)}</span>
+                    <span className="text-xs text-fg-faint flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" />
+                      {spinnerLabel}
+                    </span>
                   </div>
                 );
               }
@@ -409,7 +421,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
                 <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs text-fg-faint">
-                      {displayState.usage.model.displayName || agentShortName(task.agent)}
+                      {resolvedModelName}
                     </span>
                     <span className="text-xs text-fg-faint">{pct}%</span>
                   </div>

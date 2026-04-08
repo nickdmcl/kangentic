@@ -511,4 +511,61 @@ test.describe('Task Activity Indicators', () => {
       }
     });
   });
+
+  // Group G: ContextBar spinner pill
+  // Verifies the bottom-bar agent label shows a single "Starting agent..."
+  // (or "Resuming agent...") spinner pill until the CLI reports a real model
+  // displayName, instead of flashing "Agent" -> "Claude" -> "Opus 4.6 (1M Context)".
+  test.describe('ContextBar spinner pill', () => {
+    test('shows "Starting agent..." spinner pill when usage has no model name', async () => {
+      const { browser, page } = await launchWithState(
+        makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false }),
+      );
+      try {
+        await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
+        const usageBar = page.locator('[data-testid="usage-bar"]').first();
+        await expect(usageBar).toBeVisible({ timeout: 10000 });
+        await expect(usageBar).toContainText('Starting agent...');
+        await expect(usageBar.locator('.lucide-loader-circle')).toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+
+    test('shows resolved model name once usage.model.displayName arrives', async () => {
+      const { browser, page } = await launchWithState(
+        makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: true }),
+      );
+      try {
+        await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
+        const usageBar = page.locator(`[data-task-id="${TASK_ID}"] [data-testid="usage-bar"]`);
+        await expect(usageBar).toBeVisible({ timeout: 10000 });
+        await expect(usageBar).toContainText('Claude Sonnet');
+        await expect(usageBar).not.toContainText('Starting agent...');
+        await expect(usageBar).not.toContainText('Resuming agent...');
+      } finally {
+        await browser.close();
+      }
+    });
+
+    test('shows "Resuming agent..." when session.resuming is true', async () => {
+      const preConfig = makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false })
+        + `
+        window.__mockPreConfigure(function (state) {
+          var session = state.sessions.find(function (s) { return s.id === '${SESSION_ID}'; });
+          if (session) session.resuming = true;
+        });
+        `;
+      const { browser, page } = await launchWithState(preConfig);
+      try {
+        await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
+        const usageBar = page.locator('[data-testid="usage-bar"]').first();
+        await expect(usageBar).toBeVisible({ timeout: 10000 });
+        await expect(usageBar).toContainText('Resuming agent...');
+        await expect(usageBar.locator('.lucide-loader-circle')).toBeVisible();
+      } finally {
+        await browser.close();
+      }
+    });
+  });
 });
