@@ -26,6 +26,7 @@ let _lastIsOpen = hmrCommandBarOpen;
 export function useCommandBar() {
   const [isOpen, setIsOpen] = useState(hmrCommandBarOpen);
   const currentProjectId = useProjectStore((s) => s.currentProject?.id);
+  const pendingOpenCommandTerminal = useSessionStore((s) => s._pendingOpenCommandTerminal);
 
   // Keep module-scoped tracker in sync for HMR dispose()
   useEffect(() => {
@@ -54,6 +55,16 @@ export function useCommandBar() {
   const close = useCallback(() => {
     setIsOpen(false);
   }, []);
+
+  // Consume pending-open flag set by notification clicks for transient sessions.
+  // Runs after currentProjectId settles, so cross-project notification clicks
+  // (which call openProject first) reopen the overlay on the correct project.
+  useEffect(() => {
+    if (!pendingOpenCommandTerminal) return;
+    if (!currentProjectId) return;
+    useSessionStore.getState().setPendingOpenCommandTerminal(false);
+    setIsOpen(true);
+  }, [pendingOpenCommandTerminal, currentProjectId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

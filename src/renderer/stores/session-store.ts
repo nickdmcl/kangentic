@@ -73,6 +73,10 @@ interface SessionStore {
   /** Last selected file in the Changes panel, keyed by task ID */
   changesSelectedFile: Record<string, string>;
   _pendingOpenTaskId: string | null;
+  /** One-shot flag set by notification click for transient (Command Terminal) sessions.
+   *  Consumed by useCommandBar to open the overlay (and reattach to the preserved PTY). */
+  _pendingOpenCommandTerminal: boolean;
+  setPendingOpenCommandTerminal: (value: boolean) => void;
 
   syncSessions: () => Promise<boolean>;
   setPendingOpenTaskId: (id: string | null) => void;
@@ -150,6 +154,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   changesOpenTasks: new Set(),
   changesSelectedFile: {},
   _pendingOpenTaskId: null,
+  _pendingOpenCommandTerminal: false,
+  setPendingOpenCommandTerminal: (value) => set({ _pendingOpenCommandTerminal: value }),
   commandBarVisible: false,
   setCommandBarVisible: (visible) => set({ commandBarVisible: visible }),
   transientSessions: preservedTransientState?.transientSessions ?? {},

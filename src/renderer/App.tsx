@@ -14,6 +14,11 @@ import type { SessionEvent, SessionUsage } from '../shared/types';
  * updates during the current microtask and applies them in a single set() call.
  * This prevents N background IPC callbacks from triggering N separate React renders.
  */
+/** Sentinel taskId used in notification round-trips for transient (Command Terminal)
+ *  sessions, which have no associated task. The click handler routes this value
+ *  through `setPendingOpenCommandTerminal` instead of opening a task detail dialog. */
+const COMMAND_TERMINAL_NOTIFICATION_TASK_ID = '__command_terminal__';
+
 const pendingUsage = new Map<string, SessionUsage>();
 const pendingEvents: Array<{ sessionId: string; event: SessionEvent }> = [];
 let batchScheduled = false;
@@ -346,9 +351,10 @@ export function App() {
                 if (!notify) return;
                 const project = useProjectStore.getState().projects.find((p) => p.id === session.projectId);
                 const projectName = project?.name ?? 'A project';
-                const label = taskTitle ?? 'A task';
+                const label = session.transient ? 'Command Terminal' : (taskTitle ?? 'A task');
                 const body = isPermission ? `Needs permission: ${projectName}` : projectName;
-                sendNotification(sessionId, label, body, session.projectId, taskId ?? '');
+                const clickTaskId = session.transient ? COMMAND_TERMINAL_NOTIFICATION_TASK_ID : (taskId ?? '');
+                sendNotification(sessionId, label, body, session.projectId, clickTaskId);
               });
             }
           }
@@ -390,6 +396,14 @@ export function App() {
     if (notifications?.onClicked) {
       cleanups.push(notifications.onClicked((projectId, taskId) => {
         const alreadyActive = useProjectStore.getState().currentProject?.id === projectId;
+        const isCommandTerminal = taskId === COMMAND_TERMINAL_NOTIFICATION_TASK_ID;
+        if (isCommandTerminal) {
+          useSessionStore.getState().setPendingOpenCommandTerminal(true);
+          if (!alreadyActive) {
+            useProjectStore.getState().openProject(projectId);
+          }
+          return;
+        }
         if (taskId && alreadyActive) {
           useSessionStore.getState().setDetailTaskId(taskId);
         } else {
