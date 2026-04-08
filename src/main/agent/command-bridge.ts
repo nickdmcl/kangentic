@@ -64,25 +64,34 @@ export class CommandBridge {
   }
 
   start(): void {
-    // Ensure directories exist
     fs.mkdirSync(path.dirname(this.commandsPath), { recursive: true });
     fs.mkdirSync(this.responsesDir, { recursive: true });
 
-    // Truncate commands file on start (no stale commands from previous sessions)
+    // Seed offset to current file size so we skip pre-existing lines without
+    // truncating. Truncating races with Claude CLI's child MCP server: if it
+    // appends a command between PTY spawn and bridge.start() (or during HMR
+    // restart), a truncate would wipe the in-flight command and the MCP
+    // server would hang until timeout.
+    //
+    // Trade-off: any command queued in the file before a bridge restart is
+    // skipped, so the MCP child still polling for that response will time
+    // out at 30s. Acceptable because the alternative (replay the whole
+    // history with offset = 0) would create duplicate tasks on every HMR
+    // restart.
     try {
-      fs.writeFileSync(this.commandsPath, '');
+      this.fileOffset = fs.statSync(this.commandsPath).size;
     } catch {
-      // File may not exist yet
+      this.fileOffset = 0;
     }
 
     this.fileWatcher = new FileWatcher({
       filePath: this.commandsPath,
       onChange: () => this.processNewCommands(),
       debounceMs: 50,
+      pollIntervalMs: 200,
       isStale: () => {
         try {
-          const stat = fs.statSync(this.commandsPath);
-          return stat.size > this.fileOffset;
+          return fs.statSync(this.commandsPath).size > this.fileOffset;
         } catch {
           return false;
         }

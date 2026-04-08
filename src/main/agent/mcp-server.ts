@@ -29,7 +29,9 @@ if (!commandsPath || !responsesDir) {
 }
 
 const POLL_INTERVAL_MS = 100;
-const COMMAND_TIMEOUT_MS = 10_000;
+// 30s ceiling stays well under MCP SDK client default of 60s; 10s was too
+// tight for cold-start DB open + migrations on Windows.
+const COMMAND_TIMEOUT_MS = 30_000;
 const MAX_TASKS_PER_SESSION = 50;
 
 let taskCreationCount = 0;

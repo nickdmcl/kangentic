@@ -1462,3 +1462,26 @@ describe('CommandBridge - update_column', () => {
     expect(response.error).toContain('not found');
   });
 });
+
+describe('CommandBridge - no-truncate invariant', () => {
+  it('does not wipe in-flight commands when start() runs after a write', () => {
+    // Repro of the original timeout bug: a command is appended to
+    // commands.jsonl before the bridge starts (e.g. Claude CLI's MCP child
+    // process raced ahead of the bridge, or HMR restarted main mid-flight).
+    // The bridge must NOT truncate the file - that would orphan the
+    // command and the MCP server would hang until its timeout.
+    const commandsPath = path.join(tmpDir, 'commands.jsonl');
+    const preStartLine = JSON.stringify({
+      id: 'pre-start-1', method: 'list_columns', params: {}, ts: Date.now(),
+    }) + '\n';
+    fs.writeFileSync(commandsPath, preStartLine);
+
+    const bridge = createBridge();
+    bridge.start();
+    bridge.stop();
+
+    expect(fs.readFileSync(commandsPath, 'utf-8')).toBe(preStartLine);
+    // Offset-seek must skip the pre-existing line, not replay it.
+    expect(fs.existsSync(path.join(tmpDir, 'responses', 'pre-start-1.json'))).toBe(false);
+  });
+});
