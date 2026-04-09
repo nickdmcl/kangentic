@@ -1754,20 +1754,32 @@ describe('Event-derived activity state', () => {
       outputTokens: number,
     ): void {
       fs.writeFileSync(statusPath, makeStatus(inputTokens, outputTokens));
+      // After the StatusFileReader refactor, status parse+dispatch lives
+      // in StatusFileReader. For tests we need a synchronous equivalent,
+      // so we parse via the session's agent parser directly and then
+      // invoke UsageTracker.processStatusUpdate - exactly what the
+      // reader's handleStatusChange does under the hood.
       const internals = sessionManager as unknown as {
-        usageTracker: { readAndEmitUsage: (sessionId: string, statusOutputPath: string) => void };
+        sessions: Map<string, { agentParser?: { parseStatus(raw: string): unknown } }>;
+        usageTracker: {
+          processStatusUpdate: (sessionId: string, usage: unknown) => void;
+        };
       };
-      internals.usageTracker.readAndEmitUsage(sessionId, statusPath);
+      const managedSession = internals.sessions.get(sessionId);
+      const raw = fs.readFileSync(statusPath, 'utf-8');
+      const usage = managedSession?.agentParser?.parseStatus(raw) ?? null;
+      if (usage) internals.usageTracker.processStatusUpdate(sessionId, usage);
     }
 
     function triggerEventRead(sessionManager: SessionManager, sessionId: string, eventsPath: string): void {
+      // After the StatusFileReader refactor, the reader owns the cursor
+      // and parse logic. Use its public flushPendingEvents entry point
+      // which does a synchronous read of any pending bytes.
+      void eventsPath;
       const internals = sessionManager as unknown as {
-        usageTracker: { readAndProcessEvents: (sessionId: string, eventsOutputPath: string, fileOffset: number) => number };
-        fileWatcher: { getEventsFileOffset: (sessionId: string) => number; setEventsFileOffset: (sessionId: string, offset: number) => void };
+        statusFileReader: { flushPendingEvents: (sessionId: string) => void };
       };
-      const offset = internals.fileWatcher.getEventsFileOffset(sessionId);
-      const newOffset = internals.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
-      internals.fileWatcher.setEventsFileOffset(sessionId, newOffset);
+      internals.statusFileReader.flushPendingEvents(sessionId);
     }
 
     beforeEach(() => {

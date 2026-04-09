@@ -1,6 +1,4 @@
-import fs from 'node:fs';
-import which from 'which';
-import { execVersion } from '../../shared/exec-version';
+import { AgentDetector } from '../../shared/agent-detector';
 import { interpolateTemplate } from '../../shared/template-utils';
 import { quoteArg, isUnixLikeShell, toForwardSlash } from '../../../../shared/paths';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
@@ -29,49 +27,20 @@ export class AiderAdapter implements AgentAdapter {
   ];
   readonly defaultPermission: PermissionMode = 'bypassPermissions';
 
-  private cachedDetection: AgentInfo | null = null;
-  private inflightDetection: Promise<AgentInfo> | null = null;
+  // Aider uses the shared AgentDetector via composition (keeps the
+  // single-file layout while deduplicating detection logic across
+  // all four adapters).
+  private readonly detector = new AgentDetector({
+    binaryName: 'aider',
+    parseVersion: (raw) => raw.replace(/^aider\s+/i, '').trim() || null,
+  });
 
   async detect(overridePath?: string | null): Promise<AgentInfo> {
-    if (this.cachedDetection) return this.cachedDetection;
-    if (this.inflightDetection) return this.inflightDetection;
-
-    this.inflightDetection = this.performDetection(overridePath);
-    try {
-      return await this.inflightDetection;
-    } finally {
-      this.inflightDetection = null;
-    }
-  }
-
-  private async performDetection(overridePath?: string | null): Promise<AgentInfo> {
-    try {
-      const aiderPath = overridePath || await which('aider');
-      const version = await this.extractVersion(aiderPath);
-      this.cachedDetection = { found: true, path: aiderPath, version };
-      return this.cachedDetection;
-    } catch { /* not on PATH */ }
-
-    this.cachedDetection = { found: false, path: null, version: null };
-    return this.cachedDetection;
-  }
-
-  /** Run --version and return the version string, or null on failure. */
-  private async extractVersion(candidatePath: string): Promise<string | null> {
-    try {
-      if (!fs.existsSync(candidatePath)) return null;
-      const { stdout, stderr } = await execVersion(candidatePath);
-      const raw = stdout.trim() || stderr.trim() || null;
-      // `aider --version` outputs e.g. "aider 86.2" - strip the product name prefix
-      return raw?.replace(/^aider\s+/i, '') ?? null;
-    } catch {
-      return null;
-    }
+    return this.detector.detect(overridePath);
   }
 
   invalidateDetectionCache(): void {
-    this.cachedDetection = null;
-    this.inflightDetection = null;
+    this.detector.invalidateCache();
   }
 
   // Aider has no trust mechanism - no-op

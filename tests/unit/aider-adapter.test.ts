@@ -105,10 +105,16 @@ describe('AiderAdapter', () => {
       expect(result.version).toBeNull();
     });
 
-    it('returns found: true with null version when --version fails', async () => {
+    it('returns found: false with the configured path when --version fails on an override', async () => {
+      // When the user configures an explicit override path and it fails,
+      // the detector reports {found: false, path: <override>} so the
+      // user can see WHICH configured path failed. This does NOT fall
+      // through to PATH lookup - masking the user's explicit choice
+      // would hide the misconfiguration. Shared with all four adapters
+      // via AgentDetector.
       mockExecVersionShouldFail = true;
       const result = await adapter.detect('/custom/aider');
-      expect(result.found).toBe(true);
+      expect(result.found).toBe(false);
       expect(result.path).toBe('/custom/aider');
       expect(result.version).toBeNull();
     });

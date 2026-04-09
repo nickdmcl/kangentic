@@ -47,8 +47,11 @@ One scannable block per adapter for activity-state derivation and session ID cap
 | `activity` | `ActivityDetectionStrategy` | How thinking-vs-idle is detected. See [Activity Detection](activity-detection.md) for the discriminated union variants and the `ActivityDetection.hooks() / pty() / hooksAndPty()` factories. |
 | `sessionId.fromHook?(hookContext)` | `(string) => string \| null` | Parse the agent's CLI session ID from hook stdin JSON. Fires once on `session_start`. Used by Gemini (`session_id` field) and Codex (`thread_id` via the `CODEX_THREAD_ID` env var captured by event-bridge). |
 | `sessionId.fromOutput?(data)` | `(string) => string \| null` | Parse the agent's CLI session ID from raw PTY output. Scanned on every data chunk by `SessionIdScanner` (chunk-boundary-safe rolling buffer with ANSI stripping), plus a final scrollback scan in `suspend()`. Used for Codex's startup header and Gemini's shutdown summary. |
+| `sessionHistory?.locate({agentSessionId, cwd})` | `(options) => Promise<string \| null>` | Locate the agent's native session history file on disk for a captured session UUID. Used by `SessionHistoryReader` (`src/main/pty/session-history-reader.ts`) to start tailing. See [Adapter Session History](adapter-session-history.md) for the full pipeline. |
+| `sessionHistory?.parse(content, mode)` | `(string, 'full' \| 'append') => SessionHistoryParseResult` | Parse newly-appended bytes (Codex JSONL) or full file content (Gemini JSON) into a `SessionHistoryParseResult` containing `usage`, `events[]`, and an optional `activity` hint. |
+| `sessionHistory?.isFullRewrite` | `boolean` | `true` for whole-file-rewrite agents (Gemini), `false` for append-only JSONL (Codex). Tells the watcher whether to track a byte cursor. |
 
-Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--session-id`) or that have no resume mechanism (Aider).
+Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--session-id`) or that have no resume mechanism (Aider). Omit `sessionHistory` for agents without a native session log file (Claude uses the hook-based status.json pipeline; Aider has no equivalent).
 
 ### `SpawnSessionInput` extras
 

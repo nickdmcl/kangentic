@@ -1,6 +1,8 @@
 import { CodexDetector } from './detector';
 import { CodexCommandBuilder } from './command-builder';
+import { CodexStatusParser } from './status-parser';
 import { stripCodexHooks } from './hook-manager';
+import { CodexSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -47,30 +49,28 @@ export class CodexAdapter implements AgentAdapter {
     return this.commandBuilder.interpolateTemplate(template, variables);
   }
 
-  parseStatus(_raw: string): SessionUsage | null {
-    // Codex CLI does not expose real-time token usage or cost data
-    // via a statusLine mechanism. Return null until a future version
-    // adds equivalent support.
-    return null;
+  parseStatus(raw: string): SessionUsage | null {
+    return CodexStatusParser.parseStatus(raw);
   }
 
   parseEvent(line: string): SessionEvent | null {
-    try {
-      return JSON.parse(line) as SessionEvent;
-    } catch {
-      return null;
-    }
+    return CodexStatusParser.parseEvent(line);
   }
 
   /**
    * Runtime strategy: how Codex exposes activity state and session IDs.
    *
-   * - Activity: PTY silence timer only. Codex's Rust CLI doesn't read
-   *   .codex/hooks.json at the moment, so hook events never arrive.
+   * - Activity: PTY silence timer as fallback. The sessionHistory hook
+   *   below provides authoritative task_started/task_complete events
+   *   from the rollout JSONL; the PTY tracker is suppressed once the
+   *   first history event arrives.
    * - Session ID (fromHook): CODEX_THREAD_ID env var (openai/codex#10096)
    *   captured via hook-manager's `env:thread_id=CODEX_THREAD_ID` directive.
    * - Session ID (fromOutput): Codex v0.118+ prints "session id: <uuid>" in
    *   the startup header; older versions printed "codex resume thr_..." at exit.
+   *   This UUID is used to locate the rollout file on disk.
+   * - sessionHistory: tails ~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-*-<id>.jsonl
+   *   for real-time model, context window, and token counts. See CodexSessionHistoryParser.
    */
   readonly runtime: AdapterRuntimeStrategy = {
     activity: ActivityDetection.pty((data: string) => {
@@ -106,6 +106,11 @@ export class CodexAdapter implements AgentAdapter {
         const resumeMatch = data.match(/codex\s+resume\s+(thr_\S+)/);
         return resumeMatch ? resumeMatch[1] : null;
       },
+    },
+    sessionHistory: {
+      locate: CodexSessionHistoryParser.locate,
+      parse: CodexSessionHistoryParser.parse,
+      isFullRewrite: false,
     },
   };
 

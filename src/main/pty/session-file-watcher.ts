@@ -1,13 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { FileWatcher } from './file-watcher';
 import { CommandBridge } from '../agent/command-bridge';
 import { getProjectDb } from '../db/database';
 import type { Task, Swimlane } from '../../shared/types';
 
 interface SessionFileWatcherCallbacks {
-  onUsageFileChanged(sessionId: string, statusOutputPath: string): void;
-  onEventsFileChanged(sessionId: string, eventsOutputPath: string): void;
   onTaskCreated(sessionId: string, task: Task, columnName: string, swimlaneId: string): void;
   onTaskUpdated(sessionId: string, task: Task): void;
   onTaskDeleted(sessionId: string, task: Task): void;
@@ -18,20 +15,19 @@ interface SessionFileWatcherCallbacks {
 }
 
 interface WatcherState {
-  statusFileWatcher: FileWatcher | null;
-  eventsFileWatcher: FileWatcher | null;
   commandBridge: CommandBridge | null;
-  statusOutputPath: string | null;
-  eventsOutputPath: string | null;
   mergedSettingsPath: string | null;
-  eventsFileOffset: number;
+  sessionDir: string | null;
 }
 
 /**
- * Manages per-session file watchers for usage data, event logs, and command bridge.
+ * Manages per-session non-telemetry infrastructure: the MCP command
+ * bridge for agent → Kangentic task operations, plus cleanup of the
+ * merged Claude hook settings file and the per-session directory.
  *
- * Each session can have up to three watchers: usage (status.json), events (activity.jsonl),
- * and command bridge (commands.jsonl). This module owns their lifecycle and file cleanup.
+ * Telemetry file watching (status.json, events.jsonl) is owned by
+ * StatusFileReader, not this class. This class stays out of the
+ * telemetry pipeline entirely.
  */
 export class SessionFileWatcher {
   private watchers = new Map<string, WatcherState>();
@@ -41,85 +37,47 @@ export class SessionFileWatcher {
     this.callbacks = callbacks;
   }
 
+  /**
+   * Start the MCP command bridge for a session and record the paths
+   * that `cleanupAndRemove` is responsible for deleting on shutdown.
+   *
+   * `statusOutputPath` is used only to derive the session directory
+   * (via path.dirname) - the actual status.json watching belongs to
+   * StatusFileReader.
+   */
   startAll(info: {
     sessionId: string;
     projectId: string;
     cwd: string;
     statusOutputPath: string | null;
-    eventsOutputPath: string | null;
   }): void {
-    const { sessionId, projectId, statusOutputPath, eventsOutputPath } = info;
+    const { sessionId, projectId, statusOutputPath } = info;
 
-    // Derive merged settings path from statusOutputPath pattern
+    // Derive session dir + merged settings path from statusOutputPath.
     // statusOutputPath = <project>/.kangentic/sessions/<sessionId>/status.json
     // mergedSettingsPath = <project>/.kangentic/sessions/<sessionId>/settings.json
+    let sessionDir: string | null = null;
     let mergedSettingsPath: string | null = null;
     if (statusOutputPath) {
-      const sessionDir = statusOutputPath.replace(/[/\\][^/\\]+$/, '');
+      sessionDir = statusOutputPath.replace(/[/\\][^/\\]+$/, '');
       mergedSettingsPath = sessionDir + '/settings.json';
     }
 
     const state: WatcherState = {
-      statusFileWatcher: null,
-      eventsFileWatcher: null,
       commandBridge: null,
-      statusOutputPath,
-      eventsOutputPath,
       mergedSettingsPath,
-      eventsFileOffset: 0,
+      sessionDir,
     };
     this.watchers.set(sessionId, state);
 
-    // Delete stale status.json so the usage watcher doesn't emit
-    // cached data from the previous session run
-    if (statusOutputPath) {
-      try { fs.unlinkSync(statusOutputPath); } catch { /* may not exist yet */ }
-    }
-
-    // Start watching the status output file for usage data
-    if (statusOutputPath) {
-      state.statusFileWatcher = new FileWatcher({
-        filePath: statusOutputPath,
-        onChange: () => this.callbacks.onUsageFileChanged(sessionId, statusOutputPath),
-        debounceMs: 100,
-      });
-      // Immediately read any existing status.json (e.g. resumed sessions after restart)
-      this.callbacks.onUsageFileChanged(sessionId, statusOutputPath);
-    }
-
-    // Start watching the events JSONL file for activity log
-    if (eventsOutputPath) {
-      // Truncate existing file on resume - historical events aren't needed
-      try {
-        fs.writeFileSync(eventsOutputPath, '');
-      } catch {
-        // File may not exist yet - that's OK, bridge will create it
-      }
-
-      state.eventsFileWatcher = new FileWatcher({
-        filePath: eventsOutputPath,
-        onChange: () => this.callbacks.onEventsFileChanged(sessionId, eventsOutputPath),
-        debounceMs: 50,
-        isStale: () => {
-          try {
-            const stat = fs.statSync(eventsOutputPath);
-            return stat.size > state.eventsFileOffset;
-          } catch {
-            return false;
-          }
-        },
-      });
-    }
-
     // Start command bridge for MCP server communication (if session dir exists)
-    if (statusOutputPath) {
-      const sessionDir = statusOutputPath.replace(/[/\\][^/\\]+$/, '');
+    if (sessionDir) {
       const commandsPath = path.join(sessionDir, 'commands.jsonl');
       const responsesDir = path.join(sessionDir, 'responses');
 
       // Derive project path from statusOutputPath pattern:
       // <projectPath>/.kangentic/sessions/<sessionId>/status.json
-      const projectPath = path.resolve(statusOutputPath, '..', '..', '..', '..');
+      const projectPath = path.resolve(sessionDir, '..', '..', '..');
 
       state.commandBridge = new CommandBridge({
         commandsPath,
@@ -153,34 +111,33 @@ export class SessionFileWatcher {
     }
   }
 
-  /** Close watchers but preserve session files on disk. */
+  /** Stop the command bridge but preserve session files on disk. */
   stopAll(sessionId: string): void {
     const state = this.watchers.get(sessionId);
     if (!state) return;
 
-    state.statusFileWatcher?.close();
-    state.statusFileWatcher = null;
-    state.eventsFileWatcher?.close();
-    state.eventsFileWatcher = null;
     state.commandBridge?.stop();
     state.commandBridge = null;
   }
 
   /**
-   * Null out file paths to prevent onExit cleanup race.
-   * When resuming a session, the old and new sessions share the same
-   * claudeSessionId, so files resolve to the same path. Nulling prevents
-   * the old onExit handler from deleting files the new session needs.
+   * Null out the merged settings path + session dir to prevent onExit
+   * cleanup race. When resuming a session, the old and new sessions
+   * share the same claudeSessionId, so the session dir resolves to
+   * the same path. Nulling prevents the old onExit handler from
+   * deleting files the new session needs.
+   *
+   * Status/events paths live on StatusFileReader, not here - their
+   * own detach path handles the resume race via `detachWithoutCleanup`.
    */
   nullifyPaths(sessionId: string): void {
     const state = this.watchers.get(sessionId);
     if (!state) return;
-    state.statusOutputPath = null;
-    state.eventsOutputPath = null;
     state.mergedSettingsPath = null;
+    state.sessionDir = null;
   }
 
-  /** Stop watchers and clean up status + events + merged settings files. */
+  /** Stop watchers and clean up merged settings file + session directory. */
   cleanupAndRemove(sessionId: string): void {
     const state = this.watchers.get(sessionId);
     if (!state) return;
@@ -191,41 +148,18 @@ export class SessionFileWatcher {
     // handle their own cleanup. killAll() (app shutdown) should NOT clean up -
     // the entry will be re-injected on next session spawn.
 
-    // Clean up status JSON file
-    if (state.statusOutputPath) {
-      try { fs.unlinkSync(state.statusOutputPath); } catch { /* may not exist */ }
-    }
-
-    // Clean up events JSONL file
-    if (state.eventsOutputPath) {
-      try { fs.unlinkSync(state.eventsOutputPath); } catch { /* may not exist */ }
-    }
-
-    // Clean up merged settings file
+    // Clean up merged settings file (written by Claude's command-builder).
+    // status.json and events.jsonl are StatusFileReader's responsibility.
     if (state.mergedSettingsPath) {
       try { fs.unlinkSync(state.mergedSettingsPath); } catch { /* may not exist */ }
     }
 
-    // Try to remove the now-empty session directory
-    if (state.statusOutputPath) {
-      const sessionDir = state.statusOutputPath.replace(/[/\\][^/\\]+$/, '');
-      try { fs.rmdirSync(sessionDir); } catch { /* dir may not be empty or already gone */ }
+    // Try to remove the now-empty session directory.
+    if (state.sessionDir) {
+      try { fs.rmdirSync(state.sessionDir); } catch { /* dir may not be empty or already gone */ }
     }
 
     this.watchers.delete(sessionId);
-  }
-
-  getEventsOutputPath(sessionId: string): string | null {
-    return this.watchers.get(sessionId)?.eventsOutputPath ?? null;
-  }
-
-  getEventsFileOffset(sessionId: string): number {
-    return this.watchers.get(sessionId)?.eventsFileOffset ?? 0;
-  }
-
-  setEventsFileOffset(sessionId: string, offset: number): void {
-    const state = this.watchers.get(sessionId);
-    if (state) state.eventsFileOffset = offset;
   }
 
   removeSession(sessionId: string): void {

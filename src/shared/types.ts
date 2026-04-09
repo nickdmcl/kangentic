@@ -1051,6 +1051,83 @@ export interface AdapterRuntimeStrategy {
      *  Gemini shutdown summary). */
     fromOutput?(data: string): string | null;
   };
+
+  /**
+   * How the agent's native session history file is located and parsed
+   * for real-time telemetry (model, context window, token counts,
+   * message events). Used by agents that persist conversation state
+   * to a local file we can tail: Codex writes JSONL to
+   * ~/.codex/sessions/..., Gemini writes JSON to ~/.gemini/tmp/...
+   * Omit entirely for agents without such files (Claude uses
+   * status.json + event-bridge hooks; Aider has no equivalent).
+   */
+  readonly sessionHistory?: {
+    /**
+     * Given the agent-reported session ID (captured by the PTY
+     * scraper via runtime.sessionId.fromOutput), locate the session
+     * history file on disk. Returns an absolute path, or null if the
+     * file cannot be found within the polling budget (~5 s) or if
+     * the platform can't be supported (e.g. WSL from Windows).
+     *
+     * Implementations should: compute the expected directory from
+     * cwd and the UTC date (Codex) or cwd basename (Gemini),
+     * readdirSync, filter by a filename regex embedding
+     * agentSessionId, poll every 500 ms for up to 5 s if not
+     * immediately present.
+     */
+    locate(options: {
+      agentSessionId: string;
+      cwd: string;
+    }): Promise<string | null>;
+
+    /**
+     * Parse session history content into telemetry. For append-only
+     * JSONL files (Codex) this receives newly-appended bytes; caller
+     * tracks the byte cursor. For whole-file-rewrite JSON files
+     * (Gemini) this receives the full file content.
+     */
+    parse(content: string, mode: 'full' | 'append'): SessionHistoryParseResult;
+
+    /**
+     * True for whole-file-rewrite agents (Gemini rewrites session.json
+     * on every message). False for append-only JSONL (Codex appends).
+     * Tells the watcher whether to track a byte cursor or always
+     * re-read the whole file.
+     */
+    readonly isFullRewrite: boolean;
+  };
+}
+
+/**
+ * Typesafe enum for the explicit activity transition hint returned by
+ * session history parsers. Parsers emit these when a history entry
+ * maps directly to a state change (Codex `task_started` → Thinking,
+ * `task_complete` → Idle) rather than relying on the event stream
+ * alone. Mirrors the `ActivityState` string union but scoped to the
+ * transitions a history parser can observe.
+ */
+export const Activity = {
+  Thinking: 'thinking',
+  Idle: 'idle',
+} as const;
+export type Activity = typeof Activity[keyof typeof Activity];
+
+/**
+ * Parsed telemetry extracted from an agent's native session history
+ * file by AdapterRuntimeStrategy.sessionHistory.parse(). All fields
+ * are optional so parsers can return partial results (e.g. a token
+ * update with no model change yields `usage` populated and
+ * `events: []`).
+ */
+export interface SessionHistoryParseResult {
+  /** Updated usage snapshot. Null if this parse pass didn't touch
+   *  model or tokens. Callers merge with the existing usageCache entry. */
+  usage: SessionUsage | null;
+  /** New events to push into the session event log. Empty array if none. */
+  events: SessionEvent[];
+  /** Explicit activity transition hint. Null if events[] already
+   *  imply the transition via the state machine. */
+  activity: Activity | null;
 }
 
 export interface SpawnSessionInput {

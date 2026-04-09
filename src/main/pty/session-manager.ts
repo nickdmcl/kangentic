@@ -7,6 +7,8 @@ import { ShellResolver } from './shell-resolver';
 import { SessionQueue } from './session-queue';
 import { PtyBufferManager } from './pty-buffer-manager';
 import { SessionFileWatcher } from './session-file-watcher';
+import { SessionHistoryReader } from './session-history-reader';
+import { StatusFileReader } from './status-file-reader';
 import { UsageTracker } from './usage-tracker';
 import { TranscriptWriter } from './transcript-writer';
 import { SessionIdScanner } from './session-id-scanner';
@@ -54,6 +56,8 @@ export class SessionManager extends EventEmitter {
   private bufferManager: PtyBufferManager;
   private fileWatcher: SessionFileWatcher;
   private usageTracker: UsageTracker;
+  private sessionHistoryReader: SessionHistoryReader;
+  private statusFileReader: StatusFileReader;
   private firstOutputEmitted = new Set<string>();
 
   /** Rolling buffer size for session-ID capture. Must be at least 2x the max
@@ -134,21 +138,44 @@ export class SessionManager extends EventEmitter {
         //    created a different session (--resume failed silently). DB needs the correct ID.
         // recoverStaleSessionId() handles both cases - emit unconditionally.
         const session = this.sessions.get(sessionId);
-        if (session) {
-          this.emit('agent-session-id', sessionId, session.taskId, session.projectId, agentReportedId);
+        if (!session) return;
+        this.emit('agent-session-id', sessionId, session.taskId, session.projectId, agentReportedId);
+        // Hand off to the session-history reader if the adapter declares
+        // a native history hook. Fire-and-forget - the reader logs any
+        // failures and degrades gracefully to PtyActivityTracker.
+        const historyHook = session.agentParser?.runtime?.sessionHistory;
+        if (historyHook) {
+          this.sessionHistoryReader.attach({
+            sessionId,
+            agentSessionId: agentReportedId,
+            cwd: session.cwd,
+            hook: historyHook,
+            agentName: session.agentName,
+          }).catch((err) => {
+            console.warn(`[session-history] attach failed for session=${sessionId.slice(0, 8)}:`, err);
+          });
         }
       },
       requestSuspend: (sessionId) => this.suspend(sessionId),
       isSessionRunning: (sessionId) => this.sessions.get(sessionId)?.status === 'running',
     });
 
-    this.fileWatcher = new SessionFileWatcher({
-      onUsageFileChanged: (sessionId, statusPath) => this.usageTracker.readAndEmitUsage(sessionId, statusPath),
-      onEventsFileChanged: (sessionId, eventsPath) => {
-        const offset = this.fileWatcher.getEventsFileOffset(sessionId);
-        const newOffset = this.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
-        this.fileWatcher.setEventsFileOffset(sessionId, newOffset);
+    this.sessionHistoryReader = new SessionHistoryReader({
+      onUsageUpdate: (sessionId, usage) => this.usageTracker.setSessionUsage(sessionId, usage),
+      onEvents: (sessionId, events) => this.usageTracker.ingestEvents(sessionId, events),
+      onActivity: (sessionId, activity) => this.usageTracker.forceActivity(sessionId, activity),
+      onFirstTelemetry: (sessionId) => this.usageTracker.suppressPty(sessionId),
+    });
+
+    this.statusFileReader = new StatusFileReader({
+      onUsageParsed: (sessionId, usage) => this.usageTracker.processStatusUpdate(sessionId, usage),
+      onEventsParsed: (sessionId, rawLines, events) => {
+        this.usageTracker.captureHookSessionIds(sessionId, rawLines);
+        this.usageTracker.ingestEvents(sessionId, events);
       },
+    });
+
+    this.fileWatcher = new SessionFileWatcher({
       onTaskCreated: (sessionId, task, columnName, swimlaneId) => this.emit('task-created', sessionId, task, columnName, swimlaneId),
       onTaskUpdated: (sessionId, task) => this.emit('task-updated', sessionId, task),
       onTaskDeleted: (sessionId, task) => this.emit('task-deleted', sessionId, task),
@@ -307,14 +334,20 @@ export class SessionManager extends EventEmitter {
     // Stop any existing watchers for this task
     if (existing) {
       this.fileWatcher.stopAll(existing.id);
+      // Detach the old session-history + status-file readers WITHOUT
+      // deleting their files. The new session is about to reuse the
+      // same paths, so deleting here would race with its attach.
+      this.sessionHistoryReader.detach(existing.id);
+      this.statusFileReader.detachWithoutCleanup(existing.id);
     }
 
     // Null out file paths on the old session object to prevent its
     // onExit callback (which runs asynchronously after ptyRef.kill())
     // from deleting files that the new session will create at the same
     // paths. This race occurs when resuming a session: the old and new
-    // sessions share the same claudeSessionId, so the merged settings,
-    // status, and events files all resolve to the same path.
+    // sessions share the same claudeSessionId, so the merged settings
+    // files all resolve to the same path. Status/events file races are
+    // handled by statusFileReader.detachWithoutCleanup above.
     if (existing) {
       this.fileWatcher.nullifyPaths(existing.id);
       // Cancel the old session's diagnostic timer so it can't fire a
@@ -496,9 +529,23 @@ export class SessionManager extends EventEmitter {
       projectId: session.projectId,
       cwd: effectiveCwd,
       statusOutputPath: input.statusOutputPath || null,
-      eventsOutputPath: input.eventsOutputPath || null,
     });
     this.usageTracker.initSession(id, input.agentParser);
+    // Attach the status-file telemetry reader for sessions that provide
+    // status/events file paths (today only Claude). The reader owns the
+    // FileWatcher instances and dispatches parsed telemetry via the
+    // generic UsageTracker primitives wired in this.statusFileReader's
+    // callbacks. When the session has no parser, the reader still runs
+    // startup file cleanup (delete stale status.json, truncate stale
+    // events.jsonl) but skips watcher setup.
+    if (input.statusOutputPath || input.eventsOutputPath) {
+      this.statusFileReader.attach({
+        sessionId: id,
+        statusOutputPath: input.statusOutputPath || null,
+        eventsOutputPath: input.eventsOutputPath || null,
+        parser: input.agentParser ?? null,
+      });
+    }
 
     // Arm diagnostic timer: if the agent supports session-ID capture but
     // nothing fires by the timeout, something upstream is broken (wrong regex,
@@ -580,9 +627,11 @@ export class SessionManager extends EventEmitter {
       this.flushPendingEvents(id);
 
       // Close watchers but preserve session files on disk - they are needed
-      // for crash recovery (startUsageWatcher reads status.json on resume).
-      // Files are cleaned up by pruneStaleResources(), remove(), or killAll().
+      // for crash recovery (the status-file reader reads status.json on
+      // resume). Files are cleaned up by pruneStaleResources(), remove(),
+      // or killAll().
       this.fileWatcher.stopAll(id);
+      this.statusFileReader.detachWithoutCleanup(id);
 
       // Fallback PR scan: if a PR command was flagged (ToolStart seen) but
       // ToolEnd was never processed (event lost or never written), scan the
@@ -661,11 +710,7 @@ export class SessionManager extends EventEmitter {
    * written just before PTY exit are not lost to the fs.watch race.
    */
   private flushPendingEvents(sessionId: string): void {
-    const eventsPath = this.fileWatcher.getEventsOutputPath(sessionId);
-    if (!eventsPath) return;
-    const offset = this.fileWatcher.getEventsFileOffset(sessionId);
-    const newOffset = this.usageTracker.readAndProcessEvents(sessionId, eventsPath, offset);
-    this.fileWatcher.setEventsFileOffset(sessionId, newOffset);
+    this.statusFileReader.flushPendingEvents(sessionId);
   }
 
   /**
@@ -681,6 +726,8 @@ export class SessionManager extends EventEmitter {
       clearTimeout(session.sessionIdCaptureTimer);
       session.sessionIdCaptureTimer = undefined;
     }
+    this.sessionHistoryReader.detach(sessionId);
+    this.statusFileReader.detach(sessionId);
     this.kill(sessionId);
     this.fileWatcher.cleanupAndRemove(sessionId);
     this.sessions.delete(sessionId);
@@ -793,9 +840,15 @@ export class SessionManager extends EventEmitter {
 
     // Close watchers - no longer need real-time updates
     this.fileWatcher.stopAll(sessionId);
+    // Detach telemetry readers WITHOUT deleting files - they persist
+    // for resume (the next spawn reads them back).
+    this.sessionHistoryReader.detach(sessionId);
+    this.statusFileReader.detachWithoutCleanup(sessionId);
 
-    // Null out file paths BEFORE killing so the onExit handler's
-    // cleanup skips file deletion - files persist for resume
+    // Null out merged-settings path BEFORE killing so the onExit
+    // handler's cleanup skips settings.json deletion - it persists for
+    // resume. Status/events path races are handled by the telemetry
+    // reader detach calls above.
     this.fileWatcher.nullifyPaths(sessionId);
 
     // Flush transcript to DB before killing PTY
@@ -888,6 +941,14 @@ export class SessionManager extends EventEmitter {
   /** Return cached usage data for all sessions (survives renderer reloads). */
   getUsageCache(): Record<string, SessionUsage> {
     return this.usageTracker.getUsageCache();
+  }
+
+  /**
+   * Upsert a partial SessionUsage entry for a session. Thin wrapper
+   * around UsageTracker.setSessionUsage for external callers.
+   */
+  setSessionUsage(sessionId: string, partial: Partial<SessionUsage>): void {
+    this.usageTracker.setSessionUsage(sessionId, partial);
   }
 
   /** Return cached activity state for all sessions (survives renderer reloads). */
@@ -1073,6 +1134,8 @@ export class SessionManager extends EventEmitter {
       // Close watchers but preserve session files -
       // sessions will be resumed on next app launch via session recovery
       this.fileWatcher.stopAll(session.id);
+      this.sessionHistoryReader.detach(session.id);
+      this.statusFileReader.detachWithoutCleanup(session.id);
 
       if (session.pty) {
         const ptyRef = session.pty;
@@ -1102,6 +1165,8 @@ export class SessionManager extends EventEmitter {
       }
       // Clean up watchers and files
       this.fileWatcher.cleanupAndRemove(session.id);
+      this.sessionHistoryReader.detach(session.id);
+      this.statusFileReader.detach(session.id);
     }
     this.sessions.clear();
     this.sessionQueue.clear();

@@ -1,5 +1,4 @@
-import fs from 'node:fs';
-import { EventType, EventTypeActivity, AgentTool, IdleReason, PromptReason } from '../../shared/types';
+import { EventType, EventTypeActivity, AgentTool, IdleReason, PromptReason, Activity } from '../../shared/types';
 import type { SessionUsage, ActivityState, SessionEvent, AgentParser } from '../../shared/types';
 import { matchesPRCommand } from './pr-connectors';
 import { PtyActivityTracker } from './pty-activity-tracker';
@@ -158,112 +157,75 @@ export class UsageTracker {
   }
 
   /**
-   * Read and emit usage data from a session's status output file.
-   * Shared by both the fs.watch callback and polling fallback.
+   * Rich status-update ingestion for agents whose telemetry comes from
+   * a streaming status file (Claude's statusline). Performs one-shot
+   * agent session ID capture (from `usage.sessionId`), runs heartbeat
+   * recovery (tokens increased while idle → force thinking), resets
+   * the stale-thinking timer, and merges the usage into the cache.
+   *
+   * Called by `StatusFileReader`. For simpler telemetry sources that
+   * only need the merge (Codex/Gemini session history), use
+   * `setSessionUsage` instead.
    */
-  readAndEmitUsage(sessionId: string, statusOutputPath: string): void {
-    try {
-      const raw = fs.readFileSync(statusOutputPath, 'utf-8');
-      const parser = this.sessionParsers.get(sessionId);
-      const usage = parser?.parseStatus(raw) ?? null;
-      if (!usage) return;
-
-      // Extract agent-reported session_id from raw status.json for stale ID recovery.
-      // Only check once per session - after the first status update the DB is corrected
-      // and subsequent calls would be no-op lookups.
-      if (this.callbacks.onAgentSessionId && !this.agentSessionIdChecked.has(sessionId)) {
-        this.agentSessionIdChecked.add(sessionId);
-        if (usage.sessionId && typeof usage.sessionId === 'string') {
-          this.callbacks.onAgentSessionId(sessionId, usage.sessionId);
-        }
+  processStatusUpdate(sessionId: string, usage: SessionUsage): void {
+    // One-shot agent session ID capture from the status payload. This
+    // is the status-file equivalent of fromHook / fromOutput scraping -
+    // when the agent reports its own UUID in the status.json, use it
+    // for stale ID recovery. Only runs once per session.
+    if (this.callbacks.onAgentSessionId && !this.agentSessionIdChecked.has(sessionId)) {
+      this.agentSessionIdChecked.add(sessionId);
+      if (usage.sessionId && typeof usage.sessionId === 'string') {
+        this.callbacks.onAgentSessionId(sessionId, usage.sessionId);
       }
+    }
 
-      const previousUsage = this.usageCache.get(sessionId);
+    const previousUsage = this.usageCache.get(sessionId);
 
-      this.usageCache.set(sessionId, usage);
-      this.callbacks.onUsageChange(sessionId, usage);
+    this.usageCache.set(sessionId, usage);
+    this.callbacks.onUsageChange(sessionId, usage);
 
-      const state = this.activityStateMachine.getOrCreateState(sessionId);
+    const state = this.activityStateMachine.getOrCreateState(sessionId);
 
-      // Usage update proves the agent is working. Reset stale thinking timer.
-      if (state.activity === 'thinking') {
-        this.activityStateMachine.markThinkingSignal(sessionId);
+    // Usage update proves the agent is working. Reset stale thinking timer.
+    if (state.activity === 'thinking') {
+      this.activityStateMachine.markThinkingSignal(sessionId);
+    }
+
+    // Heartbeat recovery: if tokens increased while idle for >1s, the
+    // agent resumed work. During true idle, the model is blocked and
+    // token counts are frozen. Only when work genuinely resumes do
+    // tokens climb. The 1-second grace period prevents race conditions
+    // from status updates arriving slightly after an idle event.
+    if (previousUsage && state.activity === 'idle') {
+      const previousTokens = previousUsage.contextWindow.totalInputTokens
+                           + previousUsage.contextWindow.totalOutputTokens;
+      const currentTokens = usage.contextWindow.totalInputTokens
+                          + usage.contextWindow.totalOutputTokens;
+      const idleStart = state.idleTimestamp;
+      if (currentTokens > previousTokens && idleStart && (Date.now() - idleStart) > 1000) {
+        this.activityStateMachine.forceThinking(sessionId);
       }
-
-      // Heartbeat recovery: if tokens increased while idle for >1s, agent resumed work.
-      // During any true idle, the model is blocked and token counts are frozen.
-      // Only when work genuinely resumes do tokens climb. The 1-second grace period
-      // prevents race conditions from status updates arriving slightly after an idle event.
-      if (previousUsage && state.activity === 'idle') {
-        const previousTokens = previousUsage.contextWindow.totalInputTokens
-                             + previousUsage.contextWindow.totalOutputTokens;
-        const currentTokens = usage.contextWindow.totalInputTokens
-                            + usage.contextWindow.totalOutputTokens;
-        const idleStart = state.idleTimestamp;
-        if (currentTokens > previousTokens && idleStart && (Date.now() - idleStart) > 1000) {
-          this.activityStateMachine.forceThinking(sessionId);
-        }
-      }
-    } catch {
-      // File may not exist yet - ignore
     }
   }
 
   /**
-   * Read new lines from a session's events JSONL file and process them.
-   * Uses eventsFileOffset as cursor - safe to call from multiple triggers.
-   * Returns the new file offset.
+   * One-shot hook-based agent session ID capture. Scans raw JSON lines
+   * from an event-bridge-style source (event-bridge.js writes
+   * `hookContext` alongside each parsed event) and calls the parser's
+   * `runtime.sessionId.fromHook` to extract the agent-reported UUID.
+   * Fires `onAgentSessionId` callback on the first successful capture.
+   *
+   * Separate from `ingestEvents` because this needs raw line JSON
+   * (hookContext is not exposed on `SessionEvent`), while `ingestEvents`
+   * works on parsed events alone.
    */
-  readAndProcessEvents(sessionId: string, eventsOutputPath: string, fileOffset: number): number {
-    try {
-      const stat = fs.statSync(eventsOutputPath);
-      if (stat.size <= fileOffset) return fileOffset;
-
-      const fd = fs.openSync(eventsOutputPath, 'r');
-      const buf = Buffer.alloc(stat.size - fileOffset);
-      fs.readSync(fd, buf, 0, buf.length, fileOffset);
-      fs.closeSync(fd);
-      const newOffset = stat.size;
-
-      const chunk = buf.toString('utf-8');
-      const lines = chunk.split('\n').filter(Boolean);
-
-      // Get or create event cache for this session
-      let events = this.eventCache.get(sessionId);
-      if (!events) {
-        events = [];
-        this.eventCache.set(sessionId, events);
-      }
-
-      const parser = this.sessionParsers.get(sessionId);
-      for (const line of lines) {
-        this.tryCaptureAgentSessionId(sessionId, line, parser);
-
-        const event = parser?.parseEvent(line) ?? null;
-        if (!event) continue;
-
-        events.push(event);
-        this.callbacks.onEvent(sessionId, event);
-
-        this.maybeSuppressPtyTracker(sessionId, event, parser);
-        this.detectExitPlanMode(sessionId, event);
-        this.detectPRCommand(sessionId, event);
-
-        // All activity state transitions (guards, counters, timestamps)
-        // happen inside the state machine.
-        this.activityStateMachine.processEvent(sessionId, event);
-      }
-
-      // Cap cached events per session
-      if (events.length > MAX_EVENTS_PER_SESSION) {
-        const trimmed = events.slice(-MAX_EVENTS_PER_SESSION);
-        this.eventCache.set(sessionId, trimmed);
-      }
-
-      return newOffset;
-    } catch {
-      // File may not exist yet, or be partially written - ignore
-      return fileOffset;
+  captureHookSessionIds(sessionId: string, rawLines: string[]): void {
+    if (this.agentSessionIdChecked.has(sessionId)) return;
+    const parser = this.sessionParsers.get(sessionId);
+    if (!parser?.runtime?.sessionId?.fromHook) return;
+    for (const line of rawLines) {
+      this.tryCaptureAgentSessionId(sessionId, line, parser);
+      if (this.agentSessionIdChecked.has(sessionId)) return;
     }
   }
 
@@ -465,6 +427,111 @@ export class UsageTracker {
       this.staleThinkingInterval = null;
     }
     this.ptyTracker.dispose();
+  }
+
+  /**
+   * Upsert a partial SessionUsage entry for a session. Used by agents
+   * that derive usage from native log files (Codex, Gemini) rather than
+   * a streamed status.json (Claude). Merges with any existing entry,
+   * seeding a zeroed base if none exists. Emits onUsageChange so the
+   * renderer updates.
+   */
+  setSessionUsage(sessionId: string, partial: Partial<SessionUsage>): void {
+    const base: SessionUsage = this.usageCache.get(sessionId) ?? {
+      contextWindow: {
+        usedPercentage: 0,
+        usedTokens: 0,
+        cacheTokens: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        contextWindowSize: 0,
+      },
+      cost: { totalCostUsd: 0, totalDurationMs: 0 },
+      model: { id: '', displayName: '' },
+    };
+    const next: SessionUsage = {
+      ...base,
+      ...partial,
+      contextWindow: { ...base.contextWindow, ...(partial.contextWindow ?? {}) },
+      cost: { ...base.cost, ...(partial.cost ?? {}) },
+      model: { ...base.model, ...(partial.model ?? {}) },
+    };
+    this.usageCache.set(sessionId, next);
+    this.callbacks.onUsageChange(sessionId, next);
+  }
+
+  /**
+   * Ingest a batch of events into the session event log and run each
+   * through the activity state machine. Generic primitive - any
+   * subsystem producing events (native history readers, hook bridges,
+   * future telemetry sources) can call this. Caps the per-session
+   * event cache at MAX_EVENTS_PER_SESSION.
+   *
+   * Per-event detectors run for every event regardless of source:
+   * - `maybeSuppressPtyTracker`: once hooks_and_pty agents deliver a
+   *   thinking signal, PTY-based silence timers are suppressed.
+   * - `detectExitPlanMode`: fires a plan-exit callback when an
+   *   `ExitPlanMode` tool invocation is seen.
+   * - `detectPRCommand`: tracks pending `gh pr ...` commands so the
+   *   consumer can scan scrollback for the printed PR URL.
+   *
+   * These detectors are generic (keyed on EventType + adapter runtime
+   * strategy) and safe to run regardless of whether the event came
+   * from a hook pipeline or a native session-history file.
+   */
+  ingestEvents(sessionId: string, events: SessionEvent[]): void {
+    if (events.length === 0) return;
+    let cached = this.eventCache.get(sessionId);
+    if (!cached) {
+      cached = [];
+      this.eventCache.set(sessionId, cached);
+    }
+    const parser = this.sessionParsers.get(sessionId);
+    for (const event of events) {
+      cached.push(event);
+      this.callbacks.onEvent(sessionId, event);
+
+      this.maybeSuppressPtyTracker(sessionId, event, parser);
+      this.detectExitPlanMode(sessionId, event);
+      this.detectPRCommand(sessionId, event);
+
+      this.activityStateMachine.processEvent(sessionId, event);
+    }
+    if (cached.length > MAX_EVENTS_PER_SESSION) {
+      const trimmed = cached.slice(-MAX_EVENTS_PER_SESSION);
+      this.eventCache.set(sessionId, trimmed);
+    }
+  }
+
+  /**
+   * Force the activity state machine to a specific state. Pushes a
+   * synthetic event into the log (matching the PtyActivityTracker
+   * callback pattern at handlePtyThinking/handlePtyIdle) and calls the
+   * state machine's force* methods. Generic primitive callable by any
+   * telemetry source that wants to override the default state machine
+   * transitions.
+   */
+  forceActivity(sessionId: string, activity: Activity): void {
+    if (activity === Activity.Thinking) {
+      const event: SessionEvent = { ts: Date.now(), type: EventType.Prompt, detail: PromptReason.PtyActivity };
+      this.pushEvent(sessionId, event);
+      this.activityStateMachine.forceThinking(sessionId);
+    } else if (activity === Activity.Idle) {
+      const event: SessionEvent = { ts: Date.now(), type: EventType.Idle, detail: IdleReason.Prompt };
+      this.pushEvent(sessionId, event);
+      this.activityStateMachine.forceIdle(sessionId);
+    }
+  }
+
+  /**
+   * Suppress PTY-based activity tracking for a session. Called by
+   * subsystems (native history readers, hook pipelines) once they
+   * confirm authoritative telemetry is flowing, so PTY silence-timer
+   * heuristics stop competing. Shares the same underlying mechanism
+   * Claude's hooks use (maybeSuppressPtyTracker above).
+   */
+  suppressPty(sessionId: string): void {
+    this.ptyTracker.suppress(sessionId);
   }
 
   /** Return cached usage data for all sessions. */

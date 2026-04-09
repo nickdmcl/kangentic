@@ -2,6 +2,7 @@ import { GeminiDetector } from './detector';
 import { GeminiCommandBuilder } from './command-builder';
 import { GeminiStatusParser } from './status-parser';
 import { stripGeminiKangenticHooks } from './hook-manager';
+import { GeminiSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -61,12 +62,15 @@ export class GeminiAdapter implements AgentAdapter {
    *
    * - Activity: hook-based primary (Gemini's documented base hook schema
    *   includes activity events), with PTY silence-timer fallback if hooks
-   *   fail at runtime.
+   *   fail at runtime. The sessionHistory hook provides the authoritative
+   *   model + tokens stream from Gemini's native chat file.
    * - Session ID (fromHook): Gemini's base hook input schema includes
    *   `session_id` (and sometimes camelCase `sessionId`) on every hook stdin.
    * - Session ID (fromOutput): Gemini prints "gemini --resume '<uuid>'" and
-   *   "Session ID: <uuid>" in the shutdown summary. Used as a scrollback
-   *   fallback by session-manager.suspend() if hooks never fired.
+   *   "Session ID: <uuid>" in the shutdown summary.
+   * - sessionHistory: reads ~/.gemini/tmp/<basename(cwd)>/chats/session-*.json
+   *   whole-file on every write to extract model + tokens from the latest
+   *   assistant message. See GeminiSessionHistoryParser.
    */
   readonly runtime: AdapterRuntimeStrategy = {
     activity: ActivityDetection.hooksAndPty((data: string) => {
@@ -102,6 +106,11 @@ export class GeminiAdapter implements AgentAdapter {
         const headerMatch = data.match(/Session ID:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
         return headerMatch ? headerMatch[1] : null;
       },
+    },
+    sessionHistory: {
+      locate: GeminiSessionHistoryParser.locate,
+      parse: GeminiSessionHistoryParser.parse,
+      isFullRewrite: true,
     },
   };
 

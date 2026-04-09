@@ -6,6 +6,10 @@ Kangentic tracks whether each agent session is **thinking** (actively using tool
 
 Each adapter declares an `ActivityDetectionStrategy` on its `runtime.activity` field that selects between hook-based events, PTY pattern detection, or both. The Claude Code pipeline (hooks-only) is described first because it's the richest source of activity information. PTY-based detection for agents without reliable hooks is documented in [Strategies](#strategies).
 
+### `Activity` typesafe enum
+
+`src/shared/types.ts` exports a small `Activity` const enum (`Thinking`, `Idle`) that is the typesafe counterpart to the `ActivityState` string union. It is used by session history parsers (Codex's `CodexSessionHistoryParser`, Gemini's `GeminiSessionHistoryParser`) as the explicit-activity-hint value on `SessionHistoryParseResult.activity` — the parsers return `Activity.Thinking` or `Activity.Idle` when a log entry (e.g. Codex `task_started` / `task_complete`) maps directly to a state transition rather than relying on the event stream alone. See [Adapter Session History](adapter-session-history.md) for the full pipeline.
+
 ## Strategies
 
 `src/shared/types.ts` - `ActivityDetectionStrategy` discriminated union
@@ -189,7 +193,7 @@ Guard 1 only fires while `permissionIdle` is true. Once the `pendingPermissions`
 
 **Heartbeat recovery (safety net):**
 - Claude Code's `status.json` contains cumulative token counts (`totalInputTokens`, `totalOutputTokens`) that only increase during active model inference
-- The status file is already watched with 100ms debounce via `readAndEmitUsage()`
+- The status file is already watched with 100ms debounce via `StatusFileReader` → `UsageTracker.processStatusUpdate()`
 - When tokens increase while idle for >1 second, the session transitions to thinking
 - During any true idle, the model is blocked and token counts are frozen -- no false recovery is possible
 - The 1-second grace period prevents race conditions from status updates arriving slightly after an idle event

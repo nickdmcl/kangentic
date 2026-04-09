@@ -434,26 +434,33 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
                   </div>
                 );
               }
-              // First output seen but no statusline usage (Codex, Gemini before
-              // they expose token usage). Render a minimal live pill driven by
-              // activity state instead of leaving the spinner stuck forever.
-              // No agent label - the swimlane already identifies the agent.
-              if (!displayState.usage || !resolvedModelName) {
-                const isThinking = displayState.activity === 'thinking';
+              // Show just the model name (no progress bar) when EITHER:
+              //   - Usage hasn't streamed any token counts yet (boot window)
+              //   - The agent's context window size is unknown (unmapped
+              //     Gemini model: contextWindowSize is 0 as sentinel)
+              // Active/idle state is already conveyed by the top-left
+              // status icon (spinner vs mail), so no dot or label here.
+              //
+              // The usage-bar div is always rendered in this branch so
+              // tests (and users) see a stable slot throughout the
+              // boot → telemetry transition. When neither tokens nor a
+              // model name are available yet, the div is empty but
+              // present (thin separator line).
+              const usage = displayState.usage;
+              const hasTokens = !!usage && usage.contextWindow.totalInputTokens > 0;
+              const hasKnownWindow = !!usage && usage.contextWindow.contextWindowSize > 0;
+              if (!usage || !hasTokens || !hasKnownWindow) {
                 return (
                   <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
-                    <span className="text-xs text-fg-faint flex items-center gap-1.5">
-                      <span
-                        className={`inline-block w-1.5 h-1.5 rounded-full ${
-                          isThinking ? 'bg-accent animate-pulse' : 'bg-fg-faint'
-                        }`}
-                      />
-                      {isThinking ? 'working' : 'idle'}
-                    </span>
+                    {resolvedModelName && (
+                      <span className="text-xs text-fg-faint truncate block">
+                        {resolvedModelName}
+                      </span>
+                    )}
                   </div>
                 );
               }
-              const pct = Math.round(displayState.usage.contextWindow.usedPercentage);
+              const pct = Math.round(usage.contextWindow.usedPercentage);
               const progressColor = getProgressColor(pct);
               return (
                 <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
