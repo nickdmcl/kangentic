@@ -1,10 +1,9 @@
 import { CodexDetector } from './detector';
 import { CodexCommandBuilder } from './command-builder';
-import { CodexStatusParser } from './status-parser';
 import { stripCodexHooks } from './hook-manager';
 import { CodexSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
 
 /**
@@ -47,14 +46,6 @@ export class CodexAdapter implements AgentAdapter {
 
   interpolateTemplate(template: string, variables: Record<string, string>): string {
     return this.commandBuilder.interpolateTemplate(template, variables);
-  }
-
-  parseStatus(raw: string): SessionUsage | null {
-    return CodexStatusParser.parseStatus(raw);
-  }
-
-  parseEvent(line: string): SessionEvent | null {
-    return CodexStatusParser.parseEvent(line);
   }
 
   /**

@@ -1,4 +1,4 @@
-import type { SessionUsage, SessionEvent, SessionRecord, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../shared/types';
+import type { SessionRecord, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../shared/types';
 
 /** CLI detection result returned by all agent detectors. */
 export interface AgentInfo {
@@ -67,12 +67,6 @@ export interface AgentAdapter {
 
   /** Interpolate {{key}} placeholders in a template string. */
   interpolateTemplate(template: string, variables: Record<string, string>): string;
-
-  /** Parse raw status data (agent-specific format) into a SessionUsage. */
-  parseStatus(raw: string): SessionUsage | null;
-
-  /** Parse a single event line (agent-specific format) into a SessionEvent. */
-  parseEvent(line: string): SessionEvent | null;
 
   /** Remove any monitoring hooks injected by this adapter (cleanup). */
   stripHooks(directory: string): void;

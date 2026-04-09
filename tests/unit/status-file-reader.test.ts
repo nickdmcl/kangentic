@@ -5,35 +5,31 @@ import path from 'node:path';
 import {
   StatusFileReader,
   type StatusFileReaderCallbacks,
+  type StatusFileHook,
 } from '../../src/main/pty/status-file-reader';
 import {
   EventType,
-  type AgentParser,
   type SessionUsage,
   type SessionEvent,
-  ActivityDetection,
 } from '../../src/shared/types';
 
 /**
  * Tests for StatusFileReader - the subsystem that owns Claude's hook-based
  * telemetry file watching pipeline (status.json + events.jsonl).
  *
- * These tests use real temp files and a stub parser so the parser's
+ * These tests use real temp files and a stub status-file hook so its
  * behavior is predictable and we can focus on the reader's file I/O
  * and dispatch logic.
  */
 
-function makeStubParser(options: {
+function makeStubStatusFileHook(options: {
   parseStatus?: (raw: string) => SessionUsage | null;
   parseEvent?: (line: string) => SessionEvent | null;
-}): AgentParser {
+}): StatusFileHook {
   return {
     parseStatus: options.parseStatus ?? (() => null),
     parseEvent: options.parseEvent ?? (() => null),
-    detectFirstOutput: () => false,
-    runtime: {
-      activity: ActivityDetection.hooks(),
-    },
+    isFullRewrite: true,
   };
 }
 
@@ -80,7 +76,7 @@ describe('StatusFileReader', () => {
     fs.writeFileSync(statusPath, '{"existing":"data"}');
 
     const expectedUsage = makeUsage(5000);
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseStatus: () => expectedUsage,
     });
 
@@ -88,7 +84,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser,
+      statusFileHook: parser,
     });
 
     // WAIT: attach() deletes stale status.json on setup, then the watcher
@@ -110,7 +106,7 @@ describe('StatusFileReader', () => {
     const statusPath = path.join(tempDir, 'status.json');
     fs.writeFileSync(statusPath, '{"stale":"prev-run"}');
 
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseStatus: (raw) => {
         if (raw.includes('stale')) {
           throw new Error('should never parse stale content');
@@ -123,7 +119,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser,
+      statusFileHook: parser,
     });
 
     // File should be deleted by attach.
@@ -134,13 +130,13 @@ describe('StatusFileReader', () => {
     const eventsPath = path.join(tempDir, 'events.jsonl');
     fs.writeFileSync(eventsPath, '{"old":"event"}\n{"also":"old"}\n');
 
-    const parser = makeStubParser({});
+    const parser = makeStubStatusFileHook({});
 
     reader.attach({
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     // File should exist but be empty.
@@ -157,7 +153,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: eventsPath,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
 
     // Write some content after attach so there's something to delete.
@@ -179,7 +175,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: eventsPath,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
 
     fs.writeFileSync(statusPath, '{"preserve":"me"}');
@@ -197,19 +193,19 @@ describe('StatusFileReader', () => {
 
   it('double-attach is idempotent', () => {
     const statusPath = path.join(tempDir, 'status.json');
-    const parser = makeStubParser({});
+    const parser = makeStubStatusFileHook({});
 
     reader.attach({
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser,
+      statusFileHook: parser,
     });
     reader.attach({
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser,
+      statusFileHook: parser,
     });
 
     expect(reader.isAttached('session-1')).toBe(true);
@@ -226,7 +222,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: null,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
     expect(reader.isAttached('session-1')).toBe(false);
   });
@@ -239,7 +235,7 @@ describe('StatusFileReader', () => {
     const statusPath = path.join(tempDir, 'status.json');
     const eventsPath = path.join(tempDir, 'events.jsonl');
     const expectedUsage = makeUsage(1234);
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseStatus: () => expectedUsage,
     });
 
@@ -247,7 +243,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     // Write content to the status file after attach.
@@ -265,7 +261,7 @@ describe('StatusFileReader', () => {
 
   it('skips dispatch when parseStatus returns null', () => {
     const statusPath = path.join(tempDir, 'status.json');
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseStatus: () => null,
     });
 
@@ -273,7 +269,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser,
+      statusFileHook: parser,
     });
 
     fs.writeFileSync(statusPath, 'invalid');
@@ -292,7 +288,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusPath,
       eventsOutputPath: null,
-      parser: makeStubParser({
+      statusFileHook: makeStubStatusFileHook({
         parseStatus: () => {
           throw new Error('should not be called');
         },
@@ -313,7 +309,7 @@ describe('StatusFileReader', () => {
 
   it('reads new lines from events.jsonl with a byte cursor', () => {
     const eventsPath = path.join(tempDir, 'events.jsonl');
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseEvent: (line) => {
         const json = JSON.parse(line) as { type: string; detail: string };
         return { ts: Date.now(), type: EventType.Prompt, detail: json.detail } as SessionEvent;
@@ -324,7 +320,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     // First batch
@@ -349,7 +345,7 @@ describe('StatusFileReader', () => {
 
   it('resets cursor when events.jsonl shrinks (truncation guard)', () => {
     const eventsPath = path.join(tempDir, 'events.jsonl');
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseEvent: (line) => ({ ts: 1, type: EventType.Prompt, detail: line } as SessionEvent),
     });
 
@@ -357,7 +353,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     // Initial content
@@ -377,7 +373,7 @@ describe('StatusFileReader', () => {
 
   it('handles CRLF line endings', () => {
     const eventsPath = path.join(tempDir, 'events.jsonl');
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseEvent: (line) => ({ ts: 1, type: EventType.Prompt, detail: line } as SessionEvent),
     });
 
@@ -385,7 +381,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     fs.writeFileSync(eventsPath, 'line-a\r\nline-b\r\n');
@@ -400,7 +396,7 @@ describe('StatusFileReader', () => {
     // Parser returns events for the first line only; second line is
     // unparseable. The callback should still receive both raw lines
     // (for hook-context ID capture) and only one parsed event.
-    const parser = makeStubParser({
+    const parser = makeStubStatusFileHook({
       parseEvent: (line) => {
         if (line === 'good-line') {
           return { ts: 1, type: EventType.Prompt, detail: line } as SessionEvent;
@@ -413,7 +409,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser,
+      statusFileHook: parser,
     });
 
     fs.writeFileSync(eventsPath, 'good-line\nunparseable-line\n');
@@ -430,7 +426,7 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: null,
       eventsOutputPath: eventsPath,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
 
     // Reader already truncated events.jsonl on attach. Flushing should
@@ -455,13 +451,13 @@ describe('StatusFileReader', () => {
       sessionId: 'session-1',
       statusOutputPath: statusA,
       eventsOutputPath: eventsA,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
     reader.attach({
       sessionId: 'session-2',
       statusOutputPath: statusB,
       eventsOutputPath: eventsB,
-      parser: makeStubParser({}),
+      statusFileHook: makeStubStatusFileHook({}),
     });
 
     // Put some content down so we can verify disposeAll does NOT delete.

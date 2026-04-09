@@ -1,10 +1,9 @@
 import { GeminiDetector } from './detector';
 import { GeminiCommandBuilder } from './command-builder';
-import { GeminiStatusParser } from './status-parser';
 import { stripGeminiKangenticHooks } from './hook-manager';
 import { GeminiSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
 
 /**
@@ -47,14 +46,6 @@ export class GeminiAdapter implements AgentAdapter {
 
   interpolateTemplate(template: string, variables: Record<string, string>): string {
     return this.commandBuilder.interpolateTemplate(template, variables);
-  }
-
-  parseStatus(raw: string): SessionUsage | null {
-    return GeminiStatusParser.parseStatus(raw);
-  }
-
-  parseEvent(line: string): SessionEvent | null {
-    return GeminiStatusParser.parseEvent(line);
   }
 
   /**

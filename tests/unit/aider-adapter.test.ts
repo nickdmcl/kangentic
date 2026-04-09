@@ -238,14 +238,6 @@ describe('AiderAdapter', () => {
       await expect(adapter.ensureTrust('/some/dir')).resolves.toBeUndefined();
     });
 
-    it('parseStatus returns null', () => {
-      expect(adapter.parseStatus('{"some":"data"}')).toBeNull();
-    });
-
-    it('parseEvent returns null', () => {
-      expect(adapter.parseEvent('{"type":"tool_start"}')).toBeNull();
-    });
-
     it('stripHooks does not throw', () => {
       expect(() => adapter.stripHooks('/some/dir')).not.toThrow();
     });

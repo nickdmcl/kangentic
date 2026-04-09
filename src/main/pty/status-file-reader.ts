@@ -1,6 +1,13 @@
 import fs from 'node:fs';
 import { FileWatcher } from './file-watcher';
-import type { SessionUsage, SessionEvent, AgentParser } from '../../shared/types';
+import type { SessionUsage, SessionEvent, AdapterRuntimeStrategy } from '../../shared/types';
+
+/**
+ * Adapter-owned hook describing how to decode the contents of
+ * status.json and events.jsonl. Pulled from `runtime.statusFile`
+ * on the agent adapter so this reader stays generic.
+ */
+export type StatusFileHook = NonNullable<AdapterRuntimeStrategy['statusFile']>;
 
 /**
  * Generic callback primitives that StatusFileReader uses to push parsed
@@ -31,14 +38,15 @@ export interface StatusFileAttachOptions {
   statusOutputPath: string | null;
   eventsOutputPath: string | null;
   /**
-   * Agent parser used to decode status.json and events.jsonl content.
-   * Optional: when null, the reader still performs startup file
-   * cleanup (delete stale status.json, truncate stale events.jsonl)
-   * but skips watcher setup since there's nothing to parse. This is
-   * used by sessions that don't emit telemetry (pure PTY sessions,
-   * test fixtures without a parser configured).
+   * Adapter-supplied hook (from `runtime.statusFile`) used to decode
+   * status.json and events.jsonl content. Optional: when null, the
+   * reader still performs startup file cleanup (delete stale
+   * status.json, truncate stale events.jsonl) but skips watcher setup
+   * since there's nothing to parse. This is used by sessions whose
+   * adapter does not opt into the hook telemetry pipeline (Codex,
+   * Gemini, Aider) and by test fixtures.
    */
-  parser: AgentParser | null;
+  statusFileHook: StatusFileHook | null;
 }
 
 interface AttachedState {
@@ -47,7 +55,7 @@ interface AttachedState {
   statusOutputPath: string | null;
   eventsOutputPath: string | null;
   eventsFileOffset: number;
-  parser: AgentParser | null;
+  statusFileHook: StatusFileHook | null;
 }
 
 /**
@@ -85,7 +93,7 @@ export class StatusFileReader {
    * cached data from the previous session.
    */
   attach(options: StatusFileAttachOptions): void {
-    const { sessionId, statusOutputPath, eventsOutputPath, parser } = options;
+    const { sessionId, statusOutputPath, eventsOutputPath, statusFileHook } = options;
     if (this.states.has(sessionId)) return;
     if (!statusOutputPath && !eventsOutputPath) return;
 
@@ -95,7 +103,7 @@ export class StatusFileReader {
       statusOutputPath,
       eventsOutputPath,
       eventsFileOffset: 0,
-      parser,
+      statusFileHook,
     };
 
     // Delete stale status.json so the watcher doesn't emit cached data
@@ -104,10 +112,10 @@ export class StatusFileReader {
     if (statusOutputPath) {
       try { fs.unlinkSync(statusOutputPath); } catch { /* may not exist */ }
 
-      // Only install the watcher when we have a parser to decode
-      // changes. Sessions without a parser still need the file deleted
-      // but don't need change notifications.
-      if (parser) {
+      // Only install the watcher when we have a status-file hook to
+      // decode changes. Sessions without a hook still need the file
+      // deleted but don't need change notifications.
+      if (statusFileHook) {
         state.statusWatcher = new FileWatcher({
           filePath: statusOutputPath,
           onChange: () => this.handleStatusChange(sessionId),
@@ -123,7 +131,7 @@ export class StatusFileReader {
     if (eventsOutputPath) {
       try { fs.writeFileSync(eventsOutputPath, ''); } catch { /* bridge may create it */ }
 
-      if (parser) {
+      if (statusFileHook) {
         state.eventsWatcher = new FileWatcher({
           filePath: eventsOutputPath,
           onChange: () => this.handleEventsChange(sessionId),
@@ -223,10 +231,10 @@ export class StatusFileReader {
    */
   private handleStatusChange(sessionId: string): void {
     const state = this.states.get(sessionId);
-    if (!state || !state.statusOutputPath || !state.parser) return;
+    if (!state || !state.statusOutputPath || !state.statusFileHook) return;
     try {
       const raw = fs.readFileSync(state.statusOutputPath, 'utf-8');
-      const usage = state.parser.parseStatus(raw);
+      const usage = state.statusFileHook.parseStatus(raw);
       if (!usage) return;
       this.callbacks.onUsageParsed(sessionId, usage);
     } catch {
@@ -246,7 +254,7 @@ export class StatusFileReader {
    */
   private handleEventsChange(sessionId: string): void {
     const state = this.states.get(sessionId);
-    if (!state || !state.eventsOutputPath || !state.parser) return;
+    if (!state || !state.eventsOutputPath || !state.statusFileHook) return;
     try {
       const stat = fs.statSync(state.eventsOutputPath);
       if (stat.size < state.eventsFileOffset) {
@@ -271,7 +279,7 @@ export class StatusFileReader {
 
       const events: SessionEvent[] = [];
       for (const line of rawLines) {
-        const event = state.parser.parseEvent(line);
+        const event = state.statusFileHook.parseEvent(line);
         if (event) events.push(event);
       }
 

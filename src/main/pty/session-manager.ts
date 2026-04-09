@@ -543,7 +543,7 @@ export class SessionManager extends EventEmitter {
         sessionId: id,
         statusOutputPath: input.statusOutputPath || null,
         eventsOutputPath: input.eventsOutputPath || null,
-        parser: input.agentParser ?? null,
+        statusFileHook: input.agentParser?.runtime?.statusFile ?? null,
       });
     }
 

@@ -35,7 +35,9 @@ vi.mock('../../src/main/analytics/analytics', () => ({
 
 import * as pty from 'node-pty';
 import { SessionManager } from '../../src/main/pty/session-manager';
-import { ClaudeStatusParser } from '../../src/main/agent/adapters/claude/status-parser';
+import { ClaudeAdapter } from '../../src/main/agent/adapters/claude/claude-adapter';
+
+const claudeAdapter = new ClaudeAdapter();
 import { EventType } from '../../src/shared/types';
 import type { ActivityState, SessionEvent } from '../../src/shared/types';
 
@@ -1018,7 +1020,7 @@ describe('Synthetic session_end', () => {
       command: '',
       cwd: tmpDir,
       eventsOutputPath: eventsPath,
-      agentParser: ClaudeStatusParser,
+      agentParser: claudeAdapter,
     });
 
     spawnedSessionId = session.id;

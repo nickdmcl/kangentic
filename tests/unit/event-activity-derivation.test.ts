@@ -52,7 +52,9 @@ vi.mock('../../src/main/analytics/analytics', () => ({
 
 import * as pty from 'node-pty';
 import { SessionManager } from '../../src/main/pty/session-manager';
-import { ClaudeStatusParser } from '../../src/main/agent/adapters/claude/status-parser';
+import { ClaudeAdapter } from '../../src/main/agent/adapters/claude/claude-adapter';
+
+const claudeAdapter = new ClaudeAdapter();
 import { EventType, IdleReason } from '../../src/shared/types';
 import type { ActivityState } from '../../src/shared/types';
 
@@ -131,7 +133,7 @@ describe('Event-derived activity state', () => {
       command: '',
       cwd: tmpDir,
       eventsOutputPath: eventsPath,
-      agentParser: ClaudeStatusParser,
+      agentParser: claudeAdapter,
     });
 
     spawnedSessionId = session.id;
@@ -1719,7 +1721,7 @@ describe('Event-derived activity state', () => {
         cwd: tmpDir,
         eventsOutputPath: eventsPath,
         statusOutputPath: statusPath,
-        agentParser: ClaudeStatusParser,
+        agentParser: claudeAdapter,
       });
 
       fakeSpawnedSessionId = session.id;
@@ -1760,14 +1762,14 @@ describe('Event-derived activity state', () => {
       // invoke UsageTracker.processStatusUpdate - exactly what the
       // reader's handleStatusChange does under the hood.
       const internals = sessionManager as unknown as {
-        sessions: Map<string, { agentParser?: { parseStatus(raw: string): unknown } }>;
+        sessions: Map<string, { agentParser?: { runtime?: { statusFile?: { parseStatus(raw: string): unknown } } } }>;
         usageTracker: {
           processStatusUpdate: (sessionId: string, usage: unknown) => void;
         };
       };
       const managedSession = internals.sessions.get(sessionId);
       const raw = fs.readFileSync(statusPath, 'utf-8');
-      const usage = managedSession?.agentParser?.parseStatus(raw) ?? null;
+      const usage = managedSession?.agentParser?.runtime?.statusFile?.parseStatus(raw) ?? null;
       if (usage) internals.usageTracker.processStatusUpdate(sessionId, usage);
     }
 

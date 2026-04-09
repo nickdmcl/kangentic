@@ -974,10 +974,8 @@ export interface ProjectCreateInput {
   default_agent?: string;
 }
 
-/** Minimal parsing interface for agent-specific status/event parsing. */
+/** Minimal parsing interface for agent-specific runtime behavior. */
 export interface AgentParser {
-  parseStatus(raw: string): SessionUsage | null;
-  parseEvent(line: string): SessionEvent | null;
   /**
    * Detect whether the agent has produced its first meaningful output.
    * Called on each PTY data flush. Return true to emit the 'first-output'
@@ -1093,6 +1091,42 @@ export interface AdapterRuntimeStrategy {
      * on every message). False for append-only JSONL (Codex appends).
      * Tells the watcher whether to track a byte cursor or always
      * re-read the whole file.
+     */
+    readonly isFullRewrite: boolean;
+  };
+
+  /**
+   * How the agent's hook-based status/events files are parsed for
+   * real-time telemetry. Used by agents that emit telemetry through
+   * Kangentic-injected hooks (event-bridge.js + status-bridge.js)
+   * which write to per-session `status.json` and `events.jsonl` files
+   * under `.kangentic/sessions/<sessionId>/`. Today only Claude Code
+   * uses this pipeline; other agents rely on `sessionHistory` instead.
+   *
+   * Per-session file paths are caller-supplied (set on the spawn
+   * options) since they are runtime values, not static adapter
+   * metadata. The hook only owns the parse logic.
+   */
+  readonly statusFile?: {
+    /**
+     * Decode the rewritten contents of `status.json` into a
+     * `SessionUsage` snapshot (model, context window, token counts,
+     * cost). Returns null when the content is partial, malformed, or
+     * does not yet contain a complete usage block.
+     */
+    parseStatus(raw: string): SessionUsage | null;
+
+    /**
+     * Decode a single appended line from `events.jsonl` into a
+     * `SessionEvent`. Returns null for blank lines, comments, or
+     * unrecognized event shapes.
+     */
+    parseEvent(line: string): SessionEvent | null;
+
+    /**
+     * True when the status file is fully rewritten on each update.
+     * The events file is always append-only and tracked by a
+     * separate byte cursor regardless of this flag.
      */
     readonly isFullRewrite: boolean;
   };

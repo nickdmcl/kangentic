@@ -300,28 +300,6 @@ describe('Codex Adapter', () => {
     });
   });
 
-  describe('parseEvent', () => {
-    it('parses valid JSONL event', () => {
-      const event = adapter.parseEvent('{"ts":1234567890,"type":"tool_start","tool":"Bash"}');
-      expect(event).toEqual({ ts: 1234567890, type: 'tool_start', tool: 'Bash' });
-    });
-
-    it('returns null for invalid JSON', () => {
-      expect(adapter.parseEvent('not json')).toBeNull();
-    });
-
-    it('returns null for empty string', () => {
-      expect(adapter.parseEvent('')).toBeNull();
-    });
-  });
-
-  describe('parseStatus', () => {
-    it('always returns null (Codex has no statusLine)', () => {
-      expect(adapter.parseStatus('{"anything": true}')).toBeNull();
-      expect(adapter.parseStatus('')).toBeNull();
-    });
-  });
-
   describe('interpolateTemplate', () => {
     it('replaces {{key}} placeholders', () => {
       const result = adapter.interpolateTemplate(

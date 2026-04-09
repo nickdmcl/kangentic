@@ -3,7 +3,7 @@ import { interpolateTemplate } from '../../shared/template-utils';
 import { quoteArg, isUnixLikeShell, toForwardSlash } from '../../../../shared/paths';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
 
 /**
@@ -92,16 +92,6 @@ export class AiderAdapter implements AgentAdapter {
 
   interpolateTemplate(template: string, variables: Record<string, string>): string {
     return interpolateTemplate(template, variables);
-  }
-
-  // Aider has no structured status output
-  parseStatus(_raw: string): SessionUsage | null {
-    return null;
-  }
-
-  // Aider has no JSONL event stream
-  parseEvent(_line: string): SessionEvent | null {
-    return null;
   }
 
   /**

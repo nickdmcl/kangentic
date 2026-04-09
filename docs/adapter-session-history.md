@@ -182,14 +182,46 @@ The `<projectSlug>` is NOT a hash. It is the cwd with every `/`, `\`, `:`, and `
 
 Unlike Codex and Gemini, Claude has TWO active telemetry pipelines simultaneously:
 
-1. **Hook pipeline** (`StatusFileReader`): consumes `status.json` + `events.jsonl` written by event-bridge hooks injected into Claude's `.claude/settings.json`.
-2. **Native log** (this parser): consumes `~/.claude/projects/<slug>/<sessionId>.jsonl` written by Claude Code itself.
+1. **Hook pipeline** (`StatusFileReader`, declared via `runtime.statusFile` - see below): consumes `status.json` + `events.jsonl` written by event-bridge hooks injected into Claude's `.claude/settings.json`.
+2. **Native log** (this parser, declared via `runtime.sessionHistory`): consumes `~/.claude/projects/<slug>/<sessionId>.jsonl` written by Claude Code itself.
 
 Both pipelines feed `UsageTracker.setSessionUsage`, which 3-level merges partial updates (root, contextWindow, cost, model). Last writer wins per field. The native log typically writes after the hook, so it ends up authoritative for cumulative counts.
 
 To prevent activity flicker from two sources fighting, the native-log parser deliberately returns `activity: null`. Claude's activity state remains owned by the hook-based `ActivityDetection.hooks()` strategy.
 
 The hook pipeline's `processStatusUpdate` is what triggers `sessionHistoryReader.attach()` for Claude: when the first status.json arrives, `usage.sessionId` (extracted from `session_id`) fires `onAgentSessionId`, which in turn attaches the native-log reader. No PTY scraping is needed because Claude uses caller-owned session IDs.
+
+## Claude status-file pipeline (`runtime.statusFile`)
+
+The hook-based telemetry source is declared on the adapter alongside `sessionHistory` so `claude-adapter.ts` is the single source of truth for what Claude reads from disk:
+
+```ts
+readonly runtime: AdapterRuntimeStrategy = {
+  activity: ActivityDetection.hooks(),
+  statusFile: {
+    parseStatus: ClaudeStatusParser.parseStatus,
+    parseEvent: ClaudeStatusParser.parseEvent,
+    isFullRewrite: true,
+  },
+  sessionHistory: {
+    locate: ClaudeSessionHistoryParser.locate,
+    parse: ClaudeSessionHistoryParser.parse,
+    isFullRewrite: false,
+  },
+};
+```
+
+`StatusFileReader` (`src/main/pty/status-file-reader.ts`) reads `session.agentParser?.runtime?.statusFile` at attach time and dispatches through the hook's `parseStatus` / `parseEvent` methods. It contains no Claude-specific parsing code - swap the hook and the same reader serves any future adapter that wants to ride the same pipeline.
+
+| Field | Semantics |
+|-------|-----------|
+| `parseStatus(raw)` | Decode the rewritten contents of `status.json` into a `SessionUsage`. Returns null for partial or malformed content. |
+| `parseEvent(line)` | Decode a single appended line from `events.jsonl` into a `SessionEvent`. Returns null for blank/invalid lines. |
+| `isFullRewrite` | True for `status.json` (whole-file rewrite on every update). The events file is always append-only, tracked by a separate byte cursor regardless of this flag. |
+
+**File paths** (`status.json`, `events.jsonl` under `.kangentic/sessions/<sessionId>/`) are caller-supplied at spawn time on `SpawnSessionInput.statusOutputPath` / `eventsOutputPath`. They are runtime values, not static adapter metadata, mirroring how `sessionHistory.locate` takes `{ agentSessionId, cwd }` at call time.
+
+**Symmetry with `sessionHistory`**: both hooks live on `AdapterRuntimeStrategy`, both readers (`StatusFileReader`, `SessionHistoryReader`) own their `FileWatcher` instances, both fan out through generic `UsageTracker` primitives, neither mentions a specific agent name. Adding a hook-based telemetry source to a future agent is a single declaration in `runtime.statusFile`.
 
 ### Line entries we depend on
 

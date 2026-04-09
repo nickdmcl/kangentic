@@ -5,7 +5,7 @@ import { ClaudeSessionHistoryParser } from './session-history-parser';
 import { ensureWorktreeTrust, ensureMcpServerTrust } from './trust-manager';
 import { stripKangenticHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
-import type { SessionUsage, SessionEvent, AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
+import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
 
 /**
@@ -53,20 +53,24 @@ export class ClaudeAdapter implements AgentAdapter {
     return this.commandBuilder.interpolateTemplate(template, variables);
   }
 
-  parseStatus(raw: string): SessionUsage | null {
-    return ClaudeStatusParser.parseStatus(raw);
-  }
-
-  parseEvent(line: string): SessionEvent | null {
-    return ClaudeStatusParser.parseEvent(line);
-  }
-
   // Claude uses caller-owned session IDs via --session-id, so no capture needed.
-  // The native session log at ~/.claude/projects/<slug>/<sessionId>.jsonl runs
-  // alongside the hook-based status.json/events.jsonl pipeline. Both feed
-  // UsageTracker.setSessionUsage, which merges partial updates safely.
+  // Claude exposes telemetry through two parallel on-disk pipelines, both
+  // declared here so this file is the single source of truth for what
+  // Claude reads from disk:
+  //   - statusFile: hook-driven status.json + events.jsonl, written by
+  //     Kangentic's injected event-bridge.js / status-bridge.js into
+  //     .kangentic/sessions/<sessionId>/. Watched by StatusFileReader.
+  //   - sessionHistory: Claude Code's native session log at
+  //     ~/.claude/projects/<slug>/<sessionId>.jsonl. Watched by
+  //     SessionHistoryReader.
+  // Both feed UsageTracker.setSessionUsage, which merges partial updates safely.
   readonly runtime: AdapterRuntimeStrategy = {
     activity: ActivityDetection.hooks(),
+    statusFile: {
+      parseStatus: ClaudeStatusParser.parseStatus,
+      parseEvent: ClaudeStatusParser.parseEvent,
+      isFullRewrite: true,
+    },
     sessionHistory: {
       locate: ClaudeSessionHistoryParser.locate,
       parse: ClaudeSessionHistoryParser.parse,
