@@ -438,35 +438,26 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
               //   - Usage hasn't streamed any token counts yet (boot window)
               //   - The agent's context window size is unknown (unmapped
               //     Gemini model: contextWindowSize is 0 as sentinel)
+              // Always render the full progress bar layout once the CLI has
+              // reported. Default to 0% with a placeholder label when usage
+              // data hasn't streamed yet -- the bar at zero is the graceful
+              // baseline, never a blank slot. Smoothly animates to real
+              // values via the inner bar's transition-all when tokens arrive.
               // Active/idle state is already conveyed by the top-left
               // status icon (spinner vs mail), so no dot or label here.
-              //
-              // The usage-bar div is always rendered in this branch so
-              // tests (and users) see a stable slot throughout the
-              // boot → telemetry transition. When neither tokens nor a
-              // model name are available yet, the div is empty but
-              // present (thin separator line).
               const usage = displayState.usage;
               const hasTokens = !!usage && usage.contextWindow.totalInputTokens > 0;
               const hasKnownWindow = !!usage && usage.contextWindow.contextWindowSize > 0;
-              if (!usage || !hasTokens || !hasKnownWindow) {
-                return (
-                  <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
-                    {resolvedModelName && (
-                      <span className="text-xs text-fg-faint truncate block">
-                        {resolvedModelName}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-              const pct = Math.round(usage.contextWindow.usedPercentage);
+              const pct = usage && hasTokens && hasKnownWindow
+                ? Math.round(usage.contextWindow.usedPercentage)
+                : 0;
+              const modelLabel = resolvedModelName ?? '...';
               const progressColor = getProgressColor(pct);
               return (
                 <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-fg-faint">
-                      {resolvedModelName}
+                    <span className="text-xs text-fg-faint truncate">
+                      {modelLabel}
                     </span>
                     <span className="text-xs text-fg-faint">{pct}%</span>
                   </div>

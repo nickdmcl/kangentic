@@ -548,6 +548,61 @@ test.describe('Task Activity Indicators', () => {
       }
     });
 
+    test('shows placeholder "..." label with 0% bar when CLI has reported but usage is still null', async () => {
+      // hasActivityEntry (eventCache) flips cliHasReported true while usage is
+      // still null -- the running branch should render the full bar layout
+      // with a "..." placeholder label and 0%, never an empty slot.
+      const { browser, page } = await launchWithState(
+        makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, withEvents: true }),
+      );
+      try {
+        await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
+        const usageBar = page.locator(`[data-task-id="${TASK_ID}"] [data-testid="usage-bar"]`);
+        await expect(usageBar).toBeVisible({ timeout: 10000 });
+        await expect(usageBar).toContainText('...');
+        await expect(usageBar).toContainText('0%');
+        await expect(usageBar).not.toContainText('Starting agent...');
+        // Inner progress bar element exists at zero width
+        // Inner progress bar element exists at zero width (not "visible" since 0px wide)
+        await expect(usageBar.locator('div.h-full.rounded-full')).toHaveCount(1);
+        await expect(usageBar.locator('div.h-full.rounded-full')).toHaveAttribute('style', /width:\s*0%/);
+      } finally {
+        await browser.close();
+      }
+    });
+
+    test('shows model name with 0% bar when usage exists but no tokens streamed yet', async () => {
+      // Usage object is present with a model displayName but totalInputTokens
+      // is 0 -- the bar should render the model name on the left and 0% on
+      // the right with a zero-width inner bar (no missing progress row).
+      const preConfig = makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false })
+        + `
+        window.electronAPI.sessions.getUsage = async function () {
+          var result = {};
+          result['${SESSION_ID}'] = {
+            model: { id: 'claude-sonnet', displayName: 'Claude Sonnet' },
+            contextWindow: { usedPercentage: 0, usedTokens: 0, cacheTokens: 0, totalInputTokens: 0, totalOutputTokens: 0, contextWindowSize: 200000 },
+            cost: { totalCostUsd: 0, totalDurationMs: 0 },
+          };
+          return result;
+        };
+        `;
+      const { browser, page } = await launchWithState(preConfig);
+      try {
+        await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
+        const usageBar = page.locator(`[data-task-id="${TASK_ID}"] [data-testid="usage-bar"]`);
+        await expect(usageBar).toBeVisible({ timeout: 10000 });
+        await expect(usageBar).toContainText('Claude Sonnet');
+        await expect(usageBar).toContainText('0%');
+        await expect(usageBar).not.toContainText('...');
+        // Inner progress bar element exists at zero width (not "visible" since 0px wide)
+        await expect(usageBar.locator('div.h-full.rounded-full')).toHaveCount(1);
+        await expect(usageBar.locator('div.h-full.rounded-full')).toHaveAttribute('style', /width:\s*0%/);
+      } finally {
+        await browser.close();
+      }
+    });
+
     test('shows "Resuming agent..." when session.resuming is true', async () => {
       const preConfig = makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, noActivityCache: true })
         + `
