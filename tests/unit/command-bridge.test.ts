@@ -1633,3 +1633,105 @@ describe('CommandBridge - no-truncate invariant', () => {
     expect(fs.existsSync(path.join(tmpDir, 'responses', 'pre-start-1.json'))).toBe(false);
   });
 });
+
+// ── Async handler dispatch ────────────────────────────────────────────────
+
+import { commandHandlers } from '../../src/main/agent/commands';
+import type { CommandResponse } from '../../src/main/agent/commands/types';
+
+/**
+ * Wait until the response file for a request appears, then read it.
+ * Async handlers (like get_transcript with format=structured) write the
+ * response on Promise resolution, not inline like sync handlers, so the
+ * existing sync sendCommand() helper would race the file write.
+ */
+async function awaitResponse(requestId: string, timeoutMs = 2000): Promise<CommandResponse> {
+  const responsePath = path.join(tmpDir, 'responses', `${requestId}.json`);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(responsePath)) {
+      return JSON.parse(fs.readFileSync(responsePath, 'utf-8')) as CommandResponse;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timed out waiting for response file ${requestId}`);
+}
+
+describe('CommandBridge - async handler dispatch', () => {
+  // Snapshot the registry so each test can register a temporary async
+  // handler without leaking it to other test files (vitest shares modules).
+  const originalHandlers = { ...commandHandlers };
+  afterEach(() => {
+    for (const key of Object.keys(commandHandlers)) {
+      if (!(key in originalHandlers)) delete commandHandlers[key];
+    }
+  });
+
+  it('awaits Promise-returning handlers and writes the resolved response', async () => {
+    let resolveHandler: ((value: CommandResponse) => void) | null = null;
+    commandHandlers.test_async_resolve = () =>
+      new Promise<CommandResponse>((resolve) => { resolveHandler = resolve; });
+
+    const bridge = createBridge();
+    bridge.start();
+
+    const requestId = `req-async-${Date.now()}`;
+    const commandLine = JSON.stringify({ id: requestId, method: 'test_async_resolve', params: {}, ts: Date.now() });
+    fs.appendFileSync(path.join(tmpDir, 'commands.jsonl'), commandLine + '\n');
+    (bridge as unknown as { processNewCommands: () => void }).processNewCommands();
+
+    // The response file MUST NOT exist yet - the handler is still pending.
+    // This is the contract that distinguishes async dispatch from sync.
+    expect(fs.existsSync(path.join(tmpDir, 'responses', `${requestId}.json`))).toBe(false);
+
+    // Resolve the handler and verify the bridge writes the response.
+    resolveHandler!({ success: true, message: 'async ok', data: { wasAsync: true } });
+    const response = await awaitResponse(requestId);
+
+    bridge.stop();
+
+    expect(response.success).toBe(true);
+    expect(response.message).toBe('async ok');
+    expect((response.data as { wasAsync: boolean }).wasAsync).toBe(true);
+  });
+
+  it('catches Promise rejection and writes a structured error response', async () => {
+    commandHandlers.test_async_reject = async () => {
+      throw new Error('something exploded');
+    };
+
+    const bridge = createBridge();
+    bridge.start();
+
+    const requestId = `req-async-fail-${Date.now()}`;
+    const commandLine = JSON.stringify({ id: requestId, method: 'test_async_reject', params: {}, ts: Date.now() });
+    fs.appendFileSync(path.join(tmpDir, 'commands.jsonl'), commandLine + '\n');
+    (bridge as unknown as { processNewCommands: () => void }).processNewCommands();
+
+    const response = await awaitResponse(requestId);
+
+    bridge.stop();
+
+    expect(response.success).toBe(false);
+    expect(response.error).toContain('something exploded');
+  });
+
+  it('keeps sync handlers writing inline so test harnesses can read responses immediately', () => {
+    // Regression guard: the previous fully-async dispatch broke the existing
+    // sync sendCommand() helper because the response file was written on a
+    // microtask. Sync handlers must still write inline.
+    commandHandlers.test_sync_inline = () => ({ success: true, message: 'sync ok' });
+
+    const bridge = createBridge();
+    bridge.start();
+
+    // Use the sync sendCommand helper (no await) - if dispatch were async,
+    // this would throw "No response file for request ...".
+    const response = sendCommand(bridge, 'test_sync_inline');
+
+    bridge.stop();
+
+    expect(response.success).toBe(true);
+    expect(response.message).toBe('sync ok');
+  });
+});

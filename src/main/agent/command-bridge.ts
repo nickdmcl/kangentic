@@ -137,22 +137,37 @@ export class CommandBridge {
   }
 
   private handleCommand(command: Command): void {
-    let response: CommandResponse;
+    const handler = commandHandlers[command.method];
+    if (!handler) {
+      this.writeResponse(command.id, { success: false, error: `Unknown command: ${command.method}` });
+      return;
+    }
 
+    let result: CommandResponse | Promise<CommandResponse>;
     try {
-      const handler = commandHandlers[command.method];
-      if (handler) {
-        response = handler(command.params, this.context);
-      } else {
-        response = { success: false, error: `Unknown command: ${command.method}` };
-      }
+      result = handler(command.params, this.context);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[CommandBridge] Error handling ${command.method}:`, errorMessage);
-      response = { success: false, error: errorMessage };
+      this.writeResponse(command.id, { success: false, error: errorMessage });
+      return;
     }
 
-    this.writeResponse(command.id, response);
+    // Sync handlers complete their write inline so test harnesses that read
+    // the response file immediately after dispatch keep working. Async
+    // handlers (e.g. structured transcript parsing) write on resolution.
+    if (result instanceof Promise) {
+      result
+        .then((response) => this.writeResponse(command.id, response))
+        .catch((error) => {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`[CommandBridge] Error handling ${command.method}:`, errorMessage);
+          this.writeResponse(command.id, { success: false, error: errorMessage });
+        });
+      return;
+    }
+
+    this.writeResponse(command.id, result);
   }
 
   private writeResponse(requestId: string, response: CommandResponse): void {

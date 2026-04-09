@@ -739,17 +739,19 @@ server.registerTool(
 server.registerTool(
   'kangentic_get_transcript',
   {
-    description: 'Get the full ANSI-stripped session transcript for a task. Returns the complete terminal output from the agent session, useful for reviewing what an agent did, debugging issues, or auditing work. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
+    description: 'Get a task\'s session transcript. Default `format="structured"` returns Claude\'s parsed conversation as markdown (best for cross-agent context handoff). `format="raw"` returns the ANSI-stripped terminal scrollback (works for any agent). Find task IDs with kangentic_find_task.',
     inputSchema: z.object({
       taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). Returns transcript from the most recent session for this task.'),
       sessionId: z.string().optional().describe('Session UUID for a specific session. Use kangentic_get_session_history to find session IDs.'),
+      format: z.enum(['structured', 'raw']).optional().describe('Transcript format. "structured" (default) returns the parsed conversation as markdown - Claude sessions only. "raw" returns the ANSI-stripped terminal scrollback for any agent.'),
     }),
   },
-  async ({ taskId, sessionId }) => {
+  async ({ taskId, sessionId, format }) => {
     try {
       const response = await sendCommand('get_transcript', {
         taskId: taskId ?? null,
         sessionId: sessionId ?? null,
+        format: format ?? 'structured',
       });
       if (!response.success) {
         return { content: [{ type: 'text' as const, text: `Failed to get transcript: ${response.error}` }], isError: true };

@@ -2,21 +2,43 @@ import { TranscriptRepository } from '../../db/repositories/transcript-repositor
 import { SessionRepository } from '../../db/repositories/session-repository';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { resolveTask } from './task-resolver';
+import { parseClaudeTranscript, locateClaudeTranscriptFile } from '../adapters/claude/transcript-parser';
+import { transcriptToMarkdown } from '../../../shared/transcript-format';
 import type { CommandContext, CommandResponse } from './types';
+import type { SessionRecord } from '../../../shared/types';
+
+type TranscriptFormat = 'structured' | 'raw';
 
 /**
  * MCP command handler: get_transcript
  *
- * Returns the ANSI-stripped session transcript for a task's most recent
- * (or specified) session. Useful for debugging, auditing, and reviewing
- * what an agent actually did.
+ * Returns a session's transcript for a task's most recent (or specified)
+ * session. Two formats:
+ *
+ * - `structured` (default): the parsed conversation - user prompts,
+ *   assistant text, tool calls and results - rendered as markdown.
+ *   Sourced from Claude Code's native session JSONL. Best for
+ *   cross-agent context handoff and human review. Claude sessions only.
+ *
+ * - `raw`: the ANSI-stripped PTY scrollback - exactly what hit the
+ *   terminal, including TUI redraws. Useful for debugging the terminal
+ *   layer or for inspecting non-Claude sessions where the structured
+ *   parser isn't yet supported.
  */
-export function handleGetTranscript(
+export async function handleGetTranscript(
   params: Record<string, unknown>,
   context: CommandContext,
-): CommandResponse {
-  const rawTaskId = params.taskId as string | undefined;
-  const sessionId = params.sessionId as string | undefined;
+): Promise<CommandResponse> {
+  const rawTaskId = typeof params.taskId === 'string' ? params.taskId : undefined;
+  const sessionId = typeof params.sessionId === 'string' ? params.sessionId : undefined;
+
+  // Validate format BEFORE narrowing - never cast user-supplied input
+  // before checking it's in the allowed set.
+  const formatParam = params.format;
+  if (formatParam !== undefined && formatParam !== 'structured' && formatParam !== 'raw') {
+    return { success: false, error: `Invalid format "${String(formatParam)}". Use "structured" or "raw".` };
+  }
+  const format: TranscriptFormat = formatParam ?? 'structured';
 
   if (!rawTaskId && !sessionId) {
     return { success: false, error: 'Provide either taskId or sessionId.' };
@@ -24,50 +46,78 @@ export function handleGetTranscript(
 
   try {
     const db = context.getProjectDb();
-    const transcriptRepo = new TranscriptRepository(db);
+    const sessionRepo = new SessionRepository(db);
 
-    let targetSessionId: string | null = null;
-
-    if (sessionId) {
-      targetSessionId = sessionId;
-    } else if (rawTaskId) {
+    // Single resolution path: produce one SessionRecord that both branches
+    // agree on. This avoids the prior split where structured and raw could
+    // disagree about whether a session exists.
+    let record: SessionRecord | undefined;
+    if (rawTaskId) {
       const taskRepo = new TaskRepository(db);
       const task = resolveTask(taskRepo, rawTaskId);
       if (!task) {
         return { success: false, error: `Task not found: ${rawTaskId}` };
       }
-      // Use the task's current session, or find the latest from session history
-      if (task.session_id) {
-        targetSessionId = task.session_id;
-      } else {
-        const sessionRepo = new SessionRepository(db);
-        const latest = sessionRepo.getLatestForTask(task.id);
-        if (latest) {
-          targetSessionId = latest.id;
-        }
-      }
+      record = sessionRepo.getLatestForTask(task.id);
+    } else if (sessionId) {
+      record = sessionRepo.findByAnyId(sessionId);
     }
 
-    if (!targetSessionId) {
+    if (!record) {
       return { success: true, message: 'No session found for this task.' };
     }
 
-    const record = transcriptRepo.getBySessionId(targetSessionId);
-    if (!record || !record.transcript) {
-      return { success: true, message: `No transcript captured for session ${targetSessionId.slice(0, 8)}.` };
+    const targetSessionId = record.id;
+
+    if (format === 'structured') {
+      if (record.session_type !== 'claude_agent') {
+        return {
+          success: true,
+          message: `Structured transcripts are currently supported only for Claude sessions (session_type=${record.session_type}). Re-run with format="raw" to get the terminal scrollback instead.`,
+        };
+      }
+      if (!record.agent_session_id) {
+        return { success: true, message: `Session ${targetSessionId.slice(0, 8)} has no agent_session_id - JSONL not yet written.` };
+      }
+
+      const filePath = locateClaudeTranscriptFile(record.agent_session_id, record.cwd);
+      const entries = await parseClaudeTranscript(filePath);
+      if (entries.length === 0) {
+        return { success: true, message: `No transcript entries found at ${filePath}.` };
+      }
+
+      const markdown = transcriptToMarkdown(entries);
+      const header = `Session: ${targetSessionId.slice(0, 8)}... | Format: structured | Entries: ${entries.length}`;
+      return {
+        success: true,
+        message: `${header}\n\n${markdown}`,
+        data: {
+          sessionId: targetSessionId,
+          format,
+          entryCount: entries.length,
+          filePath,
+        },
+      };
     }
 
-    const sizeKb = (record.size_bytes / 1024).toFixed(1);
-    const header = `Session: ${targetSessionId.slice(0, 8)}... | Size: ${sizeKb} KB | Updated: ${record.updated_at}`;
+    // format === 'raw'
+    const transcriptRepo = new TranscriptRepository(db);
+    const rawRecord = transcriptRepo.getBySessionId(targetSessionId);
+    if (!rawRecord || !rawRecord.transcript) {
+      return { success: true, message: `No raw transcript captured for session ${targetSessionId.slice(0, 8)}.` };
+    }
 
+    const sizeKb = (rawRecord.size_bytes / 1024).toFixed(1);
+    const header = `Session: ${targetSessionId.slice(0, 8)}... | Format: raw | Size: ${sizeKb} KB | Updated: ${rawRecord.updated_at}`;
     return {
       success: true,
-      message: `${header}\n\n${record.transcript}`,
+      message: `${header}\n\n${rawRecord.transcript}`,
       data: {
         sessionId: targetSessionId,
-        sizeBytes: record.size_bytes,
-        createdAt: record.created_at,
-        updatedAt: record.updated_at,
+        format,
+        sizeBytes: rawRecord.size_bytes,
+        createdAt: rawRecord.created_at,
+        updatedAt: rawRecord.updated_at,
       },
     };
   } catch (error) {

@@ -11,7 +11,7 @@ import type { TaskUpdateInput } from '../../../shared/types';
 export const handleCreateTask: CommandHandler = (
   params: Record<string, unknown>,
   context: CommandContext,
-): CommandResponse => {
+) => {
   const title = String(params.title ?? '').slice(0, 200);
   const description = String(params.description ?? '').slice(0, 10_000);
   const columnName = params.column as string | null;

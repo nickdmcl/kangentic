@@ -1164,6 +1164,21 @@ export interface SessionHistoryParseResult {
   activity: Activity | null;
 }
 
+/**
+ * One entry in a parsed agent transcript. Distinct from `SessionEvent`
+ * (telemetry only) - this preserves the actual conversation content for
+ * display in the Transcript tab.
+ */
+export type TranscriptEntry =
+  | { kind: 'user'; uuid: string; ts: number; text: string }
+  | { kind: 'assistant'; uuid: string; ts: number; model?: string; blocks: TranscriptBlock[] }
+  | { kind: 'tool_result'; uuid: string; ts: number; toolUseId: string; content: string; isError?: boolean };
+
+export type TranscriptBlock =
+  | { type: 'text'; text: string }
+  | { type: 'thinking'; text: string }
+  | { type: 'tool_use'; id: string; name: string; input: unknown };
+
 export interface SpawnSessionInput {
   /** Caller-provided session ID. When omitted, spawn() generates one via uuidv4(). */
   id?: string;

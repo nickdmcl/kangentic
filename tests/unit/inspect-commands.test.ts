@@ -4,9 +4,18 @@ import type { CommandContext } from '../../src/main/agent/commands/types';
 
 // --- Helpers ---
 
+interface MockSessionRow {
+  id: string;
+  task_id: string;
+  session_type?: string;
+  agent_session_id?: string | null;
+  cwd?: string;
+  started_at?: string;
+}
+
 function createMockDb(options: {
   tasks?: Array<{ id: string; display_id: number; session_id: string | null }>;
-  sessions?: Array<{ id: string; task_id: string }>;
+  sessions?: MockSessionRow[];
   transcripts?: Array<{ session_id: string; transcript: string; size_bytes: number; created_at: string; updated_at: string }>;
   queryResults?: Record<string, unknown>[];
 } = {}) {
@@ -43,9 +52,18 @@ function createMockDb(options: {
       }
 
       // Session queries
-      if (sql.includes('FROM sessions') && sql.includes('task_id')) {
+      if (sql.includes('FROM sessions') && sql.includes('task_id = ?')) {
+        // SessionRepository.getLatestForTask
         return {
           get: vi.fn((taskId: string) => sessions.find((session) => session.task_id === taskId) ?? undefined),
+          all: vi.fn(() => sessions),
+        };
+      }
+      if (sql.includes('FROM sessions') && sql.includes('id = ?') && sql.includes('agent_session_id = ?')) {
+        // SessionRepository.findByAnyId - id OR agent_session_id, both bound positionally
+        return {
+          get: vi.fn((idArg: string, agentIdArg: string) =>
+            sessions.find((session) => session.id === idArg || session.agent_session_id === agentIdArg) ?? undefined),
           all: vi.fn(() => sessions),
         };
       }
@@ -103,18 +121,19 @@ function createMockContext(db: ReturnType<typeof createMockDb>): CommandContext 
 // --- handleGetTranscript ---
 
 describe('handleGetTranscript', () => {
-  it('returns error when no taskId or sessionId provided', () => {
+  it('returns error when no taskId or sessionId provided', async () => {
     const db = createMockDb();
     const context = createMockContext(db);
 
-    const result = handleGetTranscript({}, context);
+    const result = await handleGetTranscript({}, context);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('taskId or sessionId');
   });
 
-  it('returns transcript by sessionId', () => {
+  it('returns raw transcript by sessionId when format="raw"', async () => {
     const db = createMockDb({
+      sessions: [{ id: 'session-abc', task_id: 'task-1', session_type: 'claude_agent' }],
       transcripts: [{
         session_id: 'session-abc',
         transcript: 'Hello world output',
@@ -125,34 +144,46 @@ describe('handleGetTranscript', () => {
     });
     const context = createMockContext(db);
 
-    const result = handleGetTranscript({ sessionId: 'session-abc' }, context);
+    const result = await handleGetTranscript({ sessionId: 'session-abc', format: 'raw' }, context);
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('Hello world output');
     expect(result.message).toContain('session-');
+    expect(result.message).toContain('Format: raw');
   });
 
-  it('returns message when no transcript exists', () => {
+  it('returns message when no raw transcript exists', async () => {
     const db = createMockDb({
       tasks: [{ id: 'task-1', display_id: 1, session_id: 'session-1' }],
+      sessions: [{ id: 'session-1', task_id: 'task-1', session_type: 'claude_agent' }],
       transcripts: [],
     });
     const context = createMockContext(db);
 
-    const result = handleGetTranscript({ taskId: '1' }, context);
+    const result = await handleGetTranscript({ taskId: '1', format: 'raw' }, context);
 
     expect(result.success).toBe(true);
-    expect(result.message).toContain('No transcript captured');
+    expect(result.message).toContain('No raw transcript captured');
   });
 
-  it('returns error when task not found', () => {
+  it('returns error when task not found', async () => {
     const db = createMockDb({ tasks: [] });
     const context = createMockContext(db);
 
-    const result = handleGetTranscript({ taskId: '999' }, context);
+    const result = await handleGetTranscript({ taskId: '999' }, context);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Task not found');
+  });
+
+  it('rejects an unknown format value', async () => {
+    const db = createMockDb();
+    const context = createMockContext(db);
+
+    const result = await handleGetTranscript({ sessionId: 'x', format: 'pretty' }, context);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid format');
   });
 });
 

@@ -20,7 +20,18 @@ export interface CommandResponse {
   message?: string;
 }
 
+/**
+ * Handlers may be sync or async. Most are sync (DB-only operations via the
+ * synchronous better-sqlite3 driver), but some need to await I/O - e.g.
+ * `get_transcript`'s structured branch reads Claude Code's native session
+ * JSONL from disk. CommandBridge dispatches sync handlers inline so test
+ * harnesses that read response files immediately after invocation keep
+ * working; only Promise-returning handlers go through async dispatch.
+ *
+ * Do not narrow this back to `CommandResponse` without first migrating
+ * every async handler.
+ */
 export type CommandHandler = (
   params: Record<string, unknown>,
   context: CommandContext,
-) => CommandResponse;
+) => CommandResponse | Promise<CommandResponse>;

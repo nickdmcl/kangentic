@@ -170,6 +170,18 @@ export class SessionRepository {
     ).get(taskId, sessionType) as SessionRecord | undefined;
   }
 
+  /**
+   * Find a session record by either its Kangentic id or its agent_session_id.
+   * Used by lookup paths that accept "any session identifier" - e.g. the
+   * MCP get_transcript handler accepting either flavor of UUID. Picks the
+   * most recent match if both columns happen to collide on the same id.
+   */
+  findByAnyId(sessionId: string): SessionRecord | undefined {
+    return this.db.prepare(
+      `SELECT * FROM sessions WHERE id = ? OR agent_session_id = ? ORDER BY started_at DESC LIMIT 1`
+    ).get(sessionId, sessionId) as SessionRecord | undefined;
+  }
+
   /** Get task IDs whose latest session was user-paused (for reconciliation). */
   getUserPausedTaskIds(): Set<string> {
     const rows = this.db.prepare(`

@@ -1,0 +1,340 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { parseClaudeTranscript } from '../../src/main/agent/adapters/claude/transcript-parser';
+import { transcriptToMarkdown } from '../../src/shared/transcript-format';
+
+function writeFixture(lines: object[]): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcript-test-'));
+  const file = path.join(dir, 'session.jsonl');
+  fs.writeFileSync(file, lines.map((line) => JSON.stringify(line)).join('\n'));
+  return file;
+}
+
+describe('parseClaudeTranscript', () => {
+  let tmpFile: string | null = null;
+
+  afterEach(() => {
+    if (tmpFile) {
+      try { fs.rmSync(path.dirname(tmpFile), { recursive: true, force: true }); } catch { /* ignore */ }
+      tmpFile = null;
+    }
+  });
+
+  it('returns [] for missing files', async () => {
+    const entries = await parseClaudeTranscript(path.join(os.tmpdir(), 'does-not-exist.jsonl'));
+    expect(entries).toEqual([]);
+  });
+
+  it('parses user, assistant, and tool_result entries', async () => {
+    tmpFile = writeFixture([
+      { type: 'user', uuid: 'u1', timestamp: '2026-04-09T00:00:00Z', message: { content: 'hello there' } },
+      {
+        type: 'assistant',
+        uuid: 'a1',
+        timestamp: '2026-04-09T00:00:01Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [
+            { type: 'text', text: 'Let me check.' },
+            { type: 'tool_use', id: 'tool-123', name: 'Bash', input: { command: 'ls' } },
+          ],
+        },
+      },
+      {
+        type: 'user',
+        uuid: 'r1',
+        timestamp: '2026-04-09T00:00:02Z',
+        message: {
+          content: [
+            { type: 'tool_result', tool_use_id: 'tool-123', content: 'file1.txt\nfile2.txt' },
+          ],
+        },
+      },
+      {
+        type: 'assistant',
+        uuid: 'a2',
+        timestamp: '2026-04-09T00:00:03Z',
+        message: { model: 'claude-opus-4-6', content: [{ type: 'text', text: 'Two files found.' }] },
+      },
+    ]);
+
+    const entries = await parseClaudeTranscript(tmpFile);
+    expect(entries).toHaveLength(4);
+    expect(entries[0]).toMatchObject({ kind: 'user', text: 'hello there' });
+    expect(entries[1]).toMatchObject({
+      kind: 'assistant',
+      model: 'claude-opus-4-6',
+      blocks: [
+        { type: 'text', text: 'Let me check.' },
+        { type: 'tool_use', id: 'tool-123', name: 'Bash', input: { command: 'ls' } },
+      ],
+    });
+    expect(entries[2]).toMatchObject({
+      kind: 'tool_result',
+      toolUseId: 'tool-123',
+      content: 'file1.txt\nfile2.txt',
+    });
+    expect(entries[3]).toMatchObject({ kind: 'assistant', blocks: [{ type: 'text', text: 'Two files found.' }] });
+  });
+
+  it('preserves non-empty thinking blocks but drops the empty signature-only blocks Claude actually persists', async () => {
+    tmpFile = writeFixture([
+      // Realistic shape: real Claude Code session JSONL only stores
+      // signature-encrypted thinking, never plaintext. The empty-thinking
+      // assistant entry must NOT produce a stray empty assistant turn.
+      {
+        type: 'assistant',
+        uuid: 'a1',
+        timestamp: '2026-04-09T00:00:01Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [{ type: 'thinking', thinking: '', signature: 'ErcCCmIIDB...' }],
+        },
+      },
+      // Forward-compat coverage: real Claude Code 2.1.x never produces
+      // this shape (it always emits empty `thinking` with a signature),
+      // but the parser branch exists so that if a future version starts
+      // persisting plaintext thinking we will capture it. DO NOT delete
+      // this case as "unrealistic" - it locks in the contract.
+      {
+        type: 'assistant',
+        uuid: 'a2',
+        timestamp: '2026-04-09T00:00:02Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [
+            { type: 'thinking', thinking: 'reasoning...' },
+            { type: 'text', text: 'done' },
+          ],
+        },
+      },
+    ]);
+
+    const entries = await parseClaudeTranscript(tmpFile);
+    // a1 should be filtered entirely (no blocks after dropping empty thinking)
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: 'assistant',
+      uuid: 'a2',
+      blocks: [
+        { type: 'thinking', text: 'reasoning...' },
+        { type: 'text', text: 'done' },
+      ],
+    });
+  });
+
+  it('flattens tool_result content with text, image, and tool_reference blocks', async () => {
+    tmpFile = writeFixture([
+      {
+        type: 'user',
+        uuid: 'r1',
+        timestamp: '2026-04-09T00:00:02Z',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'x',
+              is_error: true,
+              content: [
+                { type: 'text', text: 'boom' },
+                { type: 'image' },
+                { type: 'tool_reference', tool_name: 'ExitPlanMode' },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const entries = await parseClaudeTranscript(tmpFile);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: 'tool_result',
+      isError: true,
+      content: 'boom\n[image]\n[tool_reference: ExitPlanMode]',
+    });
+  });
+
+  it('ignores entries Claude Code adds for its own bookkeeping', async () => {
+    // Real-world top-level types observed in Claude Code 2.1.x sessions
+    // that the parser must skip without complaint. Verified empirically
+    // against ~/.claude/projects/<slug>/<sessionId>.jsonl files.
+    tmpFile = writeFixture([
+      { type: 'permission-mode', permissionMode: 'plan', sessionId: 's1' },
+      { type: 'file-history-snapshot', messageId: 'm1', snapshot: {} },
+      { type: 'attachment', uuid: 'att1', attachment: { type: 'skill_listing', content: '...' } },
+      { type: 'system', subtype: 'stop_hook_summary', hookCount: 1 },
+      { type: 'custom-title', customTitle: 'my-session' },
+      { type: 'agent-name', agentName: 'my-agent' },
+      { type: 'queue-operation', operation: 'enqueue' },
+      { type: 'progress', progress: 42 },
+      // Sandwich a real entry between them to make sure surrounding noise
+      // doesn't shift the order or count.
+      { type: 'user', uuid: 'u1', timestamp: '2026-04-09T00:00:00Z', message: { content: 'hello' } },
+      { type: 'file-history-snapshot', messageId: 'm2', snapshot: {} },
+    ]);
+
+    const entries = await parseClaudeTranscript(tmpFile);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'user', text: 'hello' });
+  });
+
+  it('parses a realistic Claude Code 2.1.x streaming session end-to-end', async () => {
+    // Mirrors the actual on-disk shape verified against real ~/.claude/projects
+    // session files: each streaming chunk (thinking, text, tool_use) is its
+    // own assistant entry; tool results come back as synthetic user entries
+    // with array-typed message.content. Bookkeeping entries are interspersed.
+    tmpFile = writeFixture([
+      { type: 'permission-mode', permissionMode: 'default', sessionId: 's1' },
+      { type: 'file-history-snapshot', messageId: 'm1', snapshot: {} },
+      {
+        type: 'user',
+        uuid: 'u-prompt',
+        timestamp: '2026-04-09T10:00:00Z',
+        message: { role: 'user', content: 'Find files matching foo' },
+      },
+      { type: 'attachment', uuid: 'att-1', attachment: { type: 'deferred_tools_delta' } },
+      // Streaming chunk 1: signature-only thinking (filtered)
+      {
+        type: 'assistant',
+        uuid: 'a-think',
+        timestamp: '2026-04-09T10:00:01Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [{ type: 'thinking', thinking: '', signature: 'sig...' }],
+        },
+      },
+      // Streaming chunk 2: text response
+      {
+        type: 'assistant',
+        uuid: 'a-text',
+        timestamp: '2026-04-09T10:00:02Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [{ type: 'text', text: 'Let me search.' }],
+        },
+      },
+      // Streaming chunk 3: tool_use
+      {
+        type: 'assistant',
+        uuid: 'a-tool',
+        timestamp: '2026-04-09T10:00:03Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [
+            { type: 'tool_use', id: 'toolu_01', name: 'Grep', input: { pattern: 'foo' } },
+          ],
+        },
+      },
+      // Synthetic user entry carrying the tool_result
+      {
+        type: 'user',
+        uuid: 'u-result',
+        timestamp: '2026-04-09T10:00:04Z',
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'toolu_01',
+              content: 'src/foo.ts\nsrc/foo-utils.ts',
+            },
+          ],
+        },
+      },
+      // Final assistant text turn
+      {
+        type: 'assistant',
+        uuid: 'a-final',
+        timestamp: '2026-04-09T10:00:05Z',
+        message: {
+          model: 'claude-opus-4-6',
+          content: [{ type: 'text', text: 'Found 2 matches.' }],
+        },
+      },
+      { type: 'system', subtype: 'stop_hook_summary' },
+    ]);
+
+    const entries = await parseClaudeTranscript(tmpFile);
+
+    // Expected order: user prompt, assistant text, assistant tool_use, tool_result, assistant text
+    // The signature-only thinking and all bookkeeping entries are filtered.
+    expect(entries.map((entry) => entry.kind)).toEqual([
+      'user',
+      'assistant',
+      'assistant',
+      'tool_result',
+      'assistant',
+    ]);
+    expect(entries[0]).toMatchObject({ kind: 'user', text: 'Find files matching foo' });
+    expect(entries[1]).toMatchObject({
+      kind: 'assistant',
+      blocks: [{ type: 'text', text: 'Let me search.' }],
+    });
+    expect(entries[2]).toMatchObject({
+      kind: 'assistant',
+      blocks: [{ type: 'tool_use', id: 'toolu_01', name: 'Grep' }],
+    });
+    expect(entries[3]).toMatchObject({
+      kind: 'tool_result',
+      toolUseId: 'toolu_01',
+      content: 'src/foo.ts\nsrc/foo-utils.ts',
+    });
+    expect(entries[4]).toMatchObject({
+      kind: 'assistant',
+      blocks: [{ type: 'text', text: 'Found 2 matches.' }],
+    });
+
+    // The markdown formatter should pair the tool_result back under its
+    // owning tool_use even though they're separate entries on disk.
+    const md = transcriptToMarkdown(entries);
+    expect(md).toContain('## User');
+    expect(md).toContain('Find files matching foo');
+    expect(md).toContain('**Tool:** `Grep`');
+    expect(md).toContain('"pattern": "foo"');
+    expect(md).toContain('**Result:**');
+    expect(md).toContain('src/foo.ts');
+    expect(md).toContain('Found 2 matches.');
+  });
+
+  it('skips malformed lines without throwing', async () => {
+    tmpFile = writeFixture([
+      { type: 'user', uuid: 'u1', timestamp: '2026-04-09T00:00:00Z', message: { content: 'one' } },
+    ]);
+    fs.appendFileSync(tmpFile, '\n{not valid json\n');
+    fs.appendFileSync(tmpFile, JSON.stringify({ type: 'user', uuid: 'u2', timestamp: '2026-04-09T00:00:01Z', message: { content: 'two' } }) + '\n');
+
+    const entries = await parseClaudeTranscript(tmpFile);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ text: 'one' });
+    expect(entries[1]).toMatchObject({ text: 'two' });
+  });
+});
+
+describe('transcriptToMarkdown', () => {
+  it('formats a transcript with paired tool result', () => {
+    const md = transcriptToMarkdown([
+      { kind: 'user', uuid: 'u1', ts: 0, text: 'list files' },
+      {
+        kind: 'assistant',
+        uuid: 'a1',
+        ts: 1,
+        model: 'claude-opus-4-6',
+        blocks: [
+          { type: 'text', text: 'Sure.' },
+          { type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } },
+        ],
+      },
+      { kind: 'tool_result', uuid: 'r1', ts: 2, toolUseId: 't1', content: 'a.txt\nb.txt' },
+    ]);
+    expect(md).toContain('## User');
+    expect(md).toContain('list files');
+    expect(md).toContain('## Assistant (claude-opus-4-6)');
+    expect(md).toContain('**Tool:** `Bash`');
+    expect(md).toContain('"command": "ls"');
+    expect(md).toContain('**Result:**');
+    expect(md).toContain('a.txt');
+  });
+});
