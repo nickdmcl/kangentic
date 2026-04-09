@@ -73,7 +73,17 @@ export class CodexAdapter implements AgentAdapter {
    *   the startup header; older versions printed "codex resume thr_..." at exit.
    */
   readonly runtime: AdapterRuntimeStrategy = {
-    activity: ActivityDetection.pty(),
+    activity: ActivityDetection.pty((data: string) => {
+      // Patterns derived from real Codex 0.118 PTY captures (see
+      // tests/unit/agent-pty-detection.test.ts and the .bin fixtures).
+      // The Codex TUI paints `› ` (U+203A) as its input cursor in both
+      // the trust dialog ("› 1. Yes, continue") and the post-boot input
+      // prompt. "Press enter to continue" appears at trust dialogs and
+      // other interactive blocks. Either signal indicates the CLI is
+      // idle waiting for user input.
+      const clean = data.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07\x1b]*[\x07\x1b]/g, '');
+      return /\u203A\s/.test(clean) || /Press enter to continue/.test(clean);
+    }),
     sessionId: {
       fromHook(hookContext) {
         try {

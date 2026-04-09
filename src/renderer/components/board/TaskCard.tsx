@@ -184,6 +184,23 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
       [task.id],
     ),
   );
+  const hasFirstOutput = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        sessionId ? !!s.sessionFirstOutput[sessionId] : false,
+      [sessionId],
+    ),
+  );
+  // Raw activity entry presence (not the falling-back value from useTaskProgress).
+  // If the activity cache has an entry for this session, the CLI has reported
+  // at least one activity transition - i.e. it's past the boot phase.
+  const hasActivityEntry = useSessionStore(
+    useCallback(
+      (s: ReturnType<typeof useSessionStore.getState>) =>
+        sessionId ? s.sessionActivity[sessionId] !== undefined : false,
+      [sessionId],
+    ),
+  );
 
   const {
     attributes,
@@ -401,16 +418,37 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           switch (displayState.kind) {
             case 'running': {
               const resolvedModelName = displayState.usage?.model.displayName || null;
-              if (!displayState.usage || !resolvedModelName) {
-                // Until the CLI status line reports a real model displayName,
-                // show a single spinner pill instead of flashing intermediate
-                // labels ("Agent" -> "Claude" -> "Opus 4.6 (1M Context)").
+              // Before the CLI has produced any signal (first output, activity
+              // event, or usage data), show a single spinner pill so we don't
+              // flash intermediate labels. Once any signal arrives, fall through
+              // to the rich or minimal pill.
+              const cliHasReported = hasFirstOutput || hasActivityEntry || !!displayState.usage;
+              if (!cliHasReported) {
                 const spinnerLabel = isResuming ? 'Resuming agent...' : 'Starting agent...';
                 return (
                   <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
                     <span className="text-xs text-fg-faint flex items-center gap-1">
                       <Loader2 size={12} className="animate-spin" />
                       {spinnerLabel}
+                    </span>
+                  </div>
+                );
+              }
+              // First output seen but no statusline usage (Codex, Gemini before
+              // they expose token usage). Render a minimal live pill driven by
+              // activity state instead of leaving the spinner stuck forever.
+              // No agent label - the swimlane already identifies the agent.
+              if (!displayState.usage || !resolvedModelName) {
+                const isThinking = displayState.activity === 'thinking';
+                return (
+                  <div className="mt-2 pt-2 border-t border-edge" data-testid="usage-bar">
+                    <span className="text-xs text-fg-faint flex items-center gap-1.5">
+                      <span
+                        className={`inline-block w-1.5 h-1.5 rounded-full ${
+                          isThinking ? 'bg-accent animate-pulse' : 'bg-fg-faint'
+                        }`}
+                      />
+                      {isThinking ? 'working' : 'idle'}
                     </span>
                   </div>
                 );

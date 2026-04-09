@@ -41,7 +41,7 @@ const SESSION_ID = 'sess-activity-test';
 const SWIMLANE_ID = 'lane-backlog';
 
 /** Base pre-configure that creates a project with a task linked to a running session */
-function makePreConfig(opts: { sessionStatus: string; activity: string; withUsage: boolean; nullSessionId?: boolean; withEvents?: boolean }): string {
+function makePreConfig(opts: { sessionStatus: string; activity: string; withUsage: boolean; nullSessionId?: boolean; withEvents?: boolean; noActivityCache?: boolean }): string {
   return `
     window.__mockPreConfigure(function (state) {
       var ts = new Date().toISOString();
@@ -84,7 +84,7 @@ function makePreConfig(opts: { sessionStatus: string; activity: string; withUsag
         exitCode: null,
       });
 
-      state.activityCache['${SESSION_ID}'] = '${opts.activity}';
+      ${opts.noActivityCache ? '' : `state.activityCache['${SESSION_ID}'] = '${opts.activity}';`}
       ${opts.withEvents ? `
       state.eventCache['${SESSION_ID}'] = [
         { ts: Date.now(), type: 'tool_start', tool: 'Read', detail: '/mock/file.ts' },
@@ -517,9 +517,9 @@ test.describe('Task Activity Indicators', () => {
   // (or "Resuming agent...") spinner pill until the CLI reports a real model
   // displayName, instead of flashing "Agent" -> "Claude" -> "Opus 4.6 (1M Context)".
   test.describe('ContextBar spinner pill', () => {
-    test('shows "Starting agent..." spinner pill when usage has no model name', async () => {
+    test('shows "Starting agent..." spinner pill when CLI has reported no signal yet', async () => {
       const { browser, page } = await launchWithState(
-        makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false }),
+        makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, noActivityCache: true }),
       );
       try {
         await page.locator('[data-swimlane-name="To Do"]').waitFor({ state: 'visible', timeout: 15000 });
@@ -549,7 +549,7 @@ test.describe('Task Activity Indicators', () => {
     });
 
     test('shows "Resuming agent..." when session.resuming is true', async () => {
-      const preConfig = makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false })
+      const preConfig = makePreConfig({ sessionStatus: 'running', activity: 'idle', withUsage: false, noActivityCache: true })
         + `
         window.__mockPreConfigure(function (state) {
           var session = state.sessions.find(function (s) { return s.id === '${SESSION_ID}'; });

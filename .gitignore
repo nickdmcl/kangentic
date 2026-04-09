@@ -110,7 +110,9 @@ tests/screenshots/
 tests/.tmp/
 tests/.test-data/
 tests/reports/
+tests/fixtures/agent-pty/
 test-results/
 playwright-report/
+.kangentic-test-sandbox-*
 .claude/settings.local.json
 kangentic.local.json

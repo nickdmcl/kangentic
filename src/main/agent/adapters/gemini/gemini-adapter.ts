@@ -69,7 +69,17 @@ export class GeminiAdapter implements AgentAdapter {
    *   fallback by session-manager.suspend() if hooks never fired.
    */
   readonly runtime: AdapterRuntimeStrategy = {
-    activity: ActivityDetection.hooksAndPty(),
+    activity: ActivityDetection.hooksAndPty((data: string) => {
+      // Patterns derived from real Gemini 0.37 PTY captures (see
+      // tests/unit/agent-pty-detection.test.ts and the .bin fixtures).
+      // Gemini's TUI paints box-drawing borders (`╰────╯`) around every
+      // interactive surface - the trust dialog, the input prompt, and
+      // the auth dialog all close with this border. The presence of a
+      // closed box border in a chunk's tail means the TUI has finished
+      // painting a frame and is waiting for input.
+      const clean = data.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07\x1b]*[\x07\x1b]/g, '');
+      return /\u2570[\u2500]+\u256F/.test(clean) || /I'm ready\./.test(clean);
+    }),
     sessionId: {
       fromHook(hookContext) {
         try {

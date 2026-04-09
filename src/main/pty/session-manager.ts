@@ -94,6 +94,13 @@ export class SessionManager extends EventEmitter {
           if (isReady) {
             this.firstOutputEmitted.add(sessionId);
             this.emit('first-output', sessionId);
+            // Clear the resuming flag once the resumed CLI has actually
+            // produced output. This unblocks card / overlay labels for
+            // adapters (Codex, Gemini) that don't emit a usage statusline.
+            if (session && session.resuming) {
+              session.resuming = false;
+              this.emit('session-changed', sessionId, this.toSession(session));
+            }
           }
         }
         // Only emit IPC data for focused sessions. Background sessions
