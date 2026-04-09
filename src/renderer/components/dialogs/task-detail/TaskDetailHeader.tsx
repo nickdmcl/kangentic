@@ -114,11 +114,16 @@ export function TaskDetailHeader({
       <PriorityBadge priority={task.priority ?? 0} />
 
       {/* Title */}
-      <h2 className="text-base font-semibold text-fg truncate min-w-0">{task.title}</h2>
+      <h2
+        className="text-base font-semibold text-fg truncate min-w-0 flex-1 basis-0"
+        title={task.title}
+      >
+        {task.title}
+      </h2>
 
       {/* Scrollable pills container - hidden for archived tasks */}
       {!isArchived ? (
-        <div className={`flex-1 flex items-center flex-wrap gap-3 min-w-0${showCommandPalette ? '' : ' overflow-hidden max-h-8'}`}>
+        <div className={`flex items-center flex-wrap gap-3 min-w-0 flex-shrink-0${showCommandPalette ? '' : ' overflow-hidden max-h-8'}`}>
           {/* Commands button */}
           {!isEditing && (
             <div className="relative flex-shrink-0" ref={commandButtonRef}>
