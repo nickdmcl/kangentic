@@ -9,6 +9,7 @@ import { handleGetTaskStats, handleBoardSummary, handleGetSessionHistory, handle
 import { handleListBacklog, handleCreateBacklogTask, handleSearchBacklog, handlePromoteBacklog } from './backlog-commands';
 import { handleGetHandoffContext } from './handoff-commands';
 import { handleGetTranscript, handleQueryDb } from './inspect-commands';
+import { handleGetSessionFiles, handleGetSessionEvents } from './session-files-commands';
 import type { CommandHandler } from './types';
 
 /**
@@ -37,4 +38,6 @@ export const commandHandlers: Record<string, CommandHandler> = {
   get_handoff_context: handleGetHandoffContext,
   get_transcript: handleGetTranscript,
   query_db: handleQueryDb,
+  get_session_files: handleGetSessionFiles,
+  get_session_events: handleGetSessionEvents,
 };

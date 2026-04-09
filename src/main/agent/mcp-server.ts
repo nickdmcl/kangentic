@@ -426,7 +426,7 @@ server.registerTool(
 server.registerTool(
   'kangentic_get_session_history',
   {
-    description: 'Get the session history for a task: how many sessions it went through, when they started/ended, exit codes, and whether they were suspended by user or system. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
+    description: 'Get the session history for a task: how many sessions it went through, when they started/ended, exit codes, suspension reasons, and per-session metrics. Each record now includes the Kangentic session id, agentSessionId (agent CLI resume id), cwd, sessionType, and the absolute eventsJsonlPath - feed any of these into kangentic_get_session_events / kangentic_get_session_files instead of guessing paths. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
     inputSchema: z.object({
       taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
     }),
@@ -803,11 +803,64 @@ server.registerTool(
   },
 );
 
+// --- kangentic_get_session_files ---
+server.registerTool(
+  'kangentic_get_session_files',
+  {
+    description: 'Get the absolute paths to every per-session file the runtime maintains for a session: events.jsonl (activity log), status.json (usage/metrics), settings.json (Claude Code settings + hooks), commands.jsonl (MCP queue), mcp.json, responses/ dir, and handoff-context.md. Use this to skip the "where is the events.jsonl?" dance - the runtime keys session directories by the Kangentic PTY session id (NOT agent_session_id) and always under the project root .kangentic/sessions/<id>/ (NOT under a worktree). Each file entry includes an "exists" flag. Provide either taskId or sessionId.',
+    inputSchema: z.object({
+      taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). Picks the latest session for the task by default.'),
+      sessionId: z.string().optional().describe('Kangentic session UUID (the sessions.id column). Use kangentic_get_session_history to find session ids.'),
+      sessionIndex: z.number().int().min(0).optional().describe('When taskId is given, which session to pick: 0 = newest (default), 1 = previous, etc. Sessions are ordered started_at DESC.'),
+    }),
+  },
+  async ({ taskId, sessionId, sessionIndex }) => {
+    try {
+      const response = await sendCommand('get_session_files', { taskId, sessionId, sessionIndex });
+      if (!response.success) {
+        return { content: [{ type: 'text' as const, text: `Failed to get session files: ${response.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(response.data, null, 2) }] };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text' as const, text: `Error getting session files: ${errorMessage}` }], isError: true };
+    }
+  },
+);
+
+// --- kangentic_get_session_events ---
+server.registerTool(
+  'kangentic_get_session_events',
+  {
+    description: 'Read parsed events from a session\'s events.jsonl activity log without needing to locate or open the file yourself. Each line is a JSON event emitted by the Claude Code hook bridge (PreToolUse, PostToolUse, Stop, Notification, etc.). Use this for idle-detection debugging, tracing tool usage, or replaying what an agent did. Filters: tail (last N matching events, default 200, max 2000), since (epoch ms - drop events older than this), eventTypes (only return events whose hook_event_name/type is in this list). Provide either taskId or sessionId.',
+    inputSchema: z.object({
+      taskId: z.string().optional().describe('Task ID (numeric display ID or UUID). Picks the latest session by default.'),
+      sessionId: z.string().optional().describe('Kangentic session UUID (sessions.id column).'),
+      sessionIndex: z.number().int().min(0).optional().describe('When taskId is given, which session to pick: 0 = newest (default).'),
+      tail: z.number().int().min(1).max(2000).optional().describe('Return the last N matching events. Default 200, hard cap 2000.'),
+      since: z.number().int().optional().describe('Epoch milliseconds. Only return events with timestamp >= since.'),
+      eventTypes: z.array(z.string()).optional().describe('Only return events whose hook_event_name or type matches one of these (e.g. ["PreToolUse", "Stop", "Notification"]).'),
+    }),
+  },
+  async ({ taskId, sessionId, sessionIndex, tail, since, eventTypes }) => {
+    try {
+      const response = await sendCommand('get_session_events', { taskId, sessionId, sessionIndex, tail, since, eventTypes });
+      if (!response.success) {
+        return { content: [{ type: 'text' as const, text: `Failed to get session events: ${response.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: JSON.stringify(response.data, null, 2) }] };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text' as const, text: `Error getting session events: ${errorMessage}` }], isError: true };
+    }
+  },
+);
+
 // --- kangentic_query_db ---
 server.registerTool(
   'kangentic_query_db',
   {
-    description: 'Run a read-only SQL query against the current project database. Only SELECT, PRAGMA, and WITH (CTE) statements are allowed. Returns up to 100 rows as a markdown table. Useful for debugging, inspecting internal state, and answering questions about sessions, tasks, transcripts, handoffs, and other project data. Key tables: tasks, swimlanes, sessions, session_transcripts, handoffs, actions, swimlane_transitions, backlog_items. tasks columns: id (uuid), display_id (numeric, the "#N" shown in UI), title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name (NOT "branch"), pr_number, pr_url, base_branch, use_worktree, labels (JSON array), priority, archived_at, created_at, updated_at. Use PRAGMA table_info(<table>) to discover columns of any other table before querying.',
+    description: 'Run a read-only SQL query against the current project database. Only SELECT, PRAGMA, and WITH (CTE) statements are allowed. Returns up to 100 rows as a markdown table. Useful for debugging, inspecting internal state, and answering questions about sessions, tasks, transcripts, handoffs, and other project data. Key tables: tasks, swimlanes, sessions, session_transcripts, handoffs, actions, swimlane_transitions, backlog_items. tasks columns: id (uuid), display_id (numeric, the "#N" shown in UI), title, description, swimlane_id, position, agent, session_id, worktree_path, branch_name (NOT "branch"), pr_number, pr_url, base_branch, use_worktree, labels (JSON array), priority, archived_at, created_at, updated_at. sessions columns: id (PTY/Kangentic session UUID, drives the .kangentic/sessions/<id>/ directory name), task_id, session_type (e.g. "claude", "codex"), agent_session_id (the agent CLI resume id - NOT named "claude_session_id"), command, cwd, permission_mode, prompt, status (running/suspended/exited/queued), exit_code, started_at, suspended_at, exited_at, suspended_by, plus metrics: total_cost_usd, total_input_tokens, total_output_tokens, model_id, model_display_name, total_duration_ms, tool_call_count, lines_added, lines_removed, files_changed. To read on-disk session files, prefer kangentic_get_session_files / kangentic_get_session_events instead of constructing paths manually. Use PRAGMA table_info(<table>) to discover columns of any other table.',
     inputSchema: z.object({
       sql: z.string().describe('SQL query to execute. Must be a SELECT, PRAGMA, or WITH statement. Examples: "SELECT * FROM session_transcripts", "SELECT name, sql FROM sqlite_master WHERE type=\'table\'", "PRAGMA table_info(sessions)"'),
     }),

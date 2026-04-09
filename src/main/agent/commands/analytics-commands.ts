@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { TaskRepository } from '../../db/repositories/task-repository';
+import { sessionOutputPaths } from '../../engine/session-paths';
 import { SessionRepository } from '../../db/repositories/session-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { BacklogRepository } from '../../db/repositories/backlog-repository';
@@ -240,12 +242,14 @@ export const handleGetSessionHistory: CommandHandler = (
     return { success: false, error: `Task "${taskId}" not found` };
   }
 
+  const projectRoot = context.getProjectPath();
   const records = db.prepare(
     `SELECT * FROM sessions WHERE task_id = ? ORDER BY started_at ASC`
   ).all(task.id) as Array<{
     id: string;
     session_type: string;
     agent_session_id: string | null;
+    cwd: string;
     status: string;
     exit_code: number | null;
     started_at: string;
@@ -295,6 +299,11 @@ export const handleGetSessionHistory: CommandHandler = (
     message: lines.join('\n'),
     data: records.map((record) => ({
       id: record.id,
+      agentSessionId: record.agent_session_id,
+      cwd: record.cwd,
+      eventsJsonlPath: sessionOutputPaths(
+        path.join(projectRoot, '.kangentic', 'sessions', record.id),
+      ).eventsOutputPath,
       sessionType: record.session_type,
       status: record.status,
       exitCode: record.exit_code,
