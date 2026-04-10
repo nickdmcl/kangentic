@@ -12,6 +12,7 @@ import { AttachmentThumbnails } from './AttachmentThumbnails';
 import type { AttachmentWithPreview } from './useAttachments';
 import { MarkdownRenderer } from '../../MarkdownRenderer';
 import type { Task, SessionDisplayState } from '../../../../shared/types';
+import { useSessionStore } from '../../../stores/session-store';
 
 const ChangesPanel = lazy(() => import('./changes/ChangesPanel').then((module) => ({ default: module.ChangesPanel })));
 
@@ -62,6 +63,13 @@ export function TaskDetailBody({
 }: TaskDetailBodyProps) {
   const labelColors = useConfigStore((state) => state.config.backlog?.labelColors) ?? {};
   const defaultBaseBranch = useConfigStore((state) => state.config.git.defaultBaseBranch);
+  const changesViewMode = useSessionStore((state) => state.changesViewMode[task.id] ?? 'split');
+  const setChangesViewMode = useSessionStore((state) => state.setChangesViewMode);
+  const toggleChangesOpen = useSessionStore((state) => state.toggleChangesOpen);
+  const changesExpanded = changesOpen && changesViewMode === 'expanded';
+  const handleChangesExpand = () => setChangesViewMode(task.id, 'expanded');
+  const handleChangesCollapse = () => setChangesViewMode(task.id, 'split');
+  const handleChangesClose = () => toggleChangesOpen(task.id);
   const taskLabels = task.labels ?? [];
   const taskPriority = task.priority ?? 0;
   const hasLabelsOrPriority = taskPriority > 0 || taskLabels.length > 0;
@@ -119,7 +127,9 @@ export function TaskDetailBody({
   }
 
   const changesPanelElement = changesOpen && (
-    <div className="w-1/2 min-h-0 border-l border-edge flex-shrink-0">
+    <div
+      className={`${changesExpanded ? 'flex-1' : 'w-1/2 border-l border-edge'} min-h-0 flex-shrink-0`}
+    >
       <Suspense
         fallback={
           <div className="flex items-center justify-center h-full">
@@ -132,6 +142,10 @@ export function TaskDetailBody({
           projectPath={projectPath}
           worktreePath={task.worktree_path ?? undefined}
           baseBranch={task.base_branch || defaultBaseBranch || 'main'}
+          panelMode={changesViewMode}
+          onExpand={handleChangesExpand}
+          onCollapse={handleChangesCollapse}
+          onClose={handleChangesClose}
         />
       </Suspense>
     </div>
@@ -143,16 +157,18 @@ export function TaskDetailBody({
       <>
         {descriptionBar}
         <div className="flex-1 min-h-0 flex">
-          <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} min-h-0 relative`}>
-            <div className="absolute inset-0">
-              <TerminalTab
-                key={sessionId}
-                sessionId={sessionId}
-                taskId={task.id}
-                active={true}
-              />
+          {!changesExpanded && (
+            <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} min-h-0 relative`}>
+              <div className="absolute inset-0">
+                <TerminalTab
+                  key={sessionId}
+                  sessionId={sessionId}
+                  taskId={task.id}
+                  active={true}
+                />
+              </div>
             </div>
-          </div>
+          )}
           {changesPanelElement}
         </div>
         <ContextBar sessionId={sessionId} />
@@ -170,11 +186,13 @@ export function TaskDetailBody({
     if (pendingCommandLabel) {
       return (
         <div className="flex-1 min-h-0 flex">
-          <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} min-h-0 relative`}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface">
-              <ShimmerOverlay label={pendingCommandLabel} />
+          {!changesExpanded && (
+            <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} min-h-0 relative`}>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface">
+                <ShimmerOverlay label={pendingCommandLabel} />
+              </div>
             </div>
-          </div>
+          )}
           {changesPanelElement}
         </div>
       );
@@ -192,30 +210,32 @@ export function TaskDetailBody({
         : 'Resuming agent...';
     return (
       <div className="flex-1 min-h-0 flex">
-        <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} flex flex-col items-center justify-center gap-3 bg-surface/50`}>
-          <button
-            onClick={handleToggle}
-            disabled={toggling}
-            className="flex items-center gap-2.5 px-6 py-3 rounded-lg bg-accent/20 border border-accent/40 text-base text-accent-fg hover:bg-accent/30 transition-colors disabled:opacity-50"
-          >
-            {toggleIcon}
-            {toggleLabel}
-          </button>
-          {resumeFailed && onResetSession && (
-            <div className="flex flex-col items-center gap-2 mt-1">
-              <p className="text-xs text-fg-muted text-center max-w-sm">
-                {resumeError || 'Session could not be resumed.'}
-              </p>
-              <button
-                onClick={onResetSession}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-fg-muted hover:text-fg hover:bg-surface-hover border border-edge-input transition-colors"
-              >
-                <RotateCcw size={14} />
-                Reset session
-              </button>
-            </div>
-          )}
-        </div>
+        {!changesExpanded && (
+          <div className={`${changesOpen ? 'w-1/2' : 'flex-1'} flex flex-col items-center justify-center gap-3 bg-surface/50`}>
+            <button
+              onClick={handleToggle}
+              disabled={toggling}
+              className="flex items-center gap-2.5 px-6 py-3 rounded-lg bg-accent/20 border border-accent/40 text-base text-accent-fg hover:bg-accent/30 transition-colors disabled:opacity-50"
+            >
+              {toggleIcon}
+              {toggleLabel}
+            </button>
+            {resumeFailed && onResetSession && (
+              <div className="flex flex-col items-center gap-2 mt-1">
+                <p className="text-xs text-fg-muted text-center max-w-sm">
+                  {resumeError || 'Session could not be resumed.'}
+                </p>
+                <button
+                  onClick={onResetSession}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-fg-muted hover:text-fg hover:bg-surface-hover border border-edge-input transition-colors"
+                >
+                  <RotateCcw size={14} />
+                  Reset session
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {changesPanelElement}
       </div>
     );
@@ -225,19 +245,21 @@ export function TaskDetailBody({
   if (changesOpen) {
     return (
       <div className="flex-1 min-h-0 flex">
-        <div className="w-1/2 min-h-0 overflow-y-auto">
-          {task.description ? (
-            <div className="px-4 py-4 space-y-2">
-              <MarkdownRenderer content={task.description} />
-              {labelsAndPriorityRow}
-              {thumbnailStrip}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-fg-disabled text-sm p-8">
-              No active session
-            </div>
-          )}
-        </div>
+        {!changesExpanded && (
+          <div className="w-1/2 min-h-0 overflow-y-auto">
+            {task.description ? (
+              <div className="px-4 py-4 space-y-2">
+                <MarkdownRenderer content={task.description} />
+                {labelsAndPriorityRow}
+                {thumbnailStrip}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-fg-disabled text-sm p-8">
+                No active session
+              </div>
+            )}
+          </div>
+        )}
         {changesPanelElement}
       </div>
     );

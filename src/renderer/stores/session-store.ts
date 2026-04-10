@@ -72,6 +72,8 @@ interface SessionStore {
   changesOpenTasks: Set<string>;
   /** Last selected file in the Changes panel, keyed by task ID */
   changesSelectedFile: Record<string, string>;
+  /** View mode for the task-detail Changes panel, keyed by task ID (default 'split') */
+  changesViewMode: Record<string, 'split' | 'expanded'>;
   _pendingOpenTaskId: string | null;
   /** One-shot flag set by notification click for transient (Command Terminal) sessions.
    *  Consumed by useCommandBar to open the overlay (and reattach to the preserved PTY). */
@@ -104,6 +106,7 @@ interface SessionStore {
   markSingleIdleSessionSeen: (sessionId: string) => void;
   toggleChangesOpen: (taskId: string) => void;
   setChangesSelectedFile: (taskId: string, filePath: string | null) => void;
+  setChangesViewMode: (taskId: string, mode: 'split' | 'expanded') => void;
 
   // Transient session (command bar) - per-project map + convenience pointers
   /** Whether the command bar overlay is currently visible (drives focused-session priority) */
@@ -153,6 +156,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   spawnProgress: {},
   changesOpenTasks: new Set(),
   changesSelectedFile: {},
+  changesViewMode: {},
   _pendingOpenTaskId: null,
   _pendingOpenCommandTerminal: false,
   setPendingOpenCommandTerminal: (value) => set({ _pendingOpenCommandTerminal: value }),
@@ -445,12 +449,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   toggleChangesOpen: (taskId) => {
     const next = new Set(get().changesOpenTasks);
+    const viewMode = { ...get().changesViewMode };
     if (next.has(taskId)) {
       next.delete(taskId);
+      delete viewMode[taskId];
     } else {
       next.add(taskId);
+      viewMode[taskId] = 'split';
     }
-    set({ changesOpenTasks: next });
+    set({ changesOpenTasks: next, changesViewMode: viewMode });
+  },
+
+  setChangesViewMode: (taskId, mode) => {
+    set({ changesViewMode: { ...get().changesViewMode, [taskId]: mode } });
   },
 
   setChangesSelectedFile: (taskId, filePath) => {

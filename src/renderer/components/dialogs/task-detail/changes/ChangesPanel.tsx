@@ -1,6 +1,6 @@
 import '../../../../monacoConfig';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Maximize2, Minimize2, X } from 'lucide-react';
 import { FileTreePanel } from './FileTreePanel';
 import { DiffViewer } from './DiffViewer';
 import { useSessionStore } from '../../../../stores/session-store';
@@ -52,6 +52,13 @@ interface ChangesPanelProps {
   baseBranch: string;
   /** When set, shown instead of the two-pane layout if the branch has zero changed files. */
   emptyMessage?: string;
+  /** Current panel layout mode (task-detail only - distinct from the internal
+   *  DiffViewer split/inline `viewMode` state below). When provided along with
+   *  handlers, the panel renders an expand/collapse/close header. */
+  panelMode?: 'split' | 'expanded';
+  onExpand?: () => void;
+  onCollapse?: () => void;
+  onClose?: () => void;
 }
 
 interface ContentCacheEntry {
@@ -59,7 +66,42 @@ interface ContentCacheEntry {
   generation: number;
 }
 
-export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch, emptyMessage }: ChangesPanelProps) {
+export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch, emptyMessage, panelMode, onExpand, onCollapse, onClose }: ChangesPanelProps) {
+  const showPanelControls = Boolean(panelMode && (onExpand || onCollapse || onClose));
+  const controlsHeader = showPanelControls && (
+    <div className="flex items-center justify-end gap-1 px-2 py-1 border-b border-edge flex-shrink-0">
+      {panelMode === 'split' && onExpand && (
+        <button
+          onClick={onExpand}
+          title="Expand changes"
+          className="p-1 rounded text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
+          data-testid="changes-expand"
+        >
+          <Maximize2 size={14} />
+        </button>
+      )}
+      {panelMode === 'expanded' && onCollapse && (
+        <button
+          onClick={onCollapse}
+          title="Collapse to split"
+          className="p-1 rounded text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
+          data-testid="changes-collapse"
+        >
+          <Minimize2 size={14} />
+        </button>
+      )}
+      {onClose && (
+        <button
+          onClick={onClose}
+          title="Close changes"
+          className="p-1 rounded text-fg-muted hover:text-fg hover:bg-surface-hover transition-colors"
+          data-testid="changes-close"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
   const [files, setFiles] = useState<GitDiffFileEntry[]>([]);
   const [totalInsertions, setTotalInsertions] = useState(0);
   const [totalDeletions, setTotalDeletions] = useState(0);
@@ -252,6 +294,7 @@ export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch, 
 
   return (
     <div className="flex flex-col h-full">
+      {controlsHeader}
       <div className="flex-1 min-h-0 flex">
         {/* File tree - left panel */}
         <div className="w-[220px] flex-shrink-0 border-r border-edge overflow-hidden">
