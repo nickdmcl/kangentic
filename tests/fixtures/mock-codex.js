@@ -25,6 +25,9 @@
  *   MOCK_CODEX_NO_HEADER=1  -> suppress the `session id:` header so tests can
  *                              exercise the scrollback fallback path.
  *   MOCK_CODEX_NO_ROLLOUT=1 -> suppress rollout JSONL file creation.
+ *   MOCK_CODEX_TUI_REDRAWS=1 -> emit periodic ANSI-only cursor repositioning
+ *                                sequences (500ms interval) to simulate Ink TUI
+ *                                redraws that happen even when idle.
  */
 
 const { randomUUID } = require('node:crypto');
@@ -204,10 +207,21 @@ if (prompt) {
 // Hide-cursor escape so detectFirstOutput() returns true and the shimmer overlay clears.
 process.stdout.write('\x1b[?25l');
 
-const timeout = setTimeout(() => { cleanupRollout(); process.exit(0); }, 30000);
-process.on('SIGTERM', () => { clearTimeout(timeout); cleanupRollout(); process.exit(0); });
-process.on('SIGINT', () => { clearTimeout(timeout); cleanupRollout(); process.exit(0); });
-process.on('exit', cleanupRollout);
+// Simulate Ink TUI redraws: periodic ANSI-only cursor repositioning and
+// screen clear sequences with no meaningful text content. Real Codex does
+// this even when idle, which previously kept the silence timer perpetually
+// reset and prevented idle detection.
+let redrawInterval = null;
+if (process.env.MOCK_CODEX_TUI_REDRAWS) {
+  redrawInterval = setInterval(() => {
+    process.stdout.write('\x1b[H\x1b[2J\x1b[?25h\x1b[1;1H\x1b[?25l');
+  }, 500);
+}
+
+const timeout = setTimeout(() => { if (redrawInterval) clearInterval(redrawInterval); cleanupRollout(); process.exit(0); }, 30000);
+process.on('SIGTERM', () => { clearTimeout(timeout); if (redrawInterval) clearInterval(redrawInterval); cleanupRollout(); process.exit(0); });
+process.on('SIGINT', () => { clearTimeout(timeout); if (redrawInterval) clearInterval(redrawInterval); cleanupRollout(); process.exit(0); });
+process.on('exit', () => { if (redrawInterval) clearInterval(redrawInterval); cleanupRollout(); });
 
 process.stdin.resume();
 process.stdin.setEncoding('utf8');

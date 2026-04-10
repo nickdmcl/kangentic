@@ -602,7 +602,9 @@ export class SessionManager extends EventEmitter {
         if (strategy.detectIdle?.(data)) {
           this.usageTracker.notifyPtyIdle(id);
         } else if (data.length > 0) {
-          this.usageTracker.notifyPtyData(id);
+          if (!strategy.isSignificantOutput || strategy.isSignificantOutput(data)) {
+            this.usageTracker.notifyPtyData(id);
+          }
         }
       }
     });

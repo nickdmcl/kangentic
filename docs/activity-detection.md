@@ -17,8 +17,8 @@ Each adapter declares an `ActivityDetectionStrategy` on its `runtime.activity` f
 | `kind` | Used by | Behavior |
 |--------|---------|----------|
 | `'hooks'` | Claude Code | Hook events are the sole source of activity truth. PTY data does not influence activity state. |
-| `'pty'` | Aider, Codex | Activity is inferred from PTY output patterns. The optional `detectIdle(data)` callback returns true on a definitive idle signal (e.g. an `aider>` prompt). Without `detectIdle`, a 10-second silence timer determines idle. |
-| `'hooks_and_pty'` | Gemini | Hooks are primary, with PTY-based detection as a fallback if hooks fail to fire. Once hooks deliver a `thinking` event, `PtyActivityTracker.suppress()` permanently disables PTY detection for that session. |
+| `'pty'` | Aider, Codex | Activity is inferred from PTY output patterns. The optional `detectIdle(data)` callback returns true on a definitive idle signal (e.g. an `aider>` prompt). Without `detectIdle`, a 10-second silence timer determines idle. The optional `isSignificantOutput(data)` callback filters TUI noise (ANSI-only redraws) that should not reset the silence timer. |
+| `'hooks_and_pty'` | Gemini | Hooks are primary, with PTY-based detection as a fallback if hooks fail to fire. Once hooks deliver a `thinking` event, `PtyActivityTracker.suppress()` permanently disables PTY detection for that session. Accepts the same optional `detectIdle(data)` and `isSignificantOutput(data)` callbacks as `'pty'`. |
 
 ### `ActivityDetection` factory
 
@@ -32,8 +32,8 @@ import { ActivityDetection } from '../../../../shared/types';
 // Claude Code: hooks are the only source
 runtime = { activity: ActivityDetection.hooks() };
 
-// Codex: PTY only, no prompt-pattern shortcut (silence timer fallback)
-runtime = { activity: ActivityDetection.pty() };
+// Codex: PTY only with TUI noise filter (Ink redraws are ANSI-only)
+runtime = { activity: ActivityDetection.pty(detectIdle, isSignificantOutput) };
 
 // Aider: PTY with prompt-regex detectIdle for instant transitions
 runtime = { activity: ActivityDetection.pty((data) => /(?:^|\n)\s*aider>\s*$/.test(data)) };

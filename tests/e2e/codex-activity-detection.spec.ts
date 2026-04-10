@@ -31,45 +31,46 @@ import path from 'node:path';
 import fs from 'node:fs';
 import type { ActivityState, SessionUsage, SessionEvent } from '../../src/shared/types';
 
-const TEST_NAME = 'codex-activity-detection';
 const runId = Date.now();
-const PROJECT_NAME = `Codex Activity Test ${runId}`;
-
-let app: ElectronApplication;
-let page: Page;
-let tmpDir: string;
-let dataDir: string;
-
-test.beforeAll(async () => {
-  tmpDir = createTempProject(TEST_NAME);
-  dataDir = getTestDataDir(TEST_NAME);
-  fs.writeFileSync(
-    path.join(dataDir, 'config.json'),
-    JSON.stringify({
-      agent: {
-        cliPaths: { codex: mockAgentPath('codex') },
-        permissionMode: 'acceptEdits',
-        maxConcurrentSessions: 5,
-        queueOverflow: 'queue',
-      },
-      git: { worktreesEnabled: false },
-    }),
-  );
-
-  const result = await launchApp({ dataDir });
-  app = result.app;
-  page = result.page;
-  await createProject(page, PROJECT_NAME, tmpDir);
-  await setProjectDefaultAgent(page, 'codex');
-});
-
-test.afterAll(async () => {
-  await app?.close();
-  cleanupTempProject(TEST_NAME);
-  cleanupTestDataDir(TEST_NAME);
-});
 
 test.describe('Codex Agent - Activity Detection', () => {
+  const TEST_NAME = 'codex-activity-detection';
+  const PROJECT_NAME = `Codex Activity Test ${runId}`;
+
+  let app: ElectronApplication;
+  let page: Page;
+  let tmpDir: string;
+  let dataDir: string;
+
+  test.beforeAll(async () => {
+    tmpDir = createTempProject(TEST_NAME);
+    dataDir = getTestDataDir(TEST_NAME);
+    fs.writeFileSync(
+      path.join(dataDir, 'config.json'),
+      JSON.stringify({
+        agent: {
+          cliPaths: { codex: mockAgentPath('codex') },
+          permissionMode: 'acceptEdits',
+          maxConcurrentSessions: 5,
+          queueOverflow: 'queue',
+        },
+        git: { worktreesEnabled: false },
+      }),
+    );
+
+    const result = await launchApp({ dataDir });
+    app = result.app;
+    page = result.page;
+    await createProject(page, PROJECT_NAME, tmpDir);
+    await setProjectDefaultAgent(page, 'codex');
+  });
+
+  test.afterAll(async () => {
+    await app?.close();
+    cleanupTempProject(TEST_NAME);
+    cleanupTestDataDir(TEST_NAME);
+  });
+
   test('spawned Codex session reports activity and settles to idle', async () => {
     const title = `Codex Activity ${runId}`;
     await createTask(page, title, 'Verify pty-only activity detection');
@@ -144,5 +145,74 @@ test.describe('Codex Agent - Activity Detection', () => {
       (event) => event.type === 'tool_start',
     );
     expect(toolEvents.length).toBeGreaterThan(0);
+  });
+});
+
+test.describe('Codex Agent - Idle Detection with TUI Redraws', () => {
+  const TEST_NAME = 'codex-tui-idle';
+  const PROJECT_NAME = `Codex TUI Idle Test ${runId}`;
+
+  let app: ElectronApplication;
+  let page: Page;
+  let tmpDir: string;
+  let dataDir: string;
+
+  test.beforeAll(async () => {
+    // Enable TUI redraw simulation: mock-codex.js will emit periodic
+    // ANSI-only cursor repositioning sequences every 500ms, mimicking
+    // real Codex Ink TUI behavior when idle.
+    process.env.MOCK_CODEX_TUI_REDRAWS = '1';
+
+    tmpDir = createTempProject(TEST_NAME);
+    dataDir = getTestDataDir(TEST_NAME);
+    fs.writeFileSync(
+      path.join(dataDir, 'config.json'),
+      JSON.stringify({
+        agent: {
+          cliPaths: { codex: mockAgentPath('codex') },
+          permissionMode: 'acceptEdits',
+          maxConcurrentSessions: 5,
+          queueOverflow: 'queue',
+        },
+        git: { worktreesEnabled: false },
+      }),
+    );
+
+    const result = await launchApp({ dataDir });
+    app = result.app;
+    page = result.page;
+    await createProject(page, PROJECT_NAME, tmpDir);
+    await setProjectDefaultAgent(page, 'codex');
+  });
+
+  test.afterAll(async () => {
+    delete process.env.MOCK_CODEX_TUI_REDRAWS;
+    await app?.close();
+    cleanupTempProject(TEST_NAME);
+    cleanupTestDataDir(TEST_NAME);
+  });
+
+  test('settles to idle despite continuous TUI redraws', async () => {
+    // This test verifies the fix for Codex tasks stuck in 'active' when
+    // idle. The mock emits continuous ANSI-only PTY data (cursor redraws)
+    // that previously kept resetting the silence timer. With the
+    // isSignificantOutput filter, these ANSI-only chunks are ignored and
+    // the silence timer fires correctly.
+    const title = `Codex TUI Idle ${runId}`;
+    await createTask(page, title, 'Verify idle detection with TUI redraws');
+
+    const swimlaneIds = await getSwimlaneIds(page);
+    const taskId = await getTaskIdByTitle(page, title);
+
+    await moveTaskIpc(page, taskId, swimlaneIds.planning);
+    await waitForScrollback(page, 'MOCK_CODEX_SESSION:');
+
+    // Despite continuous ANSI redraws every 500ms, the isSignificantOutput
+    // filter should classify them as noise. The silence timer (10s) should
+    // fire and transition to idle.
+    await expect.poll(async () => {
+      const activity = await page.evaluate(() => window.electronAPI.sessions.getActivity());
+      return Object.values(activity as Record<string, ActivityState>);
+    }, { timeout: 20000, message: 'Expected session to reach idle despite TUI redraws' }).toContain('idle');
   });
 });
