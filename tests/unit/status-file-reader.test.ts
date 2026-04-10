@@ -420,6 +420,45 @@ describe('StatusFileReader', () => {
     expect(call[2]).toHaveLength(1);
   });
 
+  it('tails events.jsonl for adapters without a statusFileHook (Codex/Gemini)', () => {
+    // REGRESSION: the events-file watcher used to be gated on
+    // `statusFileHook != null`, which made the hook-based session-ID
+    // capture path dead code for every non-Claude adapter. Gemini
+    // would write `session_id` via event-bridge.js into events.jsonl
+    // but Kangentic would never read it, so "Loading agent..."
+    // stuck forever. Now the watcher installs whenever eventsOutputPath
+    // is set, and raw lines are delivered even when the adapter
+    // provides no parseEvent hook (events[] is empty, rawLines is
+    // populated - exactly what captureHookSessionIds needs).
+    const eventsPath = path.join(tempDir, 'events.jsonl');
+
+    reader.attach({
+      sessionId: 'session-1',
+      statusOutputPath: null,
+      eventsOutputPath: eventsPath,
+      statusFileHook: null, // non-Claude adapter
+    });
+
+    // event-bridge.js appends a session_start line with hookContext
+    // (this matches the real shape captured from Gemini in
+    // tests/fixtures/agent-pty/gemini-real-auth-events.jsonl).
+    const line = JSON.stringify({
+      ts: Date.now(),
+      type: 'session_start',
+      hookContext: JSON.stringify({ session_id: 'aa7fa183-281d-4311-91f5-a244c9aab93b' }),
+    });
+    fs.writeFileSync(eventsPath, line + '\n');
+
+    reader.flushPendingEvents('session-1');
+
+    expect(callbacks.onEventsParsed).toHaveBeenCalledTimes(1);
+    const call = (callbacks.onEventsParsed as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('session-1'); // sessionId
+    expect(call[1]).toHaveLength(1);   // rawLines
+    expect(call[1][0]).toContain('aa7fa183');
+    expect(call[2]).toHaveLength(0);   // events - empty because no statusFileHook
+  });
+
   it('flushPendingEvents is idempotent on empty files', () => {
     const eventsPath = path.join(tempDir, 'events.jsonl');
     reader.attach({

@@ -21,7 +21,7 @@ Runtime flow:
 
 1. An agent adapter declares a `sessionHistory` block in its `runtime` strategy (`src/shared/types.ts` - `AdapterRuntimeStrategy.sessionHistory`).
 2. On PTY spawn, the adapter's full runtime strategy is stored on `ManagedSession.agentParser` - SessionManager does nothing session-history-specific.
-3. The existing `runtime.sessionId.fromOutput` PTY scraper captures the agent-reported UUID from our own PTY's scrollback (typically within ~1 s of spawn).
+3. The agent's session ID is captured via one of three paths (whichever fires first): `runtime.sessionId.fromHook` (Gemini hook stdin), `runtime.sessionId.fromOutput` (PTY scraper), or `runtime.sessionId.fromFilesystem` (Codex rollout directory scan). See [Agent Integration](agent-integration.md) for the full table.
 4. When `notifyAgentSessionId` fires, SessionManager reads `session.agentParser?.runtime?.sessionHistory` and, if present, calls `sessionHistoryReader.attach(...)`. This is the full session-history integration in SessionManager — about 10 lines.
 5. `SessionHistoryReader.attach()` calls `hook.locate({ agentSessionId, cwd })`, instantiates a `FileWatcher` on the resolved path, and triggers an initial read.
 6. Each file-change event reads new content (append-mode cursor for JSONL, whole-file re-read for JSON) and dispatches to `sessionHistory.parse(content, mode)`.
@@ -234,4 +234,4 @@ If a task completes in less than ~1 second (before the PTY scraper captures the 
    ```
 3. Write unit tests in `tests/unit/foo-session-history-parser.test.ts` with inline fixture strings.
 4. Document the file format in this doc.
-5. Ensure the existing `runtime.sessionId.fromOutput` (or `fromHook`) scraper captures a session ID that appears in the history filename - this is how we locate the file.
+5. Ensure one of the `runtime.sessionId` capture paths (`fromHook`, `fromOutput`, or `fromFilesystem`) delivers a session ID that appears in the history filename - this is how we locate the file.

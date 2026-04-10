@@ -536,11 +536,12 @@ export class SessionManager extends EventEmitter {
     }
 
     // Arm diagnostic timer: if the agent supports session-ID capture but
-    // nothing fires by the timeout, something upstream is broken (wrong regex,
-    // hook delivery failure, TUI rendering that defeats our scan). Surface
+    // nothing fires by the timeout, something upstream is broken. Surface
     // it in logs so dogfooding catches regressions early.
-    const hasCapturePath = !!(input.agentParser?.runtime?.sessionId?.fromHook
-      || input.agentParser?.runtime?.sessionId?.fromOutput);
+    const sessionIdStrategy = input.agentParser?.runtime?.sessionId;
+    const hasCapturePath = !!(sessionIdStrategy?.fromHook
+      || sessionIdStrategy?.fromOutput
+      || sessionIdStrategy?.fromFilesystem);
     if (hasCapturePath) {
       session.sessionIdCaptureTimer = setTimeout(() => {
         session.sessionIdCaptureTimer = undefined;
@@ -548,12 +549,26 @@ export class SessionManager extends EventEmitter {
           console.warn(
             `[session-manager] ${session.agentName} session ID not captured after `
             + `${SessionManager.SESSION_ID_CAPTURE_TIMEOUT_MS / 1000}s for session `
-            + `${id.slice(0, 8)} - --resume will not work. `
-            + `Check hook delivery and fromOutput regex.`,
+            + `${id.slice(0, 8)} - --resume will not work.`,
           );
         }
       }, SessionManager.SESSION_ID_CAPTURE_TIMEOUT_MS);
       session.sessionIdCaptureTimer.unref();
+    }
+
+    // Fire-and-forget filesystem-based session-ID capture. Primary
+    // path for Codex 0.118 (PTY output and hooks both unavailable).
+    if (sessionIdStrategy?.fromFilesystem) {
+      const spawnedAt = new Date();
+      sessionIdStrategy.fromFilesystem({ spawnedAt, cwd: effectiveCwd })
+        .then((capturedId) => {
+          if (!capturedId || this.usageTracker.hasAgentSessionId(id) || !this.sessions.has(id)) return;
+          console.log(`[${session.agentName}] Captured session ID from filesystem: ${capturedId.slice(0, 16)}...`);
+          this.usageTracker.notifyAgentSessionId(id, capturedId);
+        })
+        .catch((err) => {
+          console.warn(`[session-manager] fromFilesystem capture failed for session=${id.slice(0, 8)}:`, err);
+        });
     }
 
     // Batched data output (~60fps)

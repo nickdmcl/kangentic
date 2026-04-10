@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { CodexAdapter } from '../../src/main/agent/adapters/codex';
+import { CodexSessionHistoryParser } from '../../src/main/agent/adapters/codex/session-history-parser';
 import type { SpawnCommandOptions } from '../../src/main/agent/agent-adapter';
 import type { PermissionMode } from '../../src/shared/types';
 
@@ -364,6 +365,104 @@ describe('Codex Adapter', () => {
     it('returns null for unrelated output', () => {
       expect(adapter.runtime.sessionId!.fromOutput!('Hello world')).toBeNull();
       expect(adapter.runtime.sessionId!.fromOutput!('')).toBeNull();
+    });
+  });
+
+  describe('captureSessionIdFromFilesystem', () => {
+    // Writes synthetic rollout files into the real ~/.codex/sessions
+    // layout and verifies capture-by-cwd. Each test uses a unique UUID
+    // and cleans up after itself so real Codex sessions are untouched.
+    const createdFiles: string[] = [];
+    let sessionsDir: string;
+
+    function writeRollout(uuid: string, cwd: string, createdAt: Date = new Date()): string {
+      const iso = createdAt.toISOString();
+      const fileName = `rollout-${iso.replace(/[:.]/g, '-').replace('Z', '')}-${uuid}.jsonl`;
+      const filepath = path.join(sessionsDir, fileName);
+      fs.writeFileSync(filepath, JSON.stringify({
+        timestamp: iso,
+        type: 'session_meta',
+        // payload.timestamp is the authoritative session creation time
+        // used by captureSessionIdFromFilesystem's precise filter.
+        payload: { id: uuid, cli_version: '0.118.0', cwd, timestamp: iso },
+      }) + '\n');
+      createdFiles.push(filepath);
+      return filepath;
+    }
+
+    beforeEach(() => {
+      const iso = new Date().toISOString();
+      sessionsDir = path.join(os.homedir(), '.codex', 'sessions', iso.slice(0, 4), iso.slice(5, 7), iso.slice(8, 10));
+      fs.mkdirSync(sessionsDir, { recursive: true });
+    });
+
+    afterEach(() => {
+      for (const filepath of createdFiles) {
+        try { fs.unlinkSync(filepath); } catch { /* ignore */ }
+      }
+      createdFiles.length = 0;
+    });
+
+    it('captures the UUID for a rollout file whose session_meta.cwd matches', async () => {
+      writeRollout('aaaa1111-bbbb-cccc-dddd-eeeeeeeeeeee', '/tmp/task-a');
+      const result = await CodexSessionHistoryParser.captureSessionIdFromFilesystem({
+        spawnedAt: new Date(Date.now() - 2000),
+        cwd: '/tmp/task-a',
+        maxAttempts: 2,
+      });
+      expect(result).toBe('aaaa1111-bbbb-cccc-dddd-eeeeeeeeeeee');
+    });
+
+    it('disambiguates concurrent spawns by cwd (prevents task A from stealing task B\'s session)', async () => {
+      // REGRESSION: two fresh rollout files in the same dir. Without
+      // cwd matching, picking "newest by mtime" would cross-contaminate.
+      writeRollout('aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '/tmp/task-a');
+      writeRollout('bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '/tmp/task-b');
+
+      const resultA = await CodexSessionHistoryParser.captureSessionIdFromFilesystem({
+        spawnedAt: new Date(Date.now() - 2000), cwd: '/tmp/task-a', maxAttempts: 2,
+      });
+      const resultB = await CodexSessionHistoryParser.captureSessionIdFromFilesystem({
+        spawnedAt: new Date(Date.now() - 2000), cwd: '/tmp/task-b', maxAttempts: 2,
+      });
+      expect(resultA).toBe('aaaa1111-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+      expect(resultB).toBe('bbbb2222-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    });
+
+    it('ignores rollout files with mtime before spawnedAt', async () => {
+      const filepath = writeRollout('cccc3333-cccc-cccc-cccc-cccccccccccc', '/tmp/stale');
+      const pastTime = new Date(Date.now() - 5 * 60_000);
+      fs.utimesSync(filepath, pastTime, pastTime);
+
+      const result = await CodexSessionHistoryParser.captureSessionIdFromFilesystem({
+        spawnedAt: new Date(), cwd: '/tmp/stale', maxAttempts: 1,
+      });
+      expect(result).toBeNull();
+    });
+
+    it('ignores an actively-running prior session in the same cwd (fresh mtime but old session_meta.timestamp)', async () => {
+      // REGRESSION: file mtime alone is unreliable - a long-running
+      // Codex session appending events to its rollout keeps mtime
+      // fresh. The precise filter is payload.timestamp, which is
+      // written once at session start. Simulate the hole:
+      //   1. Write an "old" session with payload.timestamp 2 minutes ago
+      //   2. Touch its mtime to NOW (as if it just appended an event)
+      //   3. Our spawn happens NOW; scanner must NOT pick up the old one.
+      const oldSessionCreated = new Date(Date.now() - 120_000);
+      const oldFilepath = writeRollout(
+        'dddd4444-dddd-dddd-dddd-dddddddddddd',
+        '/tmp/shared-cwd',
+        oldSessionCreated,
+      );
+      const now = new Date();
+      fs.utimesSync(oldFilepath, now, now);
+
+      const result = await CodexSessionHistoryParser.captureSessionIdFromFilesystem({
+        spawnedAt: new Date(),
+        cwd: '/tmp/shared-cwd',
+        maxAttempts: 1,
+      });
+      expect(result).toBeNull();
     });
   });
 

@@ -2,6 +2,7 @@ import { GeminiDetector } from './detector';
 import { GeminiCommandBuilder } from './command-builder';
 import { stripGeminiKangenticHooks } from './hook-manager';
 import { GeminiSessionHistoryParser } from './session-history-parser';
+import { GeminiStatusParser } from './status-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -64,6 +65,15 @@ export class GeminiAdapter implements AgentAdapter {
    *   assistant message. See GeminiSessionHistoryParser.
    */
   readonly runtime: AdapterRuntimeStrategy = {
+    // Hook-driven status.json + events.jsonl pipeline. Gemini has no
+    // status line (parseStatus returns null), but the event-bridge hook
+    // output is parsed via parseEvent so tool_start/idle events drive
+    // activity transitions and captureHookSessionIds can fire.
+    statusFile: {
+      parseStatus: GeminiStatusParser.parseStatus,
+      parseEvent: GeminiStatusParser.parseEvent,
+      isFullRewrite: false,
+    },
     activity: ActivityDetection.hooksAndPty((data: string) => {
       // Patterns derived from real Gemini 0.37 PTY captures (see
       // tests/unit/agent-pty-detection.test.ts and the .bin fixtures).

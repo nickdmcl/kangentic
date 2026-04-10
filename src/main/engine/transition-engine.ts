@@ -243,7 +243,7 @@ export class TransitionEngine {
       mcpServerToken: appConfig.mcpServerToken,
     });
 
-    console.log(`[spawnAgent] Command: ${command.slice(0, 120)}...`);
+    console.log(`[spawnAgent] agent=${agentName} Command: ${command.slice(0, 120)}...`);
 
     // Last chance to abort before creating a PTY process
     signal?.throwIfAborted();

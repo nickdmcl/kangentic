@@ -97,6 +97,13 @@ export class CodexAdapter implements AgentAdapter {
         const resumeMatch = data.match(/codex\s+resume\s+(thr_\S+)/);
         return resumeMatch ? resumeMatch[1] : null;
       },
+      // Codex 0.118 neither prints the session UUID in PTY output nor
+      // fires `.codex/hooks.json` (both verified empirically - see the
+      // fixtures in tests/fixtures/agent-pty/codex.txt). The only
+      // source-of-truth for the session ID is the rollout JSONL file
+      // Codex writes synchronously at session start. This scan is
+      // what actually captures the ID on real spawns today.
+      fromFilesystem: CodexSessionHistoryParser.captureSessionIdFromFilesystem,
     },
     sessionHistory: {
       locate: CodexSessionHistoryParser.locate,

@@ -35,12 +35,77 @@ import {
  */
 export class CodexSessionHistoryParser {
   /**
-   * Locate the rollout JSONL file for a known session UUID. Called after
-   * the PTY scraper captures the session ID. Polls for up to 5 seconds
-   * (disk write latency varies on slow storage).
+   * Scan `~/.codex/sessions/<today>/` for a rollout file whose
+   * `session_meta` says it was created by our spawn, and return its
+   * embedded session UUID. The only capture path that works on
+   * Codex 0.118 (no PTY output, no hook support).
+   *
+   * Two-stage filter:
+   *   1. mtime >= spawnedAt - 30s    (cheap pre-filter; avoids
+   *      reading every historical rollout file, wide enough to not
+   *      miss fresh writes on slow disks)
+   *   2. session_meta.payload.timestamp is within ±1s of spawnedAt
+   *      AND session_meta.payload.cwd matches our cwd
+   *
+   * The `payload.timestamp` is set ONCE by Codex when the session
+   * starts, so it is immune to mtime drift from subsequent event
+   * appends. That matters because an actively-running prior Codex
+   * session in the same cwd would keep bumping its rollout mtime
+   * forward, and an mtime-only filter would pick it instead of
+   * ours. Combined with cwd matching, this gives us a precise
+   * "file created by this exact spawn" check.
+   *
+   * Known limitation: two concurrent spawns in the same cwd (no
+   * worktrees) within 1s of each other could both match - use
+   * worktrees for reliable concurrent task support.
+   */
+  static async captureSessionIdFromFilesystem(options: {
+    spawnedAt: Date;
+    cwd: string;
+    maxAttempts?: number;
+  }): Promise<string | null> {
+    const spawnedAtMs = options.spawnedAt.getTime();
+    const mtimeFloorMs = spawnedAtMs - 30_000;       // coarse pre-filter
+    const sessionCreatedFloorMs = spawnedAtMs - 1000; // precise ±1s window
+    const sessionCreatedCeilMs = spawnedAtMs + 30_000;
+    const normalizedCwd = normalizeCwdForCompare(options.cwd);
+    // rollout-<ISO-timestamp>-<UUID>.jsonl
+    const pattern = /^rollout-.*-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/;
+    const directories = Array.from(new Set([codexSessionsDirForToday(), codexSessionsDirForYesterday()]));
+
+    const maxAttempts = options.maxAttempts ?? 20; // ~10s at 500ms intervals
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      for (const directory of directories) {
+        const entries = safeReaddirWithStats(directory)
+          .filter((entry) => pattern.test(entry.name) && entry.mtimeMs >= mtimeFloorMs);
+
+        for (const entry of entries) {
+          const candidateId = entry.name.match(pattern)![1];
+          const meta = readSessionMeta(path.join(directory, entry.name));
+          if (!meta || meta.id !== candidateId) continue;
+          if (normalizeCwdForCompare(meta.cwd) !== normalizedCwd) continue;
+          // Authoritative filter: session_meta timestamp must fall
+          // within the spawn window. This excludes old still-running
+          // sessions in the same cwd whose mtime is fresh due to
+          // ongoing appends but whose session_meta is historical.
+          if (meta.createdAtMs < sessionCreatedFloorMs) continue;
+          if (meta.createdAtMs > sessionCreatedCeilMs) continue;
+          return candidateId;
+        }
+      }
+      await sleep(500);
+    }
+    return null;
+  }
+
+  /**
+   * Locate the rollout JSONL file for a known session UUID. Called
+   * after the session ID has been captured (via fromFilesystem or
+   * hooks). Polls for up to 5 seconds to cover disk write latency.
    *
    * The filename suffix contains the session UUID, so a single
-   * readdirSync + regex match is sufficient - no cross-session ambiguity.
+   * readdirSync + regex match is sufficient - no cross-session
+   * ambiguity.
    */
   static async locate(options: {
     agentSessionId: string;
@@ -230,6 +295,68 @@ function findMatchingFile(directory: string, pattern: RegExp): string | null {
   }
   const match = entries.find((name) => pattern.test(name));
   return match ? path.join(directory, match) : null;
+}
+
+/**
+ * Parse `session_meta.payload.{id,cwd,timestamp}` from the first
+ * line of a rollout JSONL. Returns null on any I/O or parse
+ * failure so callers can "skip this candidate, try the next one".
+ * Only called on mtime-fresh files, which are small enough to
+ * read whole. `createdAtMs` is parsed from `payload.timestamp`
+ * (ISO8601 string written once by Codex at session start) and is
+ * the authoritative "when did this session begin" value.
+ */
+function readSessionMeta(filePath: string): { id: string; cwd: string; createdAtMs: number } | null {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const firstLine = content.slice(0, content.indexOf('\n') + 1 || content.length);
+    const parsed: unknown = JSON.parse(firstLine);
+    if (!isRecord(parsed) || parsed.type !== 'session_meta' || !isRecord(parsed.payload)) return null;
+    const { id, cwd, timestamp } = parsed.payload;
+    if (typeof id !== 'string' || typeof cwd !== 'string' || typeof timestamp !== 'string') return null;
+    const createdAtMs = Date.parse(timestamp);
+    if (!Number.isFinite(createdAtMs)) return null;
+    return { id, cwd, createdAtMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalize a path for cross-platform comparison. Codex writes
+ * forward-slash paths in session_meta even on Windows, so we
+ * convert backslashes and lowercase on win32 (case-insensitive fs).
+ */
+function normalizeCwdForCompare(raw: string): string {
+  const slashed = raw.replace(/\\/g, '/');
+  return process.platform === 'win32' ? slashed.toLowerCase() : slashed;
+}
+
+/**
+ * Read a directory and return each entry as `{ name, mtimeMs }`,
+ * skipping anything that fails to stat. Used by
+ * `captureSessionIdFromFilesystem` so it can filter by mtime without
+ * doing a second round of syscalls per candidate. Returns an empty
+ * array when the directory does not exist (e.g. first-ever Codex run
+ * on a new UTC day).
+ */
+function safeReaddirWithStats(directory: string): Array<{ name: string; mtimeMs: number }> {
+  let names: string[];
+  try {
+    names = fs.readdirSync(directory);
+  } catch {
+    return [];
+  }
+  const results: Array<{ name: string; mtimeMs: number }> = [];
+  for (const name of names) {
+    try {
+      const stat = fs.statSync(path.join(directory, name));
+      results.push({ name, mtimeMs: stat.mtimeMs });
+    } catch {
+      // File vanished between readdir and stat - skip.
+    }
+  }
+  return results;
 }
 
 /** Simple async sleep helper for polling loops. */

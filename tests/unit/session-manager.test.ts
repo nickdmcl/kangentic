@@ -1268,3 +1268,109 @@ describe('Caller-owned session IDs', () => {
     expect(promotedSession!.id).toBe('stable-queued-id');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 14. fromFilesystem session-ID capture wiring
+// ---------------------------------------------------------------------------
+
+describe('fromFilesystem session-ID capture wiring', () => {
+  let manager: SessionManager;
+
+  beforeEach(() => {
+    manager = new SessionManager();
+  });
+
+  afterEach(async () => {
+    manager.killAll();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  it('fires agent-session-id event when fromFilesystem resolves with a UUID', async () => {
+    const mock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
+
+    const capturedIds: string[] = [];
+    manager.on('agent-session-id', (_sessionId: string, _taskId: string, _projectId: string, agentReportedId: string) => {
+      capturedIds.push(agentReportedId);
+    });
+
+    const expectedId = 'aaaa1111-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const stubAdapter = {
+      ...claudeAdapter,
+      name: 'stub-fs',
+      supportsCallerSessionId: false,
+      runtime: {
+        activity: claudeAdapter.runtime.activity,
+        sessionId: {
+          fromFilesystem: () => Promise.resolve(expectedId),
+        },
+      },
+    };
+
+    await manager.spawn({
+      taskId: 'task-fs-capture',
+      projectId: 'project-fs',
+      command: '',
+      cwd: tmpDir,
+      agentParser: stubAdapter as unknown as typeof claudeAdapter,
+      agentName: 'stub-fs',
+    });
+
+    // fromFilesystem resolves immediately (microtask) but the callback
+    // chain goes through UsageTracker -> SessionManager event -> here.
+    // Allow one tick for the async chain to settle.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(capturedIds).toContain(expectedId);
+  });
+
+  it('does NOT fire agent-session-id when session is removed before fromFilesystem resolves', async () => {
+    const mock = createMockPty();
+    vi.mocked(pty.spawn).mockReturnValue(mock.mockPty as unknown as pty.IPty);
+
+    const capturedIds: string[] = [];
+    manager.on('agent-session-id', (_sessionId: string, _taskId: string, _projectId: string, agentReportedId: string) => {
+      capturedIds.push(agentReportedId);
+    });
+
+    // Deferred promise that we resolve AFTER killing the session.
+    let resolveCapture!: (value: string | null) => void;
+    const capturePromise = new Promise<string | null>((resolve) => {
+      resolveCapture = resolve;
+    });
+
+    const stubAdapter = {
+      ...claudeAdapter,
+      name: 'stub-fs-delayed',
+      supportsCallerSessionId: false,
+      runtime: {
+        activity: claudeAdapter.runtime.activity,
+        sessionId: {
+          fromFilesystem: () => capturePromise,
+        },
+      },
+    };
+
+    const session = await manager.spawn({
+      taskId: 'task-fs-guard',
+      projectId: 'project-fs-guard',
+      command: '',
+      cwd: tmpDir,
+      agentParser: stubAdapter as unknown as typeof claudeAdapter,
+      agentName: 'stub-fs-delayed',
+    });
+
+    // Fully remove the session BEFORE resolving the filesystem capture.
+    // remove() deletes from the sessions Map (unlike kill which just
+    // sets status=exited but keeps the entry). The guard we are testing
+    // is `!this.sessions.has(id)` at session-manager.ts:565.
+    manager.remove(session.id);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Now resolve with a UUID - should be silently discarded.
+    resolveCapture('bbbb2222-cccc-dddd-eeee-ffffffffffff');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(capturedIds).not.toContain('bbbb2222-cccc-dddd-eeee-ffffffffffff');
+  });
+});

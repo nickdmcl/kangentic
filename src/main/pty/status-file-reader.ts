@@ -128,24 +128,31 @@ export class StatusFileReader {
 
     // Truncate stale events.jsonl. Historical events from a prior run
     // aren't needed - the new session starts with an empty event log.
+    //
+    // The watcher is installed whenever `eventsOutputPath` is set,
+    // regardless of whether the adapter declares a `statusFile` hook.
+    // Claude uses the hook to parse events into SessionEvent objects,
+    // but non-Claude adapters (Codex, Gemini) still need their raw
+    // event lines tailed so `UsageTracker.captureHookSessionIds` can
+    // extract the agent-reported session ID from the `hookContext`
+    // field on a `session_start` line. Gating this on `statusFileHook`
+    // made the fromHook capture path dead code for Codex/Gemini.
     if (eventsOutputPath) {
       try { fs.writeFileSync(eventsOutputPath, ''); } catch { /* bridge may create it */ }
 
-      if (statusFileHook) {
-        state.eventsWatcher = new FileWatcher({
-          filePath: eventsOutputPath,
-          onChange: () => this.handleEventsChange(sessionId),
-          debounceMs: 50,
-          isStale: () => {
-            try {
-              const stat = fs.statSync(eventsOutputPath);
-              return stat.size > state.eventsFileOffset;
-            } catch {
-              return false;
-            }
-          },
-        });
-      }
+      state.eventsWatcher = new FileWatcher({
+        filePath: eventsOutputPath,
+        onChange: () => this.handleEventsChange(sessionId),
+        debounceMs: 50,
+        isStale: () => {
+          try {
+            const stat = fs.statSync(eventsOutputPath);
+            return stat.size > state.eventsFileOffset;
+          } catch {
+            return false;
+          }
+        },
+      });
     }
 
     this.states.set(sessionId, state);
@@ -254,7 +261,7 @@ export class StatusFileReader {
    */
   private handleEventsChange(sessionId: string): void {
     const state = this.states.get(sessionId);
-    if (!state || !state.eventsOutputPath || !state.statusFileHook) return;
+    if (!state || !state.eventsOutputPath) return;
     try {
       const stat = fs.statSync(state.eventsOutputPath);
       if (stat.size < state.eventsFileOffset) {
@@ -277,10 +284,16 @@ export class StatusFileReader {
       const rawLines = chunk.split(/\r?\n/).filter((line) => line.length > 0);
       if (rawLines.length === 0) return;
 
+      // Parse into SessionEvent objects only when the adapter has a
+      // statusFile hook (currently only Claude). Other adapters still
+      // need `rawLines` delivered so the consumer can run
+      // hook-based session-ID capture on the `hookContext` field.
       const events: SessionEvent[] = [];
-      for (const line of rawLines) {
-        const event = state.statusFileHook.parseEvent(line);
-        if (event) events.push(event);
+      if (state.statusFileHook) {
+        for (const line of rawLines) {
+          const event = state.statusFileHook.parseEvent(line);
+          if (event) events.push(event);
+        }
       }
 
       this.callbacks.onEventsParsed(sessionId, rawLines, events);

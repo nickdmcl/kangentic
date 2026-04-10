@@ -2,8 +2,12 @@
  * Unit tests for GeminiAdapter session ID extraction - both hook-based
  * (extractSessionId) and PTY output-based (captureSessionIdFromOutput).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { GeminiAdapter } from '../../src/main/agent/adapters/gemini';
+import { GeminiSessionHistoryParser } from '../../src/main/agent/adapters/gemini/session-history-parser';
 
 describe('Gemini Adapter - session ID capture', () => {
   let adapter: GeminiAdapter;
@@ -104,5 +108,58 @@ describe('Gemini Adapter - session ID capture', () => {
     it('returns null for partial UUID', () => {
       expect(adapter.runtime.sessionId!.fromOutput!('Session ID: 4231e6aa')).toBeNull();
     });
+  });
+});
+
+describe('GeminiSessionHistoryParser.locate', () => {
+  // REGRESSION: Gemini 0.37 embeds only the FIRST 8 CHARS of the
+  // session UUID in the chat filename, e.g. for
+  // "08889b8d-c485-4aaa-b91d-ae966fa0ab4a" it writes
+  // "session-2026-04-01T23-37-08889b8d.json". The original locate()
+  // regex looked for the full UUID and never matched, so the session
+  // history reader never attached and the task card was stuck on
+  // "Loading agent..." forever. This test exercises the real layout.
+  const FULL_UUID = '08889b8d-c485-4aaa-b91d-ae966fa0ab4a';
+  const SHORT_ID = '08889b8d';
+
+  let sandbox: string;
+  let chatsDir: string;
+
+  beforeEach(() => {
+    sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-locate-'));
+    const projectDirName = path.basename(sandbox).toLowerCase();
+    chatsDir = path.join(os.homedir(), '.gemini', 'tmp', projectDirName, 'chats');
+    fs.mkdirSync(chatsDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(chatsDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch { /* ignore */ }
+  });
+
+  it('finds a chat file whose filename embeds only the short (8-char) prefix', async () => {
+    const filename = `session-2026-04-01T23-37-${SHORT_ID}.json`;
+    const filepath = path.join(chatsDir, filename);
+    fs.writeFileSync(filepath, JSON.stringify({ sessionId: FULL_UUID, messages: [] }));
+
+    const result = await GeminiSessionHistoryParser.locate({
+      agentSessionId: FULL_UUID,
+      cwd: sandbox,
+    });
+
+    expect(result).toBe(filepath);
+  });
+
+  it('still matches filenames with the full UUID if Gemini ever changes the scheme', async () => {
+    const filename = `session-${FULL_UUID}.json`;
+    const filepath = path.join(chatsDir, filename);
+    fs.writeFileSync(filepath, JSON.stringify({ sessionId: FULL_UUID, messages: [] }));
+
+    const result = await GeminiSessionHistoryParser.locate({
+      agentSessionId: FULL_UUID,
+      cwd: sandbox,
+    });
+
+    expect(result).toBe(filepath);
   });
 });

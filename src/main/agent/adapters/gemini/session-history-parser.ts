@@ -65,8 +65,13 @@ export class GeminiSessionHistoryParser {
     const projectDirName = computeGeminiProjectDirName(cwd);
     const directory = path.join(os.homedir(), '.gemini', 'tmp', projectDirName, 'chats');
 
-    const escapedId = agentSessionId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`session-.*${escapedId}.*\\.json$`, 'i');
+    // Gemini 0.37 embeds only the FIRST 8 CHARS of the session UUID
+    // in the filename, e.g. `session-2026-04-09T19-18-08889b8d.json`
+    // for session `08889b8d-c485-...`. Empirically verified on
+    // real on-disk files. The historical regex matched the full
+    // UUID and never fired.
+    const shortId = agentSessionId.slice(0, 8).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^session-.*${shortId}\\.json$`, 'i');
 
     const maxAttempts = 10;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {

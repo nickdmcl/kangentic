@@ -1048,6 +1048,21 @@ export interface AdapterRuntimeStrategy {
      *  that print their session ID in terminal output (Codex startup header,
      *  Gemini shutdown summary). */
     fromOutput?(data: string): string | null;
+    /**
+     * Locate the agent's session ID by scanning the filesystem for a
+     * freshly-created session file. Used for agents that don't print
+     * the ID in PTY output and whose hooks are unavailable (Codex 0.118
+     * doesn't fire `.codex/hooks.json`, but does write a rollout JSONL
+     * at `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<uuid>.jsonl`
+     * on every spawn - the UUID is in the filename). The implementation
+     * polls the expected directory for a file created after
+     * `spawnedAt` and returns the extracted UUID, or null if no match
+     * is found within the polling budget.
+     */
+    fromFilesystem?(options: {
+      spawnedAt: Date;
+      cwd: string;
+    }): Promise<string | null>;
   };
 
   /**
