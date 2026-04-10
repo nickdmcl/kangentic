@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
-  buildGeminiEventHooks,
-  stripGeminiKangenticHooks,
+  buildHooks,
+  removeHooks,
 } from '../../src/main/agent/adapters/gemini';
 
 let tmpDir: string;
@@ -29,9 +29,9 @@ afterEach(() => {
 });
 
 describe('gemini-hook-manager', () => {
-  describe('buildGeminiEventHooks', () => {
+  describe('buildHooks', () => {
     it('produces correct hook entries for all 8 mapped event types', () => {
-      const hooks = buildGeminiEventHooks(EVENT_BRIDGE, EVENTS_PATH, {});
+      const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, {});
 
       // BeforeTool: tool_start
       expect(hooks.BeforeTool).toHaveLength(1);
@@ -82,7 +82,7 @@ describe('gemini-hook-manager', () => {
         ],
       };
 
-      const hooks = buildGeminiEventHooks(EVENT_BRIDGE, EVENTS_PATH, existing);
+      const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, existing);
 
       // BeforeTool: 1 user + 1 event-bridge
       expect(hooks.BeforeTool).toHaveLength(2);
@@ -94,7 +94,7 @@ describe('gemini-hook-manager', () => {
     });
 
     it('hook entries include name field (Gemini requirement)', () => {
-      const hooks = buildGeminiEventHooks(EVENT_BRIDGE, EVENTS_PATH, {});
+      const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, {});
 
       for (const entries of Object.values(hooks)) {
         for (const entry of entries) {
@@ -107,7 +107,7 @@ describe('gemini-hook-manager', () => {
     });
   });
 
-  describe('stripGeminiKangenticHooks', () => {
+  describe('removeHooks', () => {
     it('removes kangentic hooks, preserves user hooks', () => {
       const geminiDir = path.join(tmpDir, '.gemini');
       fs.mkdirSync(geminiDir, { recursive: true });
@@ -130,7 +130,7 @@ describe('gemini-hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripGeminiKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       const result = readSettings();
       const hooks = result.hooks as Record<string, unknown[]>;
@@ -158,13 +158,13 @@ describe('gemini-hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripGeminiKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       expect(settingsExists()).toBe(false);
     });
 
     it('handles missing file', () => {
-      expect(() => stripGeminiKangenticHooks(tmpDir)).not.toThrow();
+      expect(() => removeHooks(tmpDir)).not.toThrow();
     });
 
     it('preserves non-hook settings', () => {
@@ -183,7 +183,7 @@ describe('gemini-hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripGeminiKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       const result = readSettings();
       expect(result.theme).toBe('dark');

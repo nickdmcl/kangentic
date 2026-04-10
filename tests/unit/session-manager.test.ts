@@ -1299,6 +1299,8 @@ describe('fromFilesystem session-ID capture wiring', () => {
       ...claudeAdapter,
       name: 'stub-fs',
       supportsCallerSessionId: false,
+      detectFirstOutput: () => true,
+      removeHooks: () => {},
       runtime: {
         activity: claudeAdapter.runtime.activity,
         sessionId: {
@@ -1343,6 +1345,8 @@ describe('fromFilesystem session-ID capture wiring', () => {
       ...claudeAdapter,
       name: 'stub-fs-delayed',
       supportsCallerSessionId: false,
+      detectFirstOutput: () => true,
+      removeHooks: () => {},
       runtime: {
         activity: claudeAdapter.runtime.activity,
         sessionId: {

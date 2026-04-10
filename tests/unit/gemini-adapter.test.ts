@@ -111,6 +111,82 @@ describe('Gemini Adapter - session ID capture', () => {
   });
 });
 
+describe('GeminiSessionHistoryParser.captureSessionIdFromFilesystem', () => {
+  const SESSION_UUID = '08889b8d-c485-4aaa-b91d-ae966fa0ab4a';
+
+  let sandbox: string;
+  let chatsDir: string;
+
+  beforeEach(() => {
+    sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-capture-'));
+    const projectDirName = path.basename(sandbox).toLowerCase();
+    chatsDir = path.join(os.homedir(), '.gemini', 'tmp', projectDirName, 'chats');
+    fs.mkdirSync(chatsDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(chatsDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { fs.rmSync(sandbox, { recursive: true, force: true }); } catch { /* ignore */ }
+  });
+
+  it('finds session file by startTime proximity', async () => {
+    const spawnedAt = new Date();
+    const startTime = new Date(spawnedAt.getTime() + 500).toISOString();
+    const filename = `session-2026-04-09T19-18-${SESSION_UUID.slice(0, 8)}.json`;
+    fs.writeFileSync(
+      path.join(chatsDir, filename),
+      JSON.stringify({
+        sessionId: SESSION_UUID,
+        startTime,
+        messages: [],
+      }),
+    );
+
+    const result = await GeminiSessionHistoryParser.captureSessionIdFromFilesystem({
+      spawnedAt,
+      cwd: sandbox,
+      maxAttempts: 1,
+    });
+
+    expect(result).toBe(SESSION_UUID);
+  });
+
+  it('ignores files with stale startTime', async () => {
+    const spawnedAt = new Date();
+    // startTime is 5 minutes before spawnedAt - outside the ±30s window
+    const staleStartTime = new Date(spawnedAt.getTime() - 5 * 60_000).toISOString();
+    const filename = `session-old-${SESSION_UUID.slice(0, 8)}.json`;
+    fs.writeFileSync(
+      path.join(chatsDir, filename),
+      JSON.stringify({
+        sessionId: SESSION_UUID,
+        startTime: staleStartTime,
+        messages: [],
+      }),
+    );
+
+    const result = await GeminiSessionHistoryParser.captureSessionIdFromFilesystem({
+      spawnedAt,
+      cwd: sandbox,
+      maxAttempts: 1,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when chats directory does not exist', async () => {
+    // Use a cwd whose basename doesn't match any existing directory
+    const missingCwd = path.join(os.tmpdir(), 'nonexistent-project-xyz');
+    const result = await GeminiSessionHistoryParser.captureSessionIdFromFilesystem({
+      spawnedAt: new Date(),
+      cwd: missingCwd,
+      maxAttempts: 1,
+    });
+
+    expect(result).toBeNull();
+  });
+});
+
 describe('GeminiSessionHistoryParser.locate', () => {
   // REGRESSION: Gemini 0.37 embeds only the FIRST 8 CHARS of the
   // session UUID in the chat filename, e.g. for

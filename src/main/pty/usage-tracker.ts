@@ -456,6 +456,14 @@ export class UsageTracker {
       cost: { ...base.cost, ...(partial.cost ?? {}) },
       model: { ...base.model, ...(partial.model ?? {}) },
     };
+    // Recalculate usedPercentage from merged values. Individual parse
+    // chunks (Codex append-mode JSONL) may provide contextWindowSize
+    // and usedTokens in separate updates; computing percentage only
+    // after merge ensures consistency across chunks.
+    const mergedContext = next.contextWindow;
+    if (mergedContext.contextWindowSize > 0 && mergedContext.usedTokens > 0) {
+      mergedContext.usedPercentage = (mergedContext.usedTokens / mergedContext.contextWindowSize) * 100;
+    }
     this.usageCache.set(sessionId, next);
     this.callbacks.onUsageChange(sessionId, next);
   }

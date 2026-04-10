@@ -94,8 +94,8 @@ vi.mock('../../src/main/agent/adapters/claude/trust-manager', () => ({
   ensureWorktreeTrust: vi.fn(),
 }));
 vi.mock('../../src/main/agent/adapters/claude/hook-manager', () => ({
-  buildEventHooks: vi.fn(),
-  stripKangenticHooks: vi.fn(),
+  buildHooks: vi.fn(),
+  removeHooks: vi.fn(),
 }));
 vi.mock('../../src/main/analytics/analytics', () => ({
   trackEvent: vi.fn(),

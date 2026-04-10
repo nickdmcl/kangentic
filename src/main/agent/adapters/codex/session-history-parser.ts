@@ -376,9 +376,22 @@ function mapCodexToolName(_name: string): AgentTool {
 }
 
 /**
- * Build a partial SessionUsage from the fields captured in a parse pass.
+ * Build a sparse SessionUsage from the fields captured in a parse pass.
  * Returns null if no relevant fields were seen (avoids noisy no-op usage
  * updates).
+ *
+ * IMPORTANT: Only includes fields that were actually captured in this
+ * chunk. Uncaptured fields are omitted entirely (not defaulted to 0) so
+ * that the shallow spread merge in `UsageTracker.setSessionUsage()` does
+ * not overwrite correct base values with zeros. For example, a chunk
+ * containing only `turn_context` (model name) must NOT include
+ * `contextWindowSize: 0` because that would overwrite a previously-set
+ * window size from a `task_started` chunk.
+ *
+ * `usedPercentage` is never included - it's a derived value that
+ * `setSessionUsage()` recalculates after merging, when both
+ * `usedTokens` and `contextWindowSize` are available from potentially
+ * different chunks.
  */
 function buildUsage(captured: {
   modelId: string | undefined;
@@ -401,31 +414,38 @@ function buildUsage(captured: {
     return null;
   }
 
-  // Context window used percentage. If we know both the size and the
-  // total tokens, compute it; otherwise leave at 0 and let the renderer
-  // show the minimal pill until more data arrives.
-  const inputTokens = totalInputTokens ?? 0;
-  const outputTokens = totalOutputTokens ?? 0;
-  const windowSize = contextWindowSize ?? 0;
-  const usedTokens = inputTokens; // input tokens reflect context held
-  const percentage = windowSize > 0 ? (usedTokens / windowSize) * 100 : 0;
+  // Build a sparse contextWindow with only captured fields. Keys that
+  // are absent from this object will not overwrite existing base values
+  // when spread-merged in setSessionUsage().
+  const contextWindow: Record<string, number> = {};
+  if (totalInputTokens !== undefined) {
+    contextWindow.usedTokens = totalInputTokens;
+    contextWindow.totalInputTokens = totalInputTokens;
+  }
+  if (totalOutputTokens !== undefined) {
+    contextWindow.totalOutputTokens = totalOutputTokens;
+  }
+  if (cachedInputTokens !== undefined) {
+    contextWindow.cacheTokens = cachedInputTokens;
+  }
+  if (contextWindowSize !== undefined) {
+    contextWindow.contextWindowSize = contextWindowSize;
+  }
+  // Calculate usedPercentage only when both values are in THIS chunk.
+  // When they arrive in separate chunks, setSessionUsage() recalculates
+  // after merge. Including it here when possible avoids a brief 0%
+  // flash on full-chunk scenarios (e.g. token_count with model_context_window).
+  if (contextWindowSize !== undefined && contextWindowSize > 0 && totalInputTokens !== undefined) {
+    contextWindow.usedPercentage = (totalInputTokens / contextWindowSize) * 100;
+  }
 
-  return {
-    contextWindow: {
-      usedPercentage: percentage,
-      usedTokens,
-      cacheTokens: cachedInputTokens ?? 0,
-      totalInputTokens: inputTokens,
-      totalOutputTokens: outputTokens,
-      contextWindowSize: windowSize,
-    },
-    cost: {
-      totalCostUsd: 0,
-      totalDurationMs: 0,
-    },
-    model: {
-      id: modelId ?? '',
-      displayName: modelId ?? '',
-    },
-  };
+  const result: Record<string, unknown> = {};
+  if (Object.keys(contextWindow).length > 0) {
+    result.contextWindow = contextWindow;
+  }
+  if (hasModel) {
+    result.model = { id: modelId, displayName: modelId };
+  }
+
+  return result as unknown as SessionUsage;
 }

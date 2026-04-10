@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { EventType } from '../../../../shared/types';
-import { isKangenticHookCommand, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
+import { filterKangenticHooks, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
 
 /** Hook entry in Gemini CLI's settings.json. */
 export interface GeminiHookEntry {
@@ -28,11 +28,9 @@ export const GeminiHookEvent = {
 } as const;
 export type GeminiHookEvent = (typeof GeminiHookEvent)[keyof typeof GeminiHookEvent];
 
-/** Filter out Kangentic-injected entries from a Gemini hook event array. */
+/** Filter out Kangentic-injected entries, keeping only user-defined hooks. */
 function filterOurHooks(entries: GeminiHookEntry[] | undefined): GeminiHookEntry[] {
-  return (entries || []).filter(
-    (entry) => !entry?.hooks?.some?.((hook) => isKangenticHookCommand(hook.command)),
-  );
+  return filterKangenticHooks(entries, (entry: GeminiHookEntry) => entry.hooks?.map((hook) => hook.command) ?? []);
 }
 
 /** Build a single Gemini hook entry for the event bridge. */
@@ -50,8 +48,17 @@ function bridgeEntry(eventBridge: string, eventsPath: string, eventType: string,
 /**
  * Build event-bridge hook entries to merge into Gemini CLI settings.
  * Maps available Gemini hook events to our event-bridge script.
+ *
+ * Strips any stale Kangentic hooks from existingHooks before injecting
+ * fresh ones. Gemini has no --settings flag, so hooks live in the shared
+ * project-level .gemini/settings.json. Normal cleanup runs via
+ * removeHooks() on session exit/suspend, but if the app was killed
+ * (force quit, crash, taskkill), those callbacks never fire and orphan
+ * hooks would accumulate. Stripping here ensures each spawn starts with
+ * exactly one set of Kangentic hooks regardless of how the previous
+ * session ended.
  */
-export function buildGeminiEventHooks(
+export function buildHooks(
   eventBridge: string,
   eventsPath: string,
   existingHooks: Record<string, GeminiHookEntry[]>,
@@ -65,36 +72,36 @@ export function buildGeminiEventHooks(
   return {
     ...existingHooks,
     [H.BeforeTool]: [
-      ...(existingHooks[H.BeforeTool] || []),
+      ...filterOurHooks(existingHooks[H.BeforeTool]),
       bridgeEntry(eventBridge, eventsPath, E.ToolStart,
         'tool:tool_name', 'nested-detail:tool_input:file_path,command,query'),
     ],
     [H.AfterTool]: [
-      ...(existingHooks[H.AfterTool] || []),
+      ...filterOurHooks(existingHooks[H.AfterTool]),
       bridgeEntry(eventBridge, eventsPath, E.ToolEnd, 'tool:tool_name'),
     ],
     [H.SessionStart]: [
-      ...(existingHooks[H.SessionStart] || []),
+      ...filterOurHooks(existingHooks[H.SessionStart]),
       bridgeEntry(eventBridge, eventsPath, E.SessionStart),
     ],
     [H.SessionEnd]: [
-      ...(existingHooks[H.SessionEnd] || []),
+      ...filterOurHooks(existingHooks[H.SessionEnd]),
       bridgeEntry(eventBridge, eventsPath, E.SessionEnd),
     ],
     [H.AfterAgent]: [
-      ...(existingHooks[H.AfterAgent] || []),
+      ...filterOurHooks(existingHooks[H.AfterAgent]),
       bridgeEntry(eventBridge, eventsPath, E.Idle),
     ],
     [H.BeforeAgent]: [
-      ...(existingHooks[H.BeforeAgent] || []),
+      ...filterOurHooks(existingHooks[H.BeforeAgent]),
       bridgeEntry(eventBridge, eventsPath, E.Prompt),
     ],
     [H.Notification]: [
-      ...(existingHooks[H.Notification] || []),
+      ...filterOurHooks(existingHooks[H.Notification]),
       bridgeEntry(eventBridge, eventsPath, E.Notification, 'detail:message,notification'),
     ],
     [H.PreCompress]: [
-      ...(existingHooks[H.PreCompress] || []),
+      ...filterOurHooks(existingHooks[H.PreCompress]),
       bridgeEntry(eventBridge, eventsPath, E.Compact),
     ],
   };
@@ -108,17 +115,15 @@ function geminiSettingsPath(directory: string): string {
 }
 
 /**
- * Strip ALL Kangentic hook entries from `.gemini/settings.json` at the
+ * Remove ALL Kangentic hook entries from `.gemini/settings.json` at the
  * given directory. Preserves all other user hooks and settings.
  *
- * Known race: Gemini has no `--settings <path>` flag (unlike Claude), so we
- * must write to the project-level `.gemini/settings.json` in the cwd.
- * Concurrent Gemini sessions in the same project race on this file, and
- * an abnormal termination may leave orphan Kangentic hook entries behind.
- * This stripper is the cleanup path on normal shutdown + project deletion.
- * See follow-up task to submit an upstream Gemini PR for per-session settings.
+ * Called on session exit/suspend to clean up hooks injected by
+ * buildHooks(). Gemini has no --settings flag, so hooks live
+ * in the shared project-level file and must be explicitly removed
+ * when the session ends.
  */
-export function stripGeminiKangenticHooks(directory: string): void {
+export function removeHooks(directory: string): void {
   safelyUpdateSettingsFile(geminiSettingsPath(directory), (parsed) => {
     const settings = parsed as { hooks?: Record<string, GeminiHookEntry[]> };
     if (!settings?.hooks || typeof settings.hooks !== 'object') return null;
@@ -135,5 +140,5 @@ export function stripGeminiKangenticHooks(directory: string): void {
 
     if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
     return settings;
-  }, 'stripGeminiKangenticHooks');
+  }, 'removeHooks');
 }

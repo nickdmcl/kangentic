@@ -984,6 +984,14 @@ export interface AgentParser {
   detectFirstOutput(data: string): boolean;
   /** How this agent exposes runtime state (activity detection + session ID capture). */
   runtime: AdapterRuntimeStrategy;
+  /**
+   * Remove monitoring hooks injected by this adapter from the project's
+   * settings file. Called on session exit and suspend to prevent hook
+   * accumulation across sessions. Gemini writes hooks to a shared
+   * project-level `.gemini/settings.json` (no --settings flag), so
+   * each session must clean up its own hooks when done.
+   */
+  removeHooks(directory: string): void;
 }
 
 /**

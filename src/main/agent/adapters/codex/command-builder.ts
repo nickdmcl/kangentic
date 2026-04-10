@@ -1,6 +1,6 @@
 import { toForwardSlash, quoteArg, isUnixLikeShell } from '../../../../shared/paths';
 import { interpolateTemplate } from '../../shared/template-utils';
-import { writeCodexHooks } from './hook-manager';
+import { buildHooks } from './hook-manager';
 import type { PermissionMode } from '../../../../shared/types';
 
 export interface CodexCommandOptions {
@@ -55,7 +55,7 @@ export class CodexCommandBuilder {
     // Claude's createMergedSettings side effect in buildClaudeCommand)
     if (options.eventsOutputPath) {
       const projectRoot = options.projectRoot || options.cwd;
-      writeCodexHooks(projectRoot, options.eventsOutputPath);
+      buildHooks(projectRoot, options.eventsOutputPath);
     }
 
     const parts: string[] = [];

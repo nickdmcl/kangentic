@@ -152,7 +152,7 @@ export async function cleanupProject(context: IpcContext, projectId: string, pro
   for (const directory of directories) {
     for (const adapterName of agentRegistry.list()) {
       const adapter = agentRegistry.get(adapterName);
-      if (adapter) adapter.stripHooks(directory);
+      if (adapter) adapter.removeHooks(directory);
     }
   }
 

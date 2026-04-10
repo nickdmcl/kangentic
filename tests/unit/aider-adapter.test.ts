@@ -238,8 +238,8 @@ describe('AiderAdapter', () => {
       await expect(adapter.ensureTrust('/some/dir')).resolves.toBeUndefined();
     });
 
-    it('stripHooks does not throw', () => {
-      expect(() => adapter.stripHooks('/some/dir')).not.toThrow();
+    it('removeHooks does not throw', () => {
+      expect(() => adapter.removeHooks('/some/dir')).not.toThrow();
     });
 
     it('clearSettingsCache does not throw', () => {

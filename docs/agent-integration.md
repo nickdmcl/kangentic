@@ -18,7 +18,7 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 | `parseStatus(raw)` | Parse agent-specific status data into `SessionUsage` |
 | `parseEvent(line)` | Parse a single JSONL event line into `SessionEvent` |
 | `runtime` | `AdapterRuntimeStrategy` declaring activity detection + session ID capture (see below) |
-| `stripHooks(directory)` | Remove monitoring hooks on cleanup |
+| `removeHooks(directory)` | Remove monitoring hooks on cleanup |
 | `clearSettingsCache()` | Clear cached merged settings |
 | `detectFirstOutput(data)` | Detect when the agent TUI is ready (lifts shimmer overlay) |
 | `getExitSequence()` | Return PTY write sequence for graceful exit |
@@ -337,7 +337,7 @@ gemini --resume <sessionId>
 
 Gemini reads settings from `.gemini/settings.json` in the project directory. Unlike Claude's `--settings` flag, Gemini has no way to point to a per-session settings file. Kangentic writes merged settings (with event-bridge hooks) directly to `.gemini/settings.json` in the CWD.
 
-Known limitation: concurrent Gemini sessions in the same project race on this file, and a crash may leave hooks in the user's settings. `stripHooks()` cleans up on normal shutdown.
+Known limitation: concurrent Gemini sessions in the same project race on this file, and a crash may leave hooks in the user's settings. `removeHooks()` cleans up on normal shutdown.
 
 ## Aider
 

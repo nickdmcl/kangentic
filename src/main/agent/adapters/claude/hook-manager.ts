@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { EventType } from '../../../../shared/types';
-import { isKangenticHookCommand, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
+import { filterKangenticHooks, buildBridgeCommand, safelyUpdateSettingsFile } from '../../shared/hook-utils';
 
 /** All Claude Code hook event names (settings.json keys). */
 export const ClaudeHookEvent = {
@@ -38,14 +38,9 @@ export interface ClaudeHookEntry {
   hooks: Array<{ type: string; command: string }>;
 }
 
-/**
- * Filter out ALL Kangentic-injected entries from a hook event array.
- * Returns only entries that are NOT ours (any bridge type).
- */
+/** Filter out Kangentic-injected entries, keeping only user-defined hooks. */
 function filterOurHooks(entries: ClaudeHookEntry[] | undefined): ClaudeHookEntry[] {
-  return (entries || []).filter(
-    (entry) => !entry?.hooks?.some?.((hook) => isKangenticHookCommand(hook.command)),
-  );
+  return filterKangenticHooks(entries, (entry: ClaudeHookEntry) => entry.hooks?.map((hook) => hook.command) ?? []);
 }
 
 /** Return the path to `.claude/settings.local.json` for the given directory. */
@@ -53,7 +48,7 @@ function settingsLocalPath(dir: string): string {
   return path.join(dir, '.claude', 'settings.local.json');
 }
 
-export function buildEventHooks(
+export function buildHooks(
   eventBridge: string,
   eventsPath: string,
   existingHooks: Record<string, ClaudeHookEntry[]>,
@@ -164,7 +159,7 @@ export function buildEventHooks(
  * for backward compatibility - existing worktrees created before the
  * change may still have our hooks in their settings.local.json.
  */
-export function stripKangenticHooks(dir: string): void {
+export function removeHooks(dir: string): void {
   safelyUpdateSettingsFile(settingsLocalPath(dir), (parsed) => {
     const settings = parsed as { hooks?: Record<string, ClaudeHookEntry[]> };
     if (!settings?.hooks || typeof settings.hooks !== 'object') return null;
@@ -181,5 +176,5 @@ export function stripKangenticHooks(dir: string): void {
 
     if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
     return settings;
-  }, 'stripKangenticHooks');
+  }, 'removeHooks');
 }

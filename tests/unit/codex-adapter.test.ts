@@ -3,8 +3,8 @@
  * hook management, event parsing, and template interpolation.
  *
  * These test the adapter's public API which exercises the internal
- * buildCodexCommand, mapPermissionMode, writeCodexHooks, and
- * stripCodexHooks functions.
+ * buildCodexCommand, mapPermissionMode, buildHooks, and
+ * removeHooks functions.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -243,7 +243,7 @@ describe('Codex Adapter', () => {
       expect(hooks.length).toBe(5);
     });
 
-    it('stripHooks removes Kangentic entries and preserves user hooks', () => {
+    it('removeHooks removes Kangentic entries and preserves user hooks', () => {
       const codexDir = path.join(tempDir, '.codex');
       fs.mkdirSync(codexDir, { recursive: true });
 
@@ -258,14 +258,14 @@ describe('Codex Adapter', () => {
         JSON.stringify([userHook, kangenticHook]),
       );
 
-      adapter.stripHooks(tempDir);
+      adapter.removeHooks(tempDir);
 
       const hooks = JSON.parse(fs.readFileSync(path.join(codexDir, 'hooks.json'), 'utf-8'));
       expect(hooks.length).toBe(1);
       expect(hooks[0]).toEqual(userHook);
     });
 
-    it('stripHooks removes file when only Kangentic hooks remain', () => {
+    it('removeHooks removes file when only Kangentic hooks remain', () => {
       const codexDir = path.join(tempDir, '.codex');
       fs.mkdirSync(codexDir, { recursive: true });
 
@@ -276,17 +276,17 @@ describe('Codex Adapter', () => {
       };
       fs.writeFileSync(path.join(codexDir, 'hooks.json'), JSON.stringify([kangenticHook]));
 
-      adapter.stripHooks(tempDir);
+      adapter.removeHooks(tempDir);
 
       expect(fs.existsSync(path.join(codexDir, 'hooks.json'))).toBe(false);
     });
 
-    it('stripHooks is a no-op when hooks.json does not exist', () => {
+    it('removeHooks is a no-op when hooks.json does not exist', () => {
       // Should not throw
-      adapter.stripHooks(tempDir);
+      adapter.removeHooks(tempDir);
     });
 
-    it('stripHooks is a no-op when no Kangentic hooks present', () => {
+    it('removeHooks is a no-op when no Kangentic hooks present', () => {
       const codexDir = path.join(tempDir, '.codex');
       fs.mkdirSync(codexDir, { recursive: true });
 
@@ -294,7 +294,7 @@ describe('Codex Adapter', () => {
       const original = JSON.stringify([userHook], null, 2);
       fs.writeFileSync(path.join(codexDir, 'hooks.json'), original);
 
-      adapter.stripHooks(tempDir);
+      adapter.removeHooks(tempDir);
 
       // File should be unchanged
       expect(fs.readFileSync(path.join(codexDir, 'hooks.json'), 'utf-8')).toBe(original);

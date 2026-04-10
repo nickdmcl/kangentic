@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
-  buildEventHooks,
-  stripKangenticHooks,
+  buildHooks,
+  removeHooks,
 } from '../../src/main/agent/adapters/claude';
 
 let tmpDir: string;
@@ -29,9 +29,9 @@ afterEach(() => {
 });
 
 describe('hook-manager', () => {
-  describe('buildEventHooks', () => {
+  describe('buildHooks', () => {
     it('produces correct hook entries for all 17 event types', () => {
-      const hooks = buildEventHooks(EVENT_BRIDGE, EVENTS_PATH, {});
+      const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, {});
 
       // PreToolUse: tool_start only (blank matcher)
       expect(hooks.PreToolUse).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('hook-manager', () => {
         ],
       };
 
-      const hooks = buildEventHooks(EVENT_BRIDGE, EVENTS_PATH, existing);
+      const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, existing);
 
       // PreToolUse: 1 user + 1 event-bridge
       expect(hooks.PreToolUse).toHaveLength(2);
@@ -132,7 +132,7 @@ describe('hook-manager', () => {
     });
   });
 
-  describe('stripKangenticHooks', () => {
+  describe('removeHooks', () => {
     it('removes ALL kangentic hooks, preserves user hooks', () => {
       const claudeDir = path.join(tmpDir, '.claude');
       fs.mkdirSync(claudeDir, { recursive: true });
@@ -163,7 +163,7 @@ describe('hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       const result = readSettings();
       const hooks = result.hooks as Record<string, unknown[]>;
@@ -195,7 +195,7 @@ describe('hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       const result = readSettings();
       const hooks = result.hooks as Record<string, unknown[]>;
@@ -218,13 +218,13 @@ describe('hook-manager', () => {
         JSON.stringify(settings, null, 2),
       );
 
-      stripKangenticHooks(tmpDir);
+      removeHooks(tmpDir);
 
       expect(settingsExists()).toBe(false);
     });
 
     it('handles missing file', () => {
-      expect(() => stripKangenticHooks(tmpDir)).not.toThrow();
+      expect(() => removeHooks(tmpDir)).not.toThrow();
     });
   });
 });

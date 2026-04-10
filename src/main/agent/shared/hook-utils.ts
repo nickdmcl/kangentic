@@ -17,6 +17,24 @@ export function isKangenticHookCommand(command: string | undefined): boolean {
 }
 
 /**
+ * Filter out Kangentic-injected entries from a hook array, keeping only
+ * user-defined hooks. Works with any hook entry shape - the caller
+ * provides a `getCommands` function that extracts command strings from
+ * each entry.
+ *
+ * Used by each adapter's `buildHooks` (strip stale before inject) and
+ * `removeHooks` (clean up on exit).
+ */
+export function filterKangenticHooks<T>(
+  entries: T[] | undefined,
+  getCommands: (entry: T) => string[],
+): T[] {
+  return (entries || []).filter((entry) => {
+    return !getCommands(entry).some((command) => isKangenticHookCommand(command));
+  });
+}
+
+/**
  * Build a `node <bridge> <events> <eventType> [directives...]` command string.
  * Used by all hook-managers when wiring bridge entries.
  */

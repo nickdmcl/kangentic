@@ -45,7 +45,7 @@ function codexHooksPath(directory: string): string {
  * root. Merges with any existing user-defined hooks (our entries are filtered
  * out first to avoid duplicates).
  */
-export function writeCodexHooks(projectRoot: string, eventsOutputPath: string): void {
+export function buildHooks(projectRoot: string, eventsOutputPath: string): void {
   const hooksFile = codexHooksPath(projectRoot);
   const eventBridge = toForwardSlash(resolveBridgeScript('event-bridge'));
   const eventsPath = toForwardSlash(eventsOutputPath);
@@ -84,11 +84,11 @@ export function writeCodexHooks(projectRoot: string, eventsOutputPath: string): 
  * Strip ALL Kangentic hook entries from .codex/hooks.json at the given
  * directory. Preserves all other user hooks.
  */
-export function stripCodexHooks(directory: string): void {
+export function removeHooks(directory: string): void {
   safelyUpdateSettingsFile(codexHooksPath(directory), (parsed) => {
     if (!Array.isArray(parsed)) return null;
     const hooks = parsed as CodexHookEntry[];
     const filtered = hooks.filter(entry => !isKangenticHookCommand(entry.command));
     return filtered.length === hooks.length ? null : filtered;
-  }, 'stripCodexHooks');
+  }, 'removeHooks');
 }

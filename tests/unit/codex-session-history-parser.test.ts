@@ -195,6 +195,54 @@ describe('CodexSessionHistoryParser', () => {
       expect(result.activity).toBeNull();
     });
 
+    it('buildUsage omits uncaptured fields from contextWindow (model-only chunk)', () => {
+      // A chunk with only turn_context (model name) must NOT include
+      // contextWindowSize or token fields, so the spread merge in
+      // setSessionUsage() does not overwrite previously-set values.
+      const jsonl = JSON.stringify({
+        timestamp: '2026-04-09T04:36:51.071Z',
+        type: 'turn_context',
+        payload: { model: 'gpt-5.3-codex' },
+      }) + '\n';
+
+      const result = CodexSessionHistoryParser.parse(jsonl, 'append');
+      expect(result.usage).not.toBeNull();
+      expect(result.usage!.model.id).toBe('gpt-5.3-codex');
+      // Model-only chunk: contextWindow should not be present at all,
+      // so the spread merge in setSessionUsage() preserves the base.
+      expect(Object.prototype.hasOwnProperty.call(result.usage!, 'contextWindow')).toBe(false);
+    });
+
+    it('buildUsage omits uncaptured fields from contextWindow (token-only chunk without window size)', () => {
+      // A token_count entry without model_context_window must NOT
+      // include contextWindowSize in the result, so a previously-set
+      // window size from task_started is preserved during merge.
+      const jsonl = JSON.stringify({
+        timestamp: '2026-04-09T04:38:53.854Z',
+        type: 'token_count',
+        payload: {
+          info: {
+            last_token_usage: {
+              input_tokens: 180000,
+              output_tokens: 50,
+              cached_input_tokens: 5000,
+              total_tokens: 180050,
+            },
+            // model_context_window intentionally absent
+          },
+        },
+      }) + '\n';
+
+      const result = CodexSessionHistoryParser.parse(jsonl, 'append');
+      expect(result.usage).not.toBeNull();
+      expect(result.usage!.contextWindow.totalInputTokens).toBe(180000);
+      expect(result.usage!.contextWindow.usedTokens).toBe(180000);
+      // contextWindowSize must NOT be an own property
+      expect(Object.prototype.hasOwnProperty.call(result.usage!.contextWindow, 'contextWindowSize')).toBe(false);
+      // usedPercentage is never set by buildUsage - recalculated after merge
+      expect(Object.prototype.hasOwnProperty.call(result.usage!.contextWindow, 'usedPercentage')).toBe(false);
+    });
+
     it('uses last_token_usage (per-turn) not total_token_usage (cumulative)', () => {
       // Regression test for context % bar climbing past 100% on long
       // sessions. Codex reports total_token_usage as cumulative billed

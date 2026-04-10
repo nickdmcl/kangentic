@@ -2,7 +2,7 @@ import { ClaudeDetector } from './detector';
 import { CommandBuilder } from './command-builder';
 import { ClaudeStatusParser } from './status-parser';
 import { ensureWorktreeTrust, ensureMcpServerTrust } from './trust-manager';
-import { stripKangenticHooks } from './hook-manager';
+import { removeHooks as removeClaudeHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -71,8 +71,8 @@ export class ClaudeAdapter implements AgentAdapter {
     },
   };
 
-  stripHooks(directory: string): void {
-    stripKangenticHooks(directory);
+  removeHooks(directory: string): void {
+    removeClaudeHooks(directory);
   }
 
   clearSettingsCache(): void {

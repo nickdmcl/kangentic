@@ -73,7 +73,7 @@ export interface AgentAdapter {
   interpolateTemplate(template: string, variables: Record<string, string>): string;
 
   /** Remove any monitoring hooks injected by this adapter (cleanup). */
-  stripHooks(directory: string): void;
+  removeHooks(directory: string): void;
 
   /** Clear any cached settings (e.g. after project settings change). */
   clearSettingsCache(): void;

@@ -629,6 +629,15 @@ export class SessionManager extends EventEmitter {
       // the PTY exits, but fs.watch hasn't fired the callback yet.
       this.flushPendingEvents(id);
 
+      // Strip agent hooks from the project's settings file so they don't
+      // accumulate across sessions. Gemini writes hooks to <cwd>/.gemini/
+      // settings.json (shared project-level, no --settings flag), so each
+      // session must clean up its own hooks on exit. Without this, hooks
+      // pile up and Gemini executes N copies per event.
+      if (session.agentParser?.removeHooks) {
+        session.agentParser.removeHooks(session.cwd);
+      }
+
       // Close watchers but preserve session files on disk - they are needed
       // for crash recovery (the status-file reader reads status.json on
       // resume). Files are cleaned up by pruneStaleResources(), remove(),
@@ -840,6 +849,12 @@ export class SessionManager extends EventEmitter {
   async suspend(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    // Strip agent hooks from the project's settings file before
+    // closing down. Prevents hook accumulation across sessions.
+    if (session.agentParser?.removeHooks) {
+      session.agentParser.removeHooks(session.cwd);
+    }
 
     // Close watchers - no longer need real-time updates
     this.fileWatcher.stopAll(sessionId);

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { toForwardSlash, quoteArg, isUnixLikeShell } from '../../../../shared/paths';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
 import { interpolateTemplate } from '../../shared/template-utils';
-import { buildEventHooks } from './hook-manager';
+import { buildHooks } from './hook-manager';
 import type { ClaudeHookEntry } from './hook-manager';
 import type { CommandOptions } from '../../agent-adapter';
 
@@ -237,7 +237,7 @@ export class CommandBuilder {
     const eventsPath = options.eventsOutputPath ? toForwardSlash(options.eventsOutputPath) : null;
     if (eventsPath) {
       const eventBridge = toForwardSlash(resolveBridgeScript('event-bridge'));
-      merged.hooks = buildEventHooks(eventBridge, eventsPath, baseSettings.hooks || {});
+      merged.hooks = buildHooks(eventBridge, eventsPath, baseSettings.hooks || {});
     }
 
     // Session directory (used for the merged Claude settings file).

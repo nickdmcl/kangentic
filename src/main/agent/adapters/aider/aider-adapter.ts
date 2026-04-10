@@ -109,7 +109,7 @@ export class AiderAdapter implements AgentAdapter {
   };
 
   // Aider does not use hooks - no-op
-  stripHooks(_directory: string): void {}
+  removeHooks(_directory: string): void {}
 
   // Aider has no merged settings - no-op
   clearSettingsCache(): void {}

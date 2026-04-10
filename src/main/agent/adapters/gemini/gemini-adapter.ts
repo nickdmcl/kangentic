@@ -1,6 +1,6 @@
 import { GeminiDetector } from './detector';
 import { GeminiCommandBuilder } from './command-builder';
-import { stripGeminiKangenticHooks } from './hook-manager';
+import { removeHooks as removeGeminiHooks } from './hook-manager';
 import { GeminiSessionHistoryParser } from './session-history-parser';
 import { GeminiStatusParser } from './status-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
@@ -107,6 +107,11 @@ export class GeminiAdapter implements AgentAdapter {
         const headerMatch = data.match(/Session ID:\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
         return headerMatch ? headerMatch[1] : null;
       },
+      // Gemini 0.37 neither includes session_id reliably in hook stdin
+      // nor prints it in PTY output until shutdown. The only source at
+      // runtime is the session JSON file Gemini writes synchronously at
+      // session start. This scan is the primary capture path.
+      fromFilesystem: GeminiSessionHistoryParser.captureSessionIdFromFilesystem,
     },
     sessionHistory: {
       locate: GeminiSessionHistoryParser.locate,
@@ -115,8 +120,8 @@ export class GeminiAdapter implements AgentAdapter {
     },
   };
 
-  stripHooks(directory: string): void {
-    stripGeminiKangenticHooks(directory);
+  removeHooks(directory: string): void {
+    removeGeminiHooks(directory);
   }
 
   clearSettingsCache(): void {

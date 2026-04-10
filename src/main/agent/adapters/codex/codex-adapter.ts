@@ -1,6 +1,6 @@
 import { CodexDetector } from './detector';
 import { CodexCommandBuilder } from './command-builder';
-import { stripCodexHooks } from './hook-manager';
+import { removeHooks as removeCodexHooks } from './hook-manager';
 import { CodexSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
@@ -112,8 +112,8 @@ export class CodexAdapter implements AgentAdapter {
     },
   };
 
-  stripHooks(directory: string): void {
-    stripCodexHooks(directory);
+  removeHooks(directory: string): void {
+    removeCodexHooks(directory);
   }
 
   clearSettingsCache(): void {

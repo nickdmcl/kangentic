@@ -49,6 +49,54 @@ import {
  */
 export class GeminiSessionHistoryParser {
   /**
+   * Scan `~/.gemini/tmp/<basename(cwd)>/chats/` for a session file whose
+   * `startTime` says it was created by our spawn, and return its
+   * `sessionId`. The primary capture path for Gemini - hooks are
+   * unreliable (`session_id` may be missing from SessionStart stdin)
+   * and PTY output only shows the session ID at shutdown.
+   *
+   * Two-stage filter:
+   *   1. mtime >= spawnedAt - 30s    (cheap pre-filter; avoids reading
+   *      every historical session file)
+   *   2. JSON `startTime` is within ±30s of spawnedAt (wider than Codex
+   *      because Gemini's startup can be slower, especially with auth)
+   *
+   * Known limitation: two concurrent Gemini sessions in the same cwd
+   * could both match the same file (shared basename). Worktrees mitigate
+   * this since they produce unique basenames.
+   */
+  static async captureSessionIdFromFilesystem(options: {
+    spawnedAt: Date;
+    cwd: string;
+    maxAttempts?: number;
+  }): Promise<string | null> {
+    const spawnedAtMs = options.spawnedAt.getTime();
+    const mtimeFloorMs = spawnedAtMs - 30_000;
+    const startTimeFloorMs = spawnedAtMs - 30_000;
+    const startTimeCeilMs = spawnedAtMs + 30_000;
+
+    const projectDirName = computeGeminiProjectDirName(options.cwd);
+    const directory = path.join(os.homedir(), '.gemini', 'tmp', projectDirName, 'chats');
+    const pattern = /^session-.*\.json$/;
+
+    const maxAttempts = options.maxAttempts ?? 20;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const entries = safeReaddirWithStats(directory)
+        .filter((entry) => pattern.test(entry.name) && entry.mtimeMs >= mtimeFloorMs);
+
+      for (const entry of entries) {
+        const meta = readGeminiSessionMeta(path.join(directory, entry.name));
+        if (!meta) continue;
+        if (meta.startTimeMs < startTimeFloorMs) continue;
+        if (meta.startTimeMs > startTimeCeilMs) continue;
+        return meta.sessionId;
+      }
+      await sleep(500);
+    }
+    return null;
+  }
+
+  /**
    * Locate the chat session file for a known session UUID. Gemini writes
    * the file synchronously when the session starts, so a single
    * readdirSync is usually sufficient. We poll up to 5 s as a safety net.
@@ -264,6 +312,50 @@ function findMatchingFile(directory: string, pattern: RegExp): string | null {
   }
   const match = entries.find((name) => pattern.test(name));
   return match ? path.join(directory, match) : null;
+}
+
+/**
+ * Read a directory and return each entry as `{ name, mtimeMs }`,
+ * skipping anything that fails to stat. Returns an empty array when
+ * the directory does not exist.
+ */
+function safeReaddirWithStats(directory: string): Array<{ name: string; mtimeMs: number }> {
+  let names: string[];
+  try {
+    names = fs.readdirSync(directory);
+  } catch {
+    return [];
+  }
+  const results: Array<{ name: string; mtimeMs: number }> = [];
+  for (const name of names) {
+    try {
+      const stat = fs.statSync(path.join(directory, name));
+      results.push({ name, mtimeMs: stat.mtimeMs });
+    } catch {
+      // File vanished between readdir and stat - skip.
+    }
+  }
+  return results;
+}
+
+/**
+ * Parse `sessionId` and `startTime` from a Gemini session JSON file.
+ * Returns null on any I/O or parse failure. Only called on mtime-fresh
+ * files, which are small enough to read whole.
+ */
+function readGeminiSessionMeta(filePath: string): { sessionId: string; startTimeMs: number } | null {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const parsed: unknown = JSON.parse(content);
+    if (!isRecord(parsed)) return null;
+    const { sessionId, startTime } = parsed;
+    if (typeof sessionId !== 'string' || typeof startTime !== 'string') return null;
+    const startTimeMs = Date.parse(startTime);
+    if (!Number.isFinite(startTimeMs)) return null;
+    return { sessionId, startTimeMs };
+  } catch {
+    return null;
+  }
 }
 
 /** Simple async sleep helper for polling loops. */

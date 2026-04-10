@@ -3,7 +3,7 @@ import path from 'node:path';
 import { toForwardSlash, quoteArg, isUnixLikeShell } from '../../../../shared/paths';
 import { interpolateTemplate } from '../../shared/template-utils';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
-import { buildGeminiEventHooks } from './hook-manager';
+import { buildHooks } from './hook-manager';
 import type { GeminiHookEntry } from './hook-manager';
 import type { PermissionMode } from '../../../../shared/types';
 
@@ -119,7 +119,7 @@ export class GeminiCommandBuilder {
    * Known limitation: unlike Claude's --settings flag, Gemini has no way
    * to point to a per-session settings file. Writing directly to the cwd
    * means concurrent Gemini sessions in the same project race on this file,
-   * and a crash may leave hooks in the user's settings. stripHooks() cleans
+   * and a crash may leave hooks in the user's settings. removeHooks() cleans
    * up on normal shutdown; the isKangenticHook() guard prevents affecting
    * user-defined hooks.
    */
@@ -133,7 +133,7 @@ export class GeminiCommandBuilder {
     const eventBridge = toForwardSlash(resolveBridgeScript('event-bridge'));
     const merged: GeminiSettings = {
       ...baseSettings,
-      hooks: buildGeminiEventHooks(eventBridge, eventsPath, baseSettings.hooks || {}),
+      hooks: buildHooks(eventBridge, eventsPath, baseSettings.hooks || {}),
     };
 
     // Write merged settings into the cwd's .gemini/settings.json
