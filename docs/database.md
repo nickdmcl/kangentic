@@ -253,14 +253,12 @@ No foreign key constraint on `session_id`. Cascade cleanup is handled via a DELE
 | from_agent | TEXT | NOT NULL | |
 | to_agent | TEXT | NOT NULL | |
 | trigger | TEXT | NOT NULL | |
-| packet_json | TEXT | NOT NULL | |
+| session_history_path | TEXT | | |
 | created_at | TEXT | NOT NULL | |
 
 Index: `idx_handoffs_task_id` on (task_id).
 
-Two TypeScript types map to this table:
-- `HandoffRecord` in `src/shared/types.ts` - IPC-safe shape without `packet_json` (used in renderer)
-- `HandoffRecordFull` in `src/main/db/repositories/handoff-repository.ts` - full shape with `packet_json` (used in main process)
+TypeScript type: `HandoffRecord` in `src/shared/types.ts`. Repository: `HandoffRepository` in `src/main/db/repositories/handoff-repository.ts`.
 
 ## Migration Strategy
 

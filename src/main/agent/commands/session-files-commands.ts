@@ -3,6 +3,7 @@ import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { sessionOutputPaths } from '../../engine/session-paths';
+import { agentRegistry } from '../../agent/agent-registry';
 import { resolveTask } from './task-resolver';
 import type { CommandContext, CommandHandler, CommandResponse } from './types';
 
@@ -73,7 +74,6 @@ function buildSessionFiles(projectRoot: string, sessionId: string) {
     commandsJsonl: path.join(sessionDir, 'commands.jsonl'),
     mcpJson: path.join(sessionDir, 'mcp.json'),
     responsesDir: path.join(sessionDir, 'responses'),
-    handoffContextMd: path.join(sessionDir, 'handoff-context.md'),
   };
   const filesWithExists: Record<string, { path: string; exists: boolean }> = {};
   for (const [key, filePath] of Object.entries(files)) {
@@ -82,10 +82,21 @@ function buildSessionFiles(projectRoot: string, sessionId: string) {
   return { sessionDir, files: filesWithExists };
 }
 
-export const handleGetSessionFiles: CommandHandler = (
+/**
+ * Locate the agent's native session history file for a session record.
+ * Returns the absolute path if found, null otherwise.
+ */
+async function locateNativeSessionFile(session: SessionRow): Promise<string | null> {
+  if (!session.agent_session_id) return null;
+  const adapter = agentRegistry.getBySessionType(session.session_type);
+  if (!adapter) return null;
+  return adapter.locateSessionHistoryFile(session.agent_session_id, session.cwd);
+}
+
+export async function handleGetSessionFiles(
   params: Record<string, unknown>,
   context: CommandContext,
-): CommandResponse => {
+): Promise<CommandResponse> {
   const database = context.getProjectDb();
   const resolved = resolveSession(database, params);
   if (resolved.error || !resolved.session) {
@@ -94,6 +105,12 @@ export const handleGetSessionFiles: CommandHandler = (
   const session = resolved.session;
   const projectRoot = context.getProjectPath();
   const { sessionDir, files } = buildSessionFiles(projectRoot, session.id);
+
+  // Locate the agent's native session file (Claude JSONL, Codex JSONL, Gemini JSON)
+  const nativeSessionFilePath = await locateNativeSessionFile(session);
+  const nativeSessionFile = nativeSessionFilePath
+    ? { path: nativeSessionFilePath, exists: fs.existsSync(nativeSessionFilePath) }
+    : null;
 
   return {
     success: true,
@@ -109,10 +126,11 @@ export const handleGetSessionFiles: CommandHandler = (
       suspendedAt: session.suspended_at,
       sessionDir,
       files,
+      nativeSessionFile,
     },
     message: `Session ${session.id} (${session.status}) at ${sessionDir}`,
   };
-};
+}
 
 interface ParsedEvent {
   raw: string;

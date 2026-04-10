@@ -111,17 +111,17 @@ function writeEventsJsonl(sessionId: string, lines: string[]): string {
 }
 
 describe('handleGetSessionFiles', () => {
-  it('returns error when neither taskId nor sessionId given', () => {
+  it('returns error when neither taskId nor sessionId given', async () => {
     const db = createDb({});
-    const result = handleGetSessionFiles({}, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({}, createContext(db, projectRoot));
     expect(result.success).toBe(false);
     expect(result.error).toContain('taskId or sessionId');
   });
 
-  it('resolves by sessionId and returns paths keyed by sessions.id', () => {
+  it('resolves by sessionId and returns paths keyed by sessions.id', async () => {
     const session = makeSession({ id: 'sess-xyz', agent_session_id: 'agent-xyz' });
     const db = createDb({ sessionsById: { 'sess-xyz': session } });
-    const result = handleGetSessionFiles({ sessionId: 'sess-xyz' }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ sessionId: 'sess-xyz' }, createContext(db, projectRoot));
 
     expect(result.success).toBe(true);
     const data = result.data as { sessionDir: string; sessionId: string; agentSessionId: string; files: Record<string, { path: string; exists: boolean }> };
@@ -132,56 +132,56 @@ describe('handleGetSessionFiles', () => {
     expect(data.files.eventsJsonl.exists).toBe(false);
   });
 
-  it('exists flag flips to true when the file is on disk', () => {
+  it('exists flag flips to true when the file is on disk', async () => {
     const session = makeSession({ id: 'sess-real' });
     writeEventsJsonl('sess-real', ['{"type":"Stop"}']);
     const db = createDb({ sessionsById: { 'sess-real': session } });
 
-    const result = handleGetSessionFiles({ sessionId: 'sess-real' }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ sessionId: 'sess-real' }, createContext(db, projectRoot));
     const data = result.data as { files: Record<string, { exists: boolean }> };
     expect(data.files.eventsJsonl.exists).toBe(true);
     expect(data.files.statusJson.exists).toBe(false);
   });
 
-  it('resolves by taskId picking the latest session by default', () => {
+  it('resolves by taskId picking the latest session by default', async () => {
     const newer = makeSession({ id: 'sess-new', started_at: '2026-04-08T12:00:00Z' });
     const older = makeSession({ id: 'sess-old', started_at: '2026-04-08T08:00:00Z' });
     const db = createDb({
       tasks: [{ id: 'task-1', display_id: 42, title: 'My task' }],
       sessionsByTask: { 'task-1': [newer, older] },
     });
-    const result = handleGetSessionFiles({ taskId: '42' }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ taskId: '42' }, createContext(db, projectRoot));
     expect(result.success).toBe(true);
     expect((result.data as { sessionId: string }).sessionId).toBe('sess-new');
   });
 
-  it('honors sessionIndex to pick older sessions', () => {
+  it('honors sessionIndex to pick older sessions', async () => {
     const newer = makeSession({ id: 'sess-new', started_at: '2026-04-08T12:00:00Z' });
     const older = makeSession({ id: 'sess-old', started_at: '2026-04-08T08:00:00Z' });
     const db = createDb({
       tasks: [{ id: 'task-1', display_id: 42, title: 'My task' }],
       sessionsByTask: { 'task-1': [newer, older] },
     });
-    const result = handleGetSessionFiles({ taskId: '42', sessionIndex: 1 }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ taskId: '42', sessionIndex: 1 }, createContext(db, projectRoot));
     expect((result.data as { sessionId: string }).sessionId).toBe('sess-old');
   });
 
-  it('errors when sessionIndex is out of range', () => {
+  it('errors when sessionIndex is out of range', async () => {
     const db = createDb({
       tasks: [{ id: 'task-1', display_id: 42, title: 'My task' }],
       sessionsByTask: { 'task-1': [makeSession()] },
     });
-    const result = handleGetSessionFiles({ taskId: '42', sessionIndex: 5 }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ taskId: '42', sessionIndex: 5 }, createContext(db, projectRoot));
     expect(result.success).toBe(false);
     expect(result.error).toContain('out of range');
   });
 
-  it('errors when task has no sessions', () => {
+  it('errors when task has no sessions', async () => {
     const db = createDb({
       tasks: [{ id: 'task-1', display_id: 42, title: 'My task' }],
       sessionsByTask: {},
     });
-    const result = handleGetSessionFiles({ taskId: '42' }, createContext(db, projectRoot));
+    const result = await handleGetSessionFiles({ taskId: '42' }, createContext(db, projectRoot));
     expect(result.success).toBe(false);
     expect(result.error).toContain('No sessions');
   });

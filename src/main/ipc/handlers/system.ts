@@ -383,7 +383,6 @@ export function registerSystemHandlers(context: IpcContext): void {
     if (!projectId) return [];
     const db = getProjectDb(projectId);
     const handoffRepo = new HandoffRepository(db);
-    // Use summary query to exclude large packet_json from IPC transfer
-    return handoffRepo.listSummaryByTaskId(taskId);
+    return handoffRepo.listByTaskId(taskId);
   });
 }

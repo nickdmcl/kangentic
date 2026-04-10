@@ -125,9 +125,8 @@ export class AiderAdapter implements AgentAdapter {
     return data.length > 0;
   }
 
-  transformHandoffPrompt(prompt: string, contextFilePath: string): string {
-    // Aider supports --read for reference files. Include the path inline
-    // since Aider can't be given extra flags mid-session.
-    return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
+  async locateSessionHistoryFile(_agentSessionId: string, _cwd: string): Promise<string | null> {
+    // Aider has no native session history files.
+    return null;
   }
 }

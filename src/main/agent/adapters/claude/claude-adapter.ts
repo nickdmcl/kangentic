@@ -1,6 +1,8 @@
+import fs from 'node:fs';
 import { ClaudeDetector } from './detector';
 import { CommandBuilder } from './command-builder';
 import { ClaudeStatusParser } from './status-parser';
+import { locateClaudeTranscriptFile } from './transcript-parser';
 import { ensureWorktreeTrust, ensureMcpServerTrust } from './trust-manager';
 import { removeHooks as removeClaudeHooks } from './hook-manager';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
@@ -91,7 +93,15 @@ export class ClaudeAdapter implements AgentAdapter {
     return data.includes('\x1b[?25l');
   }
 
-  transformHandoffPrompt(prompt: string, _contextFilePath: string): string {
-    return prompt + '\n\nYou can also use the `kangentic_get_handoff_context` MCP tool for structured access to the prior work context.';
+  async locateSessionHistoryFile(agentSessionId: string, cwd: string): Promise<string | null> {
+    const filePath = locateClaudeTranscriptFile(agentSessionId, cwd);
+    // locateClaudeTranscriptFile returns the computed path without checking existence.
+    // Verify the file actually exists before returning it.
+    try {
+      fs.accessSync(filePath);
+      return filePath;
+    } catch {
+      return null;
+    }
   }
 }

@@ -227,6 +227,8 @@ export interface HandoffRecord {
   from_agent: string;
   to_agent: string;
   trigger: string;
+  /** Absolute path to the source agent's native session history file, or null if unavailable. */
+  session_history_path: string | null;
   created_at: string;
 }
 

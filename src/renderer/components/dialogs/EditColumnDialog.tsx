@@ -421,15 +421,15 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
               </p>
             </div>
 
-            {/* Handoff context toggle */}
+            {/* Session history passthrough toggle */}
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs text-fg-muted">Handoff context</label>
+                <label className="text-xs text-fg-muted">Session history passthrough</label>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={handoffContext}
-                  aria-label="Handoff context"
+                  aria-label="Session history passthrough"
                   onClick={() => setHandoffContext(!handoffContext)}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                     handoffContext ? 'bg-accent' : 'bg-edge-input'
@@ -443,7 +443,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                 </button>
               </div>
               <p className="text-[11px] text-fg-faint mt-1">
-                When a task arrives from a different agent, pass the prior session's context.
+                When a task arrives from a different agent, pass the prior agent's session history file to the new agent.
               </p>
             </div>
 

@@ -15,14 +15,12 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 | `ensureTrust(workingDirectory)` | Pre-approve a directory so the agent doesn't prompt for trust |
 | `buildCommand(options)` | Build the shell command string to spawn the agent |
 | `interpolateTemplate(template, variables)` | Replace `{{key}}` placeholders in prompt templates |
-| `parseStatus(raw)` | Parse agent-specific status data into `SessionUsage` |
-| `parseEvent(line)` | Parse a single JSONL event line into `SessionEvent` |
 | `runtime` | `AdapterRuntimeStrategy` declaring activity detection + session ID capture (see below) |
 | `removeHooks(directory)` | Remove monitoring hooks on cleanup |
 | `clearSettingsCache()` | Clear cached merged settings |
 | `detectFirstOutput(data)` | Detect when the agent TUI is ready (lifts shimmer overlay) |
 | `getExitSequence()` | Return PTY write sequence for graceful exit |
-| `transformHandoffPrompt(prompt, contextFilePath)` | Add agent-specific hints to handoff prompts |
+| `locateSessionHistoryFile(agentSessionId, cwd)` | Locate the agent's native session history file on disk |
 
 ### Required Properties
 
@@ -107,16 +105,16 @@ Graceful exit sequences written to the PTY during `SessionManager.suspend()`:
 | Gemini CLI | `Ctrl+C`, `/quit` | Triggers clean shutdown |
 | Aider | `Ctrl+C` | No session resume, clean exit sufficient |
 
-## Handoff Prompt Transform
+## Session History File Location
 
-During cross-agent handoff, each adapter can add agent-specific hints to the handoff prompt:
+During cross-agent handoff, each adapter's `locateSessionHistoryFile()` finds the source agent's native session file:
 
-| Agent | Transform |
-|-------|-----------|
-| Claude Code | Appends hint to use the `kangentic_get_handoff_context` MCP tool |
-| Codex CLI | Appends file path reference to `handoff-context.md` |
-| Gemini CLI | Appends file path reference to `handoff-context.md` |
-| Aider | Appends file path reference to `handoff-context.md` |
+| Agent | File Pattern | Method |
+|-------|-------------|--------|
+| Claude Code | `~/.claude/projects/<slug>/<sessionId>.jsonl` | Direct path computation |
+| Codex CLI | `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<uuid>.jsonl` | Directory scan with polling |
+| Gemini CLI | `~/.gemini/tmp/<projectDir>/chats/session-<id>.json` | Directory scan with polling |
+| Aider | N/A | Returns null (no native session files) |
 
 ## Claude Code
 

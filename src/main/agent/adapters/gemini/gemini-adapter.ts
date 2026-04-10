@@ -140,7 +140,7 @@ export class GeminiAdapter implements AgentAdapter {
     return data.includes('\x1b[?25l');
   }
 
-  transformHandoffPrompt(prompt: string, contextFilePath: string): string {
-    return prompt + `\n\nPrior work context is at: ${contextFilePath}`;
+  async locateSessionHistoryFile(agentSessionId: string, cwd: string): Promise<string | null> {
+    return GeminiSessionHistoryParser.locate({ agentSessionId, cwd });
   }
 }

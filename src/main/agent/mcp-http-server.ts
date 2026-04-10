@@ -475,16 +475,34 @@ function registerKangenticTools(
     async () => callHandler('board_summary', {}, context, 'Failed to get board summary'),
   );
 
-  // --- kangentic_get_session_history ---
+  // --- kangentic_list_sessions ---
   server.registerTool(
-    'kangentic_get_session_history',
+    'kangentic_list_sessions',
     {
-      description: 'Get the session history for a task: how many sessions it went through, when they started/ended, exit codes, suspension reasons, and per-session metrics. Each record now includes the Kangentic session id, agentSessionId (agent CLI resume id), cwd, sessionType, and the absolute eventsJsonlPath - feed any of these into kangentic_get_session_events / kangentic_get_session_files instead of guessing paths. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
+      description: 'List all session records for a task with metadata: start/end times, exit codes, suspension reasons, cost, token counts, and duration. Use this to see how many sessions a task went through and their lifecycle details. Each record includes the Kangentic session id, agentSessionId, cwd, sessionType, and eventsJsonlPath.',
       inputSchema: z.object({
         taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
       }),
     },
-    async ({ taskId }) => callHandler('get_session_history', { taskId }, context, 'Failed to get session history'),
+    async ({ taskId }) => callHandler('list_sessions', { taskId }, context, 'Failed to list sessions'),
+  );
+
+  // --- kangentic_get_session_history ---
+  server.registerTool(
+    'kangentic_get_session_history',
+    {
+      description: 'Read the agent\'s native session history file for a task. Returns the raw file content (Claude JSONL conversation, Codex rollout JSONL, or Gemini chat JSON) from the most recent session. Use this to understand what the agent did, what decisions were made, and the full conversation history. Large files are truncated to the most recent portion.',
+      inputSchema: z.object({
+        taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
+      }),
+    },
+    async ({ taskId }) => {
+      const result = await runHandler('get_session_history', { taskId }, context);
+      if (!result.success) {
+        return { content: [{ type: 'text' as const, text: `Failed to get session history: ${result.error}` }], isError: true };
+      }
+      return { content: [{ type: 'text' as const, text: result.message ?? 'No session history available.' }] };
+    },
   );
 
   // --- kangentic_get_column_detail ---
@@ -644,16 +662,13 @@ function registerKangenticTools(
   server.registerTool(
     'kangentic_get_handoff_context',
     {
-      description: 'Get the full handoff context for a task. Call this when you are continuing work started by a previous agent. Returns the prior session transcript, git changes, commit messages, and metrics. Use this for structured access to the prior agent\'s work.',
+      description: 'Get the most recent handoff record for a task. Returns metadata about the cross-agent handoff: which agent handed off to which, when, and the path to the prior agent\'s native session history file. Use kangentic_get_session_history to read the actual session content.',
       inputSchema: z.object({
         taskId: z.string().describe('Task ID (numeric display ID like "42" or full UUID).'),
-        section: z.enum(['all', 'decisions', 'changes', 'transcript', 'metrics']).optional()
-          .describe('Which section to retrieve. "all" returns everything. "decisions" returns commit messages. "changes" returns file change list. "transcript" returns the full session transcript. "metrics" returns cost/token/duration stats. Defaults to "all".'),
       }),
     },
-    async ({ taskId, section }) => callHandler('get_handoff_context', {
+    async ({ taskId }) => callHandler('get_handoff_context', {
       taskId: taskId ?? null,
-      section: section ?? 'all',
     }, context, 'Failed to get handoff context'),
   );
 
@@ -664,7 +679,7 @@ function registerKangenticTools(
       description: 'Get the full ANSI-stripped session transcript for a task. Returns the complete terminal output from the agent session, useful for reviewing what an agent did, debugging issues, or auditing work. Find the task ID first with kangentic_find_task or kangentic_search_tasks.',
       inputSchema: z.object({
         taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). Returns transcript from the most recent session for this task.'),
-        sessionId: z.string().optional().describe('Session UUID for a specific session. Use kangentic_get_session_history to find session IDs.'),
+        sessionId: z.string().optional().describe('Session UUID for a specific session. Use kangentic_list_sessions to find session IDs.'),
       }),
     },
     async ({ taskId, sessionId }) => callHandler('get_transcript', {
@@ -677,10 +692,10 @@ function registerKangenticTools(
   server.registerTool(
     'kangentic_get_session_files',
     {
-      description: 'Get the absolute paths to every per-session file the runtime maintains for a session: events.jsonl (activity log), status.json (usage/metrics), settings.json (Claude Code settings + hooks), commands.jsonl (MCP queue), mcp.json, responses/ dir, and handoff-context.md. Use this to skip the "where is the events.jsonl?" dance - the runtime keys session directories by the Kangentic PTY session id (NOT agent_session_id) and always under the project root .kangentic/sessions/<id>/ (NOT under a worktree). Each file entry includes an "exists" flag. Provide either taskId or sessionId.',
+      description: 'Get the absolute paths to every per-session file: events.jsonl (activity log), status.json (usage/metrics), settings.json, commands.jsonl (MCP queue), mcp.json, responses/ dir, and the agent\'s native session history file (Claude JSONL, Codex JSONL, or Gemini JSON). Session directories are keyed by Kangentic PTY session id under .kangentic/sessions/<id>/. Each file entry includes an "exists" flag. Provide either taskId or sessionId.',
       inputSchema: z.object({
         taskId: z.string().optional().describe('Task ID (numeric display ID like "42" or full UUID). Picks the latest session for the task by default.'),
-        sessionId: z.string().optional().describe('Kangentic session UUID (the sessions.id column). Use kangentic_get_session_history to find session ids.'),
+        sessionId: z.string().optional().describe('Kangentic session UUID (the sessions.id column). Use kangentic_list_sessions to find session ids.'),
         sessionIndex: z.number().int().min(0).optional().describe('When taskId is given, which session to pick: 0 = newest (default), 1 = previous, etc. Sessions are ordered started_at DESC.'),
       }),
     },

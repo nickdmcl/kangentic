@@ -1,9 +1,11 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { sessionOutputPaths } from '../../engine/session-paths';
 import { SessionRepository } from '../../db/repositories/session-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { BacklogRepository } from '../../db/repositories/backlog-repository';
+import { agentRegistry } from '../../agent/agent-registry';
 import { listActiveSwimlanes } from './column-resolver';
 import { resolveTask } from './task-resolver';
 import type { Task } from '../../../shared/types';
@@ -226,7 +228,12 @@ export const handleBoardSummary: CommandHandler = (
   };
 };
 
-export const handleGetSessionHistory: CommandHandler = (
+/**
+ * List all session records for a task with metadata (times, costs, status).
+ * Renamed from get_session_history to avoid confusion with the native
+ * session file content returned by handleGetSessionHistory.
+ */
+export const handleListSessions: CommandHandler = (
   params: Record<string, unknown>,
   context: CommandContext,
 ): CommandResponse => {
@@ -267,12 +274,12 @@ export const handleGetSessionHistory: CommandHandler = (
   if (records.length === 0) {
     return {
       success: true,
-      message: `No session history for "${task.title}".`,
+      message: `No sessions for "${task.title}".`,
       data: [],
     };
   }
 
-  const lines = [`Session history for "${task.title}" (${records.length} session${records.length !== 1 ? 's' : ''}):\n`];
+  const lines = [`Sessions for "${task.title}" (${records.length} session${records.length !== 1 ? 's' : ''}):\n`];
 
   for (let index = 0; index < records.length; index++) {
     const record = records[index];
@@ -320,6 +327,95 @@ export const handleGetSessionHistory: CommandHandler = (
     })),
   };
 };
+
+const MAX_SESSION_HISTORY_BYTES = 200_000;
+
+/**
+ * Locate and read the agent's native session history file for a task.
+ * Returns the raw file content (JSONL for Claude/Codex, JSON for Gemini),
+ * truncated to the most recent portion if the file is very large.
+ */
+export async function handleGetSessionHistory(
+  params: Record<string, unknown>,
+  context: CommandContext,
+): Promise<CommandResponse> {
+  const taskId = params.taskId as string;
+  if (!taskId) {
+    return { success: false, error: 'taskId is required' };
+  }
+
+  const db = context.getProjectDb();
+  const taskRepo = new TaskRepository(db);
+  const task = resolveTask(taskRepo, taskId);
+  if (!task) {
+    return { success: false, error: `Task "${taskId}" not found` };
+  }
+
+  // Find the latest session with an agent_session_id
+  const record = db.prepare(
+    `SELECT id, session_type, agent_session_id, cwd FROM sessions
+     WHERE task_id = ? AND agent_session_id IS NOT NULL
+     ORDER BY started_at DESC LIMIT 1`
+  ).get(task.id) as {
+    id: string;
+    session_type: string;
+    agent_session_id: string;
+    cwd: string;
+  } | undefined;
+
+  if (!record) {
+    return { success: true, message: `No session with a captured agent session ID for "${task.title}".` };
+  }
+
+  const adapter = agentRegistry.getBySessionType(record.session_type);
+  if (!adapter) {
+    return { success: false, error: `No adapter registered for session type "${record.session_type}"` };
+  }
+
+  const filePath = await adapter.locateSessionHistoryFile(record.agent_session_id, record.cwd);
+  if (!filePath) {
+    return {
+      success: true,
+      message: `Could not locate the native session file for ${adapter.displayName} session ${record.agent_session_id.slice(0, 8)}.`,
+      data: { agentSessionId: record.agent_session_id, agent: adapter.name, filePath: null },
+    };
+  }
+
+  // Read the file, truncating from the beginning if too large
+  let content: string;
+  try {
+    const stats = fs.statSync(filePath);
+    if (stats.size > MAX_SESSION_HISTORY_BYTES) {
+      // Read only the tail of the file (most recent entries)
+      const buffer = Buffer.alloc(MAX_SESSION_HISTORY_BYTES);
+      const fileDescriptor = fs.openSync(filePath, 'r');
+      try {
+        fs.readSync(fileDescriptor, buffer, 0, MAX_SESSION_HISTORY_BYTES, stats.size - MAX_SESSION_HISTORY_BYTES);
+      } finally {
+        fs.closeSync(fileDescriptor);
+      }
+      const rawTail = buffer.toString('utf-8');
+      // Skip the first partial line (we likely landed mid-line)
+      const firstNewline = rawTail.indexOf('\n');
+      const cleanTail = firstNewline >= 0 ? rawTail.slice(firstNewline + 1) : rawTail;
+      content = `[Truncated - showing last ${Math.round(MAX_SESSION_HISTORY_BYTES / 1024)}KB of ${Math.round(stats.size / 1024)}KB]\n${cleanTail}`;
+    } else {
+      content = fs.readFileSync(filePath, 'utf-8');
+    }
+  } catch (readError) {
+    return { success: false, error: `Failed to read session file at ${filePath}: ${readError instanceof Error ? readError.message : String(readError)}` };
+  }
+
+  return {
+    success: true,
+    message: content,
+    data: {
+      agentSessionId: record.agent_session_id,
+      agent: adapter.name,
+      filePath,
+    },
+  };
+}
 
 export const handleGetColumnDetail: CommandHandler = (
   params: Record<string, unknown>,

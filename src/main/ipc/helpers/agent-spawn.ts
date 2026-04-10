@@ -1,16 +1,14 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { TaskRepository } from '../../db/repositories/task-repository';
 import { SwimlaneRepository } from '../../db/repositories/swimlane-repository';
 import { ActionRepository } from '../../db/repositories/action-repository';
 import { AttachmentRepository } from '../../db/repositories/attachment-repository';
 import { SessionRepository } from '../../db/repositories/session-repository';
-import { TranscriptRepository } from '../../db/repositories/transcript-repository';
 import { HandoffRepository } from '../../db/repositories/handoff-repository';
 import { TransitionEngine } from '../../engine/transition-engine';
 import { getProjectDb } from '../../db/database';
 import { interpolateTemplate } from '../../agent/shared';
-import { HandoffOrchestrator } from '../../agent/handoff';
+import { agentRegistry } from '../../agent/agent-registry';
+import { buildSessionHistoryReference } from '../../agent/handoff/session-history-reference';
 import { DEFAULT_AGENT } from '../../../shared/types';
 import type { Task, Swimlane } from '../../../shared/types';
 import type { IpcContext } from '../ipc-context';
@@ -132,7 +130,7 @@ export async function spawnAgent(options: AgentSpawnOptions): Promise<void> {
 
   console.log(`[spawnAgent] task=${task.id.slice(0, 8)} targetAgent=${targetAgent} isHandoff=${isHandoff} hasHandoffContext=${hasHandoffContext}`);
 
-  // --- Handoff path: package context and spawn target agent directly ---
+  // --- Handoff path: locate source session file and spawn target agent ---
   if (hasHandoffContext) {
     // Guard: hasHandoffContext implies isHandoff which implies task.agent !== null
     const sourceAgent = task.agent!;
@@ -140,53 +138,56 @@ export async function spawnAgent(options: AgentSpawnOptions): Promise<void> {
     emitSpawnProgress(context.mainWindow, task.id, 'packaging-handoff');
     signal?.throwIfAborted();
 
-    let handoffId: string | undefined;
     let handoffPromptPrefix: string | undefined;
-    let handoffMarkdown: string | undefined;
+    let handoffId: string | undefined;
     const handoffProjectId = options.projectId!;
-    const handoffProjectPath = options.projectPath ?? null;
     const handoffDb = getProjectDb(handoffProjectId);
 
     try {
-      // Flush pending transcript data to DB before extraction.
-      // TranscriptWriter is keyed by PTY session ID (task.session_id from
-      // the in-memory session manager), not the sessions DB record ID.
-      if (task.session_id) {
-        context.sessionManager.getTranscriptWriter()?.finalize(task.session_id);
-      }
+      // Locate the source agent's native session history file.
+      // The file path is derived from the session's agent_session_id + cwd.
       const latestSessionRecord = sessionRepo.getLatestForTask(task.id);
+      let sessionFilePath: string | null = null;
 
-      const transcriptRepo = new TranscriptRepository(handoffDb);
-      const handoffRepo = new HandoffRepository(handoffDb);
-      const orchestrator = new HandoffOrchestrator(sessionRepo, transcriptRepo, handoffRepo);
+      if (latestSessionRecord?.agent_session_id) {
+        const sourceAdapter = agentRegistry.get(sourceAgent);
+        if (sourceAdapter) {
+          sessionFilePath = await sourceAdapter.locateSessionHistoryFile(
+            latestSessionRecord.agent_session_id,
+            latestSessionRecord.cwd,
+          );
+        }
+      }
 
-      const resolvedProjectPath = handoffProjectPath ?? process.cwd();
-      const resolvedConfig = context.configManager.getEffectiveConfig(handoffProjectPath || undefined);
-      const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
-      const baseBranch = task.base_branch
-        ?? boardDefaultBranch
-        ?? resolvedConfig.git.defaultBaseBranch
-        ?? 'main';
+      // Determine if the target agent has MCP access (currently only Claude).
+      const targetAdapter = agentRegistry.get(targetAgent);
+      const targetHasMcpAccess = targetAdapter?.name === 'claude';
 
-      const events = latestSessionRecord
-        ? context.sessionManager.getEventsForSession(latestSessionRecord.id)
-        : null;
-
-      const handoffResult = await orchestrator.prepareHandoff({
-        task,
+      handoffPromptPrefix = buildSessionHistoryReference({
         sourceAgent,
-        targetAgent,
-        projectRoot: resolvedProjectPath,
-        baseBranch,
-        events,
+        sessionFilePath,
+        targetHasMcpAccess,
       });
 
-      handoffId = handoffResult.handoffId;
-      handoffPromptPrefix = handoffResult.promptPrefix;
-      handoffMarkdown = handoffResult.markdown;
+      // Store a handoff record for audit trail.
+      try {
+        const handoffRepo = new HandoffRepository(handoffDb);
+        const handoffRecord = handoffRepo.insert({
+          task_id: task.id,
+          from_session_id: latestSessionRecord?.id ?? null,
+          to_session_id: null, // Filled after target agent spawns
+          from_agent: sourceAgent,
+          to_agent: targetAgent,
+          trigger: 'column_transition',
+          session_history_path: sessionFilePath,
+        });
+        handoffId = handoffRecord.id;
+      } catch (handoffDbError) {
+        console.error('[spawnAgent] Failed to store handoff record:', handoffDbError);
+      }
     } catch (error) {
       if (isAbortError(error)) throw error;
-      console.error('[spawnAgent] Handoff packaging failed (continuing without context):', error);
+      console.error('[spawnAgent] Handoff preparation failed (continuing without context):', error);
     }
 
     emitSpawnProgress(context.mainWindow, task.id, 'detecting-agent');
@@ -203,32 +204,15 @@ export async function spawnAgent(options: AgentSpawnOptions): Promise<void> {
       return;
     }
 
-    // Post-spawn: link handoff record and write handoff-context.md.
-    // The file is written after spawn but before the agent can read it -
-    // CLI startup (detect, trust, command build) takes 1-3s while this
-    // runs synchronously (fs.writeFileSync) in ~1ms.
+    // Post-spawn: link handoff record to the target session.
     const currentTask = tasks.getById(task.id);
     if (currentTask?.session_id) {
-      const resolvedProjectPath = handoffProjectPath ?? process.cwd();
       try {
         if (handoffId) {
           const handoffRepo = new HandoffRepository(handoffDb);
           const targetSessionRecord = sessionRepo.getLatestForTask(currentTask.id);
           if (targetSessionRecord) {
             handoffRepo.updateToSession(handoffId, targetSessionRecord.id);
-          }
-        }
-
-        if (handoffMarkdown) {
-          const latestRecord = sessionRepo.getLatestForTask(currentTask.id);
-          if (latestRecord?.id) {
-            const sessionDir = path.join(resolvedProjectPath, '.kangentic', 'sessions', latestRecord.id);
-            const contextFilePath = path.join(sessionDir, 'handoff-context.md');
-            try {
-              fs.writeFileSync(contextFilePath, handoffMarkdown);
-            } catch (writeError) {
-              console.error('[spawnAgent] Failed to write handoff-context.md:', writeError);
-            }
           }
         }
       } catch (error) {

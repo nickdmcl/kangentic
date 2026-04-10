@@ -23,6 +23,17 @@ class AgentRegistry {
     return adapter;
   }
 
+  /**
+   * Look up an adapter by its session_type value (e.g. 'claude_agent').
+   * Returns the adapter whose `sessionType` matches, or undefined.
+   */
+  getBySessionType(sessionType: string): AgentAdapter | undefined {
+    for (const adapter of this.adapters.values()) {
+      if (adapter.sessionType === sessionType) return adapter;
+    }
+    return undefined;
+  }
+
   has(name: string): boolean {
     return this.adapters.has(name);
   }

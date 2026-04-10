@@ -526,6 +526,15 @@ export function runProjectMigrations(db: Database.Database): void {
     }
   }
 
+  // Migration: replace packet_json with session_history_path in handoffs table.
+  // Session history passthrough stores the native file path instead of a
+  // manufactured context packet.
+  const handoffColumns = db.prepare("PRAGMA table_info('handoffs')").all() as Array<{ name: string }>;
+  const hasSessionHistoryPath = handoffColumns.some((column) => column.name === 'session_history_path');
+  if (!hasSessionHistoryPath) {
+    db.exec('ALTER TABLE handoffs ADD COLUMN session_history_path TEXT');
+  }
+
   // Seed default swimlanes if empty (must run after all ALTER TABLE migrations)
   const laneCount = db.prepare('SELECT COUNT(*) as c FROM swimlanes').get() as { c: number };
   if (laneCount.c === 0) {

@@ -200,16 +200,12 @@ export class TransitionEngine {
       + (intent.retireRecordId ? ` retiring=${intent.retireRecordId.slice(0, 8)}` : ''),
     );
 
-    // Handoff context overlay (separate from the resume/fresh decision).
-    // Prepends a brief pointer to handoff-context.md with prior work summary.
-    // Uses ptySessionId for directory naming (agent-agnostic internal path).
+    // Session history reference overlay (separate from the resume/fresh decision).
+    // Prepends a pointer to the source agent's native session file.
     if (handoffPromptPrefix) {
-      const contextPath = `.kangentic/sessions/${ptySessionId}/handoff-context.md`;
-      let resolvedPrefix = handoffPromptPrefix.replace('{{handoffContextPath}}', contextPath);
-      resolvedPrefix = adapter.transformHandoffPrompt(resolvedPrefix, contextPath);
       prompt = prompt
-        ? resolvedPrefix + '\n\n' + prompt
-        : resolvedPrefix;
+        ? handoffPromptPrefix + '\n\n' + prompt
+        : handoffPromptPrefix;
     }
 
     // Ensure the per-session directory exists and compute output paths.

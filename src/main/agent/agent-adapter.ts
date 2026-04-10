@@ -96,13 +96,13 @@ export interface AgentAdapter {
   getExitSequence?(): string[];
 
   /**
-   * Transform the handoff prompt for this specific agent's needs.
-   * Called after the generic prompt is built, before injection.
-   *
-   * Use this to add agent-specific hints (e.g. MCP tool reference for Claude,
-   * --read flags for Aider).
+   * Locate the agent's native session history file on disk for a given
+   * session ID and working directory. Returns an absolute path to the
+   * file (e.g. Claude's JSONL, Codex's rollout JSONL, Gemini's chat JSON),
+   * or null if the agent has no session history files (Aider) or the file
+   * cannot be found.
    */
-  transformHandoffPrompt(prompt: string, contextFilePath: string): string;
+  locateSessionHistoryFile(agentSessionId: string, cwd: string): Promise<string | null>;
 
   /**
    * How this agent exposes runtime state (activity detection + session ID capture).

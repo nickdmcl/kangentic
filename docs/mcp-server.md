@@ -132,9 +132,17 @@ Get session metrics for a specific task or across all tasks.
 | `query` | string | No | Filter tasks by keyword before aggregating |
 | `sortBy` | string | No | Sort metric: "tokens", "cost", "duration", "toolCalls", "linesChanged" |
 
+### kangentic_list_sessions
+
+List all session records for a task with metadata: start/end times, exit codes, suspension reasons, cost, token counts, and duration.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `taskId` | string | Yes | Task ID |
+
 ### kangentic_get_session_history
 
-Get the session history for a task: start/end times, exit codes, suspension info, and metrics.
+Read the agent's native session history file for a task. Returns the raw file content (Claude JSONL, Codex rollout JSONL, or Gemini chat JSON) from the most recent session. Large files are truncated to the most recent portion.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -225,12 +233,11 @@ Attachments on promoted backlog tasks are automatically copied to the new task.
 
 ### kangentic_get_handoff_context
 
-Get full handoff context for a task, including transcript, git changes, and session metrics. Used during cross-agent handoff to package context from one agent's session for another.
+Get the most recent handoff record for a task. Returns metadata about the cross-agent handoff: which agent handed off to which, when, and the path to the prior agent's native session history file.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `taskId` | string | Yes | Task ID |
-| `section` | string | No | Which section to return: `all` (default), `decisions`, `changes`, `transcript`, or `metrics` |
 
 ### kangentic_get_transcript
 
