@@ -101,17 +101,23 @@ export class DiffService {
     const cached = this.mergeBaseCache.get(baseBranch);
     if (cached) return cached;
 
-    try {
-      const result = await git.raw(['merge-base', baseBranch, 'HEAD']);
-      const ref = result.trim();
-      this.mergeBaseCache.set(baseBranch, ref);
-      return ref;
-    } catch {
-      // Base branch doesn't exist (e.g. repo uses 'master' not 'main') - fall back to HEAD
-      // so the panel still shows uncommitted working tree changes.
-      this.mergeBaseCache.set(baseBranch, 'HEAD');
-      return 'HEAD';
+    // Try origin ref first - local branch may be stale if repo hasn't pulled recently.
+    // Fall back to local ref (works for repos without a remote, or non-standard remote names).
+    for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+      try {
+        const result = await git.raw(['merge-base', ref, 'HEAD']);
+        const mergeBase = result.trim();
+        this.mergeBaseCache.set(baseBranch, mergeBase);
+        return mergeBase;
+      } catch {
+        continue;
+      }
     }
+
+    // Neither ref exists (e.g. repo uses 'master' not 'main') - fall back to HEAD
+    // so the panel still shows uncommitted working tree changes.
+    this.mergeBaseCache.set(baseBranch, 'HEAD');
+    return 'HEAD';
   }
 
   async getDiffFiles(input: GitDiffFilesInput): Promise<GitDiffFilesResult> {

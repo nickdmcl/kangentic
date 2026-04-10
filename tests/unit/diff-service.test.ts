@@ -153,8 +153,8 @@ describe('DiffService', () => {
         baseBranch: 'main',
       });
 
-      // Should find merge-base first, then diff against it
-      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'main', 'HEAD']);
+      // Should try origin ref first, then diff against it
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'origin/main', 'HEAD']);
       expect(mockGit.diffSummary).toHaveBeenCalledWith(['abc123']);
       expect(mockGit.diff).toHaveBeenCalledWith(['--name-status', 'abc123']);
     });
@@ -169,10 +169,45 @@ describe('DiffService', () => {
         baseBranch: 'main',
       });
 
-      // Always uses merge-base, even without worktreePath
-      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'main', 'HEAD']);
+      // Always uses merge-base with origin ref preferred, even without worktreePath
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'origin/main', 'HEAD']);
       expect(mockGit.diffSummary).toHaveBeenCalledWith(['abc123']);
       expect(mockGit.diff).toHaveBeenCalledWith(['--name-status', 'abc123']);
+    });
+
+    it('falls back to local branch when origin ref fails', async () => {
+      // origin/main fails (no remote), local main succeeds
+      mockGit.raw
+        .mockRejectedValueOnce(new Error('fatal: not a valid object name'))
+        .mockResolvedValueOnce('def456\n');
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
+      mockGit.diff.mockResolvedValue('');
+
+      await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'main',
+      });
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'origin/main', 'HEAD']);
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'main', 'HEAD']);
+      expect(mockGit.diffSummary).toHaveBeenCalledWith(['def456']);
+    });
+
+    it('falls back to HEAD when both origin and local refs fail', async () => {
+      mockGit.raw.mockRejectedValue(new Error('fatal: not a valid object name'));
+      mockGit.diffSummary.mockResolvedValue(makeDiffSummary([]));
+      mockGit.diff.mockResolvedValue('');
+
+      await service.getDiffFiles({
+        projectPath: '/project',
+        baseBranch: 'nonexistent',
+      });
+
+      // Tried both refs
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'origin/nonexistent', 'HEAD']);
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge-base', 'nonexistent', 'HEAD']);
+      // Falls back to HEAD - diffSummary called with HEAD
+      expect(mockGit.diffSummary).toHaveBeenCalledWith(['HEAD']);
     });
 
     it('falls back to heuristic status when name-status is missing', async () => {
