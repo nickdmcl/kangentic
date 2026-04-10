@@ -1,9 +1,10 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy } from 'lucide-react';
+import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy, GitCompare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
+import { TaskChangesDialog } from '../dialogs/TaskChangesDialog';
 import { ConfirmDialog } from '../dialogs/ConfirmDialog';
 import { stripMarkdown } from '../../utils/strip-markdown';
 import { useBoardStore } from '../../stores/board-store';
@@ -24,11 +25,12 @@ interface TaskCardProps {
 }
 
 /** Inline context menu for task cards. */
-function TaskContextMenu({ position, task, swimlanes, onEdit, onMoveTo, onSendToBacklog, onArchive, onDelete, onClose }: {
+function TaskContextMenu({ position, task, swimlanes, onEdit, onShowChanges, onMoveTo, onSendToBacklog, onArchive, onDelete, onClose }: {
   position: { x: number; y: number };
   task: Task;
   swimlanes: Swimlane[];
   onEdit: () => void;
+  onShowChanges: () => void;
   onMoveTo: (targetSwimlaneId: string) => void;
   onSendToBacklog: () => void;
   onArchive: () => void;
@@ -92,6 +94,18 @@ function TaskContextMenu({ position, task, swimlanes, onEdit, onMoveTo, onSendTo
         <Pencil size={14} className="text-fg-faint" />
         Edit
       </button>
+
+      {task.worktree_path && (
+        <button
+          type="button"
+          onClick={() => { onShowChanges(); onClose(); }}
+          className="w-full px-3 py-1.5 text-sm text-fg-secondary text-left hover:bg-surface-hover/40 flex items-center gap-2"
+          data-testid="context-show-changes"
+        >
+          <GitCompare size={14} className="text-fg-faint" />
+          Changes
+        </button>
+      )}
 
       {moveTargets.length > 0 && (
         <>
@@ -225,6 +239,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
   const [confirmSendToBacklog, setConfirmSendToBacklog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [forceEdit, setForceEdit] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDragOverlay) return;
@@ -522,6 +537,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           task={task}
           swimlanes={useBoardStore.getState().swimlanes}
           onEdit={() => { setForceEdit(true); setDetailTaskId(task.id); }}
+          onShowChanges={() => setShowChanges(true)}
           onMoveTo={handleMoveTo}
           onSendToBacklog={() => {
             setContextMenu(null);
@@ -546,6 +562,10 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           }}
           onClose={() => setContextMenu(null)}
         />
+      )}
+
+      {showChanges && (
+        <TaskChangesDialog task={task} onClose={() => setShowChanges(false)} />
       )}
 
       {confirmSendToBacklog && (

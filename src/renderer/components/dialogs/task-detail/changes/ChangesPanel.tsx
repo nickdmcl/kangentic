@@ -50,6 +50,8 @@ interface ChangesPanelProps {
   projectPath: string;
   worktreePath?: string;
   baseBranch: string;
+  /** When set, shown instead of the two-pane layout if the branch has zero changed files. */
+  emptyMessage?: string;
 }
 
 interface ContentCacheEntry {
@@ -57,7 +59,7 @@ interface ContentCacheEntry {
   generation: number;
 }
 
-export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch }: ChangesPanelProps) {
+export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch, emptyMessage }: ChangesPanelProps) {
   const [files, setFiles] = useState<GitDiffFileEntry[]>([]);
   const [totalInsertions, setTotalInsertions] = useState(0);
   const [totalDeletions, setTotalDeletions] = useState(0);
@@ -66,6 +68,7 @@ export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch }
   const setSelectedFile = useCallback((filePath: string | null) => setChangesSelectedFile(entityId, filePath), [entityId, setChangesSelectedFile]);
   const [fileContent, setFileContent] = useState<GitFileContentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'split' | 'inline'>('split');
 
   // Refs for values needed inside callbacks to avoid stale closures
@@ -100,6 +103,7 @@ export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch }
       setTotalInsertions(result.totalInsertions);
       setTotalDeletions(result.totalDeletions);
       initialFetchDoneRef.current = true;
+      setLoaded(true);
     } catch (fetchError) {
       // Only show errors on initial load - transient failures during live
       // updates (e.g. git lock contention) are silently ignored.
@@ -223,6 +227,14 @@ export function ChangesPanel({ entityId, projectPath, worktreePath, baseBranch }
         >
           Retry
         </button>
+      </div>
+    );
+  }
+
+  if (emptyMessage && loaded && files.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-fg-disabled">
+        {emptyMessage}
       </div>
     );
   }
