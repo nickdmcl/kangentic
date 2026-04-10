@@ -2,8 +2,32 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseClaudeTranscript } from '../../src/main/agent/adapters/claude/transcript-parser';
+import { parseClaudeTranscript, claudeProjectSlug } from '../../src/main/agent/adapters/claude/transcript-parser';
 import { transcriptToMarkdown } from '../../src/shared/transcript-format';
+
+describe('claudeProjectSlug', () => {
+  it('replaces backslashes and colons on Windows-style paths', () => {
+    expect(claudeProjectSlug('C:\\Users\\dev\\project')).toBe('C--Users-dev-project');
+  });
+
+  it('replaces forward slashes on POSIX paths', () => {
+    expect(claudeProjectSlug('/home/dev/project')).toBe('-home-dev-project');
+  });
+
+  it('replaces dots (project names with extensions)', () => {
+    expect(claudeProjectSlug('C:\\Users\\dev\\my.app')).toBe('C--Users-dev-my-app');
+  });
+
+  it('handles worktree subpaths the same way', () => {
+    expect(
+      claudeProjectSlug('C:\\Users\\dev\\proj\\.kangentic\\worktrees\\feature-x'),
+    ).toBe('C--Users-dev-proj--kangentic-worktrees-feature-x');
+  });
+
+  it('does not collapse adjacent separators', () => {
+    expect(claudeProjectSlug('C:\\x')).toBe('C--x');
+  });
+});
 
 function writeFixture(lines: object[]): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'transcript-test-'));

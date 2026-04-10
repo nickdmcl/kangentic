@@ -2,17 +2,25 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { TranscriptEntry, TranscriptBlock } from '../../../../shared/types';
-import { claudeProjectSlug } from './session-history-parser';
+
+/**
+ * Compute Claude Code's `~/.claude/projects/<slug>/` directory name
+ * from a cwd. Replace every `/`, `\`, `:`, and `.` character with `-`.
+ * Each character is replaced individually (not collapsed), so
+ * `C:\Users` becomes `C--Users` (one dash from `:`, one from `\`).
+ */
+export function claudeProjectSlug(cwd: string): string {
+  return cwd.replace(/[/\\:.]/g, '-');
+}
 
 /**
  * Parse Claude Code's native session JSONL into a list of full transcript
  * entries (user prompts, assistant turns with text/thinking/tool_use blocks,
- * and tool results). Distinct from `ClaudeSessionHistoryParser` which only
- * extracts telemetry (tokens + tool_use events) and discards content.
+ * and tool results). Runs on demand from the renderer's Transcript tab.
  *
- * The two parsers intentionally read the same file independently. The
- * telemetry parser runs on every PTY tick via `SessionHistoryReader`; this
- * one runs only on demand from the renderer's Transcript tab.
+ * Telemetry (tokens, model, events) for Claude comes exclusively from the
+ * hook-driven `statusFile` pipeline (status.json + events.jsonl), so this
+ * file is the only consumer of the native session JSONL.
  */
 export async function parseClaudeTranscript(filePath: string): Promise<TranscriptEntry[]> {
   let content: string;
