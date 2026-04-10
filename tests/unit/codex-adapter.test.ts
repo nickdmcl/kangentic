@@ -522,58 +522,15 @@ describe('Codex Adapter', () => {
     });
   });
 
-  describe('isSignificantOutput - TUI noise filter', () => {
-    // Access the isSignificantOutput filter from the activity strategy.
-    // This filter prevents ANSI-only TUI redraws from resetting the
-    // silence timer in PtyActivityTracker.
-    function getIsSignificant(): (data: string) => boolean {
+  describe('activity detection strategy', () => {
+    it('uses PTY-only strategy with no detectIdle', () => {
       const strategy = adapter.runtime.activity;
-      return (strategy as { isSignificantOutput?: (data: string) => boolean }).isSignificantOutput!;
-    }
-
-    it('is defined on the activity strategy', () => {
-      expect(getIsSignificant()).toBeTypeOf('function');
-    });
-
-    it('returns false for pure ANSI cursor movement sequences', () => {
-      expect(getIsSignificant()('\x1b[H\x1b[2J\x1b[1;1H')).toBe(false);
-    });
-
-    it('returns false for cursor show/hide sequences', () => {
-      expect(getIsSignificant()('\x1b[?25h\x1b[?25l')).toBe(false);
-    });
-
-    it('returns false for SGR reset sequences', () => {
-      expect(getIsSignificant()('\x1b[0m\x1b[39m\x1b[49m')).toBe(false);
-    });
-
-    it('returns false for mixed ANSI-only with whitespace', () => {
-      expect(getIsSignificant()('\x1b[H\x1b[2J \x1b[?25h\n\x1b[1;1H\x1b[?25l')).toBe(false);
-    });
-
-    it('returns false for empty string', () => {
-      expect(getIsSignificant()('')).toBe(false);
-    });
-
-    it('returns true for ANSI with real text interspersed', () => {
-      expect(getIsSignificant()('\x1b[32mHello\x1b[0m')).toBe(true);
-    });
-
-    it('returns true for plain text', () => {
-      expect(getIsSignificant()('Working on task...')).toBe(true);
-    });
-
-    it('returns true for Codex output header', () => {
-      expect(getIsSignificant()('session id: 019d60ac-b67c-7a22-bcbb-af55c8295c38')).toBe(true);
-    });
-
-    it('returns false for OSC sequences only', () => {
-      expect(getIsSignificant()('\x1b]0;codex\x07')).toBe(false);
-    });
-
-    it('returns true for simulated Ink TUI redraw containing visible text', () => {
-      // Real Codex output: ANSI positioning + visible prompt
-      expect(getIsSignificant()('\x1b[H\x1b[2J\x1b[1;1H\u203A Fix the bug\x1b[?25l')).toBe(true);
+      expect(strategy.kind).toBe('pty');
+      // Codex does NOT use detectIdle. The guillemet (›) is always
+      // visible in the Ink TUI prompt area, even during active work,
+      // so it causes false idle transitions. Silence timer (10s) is
+      // the sole idle detection mechanism.
+      expect((strategy as { detectIdle?: unknown }).detectIdle).toBeUndefined();
     });
   });
 });

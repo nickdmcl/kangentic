@@ -307,33 +307,26 @@ describe('Agent PTY detection (real CLI boot)', () => {
         expect(result.firstOutputAtChunk).toBeGreaterThanOrEqual(0);
       });
 
-      it('working: at least one chunk is mid-paint (detectIdle returns false)', () => {
-        // Specificity check: if detectIdle matched EVERY chunk, the regex
-        // would be a false positive that prevents the activity dot from
-        // ever showing 'thinking' in production. We expect a mix of
-        // working chunks (TUI mid-paint) and idle hits (prompt fully
-        // painted, blocking on input).
+      // detectIdle tests only apply to adapters that provide a detectIdle
+      // callback. Codex uses silence-timer-only (no detectIdle) because the
+      // › guillemet is always visible in the Ink TUI, even during active work.
+      const hasDetectIdle = (() => {
+        const strategy = testCase.adapter.runtime.activity;
+        return (strategy.kind === 'pty' || strategy.kind === 'hooks_and_pty')
+          && typeof strategy.detectIdle === 'function';
+      })();
+
+      it.skipIf(!hasDetectIdle)('working: at least one chunk is mid-paint (detectIdle returns false)', () => {
         expect(result.workingChunks.length).toBeGreaterThan(0);
       });
 
-      it('idle: detectIdle fires once the prompt is fully painted', () => {
-        // If this fails, open tests/fixtures/agent-pty/<name>.txt and look
-        // at the trailing characters of the boot transcript - that's what
-        // the regex needs to match. Then update the adapter's detectIdle.
+      it.skipIf(!hasDetectIdle)('idle: detectIdle fires once the prompt is fully painted', () => {
         expect(result.detectedIdleEver).toBe(true);
       });
 
-      it('lifecycle: idle hits are interleaved with working chunks (not all-or-nothing)', () => {
-        // The full lifecycle the user sees on a card:
-        //   initial output -> working (CLI painting frames) -> idle
-        //   (CLI blocked on prompt) -> user input -> working again ->
-        //   idle again. We require both states to have been observed
-        //   in the same capture - this catches both "regex never
-        //   matches" (always working) and "regex always matches"
-        //   (always idle, no thinking dot ever) failure modes.
+      it.skipIf(!hasDetectIdle)('lifecycle: idle hits are interleaved with working chunks (not all-or-nothing)', () => {
         expect(result.idleHitChunks.length).toBeGreaterThan(0);
         expect(result.workingChunks.length).toBeGreaterThan(0);
-        // Sanity: total chunks accounted for == idle + working.
         expect(result.idleHitChunks.length + result.workingChunks.length)
           .toBe(result.chunks.length);
       });

@@ -10,7 +10,7 @@ import { SessionFileWatcher } from './session-file-watcher';
 import { SessionHistoryReader } from './session-history-reader';
 import { StatusFileReader } from './status-file-reader';
 import { UsageTracker } from './usage-tracker';
-import { TranscriptWriter } from './transcript-writer';
+import { TranscriptWriter, stripAnsiEscapes } from './transcript-writer';
 import { SessionIdScanner } from './session-id-scanner';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
@@ -56,6 +56,14 @@ export class SessionManager extends EventEmitter {
   private bufferManager: PtyBufferManager;
   private fileWatcher: SessionFileWatcher;
   private usageTracker: UsageTracker;
+  /**
+   * Per-session last-seen stripped PTY content for TUI redraw dedup.
+   * TUI agents (Codex, Gemini) repaint the entire screen every ~500ms
+   * even when idle. If the stripped text is identical to the previous
+   * frame, it's a redraw that should not reset the silence timer.
+   * Agent-agnostic - applies to all PTY-based strategies automatically.
+   */
+  private lastPtyContent = new Map<string, string>();
   private sessionHistoryReader: SessionHistoryReader;
   private statusFileReader: StatusFileReader;
   private firstOutputEmitted = new Set<string>();
@@ -602,7 +610,16 @@ export class SessionManager extends EventEmitter {
         if (strategy.detectIdle?.(data)) {
           this.usageTracker.notifyPtyIdle(id);
         } else if (data.length > 0) {
-          if (!strategy.isSignificantOutput || strategy.isSignificantOutput(data)) {
+          // Content dedup: TUI agents (Codex, Gemini) repaint the entire
+          // screen every ~500ms even when idle. Strip ANSI escapes and
+          // compare against the last frame. If identical, the output is a
+          // TUI redraw that should not reset the silence timer. This is
+          // agent-agnostic - works for any PTY-based strategy automatically.
+          // Fast path: skip stripAnsiEscapes when no ESC byte is present.
+          const stripped = data.includes('\x1b') ? stripAnsiEscapes(data).trim() : data.trim();
+          const previousContent = this.lastPtyContent.get(id);
+          if (stripped.length > 0 && stripped !== previousContent) {
+            this.lastPtyContent.set(id, stripped);
             this.usageTracker.notifyPtyData(id);
           }
         }
@@ -749,6 +766,7 @@ export class SessionManager extends EventEmitter {
     this.transcriptWriter?.remove(sessionId);
     this.usageTracker.removeSession(sessionId);
     this.firstOutputEmitted.delete(sessionId);
+    this.lastPtyContent.delete(sessionId);
   }
 
   /**

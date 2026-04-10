@@ -3,7 +3,6 @@ import { CodexCommandBuilder } from './command-builder';
 import { removeHooks as removeCodexHooks } from './hook-manager';
 import { CodexSessionHistoryParser } from './session-history-parser';
 import { CodexStatusParser } from './status-parser';
-import { stripAnsiEscapes } from '../../../pty/transcript-writer';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -77,30 +76,19 @@ export class CodexAdapter implements AgentAdapter {
       parseEvent: CodexStatusParser.parseEvent,
       isFullRewrite: false,
     },
-    activity: ActivityDetection.pty(
-      (data: string) => {
-        // Patterns derived from real Codex 0.118 PTY captures (see
-        // tests/unit/agent-pty-detection.test.ts and the .bin fixtures).
-        // The Codex TUI paints `› ` (U+203A) as its input cursor in both
-        // the trust dialog ("› 1. Yes, continue") and the post-boot input
-        // prompt. "Press enter to continue" appears at trust dialogs and
-        // other interactive blocks. Either signal indicates the CLI is
-        // idle waiting for user input.
-        const clean = stripAnsiEscapes(data);
-        return /\u203A\s/.test(clean) || /Press enter to continue/.test(clean);
-      },
-      (data: string) => {
-        // Codex's Ink-based TUI continuously redraws the terminal with
-        // ANSI escape sequences (cursor repositioning, screen clears)
-        // even when idle. Strip all ANSI escapes; if nothing meaningful
-        // remains, this is TUI noise that should not reset the silence
-        // timer in PtyActivityTracker.
-        // Fast path: no ESC byte means the chunk is pure text - always significant.
-        if (!data.includes('\x1b')) return data.trim().length > 0;
-        const stripped = stripAnsiEscapes(data);
-        return stripped.trim().length > 0;
-      },
-    ),
+    // Codex idle detection: silence timer only (no detectIdle callback).
+    //
+    // The `›` (U+203A) guillemet is NOT idle-specific - it's always visible
+    // in the Codex Ink TUI's prompt area, even during active tool execution.
+    // Using it for detectIdle causes false idle transitions during active
+    // work (state oscillates thinking↔idle on every frame). Empirically
+    // verified: Codex goes completely SILENT when idle (no TUI redraws),
+    // so the 10-second silence timer in PtyActivityTracker fires reliably.
+    //
+    // Content deduplication in SessionManager provides an agent-agnostic
+    // safety net: if any TUI agent does continuously redraw, repeated
+    // frames with identical stripped text are filtered automatically.
+    activity: ActivityDetection.pty(),
     sessionId: {
       fromHook(hookContext) {
         try {

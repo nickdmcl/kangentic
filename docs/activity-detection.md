@@ -17,8 +17,8 @@ Each adapter declares an `ActivityDetectionStrategy` on its `runtime.activity` f
 | `kind` | Used by | Behavior |
 |--------|---------|----------|
 | `'hooks'` | Claude Code | Hook events are the sole source of activity truth. PTY data does not influence activity state. |
-| `'pty'` | Aider, Codex | Activity is inferred from PTY output patterns. The optional `detectIdle(data)` callback returns true on a definitive idle signal (e.g. an `aider>` prompt). Without `detectIdle`, a 10-second silence timer determines idle. The optional `isSignificantOutput(data)` callback filters TUI noise (ANSI-only redraws) that should not reset the silence timer. |
-| `'hooks_and_pty'` | Gemini | Hooks are primary, with PTY-based detection as a fallback if hooks fail to fire. Once hooks deliver a `thinking` event, `PtyActivityTracker.suppress()` permanently disables PTY detection for that session. Accepts the same optional `detectIdle(data)` and `isSignificantOutput(data)` callbacks as `'pty'`. |
+| `'pty'` | Aider, Codex | Activity is inferred from PTY output patterns. The optional `detectIdle(data)` callback returns true on a definitive idle signal (e.g. an `aider>` prompt). Without `detectIdle`, a 10-second silence timer determines idle. All PTY strategies automatically filter TUI noise via content deduplication in `SessionManager` - repeated frames with identical stripped text do not reset the silence timer. |
+| `'hooks_and_pty'` | Gemini | Hooks are primary, with PTY-based detection as a fallback if hooks fail to fire. Once hooks deliver a `thinking` event, `PtyActivityTracker.suppress()` permanently disables PTY detection for that session. Accepts the same optional `detectIdle(data)` callback as `'pty'`. |
 
 ### `ActivityDetection` factory
 
@@ -32,8 +32,8 @@ import { ActivityDetection } from '../../../../shared/types';
 // Claude Code: hooks are the only source
 runtime = { activity: ActivityDetection.hooks() };
 
-// Codex: PTY only with TUI noise filter (Ink redraws are ANSI-only)
-runtime = { activity: ActivityDetection.pty(detectIdle, isSignificantOutput) };
+// Codex: PTY only, silence timer (no detectIdle - see note below)
+runtime = { activity: ActivityDetection.pty() };
 
 // Aider: PTY with prompt-regex detectIdle for instant transitions
 runtime = { activity: ActivityDetection.pty((data) => /(?:^|\n)\s*aider>\s*$/.test(data)) };
@@ -43,6 +43,10 @@ runtime = { activity: ActivityDetection.hooksAndPty() };
 ```
 
 `PtyActivityTracker` (`src/main/pty/pty-activity-tracker.ts`) owns the silence-timer state and the suppress flag. It exposes `onData()`, `onIdleDetected()`, `suppress()`, and `clearSession()` callbacks consumed by `UsageTracker`.
+
+**Content deduplication (agent-agnostic):** `SessionManager` strips ANSI from each PTY chunk and compares against the previous frame for that session. If the stripped text is identical, the chunk is a TUI redraw that does not reset the silence timer. This is a generic safety net for any TUI agent that might continuously repaint the screen.
+
+**Why Codex has no `detectIdle`:** The `›` (U+203A) guillemet prompt character is always visible in the Codex Ink TUI layout, including during active tool execution. Using it for `detectIdle` causes false idle transitions during active work (rapid thinking↔idle oscillation). Empirically verified: Codex goes completely silent when idle, so the 10-second silence timer fires reliably without prompt detection.
 
 ## Claude Code Pipeline
 

@@ -1014,8 +1014,8 @@ export interface AgentParser {
  */
 export type ActivityDetectionStrategy =
   | { readonly kind: 'hooks' }
-  | { readonly kind: 'pty'; detectIdle?(data: string): boolean; isSignificantOutput?(data: string): boolean }
-  | { readonly kind: 'hooks_and_pty'; detectIdle?(data: string): boolean; isSignificantOutput?(data: string): boolean };
+  | { readonly kind: 'pty'; detectIdle?(data: string): boolean }
+  | { readonly kind: 'hooks_and_pty'; detectIdle?(data: string): boolean };
 
 /**
  * Factory functions for constructing ActivityDetectionStrategy values.
@@ -1026,13 +1026,12 @@ export type ActivityDetectionStrategy =
 export const ActivityDetection = {
   /** Hooks are the sole source of activity truth (Claude Code). */
   hooks: (): ActivityDetectionStrategy => ({ kind: 'hooks' }),
-  /** PTY-only detection. Optional detectIdle for instant prompt-regex idle.
-   *  Optional isSignificantOutput to filter TUI noise (ANSI-only redraws). */
-  pty: (detectIdle?: (data: string) => boolean, isSignificantOutput?: (data: string) => boolean): ActivityDetectionStrategy =>
-    ({ kind: 'pty', detectIdle, isSignificantOutput }),
+  /** PTY-only detection. Optional detectIdle for instant prompt-regex idle. */
+  pty: (detectIdle?: (data: string) => boolean): ActivityDetectionStrategy =>
+    ({ kind: 'pty', detectIdle }),
   /** Hooks primary with PTY fallback if hooks fail to fire. */
-  hooksAndPty: (detectIdle?: (data: string) => boolean, isSignificantOutput?: (data: string) => boolean): ActivityDetectionStrategy =>
-    ({ kind: 'hooks_and_pty', detectIdle, isSignificantOutput }),
+  hooksAndPty: (detectIdle?: (data: string) => boolean): ActivityDetectionStrategy =>
+    ({ kind: 'hooks_and_pty', detectIdle }),
 } as const;
 
 /**

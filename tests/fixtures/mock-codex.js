@@ -207,14 +207,21 @@ if (prompt) {
 // Hide-cursor escape so detectFirstOutput() returns true and the shimmer overlay clears.
 process.stdout.write('\x1b[?25l');
 
-// Simulate Ink TUI redraws: periodic ANSI-only cursor repositioning and
-// screen clear sequences with no meaningful text content. Real Codex does
-// this even when idle, which previously kept the silence timer perpetually
-// reset and prevented idle detection.
+// Simulate Ink TUI redraws: periodic full-screen repaints with ANSI
+// positioning and visible text content (headers, prompt, status bar).
+// Real Codex redraws the entire screen every ~500ms even when idle.
+// The content is IDENTICAL each frame - this is key for testing the
+// content deduplication logic in isSignificantOutput.
 let redrawInterval = null;
 if (process.env.MOCK_CODEX_TUI_REDRAWS) {
+  const idleFrame =
+    '\x1b[H\x1b[2J' +                                          // cursor home + clear screen
+    '\x1b[1;1H\x1b[1mOpenAI Codex (v0.118.0)\x1b[0m\r\n' +    // header
+    '\x1b[2;1Hmodel: mock-codex-model\r\n' +                    // model line
+    '\x1b[4;1H\x1b[32m\u203A\x1b[0m Implement {feature}\r\n' + // idle prompt with guillemet
+    '\x1b[6;1Hmock-codex-model \xc2\xb7 100% left\x1b[?25l';   // status bar + hide cursor
   redrawInterval = setInterval(() => {
-    process.stdout.write('\x1b[H\x1b[2J\x1b[?25h\x1b[1;1H\x1b[?25l');
+    process.stdout.write(idleFrame);
   }, 500);
 }
 
