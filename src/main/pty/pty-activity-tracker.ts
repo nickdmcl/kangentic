@@ -62,7 +62,7 @@ export class PtyActivityTracker {
    */
   onData(sessionId: string): void {
     if (this.suppressed.has(sessionId)) {
-      console.log(`[pty-tracker] ${sessionId.slice(0, 8)} onData SUPPRESSED (hooks working)`);
+      console.log(`[pty-tracker] ${sessionId.slice(0, 8)} SUPPRESSED`);
       return;
     }
     if (!this.callbacks.isSessionRunning(sessionId)) {

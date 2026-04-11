@@ -14,6 +14,16 @@ import { TranscriptWriter, stripAnsiEscapes } from './transcript-writer';
 import { SessionIdScanner } from './session-id-scanner';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
+import path from 'node:path';
+
+// Diagnostic log file for PTY activity debugging
+const PTY_DEBUG_LOG = path.join(os.tmpdir(), 'kangentic-pty-debug.log');
+function ptyLog(message: string): void {
+  const timestamp = new Date().toISOString().slice(11, 23);
+  const line = `[${timestamp}] ${message}\n`;
+  console.log(line.trimEnd());
+  try { fs.appendFileSync(PTY_DEBUG_LOG, line); } catch { /* ignore */ }
+}
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { isShuttingDown } from '../shutdown-state';
 import type { TranscriptRepository } from '../db/repositories/transcript-repository';
@@ -608,7 +618,7 @@ export class SessionManager extends EventEmitter {
       const strategy = input.agentParser?.runtime?.activity;
       if (strategy && strategy.kind !== 'hooks') {
         if (strategy.detectIdle?.(data)) {
-          console.log(`[pty-dedup] ${id.slice(0, 8)} IDLE-MATCH detectIdle fired`);
+          ptyLog(`${id.slice(0, 8)} IDLE-MATCH detectIdle fired`);
           this.usageTracker.notifyPtyIdle(id);
         } else if (data.length > 0) {
           // Content dedup: TUI agents (Codex, Gemini) repaint the entire
@@ -621,12 +631,12 @@ export class SessionManager extends EventEmitter {
           const previousContent = this.lastPtyContent.get(id);
           if (stripped.length > 0 && stripped !== previousContent) {
             this.lastPtyContent.set(id, stripped);
-            console.log(`[pty-dedup] ${id.slice(0, 8)} NEW ${stripped.length}B "${stripped.slice(0, 60).replace(/\n/g, '\\n')}"`);
+            ptyLog(`${id.slice(0, 8)} NEW ${stripped.length}B "${stripped.slice(0, 60).replace(/\n/g, '\\n')}"`);
             this.usageTracker.notifyPtyData(id);
           } else if (stripped.length > 0) {
-            console.log(`[pty-dedup] ${id.slice(0, 8)} DUP ${stripped.length}B (same as prev)`);
+            ptyLog(`${id.slice(0, 8)} DUP ${stripped.length}B (same as prev)`);
           } else {
-            console.log(`[pty-dedup] ${id.slice(0, 8)} ANSI ${data.length}B (empty after strip)`);
+            ptyLog(`${id.slice(0, 8)} ANSI ${data.length}B (empty after strip)`);
           }
         }
       }
