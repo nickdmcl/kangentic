@@ -27,6 +27,15 @@ export class GeminiAdapter implements AgentAdapter {
 
   private readonly detector = new GeminiDetector();
   private readonly commandBuilder = new GeminiCommandBuilder();
+  // Set of taskIds currently holding hook injections per directory. Gemini
+  // has no per-session settings flag, so `.gemini/settings.json` is shared
+  // across concurrent sessions in the same project. removeHooks() only
+  // actually strips hooks when the last taskId releases; otherwise a first
+  // session's suspend/exit would clobber a still-running second session's
+  // hooks. A Set (rather than a counter) makes double-releases for the same
+  // taskId idempotent, which matters because session-manager's suspend path
+  // calls removeHooks once explicitly and again from the PTY onExit handler.
+  private readonly hookHolders = new Map<string, Set<string>>();
 
   async detect(overridePath?: string | null): Promise<AgentInfo> {
     return this.detector.detect(overridePath);
@@ -42,7 +51,23 @@ export class GeminiAdapter implements AgentAdapter {
 
   buildCommand(options: SpawnCommandOptions): string {
     const { agentPath, ...rest } = options;
-    return this.commandBuilder.buildGeminiCommand({ geminiPath: agentPath, ...rest });
+    const command = this.commandBuilder.buildGeminiCommand({ geminiPath: agentPath, ...rest });
+    // buildGeminiCommand writes hooks into .gemini/settings.json whenever
+    // eventsOutputPath is present. Retain a reference for every such spawn
+    // so concurrent sessions in the same cwd serialize their cleanup.
+    if (options.eventsOutputPath) {
+      this.retainHooks(options.cwd, options.taskId);
+    }
+    return command;
+  }
+
+  private retainHooks(directory: string, taskId: string): void {
+    let holders = this.hookHolders.get(directory);
+    if (!holders) {
+      holders = new Set<string>();
+      this.hookHolders.set(directory, holders);
+    }
+    holders.add(taskId);
   }
 
   interpolateTemplate(template: string, variables: Record<string, string>): string {
@@ -120,7 +145,16 @@ export class GeminiAdapter implements AgentAdapter {
     },
   };
 
-  removeHooks(directory: string): void {
+  removeHooks(directory: string, taskId?: string): void {
+    const holders = this.hookHolders.get(directory);
+    if (holders && taskId) {
+      holders.delete(taskId);
+      if (holders.size > 0) {
+        // Another session in this directory still needs the hooks.
+        return;
+      }
+      this.hookHolders.delete(directory);
+    }
     removeGeminiHooks(directory);
   }
 

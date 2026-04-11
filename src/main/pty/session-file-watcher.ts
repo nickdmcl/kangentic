@@ -77,9 +77,9 @@ export class SessionFileWatcher {
       try { fs.unlinkSync(state.mergedSettingsPath); } catch { /* may not exist */ }
     }
 
-    // Try to remove the now-empty session directory.
+    // Remove the session directory and any remaining telemetry files.
     if (state.sessionDir) {
-      try { fs.rmdirSync(state.sessionDir); } catch { /* dir may not be empty or already gone */ }
+      try { fs.rmSync(state.sessionDir, { recursive: true, force: true }); } catch { /* already gone */ }
     }
 
     this.watchers.delete(sessionId);

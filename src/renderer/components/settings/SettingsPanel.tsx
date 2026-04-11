@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, FolderOpen } from 'lucide-react';
+import { FolderOpen } from 'lucide-react';
 import { useConfigStore } from '../../stores/config-store';
 import { useProjectStore } from '../../stores/project-store';
-import { SettingsPanelShell } from './shared';
+import { Select, SettingsPanelShell } from './shared';
 import type { SettingsContentProps } from './shared';
 import { SettingsSearchProvider, computeSearchResults } from './settings-search';
 import { APP_TABS, GLOBAL_ONLY_TABS, SettingsContent } from './AppSettingsPanel';
@@ -116,25 +116,24 @@ export function SettingsPanel() {
   // which project's settings are being edited.
   const activeProjectPath = projectSettingsPath || currentProject?.path;
   const projectSwitcher = projects.length > 0 ? (
-    <div className="relative">
-      <FolderOpen size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none" />
-      <select
-        value={activeProjectPath || ''}
-        onChange={(event) => {
-          const selectedProject = projects.find((project) => project.path === event.target.value);
-          if (selectedProject) {
-            openProjectSettings(selectedProject.path, selectedProject.name);
-          }
-        }}
-        data-testid="settings-project-switcher"
-        className="appearance-none bg-surface-hover border border-edge-input rounded pl-7 pr-7 py-1 text-sm text-fg-secondary cursor-pointer hover:border-edge-hover focus:outline-none focus:border-accent max-w-[200px] truncate"
-      >
-        {projects.map((project) => (
-          <option key={project.id} value={project.path}>{project.name}</option>
-        ))}
-      </select>
-      <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none" />
-    </div>
+    <Select
+      value={activeProjectPath || ''}
+      onChange={(event) => {
+        const selectedProject = projects.find((project) => project.path === event.target.value);
+        if (selectedProject) {
+          openProjectSettings(selectedProject.path, selectedProject.name);
+        }
+      }}
+      data-testid="settings-project-switcher"
+      className="appearance-none bg-surface-hover border border-edge-input rounded pl-7 pr-7 py-1 text-sm text-fg-secondary cursor-pointer hover:border-edge-hover focus:outline-none focus:border-accent max-w-[200px] truncate"
+      leadingIcon={<FolderOpen size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none" />}
+      chevronSize={14}
+      chevronClassName="right-2"
+    >
+      {projects.map((project) => (
+        <option key={project.id} value={project.path}>{project.name}</option>
+      ))}
+    </Select>
   ) : null;
 
   return (

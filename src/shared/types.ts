@@ -996,11 +996,13 @@ export interface AgentParser {
   /**
    * Remove monitoring hooks injected by this adapter from the project's
    * settings file. Called on session exit and suspend to prevent hook
-   * accumulation across sessions. Gemini writes hooks to a shared
-   * project-level `.gemini/settings.json` (no --settings flag), so
-   * each session must clean up its own hooks when done.
+   * accumulation across sessions. Gemini and Codex write hooks to a
+   * shared project-level file (no per-session settings flag), so each
+   * session must clean up its own hooks when done. `taskId` identifies
+   * which spawn is releasing so adapters can reference-count per task
+   * and stay idempotent on double-releases (suspend + onExit).
    */
-  removeHooks(directory: string): void;
+  removeHooks(directory: string, taskId?: string): void;
 }
 
 /**

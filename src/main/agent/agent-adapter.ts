@@ -72,8 +72,17 @@ export interface AgentAdapter {
   /** Interpolate {{key}} placeholders in a template string. */
   interpolateTemplate(template: string, variables: Record<string, string>): string;
 
-  /** Remove any monitoring hooks injected by this adapter (cleanup). */
-  removeHooks(directory: string): void;
+  /**
+   * Remove any monitoring hooks injected by this adapter (cleanup).
+   *
+   * `taskId` identifies which spawn is releasing its hold on shared hook
+   * state. Adapters that write to a project-shared settings file (Codex,
+   * Gemini) use it for per-task reference counting so concurrent sessions
+   * do not clobber each other's hooks. Double-releases for the same taskId
+   * are idempotent. Adapters that use per-session settings files (Claude)
+   * ignore the parameter.
+   */
+  removeHooks(directory: string, taskId?: string): void;
 
   /** Clear any cached settings (e.g. after project settings change). */
   clearSettingsCache(): void;

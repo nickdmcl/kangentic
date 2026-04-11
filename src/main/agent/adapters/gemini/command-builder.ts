@@ -116,12 +116,12 @@ export class GeminiCommandBuilder {
    * Writes to `.gemini/settings.json` in the cwd since Gemini CLI reads
    * settings from the project directory (no --settings flag available).
    *
-   * Known limitation: unlike Claude's --settings flag, Gemini has no way
-   * to point to a per-session settings file. Writing directly to the cwd
-   * means concurrent Gemini sessions in the same project race on this file,
-   * and a crash may leave hooks in the user's settings. removeHooks() cleans
-   * up on normal shutdown; the isKangenticHook() guard prevents affecting
-   * user-defined hooks.
+   * Gemini has no --settings flag, so hooks live in a project-shared file.
+   * Concurrent sessions in the same cwd are serialized by GeminiAdapter's
+   * hook reference counter: each spawn retains one reference, and
+   * removeHooks() only strips the file when the count drops to zero. The
+   * isKangenticHook() guard prevents affecting user-defined hooks. On crash
+   * / force-quit, stripping on the next spawn (buildHooks) cleans up.
    */
   private createMergedSettings(options: GeminiCommandOptions): void {
     const projectRoot = options.projectRoot || options.cwd;

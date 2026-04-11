@@ -181,7 +181,7 @@ function cleanupRollout() {
     const parentDir = path.dirname(toDelete);
     const remaining = fs.readdirSync(parentDir);
     if (remaining.length === 0) {
-      fs.rmSync(parentDir);
+      fs.rmSync(parentDir, { force: true });
     }
   } catch { /* ignore */ }
 }

@@ -717,9 +717,12 @@ export class SessionManager extends EventEmitter {
       // accumulate across sessions. Gemini writes hooks to <cwd>/.gemini/
       // settings.json (shared project-level, no --settings flag), so each
       // session must clean up its own hooks on exit. Without this, hooks
-      // pile up and Gemini executes N copies per event.
+      // pile up and Gemini executes N copies per event. The adapter uses
+      // taskId as a reference key so double-calls (suspend + onExit) for
+      // the same task are idempotent and concurrent sessions in the same
+      // cwd do not clobber each other's hooks.
       if (session.agentParser?.removeHooks) {
-        session.agentParser.removeHooks(session.cwd);
+        session.agentParser.removeHooks(session.cwd, session.taskId);
       }
 
       // Close watchers but preserve session files on disk - they are needed
@@ -941,9 +944,12 @@ export class SessionManager extends EventEmitter {
     if (!session) return;
 
     // Strip agent hooks from the project's settings file before
-    // closing down. Prevents hook accumulation across sessions.
+    // closing down. Prevents hook accumulation across sessions. This
+    // path and the PTY onExit handler both call removeHooks; adapters
+    // key on taskId so the second call is idempotent for shared-file
+    // agents (Codex, Gemini).
     if (session.agentParser?.removeHooks) {
-      session.agentParser.removeHooks(session.cwd);
+      session.agentParser.removeHooks(session.cwd, session.taskId);
     }
 
     // Close watchers - no longer need real-time updates

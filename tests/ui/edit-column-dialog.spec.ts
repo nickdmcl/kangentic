@@ -118,7 +118,7 @@ test.describe('EditColumnDialog', () => {
 
     // Default target should be Executing
     const options = await planExitSelect.locator('option').allTextContents();
-    expect(options).toContain('Nowhere -- stay in column');
+    expect(options).toContain('Nowhere (stay in column)');
     expect(options).toContain('Executing');
 
     // Should not include current column, To Do, or Done

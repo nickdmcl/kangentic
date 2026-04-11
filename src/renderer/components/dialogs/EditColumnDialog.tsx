@@ -9,8 +9,11 @@ import { BaseDialog } from './BaseDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconPickerDialog } from './IconPickerDialog';
 import { ICON_REGISTRY, ROLE_DEFAULTS, getUsedIcons } from '../../utils/swimlane-icons';
+import { Select } from '../settings/shared';
 import { getPermissionLabel, DEFAULT_PERMISSIONS, DEFAULT_AGENT, getAgentDefaultPermission, resolvePermissionForAgent } from '../../../shared/types';
 import type { Swimlane, PermissionMode, AgentDetectionInfo } from '../../../shared/types';
+
+const DIALOG_SELECT_CLASS = 'w-full appearance-none bg-surface border border-edge-input rounded pl-3 pr-10 py-1.5 text-sm text-fg focus:outline-none focus:border-accent';
 
 const PRESET_COLORS = [
   '#6b7280', '#ef4444', '#f43f5e', '#f97316',
@@ -394,7 +397,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                   </button>
                 )}
               </div>
-              <select
+              <Select
                 value={agentOverride ?? ''}
                 onChange={(event) => {
                   const newAgent = event.target.value || null;
@@ -405,7 +408,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                     if (resolved !== permissionMode) setPermissionMode(resolved);
                   }
                 }}
-                className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
+                className={DIALOG_SELECT_CLASS}
               >
                 <option value="">{projectDefaultAgentLabel}</option>
                 {agentList
@@ -415,7 +418,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                       {agent.displayName ?? agent.name}
                     </option>
                   ))}
-              </select>
+              </Select>
               <p className="text-[11px] text-fg-faint mt-1">
                 Override the project default agent for this column.
               </p>
@@ -463,10 +466,10 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                   </button>
                 )}
               </div>
-              <select
+              <Select
                 value={permissionMode ?? ''}
-                onChange={(e) => setPermissionMode(e.target.value ? e.target.value as PermissionMode : null)}
-                className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
+                onChange={(event) => setPermissionMode(event.target.value ? event.target.value as PermissionMode : null)}
+                className={DIALOG_SELECT_CLASS}
               >
                 <option value="">{getPermissionLabel(agentPermissions, globalPermissionMode)}</option>
                 {agentPermissions
@@ -474,7 +477,7 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
                   .map((entry) => (
                     <option key={entry.mode} value={entry.mode}>{entry.label}</option>
                   ))}
-              </select>
+              </Select>
               <p className="text-[11px] text-fg-faint mt-1">
                 Override the project permission mode for this column.
               </p>
@@ -485,20 +488,20 @@ export function EditColumnDialog({ swimlane, mode, onClose }: EditColumnDialogPr
           {isPlanMode && (
             <div>
               <label className="text-xs text-fg-muted mb-1.5 block">After Plan Mode</label>
-              <select
+              <Select
                 value={planExitTargetId ?? ''}
-                onChange={(e) => setPlanExitTargetId(e.target.value || null)}
-                className="w-full appearance-none bg-surface border border-edge-input rounded px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
+                onChange={(event) => setPlanExitTargetId(event.target.value || null)}
+                className={DIALOG_SELECT_CLASS}
                 data-testid="plan-exit-target"
               >
-                <option value="">Nowhere -- stay in column</option>
+                <option value="">Nowhere (stay in column)</option>
                 {swimlanes
-                  .filter((s) => s.id !== swimlane?.id && s.role !== 'todo' && s.role !== 'done')
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                  .filter((lane) => lane.id !== swimlane?.id && lane.role !== 'todo' && lane.role !== 'done')
+                  .map((lane) => (
+                    <option key={lane.id} value={lane.id}>{lane.name}</option>
                   ))
                 }
-              </select>
+              </Select>
               <p className="text-[11px] text-fg-faint mt-1">
                 Automatically moves the task when the agent exits Plan mode.
               </p>

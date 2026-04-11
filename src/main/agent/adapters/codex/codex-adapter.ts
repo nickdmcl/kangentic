@@ -27,6 +27,14 @@ export class CodexAdapter implements AgentAdapter {
 
   private readonly detector = new CodexDetector();
   private readonly commandBuilder = new CodexCommandBuilder();
+  // Set of taskIds currently holding hook injections per project root.
+  // Codex writes hooks to a project-shared `.codex/hooks.json`, so we must
+  // avoid stripping hooks while another concurrent session still needs
+  // them. See GeminiAdapter.hookHolders for the same pattern. Note: Codex
+  // 0.118 does not honor `.codex/hooks.json` in practice today, but the
+  // refcount is kept for forward compatibility with future Codex versions
+  // that may enable the hook pipeline.
+  private readonly hookHolders = new Map<string, Set<string>>();
 
   async detect(overridePath?: string | null): Promise<AgentInfo> {
     return this.detector.detect(overridePath);
@@ -42,7 +50,25 @@ export class CodexAdapter implements AgentAdapter {
 
   buildCommand(options: SpawnCommandOptions): string {
     const { agentPath, ...rest } = options;
-    return this.commandBuilder.buildCodexCommand({ codexPath: agentPath, ...rest });
+    const command = this.commandBuilder.buildCodexCommand({ codexPath: agentPath, ...rest });
+    // buildCodexCommand writes hooks into .codex/hooks.json whenever
+    // eventsOutputPath is present. Retain a reference keyed by the
+    // project root (same key removeHooks uses) so concurrent sessions
+    // serialize their cleanup.
+    if (options.eventsOutputPath) {
+      const projectRoot = options.projectRoot || options.cwd;
+      this.retainHooks(projectRoot, options.taskId);
+    }
+    return command;
+  }
+
+  private retainHooks(directory: string, taskId: string): void {
+    let holders = this.hookHolders.get(directory);
+    if (!holders) {
+      holders = new Set<string>();
+      this.hookHolders.set(directory, holders);
+    }
+    holders.add(taskId);
   }
 
   interpolateTemplate(template: string, variables: Record<string, string>): string {
@@ -126,7 +152,16 @@ export class CodexAdapter implements AgentAdapter {
     },
   };
 
-  removeHooks(directory: string): void {
+  removeHooks(directory: string, taskId?: string): void {
+    const holders = this.hookHolders.get(directory);
+    if (holders && taskId) {
+      holders.delete(taskId);
+      if (holders.size > 0) {
+        // Another session in this directory still needs the hooks.
+        return;
+      }
+      this.hookHolders.delete(directory);
+    }
     removeCodexHooks(directory);
   }
 

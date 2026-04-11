@@ -16,7 +16,7 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 | `buildCommand(options)` | Build the shell command string to spawn the agent |
 | `interpolateTemplate(template, variables)` | Replace `{{key}}` placeholders in prompt templates |
 | `runtime` | `AdapterRuntimeStrategy` declaring activity detection + session ID capture (see below) |
-| `removeHooks(directory)` | Remove monitoring hooks on cleanup |
+| `removeHooks(directory, taskId?)` | Remove monitoring hooks on cleanup. `taskId` lets shared-file adapters (Codex, Gemini) reference-count so concurrent sessions do not clobber each other's hooks. |
 | `clearSettingsCache()` | Clear cached merged settings |
 | `detectFirstOutput(data)` | Detect when the agent TUI is ready (lifts shimmer overlay) |
 | `getExitSequence()` | Return PTY write sequence for graceful exit |
@@ -335,7 +335,7 @@ gemini --resume <sessionId>
 
 Gemini reads settings from `.gemini/settings.json` in the project directory. Unlike Claude's `--settings` flag, Gemini has no way to point to a per-session settings file. Kangentic writes merged settings (with event-bridge hooks) directly to `.gemini/settings.json` in the CWD.
 
-Known limitation: concurrent Gemini sessions in the same project race on this file, and a crash may leave hooks in the user's settings. `removeHooks()` cleans up on normal shutdown.
+Because the file is shared, concurrent Gemini sessions in the same project are serialized by a per-task reference counter in `GeminiAdapter.hookHolders`: each `buildCommand` retains a reference keyed by `taskId`, and `removeHooks(directory, taskId)` only strips the file when the last task in that directory releases. Double-calls for the same `taskId` (session-manager invokes `removeHooks` both explicitly in `suspend()` and again from the PTY `onExit` handler) are idempotent. On crash or force-quit, `buildHooks` strips any stale Kangentic entries from the settings file on the next spawn. The same pattern lives in `CodexAdapter.hookHolders` for `.codex/hooks.json`.
 
 ## Aider
 

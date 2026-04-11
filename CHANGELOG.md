@@ -6,6 +6,103 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 <!-- releases -->
 
+## [Unreleased]
+
+### Features
+
+- Multi-agent support: Codex CLI, Gemini CLI, and Aider adapters alongside Claude Code (6589b36, 765b6d2, 6079a4c)
+- Welcome screen: show all supported agents in detection grid (bef896d)
+- Agent-specific permission models with dynamic dropdowns (07d733f, b2fb55e)
+- Settings: default agent picker and per-column agent override (64aa5ce)
+- Layout settings tab: card density, column width, panel visibility toggles, window restore, animations (68d0411)
+- Multi-agent context handoff: pass the prior agent's native session history file to the next agent on column move (b92de92, 335b8bd)
+- Changes panel: added to task context menu, Command Terminal dialog, and expand/collapse toggle; auto-selects first file; untracked files visible (0df44c7, ceefed3, 2e2a806, 4224d83, 6806b23)
+- Board: Add Column button moved to toolbar with dedicated create dialog (cd17f74)
+- Board: confirmation dialog when moving task with pending changes to To Do (c6fe672)
+- Command Terminal: fetch + fast-forward pull before spawn (34204d6)
+- Context bar: Claude session and weekly rate-limit quotas (df749a5)
+- Session state machine: atomic transitions and per-task lifecycle locks with pause/resume race fixes (34970e6, 56dd2ff)
+- Session resume for Codex and Gemini (8922312)
+- Native session history telemetry for Codex, Gemini, and Claude via `SessionHistoryReader` (ea0564f, 6df12f0)
+- MCP HTTP server: in-process streamable HTTP transport replaces the file-bridge (e682b0c)
+- MCP tools: `kangentic_get_current_task`, `kangentic_delete_task`, session file/event accessors, unified task creation, rich structured transcripts (39593e5, badbb3b, eafd4c6, a0d21f8, 0ed4a40)
+
+### Fixes
+
+- Context bar always renders with 0% default; no more missing-bar states (6f16949)
+- Task card shows "Loading agent..." spinner instead of bare ellipsis while the agent model resolves (276fb09, 19ddd99)
+- Task card shows "Pausing agent..." label while suspending a running session (ba8944b)
+- Hide uninstalled agents from the per-column agent dropdown (dfcda65)
+- Remove version-number noise from agent dropdowns (ff07fc8)
+- Welcome screen no longer flashes on app startup (622621c)
+- Prevent card from snapping back during the move confirmation dialog (6198599)
+- Hide the Agent section in Edit Column for To Do / Done columns (f61ff03)
+- Window restores maximized state on launch instead of a half-width bounds (35bae8d)
+- Spinner animations no longer freeze during drag operations (0eed804)
+- Diff viewer: fix crash when selecting a file (851df64)
+- Diff viewer: remove `@monaco-editor/react` from Vite optimizeDeps to fix a `useState` crash (5bb2e08)
+- Diff viewer: eliminate flicker when the Changes panel is open alongside the terminal (3add42d)
+- Diff: prefer origin ref in `getMergeBase` to avoid stale local branches (f3aa1d0)
+- Compare: honor the project's `defaultBaseBranch` instead of a hardcoded `main` (fd48709)
+- PTY: preserve scrollback across session resume (regression from b8385ca) (1302772)
+- PTY: await process exit before worktree removal to prevent freeze (8eab0fe)
+- PTY: suppress idle -> thinking flicker after resize-induced redraws (affdbfa)
+- PTY: ring-buffer content dedup to handle placeholder rotation and normalize whitespace for resize redraws (5e653fd, df59041)
+- PTY: unstick Codex and Gemini task cards on first output (5f890a1)
+- PTY: eliminate activity watcher stale/recover loop (381a3e2)
+- Codex: unwrap `event_msg` envelope so context usage updates (373211e)
+- Codex: replace `detectIdle` with silence timer + content dedup, filter TUI noise (c351ec1, 3c52220)
+- Codex: wire `statusFile` hook and session history E2E coverage (48f2f4f)
+- Gemini: resolve model name never appearing on task card (8d13dd5)
+- Gemini / Codex: standardize hook lifecycle and status display (8be7d0d)
+- Gemini / Codex: reliable session-ID capture (1e226ae)
+- Claude: drop session-history live telemetry to stop model flash (ba31ef5)
+- Claude: detect CLI installed via Homebrew (155ae05)
+- Claude: detect CLI version on Windows via shell-aware `execFile` (d31951a)
+- Agent: surface override path failure instead of silent fallthrough (3874ca2)
+- Agent: eliminate DEP0190 deprecation warning from detectors (b0d43f9)
+- Activity state machine: unwedge permission idle inside subagents (47b8e5b)
+- Spawn: optimize task-move to agent-spawn latency (45e9253)
+- Project switch: feels instant (ef7eb4d)
+- Terminal: suppress background-session IPC to eliminate typing lag (47b8e5b)
+- Terminal: include Command Terminal in focused-session set for live PTY data (9b564b2)
+- Task: copy task ID as `Task #N` for better MCP context (18d94e1)
+- Task detail: truncate long titles so header commands always fit (cb1f441)
+- Notifications: label Command Terminal idle sessions and reopen overlay on click (000b525)
+- MCP: stop wiping in-flight commands on bridge start (b75f8fe)
+- MCP: route "create a todo task" to board instead of backlog (06e153b)
+- MCP: align session-bridge directory and wire new tools (b28c662)
+- Analytics: fix Aptabase average duration showing 0s (b2685b2)
+- Updater: retry once on transient network timeout before reporting error (29bbf32)
+- Stores: add hydration gates to board and backlog stores (5c5de90)
+- Engine: use task's original agent on session resume (1d99c4e)
+- Engine: resolve default agent from detected agents instead of hardcoding Claude (8ae5604)
+- Engine: Command Terminal uses project default agent (dd824d3)
+- Settings: refresh `currentProject` after changing default agent (55d0439)
+- Settings: preserve terminal settings when merging partial project overrides (faaa843)
+- UI: deduplicate provider name in import source labels (a9183ec)
+- HMR: preserve terminal state, transient session pointers, Command Terminal open state, `moveGeneration`, and `syncController` across refreshes (b72cae6, 7df679a, 60ffc44, d244dc3)
+- Code review follow-ups: session-file-watcher uses `fs.rmSync` with `{ recursive, force }`; Gemini hook writes are reference-counted so concurrent sessions no longer clobber each other; `EditColumnDialog` / `ActivityLog` / `SettingsPanel` dropdowns use the shared `Select` component
+
+### Refactor
+
+- DB: rename `claude_session_id` -> `agent_session_id` (9850726)
+- Config: rename `AppConfig.claude` -> `AppConfig.agent` with per-agent CLI paths (53516ad)
+- Engine: use agent adapter instead of hardcoded Claude in transition engine (15c13ea)
+- PTY: use agent adapter for status/event parsing in `UsageTracker`; trust Claude Code's `used_percentage` directly (ddd6ce8, 0b1f90b)
+- Agent: reorganize adapters into per-agent subfolders (`claude/`, `codex/`, `gemini/`, `aider/`) (dc8d2b0, 2b4f4a7)
+- Agent: extract `ActivityStateMachine` from `SessionManager`; move hook telemetry into `runtime.statusFile` (47b8e5b, f0805e0)
+- UI: replace hardcoded `claude` strings with `DEFAULT_AGENT` constant and `getAgentDisplayName` utility (d2034e6, aade3c3)
+- Session: consolidated `spawnAgent` helper for unarchive / session resume (1724cd4)
+- Settings: move session limits from Agent tab to Behavior tab (4ecfc51)
+- Board: hide agent section in Edit Column for To Do / Done columns (f61ff03)
+
+### Other
+
+- Deps: upgrade core dependencies to latest stable (03b8747)
+- Tests: add Codex and Gemini agent-parity E2E specs + `ActivityStateMachine` unit tests (7d6bb41)
+- CI: prevent partial releases and fix macOS build OOM (27c2f5b)
+
 ## [v0.14.0] - 2026-04-01
 
 ### Features

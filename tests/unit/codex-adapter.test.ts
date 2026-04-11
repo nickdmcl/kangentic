@@ -533,4 +533,123 @@ describe('Codex Adapter', () => {
       expect((strategy as { detectIdle?: unknown }).detectIdle).toBeUndefined();
     });
   });
+
+  describe('concurrent-session hook reference counting', () => {
+    let tempDir: string;
+
+    beforeEach(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kg-codex-refcount-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    const seedHooksFile = (directory: string): string => {
+      const codexDir = path.join(directory, '.codex');
+      fs.mkdirSync(codexDir, { recursive: true });
+      const hooksFile = path.join(codexDir, 'hooks.json');
+      const kangenticHook = {
+        event: 'PreToolUse',
+        command: 'node "/seed/.kangentic/event-bridge.js" "/events.jsonl" tool_start',
+        timeout_secs: 10,
+      };
+      fs.writeFileSync(hooksFile, JSON.stringify([kangenticHook]));
+      return hooksFile;
+    };
+
+    it('strips hooks only after the last live task releases', () => {
+      // Two concurrent sessions in the same cwd, distinct tasks.
+      adapter.buildCommand(makeOptions({
+        cwd: tempDir,
+        taskId: 'task-a',
+        eventsOutputPath: path.join(tempDir, '.kangentic', 'sessions', 'task-a', 'events.jsonl'),
+      }));
+      adapter.buildCommand(makeOptions({
+        cwd: tempDir,
+        taskId: 'task-b',
+        eventsOutputPath: path.join(tempDir, '.kangentic', 'sessions', 'task-b', 'events.jsonl'),
+      }));
+
+      // Replace the real buildHooks output with a deterministic seed that
+      // carries a recognizable Kangentic signature so we can assert strip vs keep.
+      const hooksFile = seedHooksFile(tempDir);
+
+      // task-a releases: hooks must remain because task-b is still live.
+      adapter.removeHooks(tempDir, 'task-a');
+      expect(fs.existsSync(hooksFile)).toBe(true);
+      const afterFirst = JSON.parse(fs.readFileSync(hooksFile, 'utf-8'));
+      expect(afterFirst.length).toBe(1);
+
+      // task-b releases: now hooks are stripped. With only Kangentic hooks
+      // remaining, safelyUpdateSettingsFile deletes the whole file.
+      adapter.removeHooks(tempDir, 'task-b');
+      expect(fs.existsSync(hooksFile)).toBe(false);
+    });
+
+    it('double-release for the same taskId is idempotent (suspend + onExit)', () => {
+      adapter.buildCommand(makeOptions({
+        cwd: tempDir,
+        taskId: 'task-a',
+        eventsOutputPath: path.join(tempDir, '.kangentic', 'sessions', 'task-a', 'events.jsonl'),
+      }));
+      adapter.buildCommand(makeOptions({
+        cwd: tempDir,
+        taskId: 'task-b',
+        eventsOutputPath: path.join(tempDir, '.kangentic', 'sessions', 'task-b', 'events.jsonl'),
+      }));
+      const hooksFile = seedHooksFile(tempDir);
+
+      // session-manager.suspend() calls removeHooks explicitly, then the
+      // PTY's onExit handler calls it again for the same taskId. Both
+      // calls must be absorbed without stripping hooks while task-b is live.
+      adapter.removeHooks(tempDir, 'task-a');
+      adapter.removeHooks(tempDir, 'task-a');
+
+      expect(fs.existsSync(hooksFile)).toBe(true);
+      const afterDoubleRelease = JSON.parse(fs.readFileSync(hooksFile, 'utf-8'));
+      expect(afterDoubleRelease.length).toBe(1);
+    });
+
+    it('decouples reference counts across different cwds', () => {
+      const tempDirTwo = fs.mkdtempSync(path.join(os.tmpdir(), 'kg-codex-refcount-b-'));
+      try {
+        adapter.buildCommand(makeOptions({
+          cwd: tempDir,
+          taskId: 'task-a',
+          eventsOutputPath: path.join(tempDir, '.kangentic', 'sessions', 'task-a', 'events.jsonl'),
+        }));
+        adapter.buildCommand(makeOptions({
+          cwd: tempDirTwo,
+          taskId: 'task-b',
+          eventsOutputPath: path.join(tempDirTwo, '.kangentic', 'sessions', 'task-b', 'events.jsonl'),
+        }));
+
+        seedHooksFile(tempDir);
+        const hooksFileTwo = seedHooksFile(tempDirTwo);
+
+        // Releasing task-a in tempDir does not touch tempDirTwo.
+        adapter.removeHooks(tempDir, 'task-a');
+        expect(fs.existsSync(hooksFileTwo)).toBe(true);
+        const stillThere = JSON.parse(fs.readFileSync(hooksFileTwo, 'utf-8'));
+        expect(stillThere.length).toBe(1);
+      } finally {
+        fs.rmSync(tempDirTwo, { recursive: true, force: true });
+      }
+    });
+
+    it('tolerates removeHooks with no prior retain (crash/restart path)', () => {
+      seedHooksFile(tempDir);
+      expect(() => adapter.removeHooks(tempDir, 'orphan-task')).not.toThrow();
+    });
+
+    it('legacy call without taskId still strips (backwards compat)', () => {
+      // Existing call sites that do not pass a taskId must still work.
+      // This covers the case where removeHooks is invoked from a path
+      // that predates the refcount (e.g. project close cleanup).
+      const hooksFile = seedHooksFile(tempDir);
+      adapter.removeHooks(tempDir);
+      expect(fs.existsSync(hooksFile)).toBe(false);
+    });
+  });
 });

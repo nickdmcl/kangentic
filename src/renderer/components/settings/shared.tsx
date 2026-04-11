@@ -304,16 +304,36 @@ export function SettingRow({ label, description, children, searchId, trailing }:
 
 /* ── Select ── */
 
-export function Select({ children, className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+interface SelectExtraProps {
+  /** Optional icon rendered at the left edge (absolute-positioned). */
+  leadingIcon?: React.ReactNode;
+  /** Override the chevron size. Defaults to 16. */
+  chevronSize?: number;
+  /** Override the chevron's right offset (Tailwind class, e.g. "right-2"). */
+  chevronClassName?: string;
+  /** Override the root wrapper className (defaults to "relative"). */
+  wrapperClassName?: string;
+}
+
+export function Select({
+  children,
+  className,
+  leadingIcon,
+  chevronSize = 16,
+  chevronClassName = 'right-3',
+  wrapperClassName = 'relative',
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & SelectExtraProps) {
   return (
-    <div className="relative">
+    <div className={wrapperClassName}>
+      {leadingIcon}
       <select
         {...props}
-        className={className ?? "appearance-none bg-surface-hover border border-edge-input rounded pl-3 pr-10 py-1.5 text-sm text-fg w-full focus:outline-none focus:border-accent"}
+        className={className ?? 'appearance-none bg-surface-hover border border-edge-input rounded pl-3 pr-10 py-1.5 text-sm text-fg w-full focus:outline-none focus:border-accent'}
       >
         {children}
       </select>
-      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none" />
+      <ChevronDown size={chevronSize} className={`absolute ${chevronClassName} top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none`} />
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useShallow } from 'zustand/react/shallow';
 import { useSessionStore } from '../../stores/session-store';
+import { Select } from '../settings/shared';
 import { EventType, IdleReason } from '../../../shared/types';
 import type { SessionEvent } from '../../../shared/types';
 
@@ -242,25 +242,22 @@ function FilterPill({
 }: FilterPillProps) {
   return (
     <div className="sticky top-0 z-10 bg-surface pt-2 pb-1.5 mb-1 border-b border-edge">
-      <div className="relative inline-block">
-        <select
-          data-testid="activity-filter"
-          value={filterSessionId ?? ''}
-          onChange={(e) => onFilter(e.target.value || null)}
-          className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="">All</option>
-          {sessionIds.map((sid) => (
-            <option key={sid} value={sid}>
-              {taskLabelMap.get(sid) || sid.slice(0, 8)}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={12}
-          className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-fg-muted"
-        />
-      </div>
+      <Select
+        data-testid="activity-filter"
+        value={filterSessionId ?? ''}
+        onChange={(event) => onFilter(event.target.value || null)}
+        className="appearance-none bg-surface-raised text-fg-muted pl-2.5 pr-7 py-0.5 text-xs font-semibold cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
+        wrapperClassName="relative inline-block"
+        chevronSize={12}
+        chevronClassName="right-2"
+      >
+        <option value="">All</option>
+        {sessionIds.map((sessionId) => (
+          <option key={sessionId} value={sessionId}>
+            {taskLabelMap.get(sessionId) || sessionId.slice(0, 8)}
+          </option>
+        ))}
+      </Select>
     </div>
   );
 }
