@@ -622,15 +622,22 @@ export class SessionManager extends EventEmitter {
           this.usageTracker.notifyPtyIdle(id);
         } else if (data.length > 0) {
           // Content dedup: TUI agents (Codex, Gemini) repaint the entire
-          // screen every ~500ms even when idle. Strip ANSI escapes and
-          // compare against the last frame. If identical, the output is a
-          // TUI redraw that should not reset the silence timer. This is
-          // agent-agnostic - works for any PTY-based strategy automatically.
-          // Fast path: skip stripAnsiEscapes when no ESC byte is present.
-          const stripped = data.includes('\x1b') ? stripAnsiEscapes(data).trim() : data.trim();
+          // screen when idle, when the terminal is resized, and when
+          // panels mount/unmount. Strip ANSI escapes AND collapse all
+          // whitespace, then compare against the last frame. If the
+          // normalized text is identical, the chunk is a redraw that
+          // should not reset the silence timer.
+          //
+          // Whitespace normalization is critical: a resize-induced redraw
+          // contains the same words but different positioning (cursor
+          // movements, line breaks at different columns). Byte-for-byte
+          // comparison would miss the duplicate. Normalizing collapses
+          // these layout differences while preserving the actual content.
+          const stripped = data.includes('\x1b') ? stripAnsiEscapes(data) : data;
+          const normalized = stripped.replace(/\s+/g, ' ').trim();
           const previousContent = this.lastPtyContent.get(id);
-          if (stripped.length > 0 && stripped !== previousContent) {
-            this.lastPtyContent.set(id, stripped);
+          if (normalized.length > 0 && normalized !== previousContent) {
+            this.lastPtyContent.set(id, normalized);
             this.usageTracker.notifyPtyData(id);
           }
         }
