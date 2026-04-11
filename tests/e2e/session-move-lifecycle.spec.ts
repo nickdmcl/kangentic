@@ -193,7 +193,9 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
     // Verify task now has a running session
     const taskSession = await page.evaluate(async (tid) => {
       const sessions = await window.electronAPI.sessions.list();
-      return sessions.find((s: any) => s.taskId === tid && s.status === 'running');
+      return sessions.find(
+        (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+      );
     }, taskId);
     expect(taskSession).toBeTruthy();
   });
@@ -212,30 +214,48 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
     // Record the session ID assigned to this task
     const sessionBefore = await page.evaluate(async (tid) => {
       const sessions = await window.electronAPI.sessions.list();
-      return sessions.find((s: any) => s.taskId === tid && s.status === 'running');
+      return sessions.find(
+        (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+      );
     }, taskId);
     expect(sessionBefore).toBeTruthy();
     const sessionIdBefore = sessionBefore.id;
 
-    // Move to Code Review → session should stay alive (same permission mode, no auto_command)
+    // Move to Code Review → session should stay alive (same permission mode, no auto_command).
+    // The move is fire-and-forget IPC; poll for the task to land in its new lane
+    // before reading session state, instead of a fixed 1000ms wait.
     await moveTask(page, taskId, lanes['Code Review']);
-    await page.waitForTimeout(1000);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.list();
+        return tasks.find((t: { id: string; swimlane_id: string }) => t.id === tid)?.swimlane_id;
+      }, taskId);
+    }, { timeout: 3000 }).toBe(lanes['Code Review']);
 
     // Verify the same PTY session is still running
     const sessionAfterReview = await page.evaluate(async (tid) => {
       const sessions = await window.electronAPI.sessions.list();
-      return sessions.find((s: any) => s.taskId === tid && s.status === 'running');
+      return sessions.find(
+        (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+      );
     }, taskId);
     expect(sessionAfterReview).toBeTruthy();
     expect(sessionAfterReview.id).toBe(sessionIdBefore);
 
     // Move to Tests → session still alive
     await moveTask(page, taskId, lanes['Tests']);
-    await page.waitForTimeout(1000);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.list();
+        return tasks.find((t: { id: string; swimlane_id: string }) => t.id === tid)?.swimlane_id;
+      }, taskId);
+    }, { timeout: 3000 }).toBe(lanes['Tests']);
 
     const sessionAfterRunning = await page.evaluate(async (tid) => {
       const sessions = await window.electronAPI.sessions.list();
-      return sessions.find((s: any) => s.taskId === tid && s.status === 'running');
+      return sessions.find(
+        (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+      );
     }, taskId);
     expect(sessionAfterRunning).toBeTruthy();
     expect(sessionAfterRunning.id).toBe(sessionIdBefore);
@@ -255,28 +275,23 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
     const originalSessionId = extractSessionId(scrollback1, 'SESSION');
     expect(originalSessionId).toBeTruthy();
 
-    // Move to Done → suspends session + archives task
+    // Move to Done → suspends session + archives task. Poll for both
+    // conditions instead of the manual 20-iteration loop + buffer wait.
     await moveTask(page, taskId, lanes['role:done']);
-
-    // Wait for session to stop running
-    // Poll manually to handle timing
-    for (let i = 0; i < 20; i++) {
-      await page.waitForTimeout(500);
-      const running = await page.evaluate(async (tid) => {
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
         const sessions = await window.electronAPI.sessions.list();
-        return sessions.some((s: any) => s.taskId === tid && s.status === 'running');
+        return sessions.some(
+          (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+        );
       }, taskId);
-      if (!running) break;
-    }
-
-    await page.waitForTimeout(1000);
-
-    // Verify task is archived
-    const isArchived = await page.evaluate(async (tid) => {
-      const tasks = await window.electronAPI.tasks.listArchived();
-      return tasks.some((t: any) => t.id === tid);
-    }, taskId);
-    expect(isArchived).toBe(true);
+    }, { timeout: 10000 }).toBe(false);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.listArchived();
+        return tasks.some((t: { id: string }) => t.id === tid);
+      }, taskId);
+    }, { timeout: 5000 }).toBe(true);
 
     // Unarchive to Code Review (non-agent column) → should RESUME
     await page.evaluate(async ({ taskId, swimlaneId }) => {
@@ -301,16 +316,14 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
 
     const taskId = await getTaskId(page, title);
 
-    // Move directly to Done (no session was ever created) → archives
+    // Move directly to Done (no session was ever created) → archives.
     await moveTask(page, taskId, lanes['role:done']);
-    await page.waitForTimeout(1000);
-
-    // Verify task is archived
-    const isArchived = await page.evaluate(async (tid) => {
-      const tasks = await window.electronAPI.tasks.listArchived();
-      return tasks.some((t: any) => t.id === tid);
-    }, taskId);
-    expect(isArchived).toBe(true);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.listArchived();
+        return tasks.some((t: { id: string }) => t.id === tid);
+      }, taskId);
+    }, { timeout: 5000 }).toBe(true);
 
     // Unarchive to Code Review → should spawn a FRESH session
     await page.evaluate(async ({ taskId, swimlaneId }) => {
@@ -348,18 +361,15 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
 
     // Wait for the session to exit
     await waitForNoRunningSessions(page);
-    await page.waitForTimeout(1000);
 
-    // Move to Done → should mark 'exited' record as 'suspended' + archive
+    // Move to Done → should mark 'exited' record as 'suspended' + archive.
     await moveTask(page, taskId, lanes['role:done']);
-    await page.waitForTimeout(1000);
-
-    // Verify task is archived
-    const isArchived = await page.evaluate(async (tid) => {
-      const tasks = await window.electronAPI.tasks.listArchived();
-      return tasks.some((t: any) => t.id === tid);
-    }, taskId);
-    expect(isArchived).toBe(true);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.listArchived();
+        return tasks.some((t: { id: string }) => t.id === tid);
+      }, taskId);
+    }, { timeout: 5000 }).toBe(true);
 
     // Unarchive to Code Review → should RESUME the previous session
     await page.evaluate(async ({ taskId, swimlaneId }) => {
@@ -390,24 +400,28 @@ test.describe('Claude Agent -- Session Move Lifecycle', () => {
     // Move to To Do → kills session, marks 'exited'
     await moveTask(page, taskId, lanes['role:todo']);
     await waitForNoRunningSessions(page);
-    await page.waitForTimeout(1000);
 
     // Move to Done → archives. Since session is 'exited' (not 'suspended'),
     // Done should NOT spawn or resume -- just archive silently.
     await moveTask(page, taskId, lanes['role:done']);
-    await page.waitForTimeout(2000);
+    await expect.poll(async () => {
+      return page.evaluate(async (tid) => {
+        const tasks = await window.electronAPI.tasks.listArchived();
+        return tasks.some((t: { id: string }) => t.id === tid);
+      }, taskId);
+    }, { timeout: 5000 }).toBe(true);
 
-    // Verify task is archived
-    const isArchived = await page.evaluate(async (tid) => {
-      const tasks = await window.electronAPI.tasks.listArchived();
-      return tasks.some((t: any) => t.id === tid);
-    }, taskId);
-    expect(isArchived).toBe(true);
+    // Give any latent spawn 1s to surface before asserting non-occurrence.
+    // This is intentionally a fixed wait - we can't poll for "nothing happens"
+    // without adding a budget for the negative case.
+    await page.waitForTimeout(1000);
 
     // Verify no running sessions for this task (Done should not spawn)
     const hasRunning = await page.evaluate(async (tid) => {
       const sessions = await window.electronAPI.sessions.list();
-      return sessions.some((s: any) => s.taskId === tid && s.status === 'running');
+      return sessions.some(
+        (s: { taskId: string; status: string }) => s.taskId === tid && s.status === 'running',
+      );
     }, taskId);
     expect(hasRunning).toBe(false);
   });

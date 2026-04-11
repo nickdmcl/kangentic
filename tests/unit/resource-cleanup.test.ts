@@ -396,3 +396,227 @@ describe('cleanupStaleResources', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// pruneOrphanedWorktreeTasks -- runs as pass 1 of cleanupStaleResources
+// ---------------------------------------------------------------------------
+
+/**
+ * Factory for tests that need `taskRepo.list()` (unfiltered) to return a
+ * populated list. The existing `createMockRepos` only returns tasks when
+ * filtered by the backlog lane ID, which doesn't exercise the orphan-prune
+ * path.
+ */
+function createMockReposWithAllTasks(allTasks: MockTask[]) {
+  const swimlaneRepo = {
+    list: vi.fn(() => [
+      { id: 'lane-backlog', role: 'todo', name: 'To Do' },
+      { id: 'lane-planning', role: null, name: 'Planning' },
+    ]),
+  };
+
+  const taskRepo = {
+    list: vi.fn((laneId?: string) => {
+      // Backlog cleanup pass filters by lane - return nothing so we do not
+      // accidentally exercise that path in these tests.
+      if (laneId === 'lane-backlog') return [];
+      return allTasks;
+    }),
+    listArchived: vi.fn(() => []),
+    update: vi.fn(),
+    delete: vi.fn(),
+  };
+
+  const sessionRepo = {
+    deleteByTaskId: vi.fn(),
+    listAllSessionIds: vi.fn(() => []),
+  };
+
+  const sessionManager = {
+    remove: vi.fn(),
+    listSessions: vi.fn(() => []),
+  };
+
+  return { swimlaneRepo, taskRepo, sessionRepo, sessionManager };
+}
+
+describe('cleanupStaleResources -- pruneOrphanedWorktreeTasks pass', () => {
+  const projectPath = '/home/dev/my-project';
+  const worktreesDir = '/home/dev/my-project/.kangentic/worktrees';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(false);
+    mockRm.mockResolvedValue(undefined);
+    mockReaddir.mockResolvedValue([]);
+    setupExecFile(() => '');
+  });
+
+  it('deletes a task whose worktree directory has been removed externally', async () => {
+    const orphanTask = createMockTask({
+      id: 'orphan11-0000-0000-0000-000000000000',
+      title: 'Orphan task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/orphan-task-orphan11',
+      branch_name: 'orphan-task-orphan11',
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([orphanTask]);
+
+    // Worktrees parent dir exists; orphan task's specific dir does NOT.
+    mockExistsSync.mockImplementation((pathArg: string) => pathArg === worktreesDir);
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(sessionRepo.deleteByTaskId).toHaveBeenCalledWith(
+      'orphan11-0000-0000-0000-000000000000',
+    );
+    expect(taskRepo.delete).toHaveBeenCalledWith(
+      'orphan11-0000-0000-0000-000000000000',
+    );
+  });
+
+  it('preserves a task whose worktree directory still exists', async () => {
+    const keepTask = createMockTask({
+      id: 'keep1111-0000-0000-0000-000000000000',
+      title: 'Keep task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/keep-task-keep1111',
+      branch_name: 'keep-task-keep1111',
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([keepTask]);
+
+    // Both the worktrees parent dir and the task's worktree dir exist.
+    mockExistsSync.mockReturnValue(true);
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(taskRepo.delete).not.toHaveBeenCalled();
+    expect(sessionRepo.deleteByTaskId).not.toHaveBeenCalled();
+  });
+
+  it('prunes the orphan but keeps the sibling task that still exists', async () => {
+    const orphanTask = createMockTask({
+      id: 'orphan11-0000-0000-0000-000000000000',
+      title: 'Orphan task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/orphan-orphan11',
+      branch_name: 'orphan-orphan11',
+    });
+    const keepTask = createMockTask({
+      id: 'keep1111-0000-0000-0000-000000000000',
+      title: 'Keep task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/keep-keep1111',
+      branch_name: 'keep-keep1111',
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([orphanTask, keepTask]);
+
+    // worktrees dir + keepTask's dir exist; orphanTask's dir does not.
+    mockExistsSync.mockImplementation((pathArg: string) =>
+      pathArg === worktreesDir || pathArg === keepTask.worktree_path,
+    );
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(taskRepo.delete).toHaveBeenCalledWith(
+      'orphan11-0000-0000-0000-000000000000',
+    );
+    expect(taskRepo.delete).not.toHaveBeenCalledWith(
+      'keep1111-0000-0000-0000-000000000000',
+    );
+  });
+
+  it('does not prune a task with an active session even if its worktree dir is missing', async () => {
+    const activeTask = createMockTask({
+      id: 'active11-0000-0000-0000-000000000000',
+      title: 'Active task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/active-active11',
+      branch_name: 'active-active11',
+      session_id: 'session-abc',
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([activeTask]);
+
+    // Worktrees dir exists; task's worktree dir does NOT.
+    mockExistsSync.mockImplementation((pathArg: string) => pathArg === worktreesDir);
+
+    // Active session running for this task.
+    sessionManager.listSessions = vi.fn(() => [
+      { id: 'session-abc', taskId: 'active11-0000-0000-0000-000000000000', status: 'running' },
+    ]);
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(taskRepo.delete).not.toHaveBeenCalled();
+  });
+
+  it('skips pruning entirely when the worktrees parent directory does not exist', async () => {
+    const orphanTask = createMockTask({
+      id: 'orphan11-0000-0000-0000-000000000000',
+      title: 'Orphan task',
+      worktree_path: '/home/dev/my-project/.kangentic/worktrees/orphan-orphan11',
+      branch_name: 'orphan-orphan11',
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([orphanTask]);
+
+    // Worktrees dir missing - possibly an unmounted drive. Do not prune.
+    mockExistsSync.mockReturnValue(false);
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(taskRepo.delete).not.toHaveBeenCalled();
+    expect(sessionRepo.deleteByTaskId).not.toHaveBeenCalled();
+  });
+
+  it('does not prune tasks that have no worktree_path recorded', async () => {
+    const backlogTask = createMockTask({
+      id: 'noworkt1-0000-0000-0000-000000000000',
+      title: 'Backlog task',
+      worktree_path: null,
+    });
+    const { swimlaneRepo, taskRepo, sessionRepo, sessionManager } =
+      createMockReposWithAllTasks([backlogTask]);
+
+    mockExistsSync.mockImplementation((pathArg: string) => pathArg === worktreesDir);
+
+    await cleanupStaleResources(
+      projectPath,
+      taskRepo as never,
+      swimlaneRepo as never,
+      sessionRepo as never,
+      sessionManager as never,
+    );
+
+    expect(taskRepo.delete).not.toHaveBeenCalled();
+  });
+});

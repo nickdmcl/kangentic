@@ -108,11 +108,13 @@ out/
 # Test artifacts
 tests/screenshots/
 tests/.tmp/
+tests/.tmp-template/
 tests/.test-data/
 tests/reports/
 tests/fixtures/agent-pty/
 test-results/
 playwright-report/
+e2e-timings*.json
 .kangentic-test-sandbox-*
 .claude/settings.local.json
 .claude/scheduled_tasks.lock

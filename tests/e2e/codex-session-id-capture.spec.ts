@@ -116,16 +116,15 @@ test.describe('Codex Agent -- Session ID Capture via Filesystem', () => {
     await waitForScrollback(page, 'MOCK_CODEX_SESSION:');
 
     // Plant the rollout file with our known UUID and matching cwd.
-    // The scanner polls at 500ms intervals - it should find this promptly.
+    // The scanner polls at 500ms intervals - 1500ms covers 3 iterations, which
+    // is enough budget for the fs.readdir + file match + DB write to land.
     rolloutFilePath = writeRolloutFile(tmpDir);
+    await page.waitForTimeout(1500);
 
-    // Give the capture pipeline time to scan, find the file, and update the DB.
-    await page.waitForTimeout(3000);
-
-    // Suspend: move to Done.
+    // Suspend: move to Done. waitForNoRunningSession already blocks until the
+    // PTY is gone; no extra buffer wait needed.
     await moveTaskIpc(page, taskId, swimlaneIds.done);
     await waitForNoRunningSession(page);
-    await page.waitForTimeout(2000);
 
     // Resume: unarchive back to Planning. If the pipeline captured our UUID,
     // the resume command will be `codex resume aaaa1111-bbbb-cccc-dddd-eeeeeeeeeeee -C <cwd>`

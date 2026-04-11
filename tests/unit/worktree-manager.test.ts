@@ -410,6 +410,86 @@ describe('WorktreeManager -- removal', () => {
   });
 });
 
+// ── renameBranch tests ────────────────────────────────────────────────────
+
+describe('WorktreeManager -- renameBranch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockProjectGit.raw.mockResolvedValue('');
+  });
+
+  it('calls git branch -m with old and new slug when title changes', async () => {
+    const mgr = new WorktreeManager('/project');
+    const taskId = 'abcd1234-0000-0000-0000-000000000000';
+    const oldBranchName = 'old-title-abcd1234';
+
+    const result = await mgr.renameBranch(taskId, oldBranchName, 'New Title');
+
+    expect(result).toBe('new-title-abcd1234');
+    expect(mockProjectGit.raw).toHaveBeenCalledWith([
+      'branch', '-m', 'old-title-abcd1234', 'new-title-abcd1234',
+    ]);
+  });
+
+  it('uses taskId first 8 chars as the branch suffix', async () => {
+    const mgr = new WorktreeManager('/project');
+    const taskId = 'deadbeef-face-0000-0000-000000000000';
+
+    const result = await mgr.renameBranch(taskId, 'irrelevant-deadbeef', 'Fix Login Bug');
+
+    expect(result).toBe('fix-login-bug-deadbeef');
+  });
+
+  it('returns null without calling git when slug is unchanged', async () => {
+    const mgr = new WorktreeManager('/project');
+    // Only punctuation changes - slugify collapses them, so slug stays identical.
+    const result = await mgr.renameBranch(
+      'abcd1234-0000-0000-0000-000000000000',
+      'fix-login-abcd1234',
+      'Fix  login!!',
+    );
+
+    expect(result).toBeNull();
+    expect(mockProjectGit.raw).not.toHaveBeenCalled();
+  });
+
+  it('returns null and logs error when git branch -m fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockProjectGit.raw.mockRejectedValue(new Error('fatal: branch already exists'));
+
+    const mgr = new WorktreeManager('/project');
+    const result = await mgr.renameBranch(
+      'abcd1234-0000-0000-0000-000000000000',
+      'old-slug-abcd1234',
+      'New Title',
+    );
+
+    expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[WORKTREE] Branch rename failed:',
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('falls back to "task" slug when the title produces an empty slug', async () => {
+    const mgr = new WorktreeManager('/project');
+    // A title of only punctuation produces an empty slug string before the
+    // fallback -- renameBranch must substitute 'task' so the branch name is
+    // still valid.
+    const result = await mgr.renameBranch(
+      'abcd1234-0000-0000-0000-000000000000',
+      'old-abcd1234',
+      '!!!',
+    );
+
+    expect(result).toBe('task-abcd1234');
+    expect(mockProjectGit.raw).toHaveBeenCalledWith([
+      'branch', '-m', 'old-abcd1234', 'task-abcd1234',
+    ]);
+  });
+});
+
 // ── listWorktrees tests ───────────────────────────────────────────────────
 
 describe('WorktreeManager -- listWorktrees', () => {

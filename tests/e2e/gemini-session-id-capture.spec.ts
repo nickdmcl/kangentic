@@ -131,13 +131,14 @@ test.describe('Gemini Agent -- Session ID Capture via Hook Pipeline', () => {
     }) + '\n');
 
     // Give the StatusFileReader watcher time to detect the new data,
-    // dispatch through captureHookSessionIds, and update the DB.
-    await page.waitForTimeout(2000);
+    // dispatch through captureHookSessionIds, and update the DB. fs.watch
+    // is typically sub-100ms; 1000ms is a generous budget.
+    await page.waitForTimeout(1000);
 
-    // Suspend: move to Done.
+    // Suspend: move to Done. waitForNoRunningSession already blocks until
+    // the PTY is gone; no extra buffer wait needed.
     await moveTaskIpc(page, taskId, swimlaneIds.done);
     await waitForNoRunningSession(page);
-    await page.waitForTimeout(2000);
 
     // Resume: unarchive back to Planning. If the pipeline captured our
     // UUID, the resume command will be `gemini --resume bbbb2222-...`

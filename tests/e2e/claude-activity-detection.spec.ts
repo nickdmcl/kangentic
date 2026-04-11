@@ -175,6 +175,36 @@ function findEventsOutputPath(): string | null {
   return match ? match[1].replace(/\//g, path.sep) : null;
 }
 
+/**
+ * Resolve the events.jsonl path for a specific task's currently-running
+ * session. Polls until the session appears in the manager - PTY scrollback
+ * markers can arrive before listSessions() reflects the new session, and
+ * unique mtime-based lookups race against unrelated sessions in this file.
+ */
+async function eventsPathForTask(taskTitle: string, timeoutMs = 10000): Promise<string> {
+  const start = Date.now();
+  let lastError = '';
+  while (Date.now() - start < timeoutMs) {
+    const result = await page.evaluate(async (title) => {
+      const tasks = await window.electronAPI.tasks.list();
+      const task = tasks.find((t) => t.title === title);
+      if (!task) return { error: `task missing` };
+      const sessions = await window.electronAPI.sessions.list();
+      const taskSessions = sessions.filter((s) => s.taskId === task.id);
+      if (taskSessions.length === 0) {
+        return { error: `0 sessions for task ${task.id}, total sessions: ${sessions.length}` };
+      }
+      return { sessionId: taskSessions[taskSessions.length - 1].id };
+    }, taskTitle);
+    if ('sessionId' in result && result.sessionId) {
+      return path.join(tmpDir, '.kangentic', 'sessions', result.sessionId, 'events.jsonl');
+    }
+    lastError = (result as { error: string }).error;
+    await page.waitForTimeout(200);
+  }
+  throw new Error(`No session found for task "${taskTitle}" after ${timeoutMs}ms (${lastError})`);
+}
+
 test.describe('Claude Agent -- Event Bridge Script', () => {
   test('event-bridge.js writes correct JSONL for tool_start event', async () => {
     const bridgePath = path.join(__dirname, '..', '..', 'src', 'main', 'agent', 'event-bridge.js');
@@ -324,51 +354,48 @@ test.describe('Claude Agent -- Activity State via IPC', () => {
   });
 
   test('writing events JSONL transitions state to thinking', async () => {
-    // Read the real events path from the merged settings file - this is
-    // the path the session-file-watcher is actually watching. Using any
-    // other derivation (e.g. agentSessionId from mock output) breaks after
-    // b28c662 because sessionDir now uses ptySessionId via statusOutputPath.
-    const eventsPath = findEventsOutputPath();
-    expect(eventsPath).toBeTruthy();
+    // Each test creates its own session so findEventsOutputPath() can find a
+    // fresh settings.json on disk. Reusing the previous test's session is
+    // brittle: after b28c662 sessionDir uses ptySessionId via statusOutputPath,
+    // and ensureBoard() between tests can leave the previous session orphaned.
+    const title = `Thinking IPC ${runId}-${Date.now()}`;
+    await createTask(page, title, 'Test thinking transition via IPC');
+    await dragTaskToColumn(title, 'Planning');
+    await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
 
-    // Ensure directory exists
-    fs.mkdirSync(path.dirname(eventsPath!), { recursive: true });
+    const eventsPath = await eventsPathForTask(title);
+    fs.mkdirSync(path.dirname(eventsPath), { recursive: true });
 
-    // Write tool_start event to the events file (simulating PreToolUse hook)
-    fs.appendFileSync(eventsPath!, JSON.stringify({
+    fs.appendFileSync(eventsPath, JSON.stringify({
       ts: Date.now(),
       type: 'tool_start',
       tool: 'Read',
     }) + '\n');
 
-    // Wait for the file watcher to pick it up and emit to the renderer
-    await page.waitForTimeout(500);
-
-    // Check that at least one session is now thinking
-    const activity = await page.evaluate(async () => {
-      return window.electronAPI.sessions.getActivity();
-    });
-    const states = Object.values(activity) as string[];
-    expect(states).toContain('thinking');
+    await expect.poll(async () => {
+      const activity = await page.evaluate(() => window.electronAPI.sessions.getActivity());
+      return Object.values(activity as Record<string, string>);
+    }, { timeout: 10000, message: 'Expected at least one session to reach thinking' }).toContain('thinking');
   });
 
   test('writing idle event transitions state back to idle', async () => {
-    const eventsPath = findEventsOutputPath();
-    expect(eventsPath).toBeTruthy();
+    const title = `Idle IPC ${runId}-${Date.now()}`;
+    await createTask(page, title, 'Test idle transition via IPC');
+    await dragTaskToColumn(title, 'Planning');
+    await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
 
-    // Write idle event (simulating Stop hook)
-    fs.appendFileSync(eventsPath!, JSON.stringify({
+    const eventsPath = await eventsPathForTask(title);
+    fs.mkdirSync(path.dirname(eventsPath), { recursive: true });
+
+    fs.appendFileSync(eventsPath, JSON.stringify({
       ts: Date.now(),
       type: 'idle',
     }) + '\n');
 
-    await page.waitForTimeout(500);
-
-    const activity = await page.evaluate(async () => {
-      return window.electronAPI.sessions.getActivity();
-    });
-    const states = Object.values(activity) as string[];
-    expect(states).toContain('idle');
+    await expect.poll(async () => {
+      const activity = await page.evaluate(() => window.electronAPI.sessions.getActivity());
+      return Object.values(activity as Record<string, string>);
+    }, { timeout: 10000, message: 'Expected session to be idle' }).toContain('idle');
   });
 });
 

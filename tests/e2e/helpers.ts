@@ -35,15 +35,35 @@ export function cleanupTestDataDir(suiteName: string): void {
   }
 }
 
+// Cached git template - initialized once per worker process and copied
+// per createTempProject() call. Replaces ~150-300ms of git init + git commit
+// per call with a fast directory copy. The template lives outside the per-test
+// .tmp tree so it's not wiped by individual test cleanup.
+const TEMPLATE_PARENT = path.join(__dirname, '..', '.tmp-template');
+const TEMPLATE_DIR = path.join(TEMPLATE_PARENT, `worker-${process.pid}`);
+let templateInitialized = false;
+
+function ensureGitTemplate(): string {
+  if (templateInitialized && fs.existsSync(TEMPLATE_DIR)) return TEMPLATE_DIR;
+  // Wipe the whole parent to also clean up stale directories from prior
+  // runs whose PIDs are no longer live.
+  try { fs.rmSync(TEMPLATE_PARENT, { recursive: true, force: true }); } catch { /* ignore */ }
+  fs.mkdirSync(TEMPLATE_DIR, { recursive: true });
+  execSync('git init', { cwd: TEMPLATE_DIR, stdio: 'ignore' });
+  execSync('git commit --allow-empty -m "init"', { cwd: TEMPLATE_DIR, stdio: 'ignore' });
+  templateInitialized = true;
+  return TEMPLATE_DIR;
+}
+
 // Temp project directory for tests -- always starts fresh
 export function createTempProject(testName: string): string {
   const tmpDir = path.join(__dirname, '..', '.tmp', testName);
   // Remove stale data from previous runs to avoid session saturation
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
-  fs.mkdirSync(tmpDir, { recursive: true });
-  // Initialize a git repo so worktrees can work
-  execSync('git init', { cwd: tmpDir, stdio: 'ignore' });
-  execSync('git commit --allow-empty -m "init"', { cwd: tmpDir, stdio: 'ignore' });
+  // Copy from the cached git template instead of running git init + commit
+  // every call. fs.cpSync recursively copies including the .git directory.
+  const template = ensureGitTemplate();
+  fs.cpSync(template, tmpDir, { recursive: true });
   return tmpDir;
 }
 

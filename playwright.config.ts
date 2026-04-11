@@ -54,7 +54,10 @@ export default defineConfig({
       testDir: './tests/e2e',
       testMatch: '**/*.spec.ts',
       workers: 1,
-      retries: 1,
+      // Retries are CI-only. Local /test runs do not pay 2x cost on the
+      // occasional Windows Electron debug-pipe flake; CI keeps the safety net
+      // to avoid PR-blocking transients.
+      retries: process.env.CI ? 1 : 0,
     },
   ],
   webServer: {

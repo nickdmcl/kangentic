@@ -74,7 +74,6 @@ test.afterAll(async () => {
 
 async function ensureBoard() {
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
   const backlog = page.locator('[data-swimlane-name="To Do"]');
   if (await backlog.isVisible().catch(() => false)) return;
   await page.locator(`button:has-text("${PROJECT_NAME}")`).first().click();
@@ -92,7 +91,6 @@ async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
     const el = document.querySelector(`[data-swimlane-name="${col}"]`);
     if (el) el.scrollIntoView({ inline: 'nearest', behavior: 'instant' });
   }, targetColumn);
-  await page.waitForTimeout(100);
 
   const cardBox = await card.boundingBox();
   const targetBox = await target.boundingBox();
@@ -106,11 +104,10 @@ async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   await page.mouse.move(startX + 10, startY, { steps: 3 });
-  await page.waitForTimeout(100);
   await page.mouse.move(endX, endY, { steps: 15 });
-  await page.waitForTimeout(200);
   await page.mouse.up();
-  await page.waitForTimeout(500);
+  // Confirm landing instead of a fixed 500ms post-drop wait.
+  await expect(target.locator(`text=${taskTitle}`).first()).toBeVisible({ timeout: 5000 });
 }
 
 /** Wait for a running session to appear for the given task title */
@@ -137,7 +134,6 @@ async function clickKebabAction(dialog: ReturnType<Page['locator']>, actionText:
   const kebabButton = dialog.locator('button[title="Actions"]');
   await kebabButton.waitFor({ state: 'visible', timeout: 3000 });
   await kebabButton.click();
-  await page.waitForTimeout(200);
 
   // Click the action in the dropdown
   const actionButton = dialog.locator('button', { hasText: new RegExp(`^${actionText}$`) });
@@ -170,10 +166,10 @@ test.describe('Task Delete', () => {
     // Click on the task card to open the detail dialog
     const card = codeReviewColumn.locator(`text=${title}`).first();
     await card.click();
-    await page.waitForTimeout(500);
 
     // Open kebab menu and click Archive (no confirmation needed)
     const dialog = page.locator('.fixed.inset-0');
+    await dialog.waitFor({ state: 'visible', timeout: 3000 });
     await clickKebabAction(dialog, 'Archive');
 
     // Verify the app is still alive (board is visible)
@@ -212,24 +208,33 @@ test.describe('Task Delete', () => {
         await window.electronAPI.sessions.kill(task.session_id);
       }
     }, title);
-    await page.waitForTimeout(500);
+    // Poll until the session reflects exited status before opening the dialog.
+    await expect.poll(async () => {
+      return page.evaluate(async (t) => {
+        const tasks = await window.electronAPI.tasks.list();
+        const task = tasks.find((tk: { title: string }) => tk.title === t);
+        if (!task?.session_id) return 'no-session';
+        const sessions = await window.electronAPI.sessions.list();
+        const session = sessions.find((s: { id: string }) => s.id === task.session_id);
+        return session?.status ?? 'gone';
+      }, title);
+    }, { timeout: 5000 }).not.toBe('running');
 
     // Open the task detail dialog
     const card = page.locator('[data-testid="swimlane"]').locator(`text=${title}`).first();
     await card.click();
-    await page.waitForTimeout(500);
 
     // Open kebab menu and click Archive
     const dialog = page.locator('.fixed.inset-0');
+    await dialog.waitFor({ state: 'visible', timeout: 3000 });
     await clickKebabAction(dialog, 'Archive');
-    await page.waitForTimeout(1000);
 
     // Verify app is still alive
     await waitForBoard(page);
 
     // Verify task is gone from active columns (archived tasks appear in Done's "Completed" section)
     const activeColumns = page.locator('[data-testid="swimlane"]:not([data-swimlane-name="Done"])');
-    await expect(activeColumns.locator(`text=${title}`)).toHaveCount(0);
+    await expect(activeColumns.locator(`text=${title}`)).toHaveCount(0, { timeout: 5000 });
   });
 
   test('delete task with queued session does not crash', async () => {
@@ -245,7 +250,13 @@ test.describe('Task Delete', () => {
         }
       }
     });
-    await page.waitForTimeout(500);
+    // Poll until no session is in running/queued state, instead of a fixed wait.
+    await expect.poll(async () => {
+      return page.evaluate(async () => {
+        const sessions = await window.electronAPI.sessions.list();
+        return sessions.filter((s: { status: string }) => s.status === 'running' || s.status === 'queued').length;
+      });
+    }, { timeout: 5000 }).toBe(0);
 
     // Lower max concurrent to 1 so the second move queues
     await page.evaluate(async () => {
@@ -320,17 +331,17 @@ test.describe('Task Delete', () => {
     await page.evaluate(async (id) => {
       await window.electronAPI.tasks.delete(id);
     }, taskBId);
-    await page.waitForTimeout(500);
 
     // Verify app is still alive
     await waitForBoard(page);
 
-    // Verify task B is gone
-    const taskBExists = await page.evaluate(async (title) => {
-      const tasks = await window.electronAPI.tasks.list();
-      return tasks.some((t: any) => t.title === title);
-    }, titleB);
-    expect(taskBExists).toBe(false);
+    // Verify task B is gone (poll the IPC instead of a fixed wait).
+    await expect.poll(async () => {
+      return page.evaluate(async (title) => {
+        const tasks = await window.electronAPI.tasks.list();
+        return tasks.some((t: { title: string }) => t.title === title);
+      }, titleB);
+    }, { timeout: 5000 }).toBe(false);
 
     // Verify the queued session is no longer queued (killed sessions stay in
     // the in-memory map but are marked exited, not removed entirely)
@@ -363,7 +374,6 @@ test.describe('Task Delete', () => {
         await window.electronAPI.sessions.kill(t.session_id);
       }
     }, titleA);
-    await page.waitForTimeout(300);
   });
 
   test('delete task without session from detail dialog', async () => {
@@ -373,21 +383,19 @@ test.describe('Task Delete', () => {
     // Open detail dialog by clicking the card
     const card = page.locator('[data-testid="swimlane"]').locator(`text=${title}`).first();
     await card.click();
-    await page.waitForTimeout(300);
 
     // Dialog opens in edit mode for no-session tasks -- Delete is in the footer
     const dialog = page.locator('.fixed.inset-0');
+    await dialog.waitFor({ state: 'visible', timeout: 3000 });
     await dialog.locator('button:has-text("Delete")').click();
-    await page.waitForTimeout(200);
 
     // Confirm deletion
     await page.locator('text=This action cannot be undone.').waitFor({ state: 'visible', timeout: 3000 });
     await page.locator('button:has-text("Delete")').click();
-    await page.waitForTimeout(500);
 
     // Verify app is still alive and task is gone from board
     await waitForBoard(page);
     const taskCards = page.locator('[data-testid="swimlane"]').locator(`text=${title}`);
-    await expect(taskCards).toHaveCount(0);
+    await expect(taskCards).toHaveCount(0, { timeout: 5000 });
   });
 });

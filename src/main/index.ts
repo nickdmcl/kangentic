@@ -69,11 +69,12 @@ app.setAppUserModelId(
 
 const appLaunchTime = Date.now();
 const isEphemeral = process.argv.includes('--ephemeral');
+const isE2ETest = process.env.NODE_ENV === 'test';
 
 // Enforce single instance -- prevents manual double-launches from spawning
-// duplicate windows. Ephemeral instances
-// (worktree previews) skip this so they can coexist with the main app.
-if (!isEphemeral) {
+// duplicate windows. Ephemeral instances (worktree previews) and E2E test
+// instances skip this so they can coexist with a running dogfooding app.
+if (!isEphemeral && !isE2ETest) {
   const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
     app.exit(0);

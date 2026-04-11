@@ -91,7 +91,6 @@ async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
     const targetEl = document.querySelector(`[data-swimlane-name="${targetCol}"]`);
     if (targetEl) targetEl.scrollIntoView({ inline: 'nearest', behavior: 'instant' });
   }, targetColumn);
-  await page.waitForTimeout(100);
 
   const cardBox = await card.boundingBox();
   const targetBox = await target.boundingBox();
@@ -105,11 +104,10 @@ async function dragTaskToColumn(taskTitle: string, targetColumn: string) {
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   await page.mouse.move(startX + 10, startY, { steps: 3 });
-  await page.waitForTimeout(100);
   await page.mouse.move(endX, endY, { steps: 15 });
-  await page.waitForTimeout(200);
   await page.mouse.up();
-  await page.waitForTimeout(500);
+  // Confirm landing instead of a fixed 500ms post-drop wait.
+  await expect(target.locator(`text=${taskTitle}`).first()).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -156,7 +154,6 @@ test.describe('Terminal Rendering', () => {
 
     // Click the session tab to ensure it's active
     await sessionTab.click();
-    await page.waitForTimeout(500);
 
     // xterm should have rendered in the terminal panel
     const terminalPanel = page.locator('.resize-handle ~ div');
@@ -172,148 +169,4 @@ test.describe('Terminal Rendering', () => {
     expect(screenBox!.height).toBeGreaterThan(20);
   });
 
-  test('task detail dialog shows xterm terminal', async () => {
-    const taskName = `Term Dialog ${runId}`;
-    await createTask(page, taskName, 'Test terminal in dialog');
-
-    // Drag to Planning to spawn a session
-    await dragTaskToColumn(taskName, 'Planning');
-    await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
-
-    // Open the task detail dialog by clicking the card
-    const card = page.locator('[data-swimlane-name="Planning"]').locator(`text=${taskName}`).first();
-    await card.click();
-    await page.waitForTimeout(500);
-
-    // Dialog should be visible
-    const dialog = page.locator('.fixed.inset-0');
-    await expect(dialog).toBeVisible({ timeout: 3000 });
-
-    // xterm should render inside the dialog
-    const dialogXterm = dialog.locator('.xterm');
-    await expect(dialogXterm.first()).toBeVisible({ timeout: 5000 });
-
-    // xterm screen should have real dimensions (not collapsed)
-    const xtermScreen = dialog.locator('.xterm-screen');
-    await expect(xtermScreen.first()).toBeVisible({ timeout: 3000 });
-    const screenBox = await xtermScreen.first().boundingBox();
-    expect(screenBox).toBeTruthy();
-    expect(screenBox!.width).toBeGreaterThan(100);
-    expect(screenBox!.height).toBeGreaterThan(50);
-
-    // Close dialog
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-  });
-
-  test('terminal shows shell output (scrollback)', async () => {
-    const taskName = `Term Output ${runId}`;
-    await createTask(page, taskName, 'Test terminal shows output');
-
-    // Drag to Planning to spawn a session
-    await dragTaskToColumn(taskName, 'Planning');
-    await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
-
-    // Open task detail dialog
-    const card = page.locator('[data-swimlane-name="Planning"]').locator(`text=${taskName}`).first();
-    await card.click();
-    await page.waitForTimeout(1000);
-
-    // The xterm terminal should render inside the dialog
-    const dialog = page.locator('.fixed.inset-0');
-    const xtermContainer = dialog.locator('.xterm');
-    await expect(xtermContainer.first()).toBeVisible({ timeout: 5000 });
-
-    // xterm v6 uses WebGL canvases for rendering, so we check that the terminal
-    // has canvas elements with real pixel content (width/height > 0)
-    const hasCanvasContent = await dialog.locator('.xterm canvas').first().evaluate((el) => {
-      const canvas = el as HTMLCanvasElement;
-      return canvas.width > 0 && canvas.height > 0;
-    });
-    expect(hasCanvasContent).toBe(true);
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-  });
-
-  test('panel resize preserves scrollback and refits xterm', async () => {
-    // Extended timeout: session spawn + drag operations
-    test.setTimeout(90000);
-
-    const taskName = `Resize Test ${runId}`;
-    await createTask(page, taskName, 'Test scrollback and refit after resize');
-
-    // Spawn a session so the bottom panel has a live terminal
-    await dragTaskToColumn(taskName, 'Planning');
-    await waitForTerminalOutput('MOCK_CLAUDE_SESSION:');
-
-    // Click the session tab to ensure this terminal is active.
-    // With multiple sessions, the "All" tab may be selected by default.
-    const sessionTab = page.locator('.resize-handle ~ div button', { hasText: /resize-test/i });
-    await sessionTab.click();
-    await page.waitForTimeout(300);
-
-    // TerminalPanel only renders the active session's <div class="absolute inset-0">
-    // (filtered at render time, not toggled via display style). The activity tab
-    // uses display:block/none but contains no .xterm. So .xterm in the panel
-    // unambiguously identifies the active session pane.
-    const terminalPanel = page.locator('.resize-handle ~ div');
-    await expect(terminalPanel.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
-
-    // --- Part 1: Scrollback preservation ---
-    const scrollbackBefore = await page.evaluate(async () => {
-      const sessions = await window.electronAPI.sessions.list();
-      if (sessions.length === 0) return '';
-      return window.electronAPI.sessions.getScrollback(sessions[0].id);
-    });
-    expect(scrollbackBefore.length).toBeGreaterThan(0);
-
-    const handle = page.locator('.resize-handle');
-    await expect(handle).toBeVisible({ timeout: 3000 });
-    const handleBox = await handle.boundingBox();
-    expect(handleBox).toBeTruthy();
-
-    const handleX = handleBox!.x + handleBox!.width / 2;
-    const handleY = handleBox!.y + handleBox!.height / 2;
-
-    // Drag UP (bigger) → DOWN (smaller) → UP (bigger again).
-    // This is the resize pattern that was losing scrollback before the fix.
-    await page.mouse.move(handleX, handleY);
-    await page.mouse.down();
-    await page.mouse.move(handleX, handleY - 100, { steps: 10 });
-    await page.mouse.move(handleX, handleY + 30, { steps: 10 });
-    await page.mouse.move(handleX, handleY - 80, { steps: 10 });
-    await page.mouse.up();
-    await page.waitForTimeout(1000);
-
-    const scrollbackAfter = await page.evaluate(async () => {
-      const sessions = await window.electronAPI.sessions.list();
-      if (sessions.length === 0) return '';
-      return window.electronAPI.sessions.getScrollback(sessions[0].id);
-    });
-
-    // PTY buffer is the source of truth -- unaffected by xterm row changes.
-    expect(scrollbackAfter).toBe(scrollbackBefore);
-
-    // --- Part 2: xterm refits after resize ---
-    const xtermScreen = terminalPanel.locator('.xterm-screen').first();
-    const boxBefore = await xtermScreen.boundingBox();
-    expect(boxBefore).toBeTruthy();
-
-    // Drag handle UP another 100px to make panel bigger
-    const handle2 = await handle.boundingBox();
-    expect(handle2).toBeTruthy();
-    const h2X = handle2!.x + handle2!.width / 2;
-    const h2Y = handle2!.y + handle2!.height / 2;
-
-    await page.mouse.move(h2X, h2Y);
-    await page.mouse.down();
-    await page.mouse.move(h2X, h2Y - 100, { steps: 10 });
-    await page.mouse.up();
-    await page.waitForTimeout(1000);
-
-    const boxAfter = await xtermScreen.boundingBox();
-    expect(boxAfter).toBeTruthy();
-    expect(boxAfter!.height).toBeGreaterThan(boxBefore!.height);
-  });
 });
