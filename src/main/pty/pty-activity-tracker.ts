@@ -1,20 +1,17 @@
-import fs from 'node:fs';
-import os from 'node:os';
 import { IdleReason } from '../../shared/types';
 import type { ActivityState } from '../../shared/types';
 
-const PTY_DEBUG_LOG = `${os.homedir()}\\kangentic-pty-debug.log`;
-function trackerLog(message: string): void {
-  const timestamp = new Date().toISOString().slice(11, 23);
-  const line = `[${timestamp}] [tracker] ${message}\n`;
-  try { fs.appendFileSync(PTY_DEBUG_LOG, line); } catch { /* ignore */ }
-}
-
 /**
  * Timeout in ms before silence is interpreted as idle.
- * Tuned to balance responsiveness vs avoiding flicker from brief output pauses.
+ *
+ * Empirically tuned: TUI agents (Codex) emit continuous output during
+ * active work (character-by-character streaming with <100ms gaps between
+ * chunks), then go completely silent when idle. A 3-second threshold is
+ * fast enough to feel responsive while comfortably exceeding intra-work
+ * gaps. The stale-thinking watchdog (45s) is the safety net for any
+ * edge cases.
  */
-const PTY_SILENCE_THRESHOLD_MS = 10_000;
+const PTY_SILENCE_THRESHOLD_MS = 3_000;
 
 interface PtyActivityCallbacks {
   /** Called when PTY data indicates the agent is working. */
@@ -70,22 +67,13 @@ export class PtyActivityTracker {
    * the silence timer. No-op if suppressed or session not running.
    */
   onData(sessionId: string): void {
-    if (this.suppressed.has(sessionId)) {
-      trackerLog(`${sessionId.slice(0, 8)} onData SUPPRESSED`);
-      return;
-    }
-    if (!this.callbacks.isSessionRunning(sessionId)) {
-      trackerLog(`${sessionId.slice(0, 8)} onData NOT-RUNNING`);
-      return;
-    }
+    if (this.suppressed.has(sessionId)) return;
+    if (!this.callbacks.isSessionRunning(sessionId)) return;
 
-    const currentActivity = this.callbacks.getActivity(sessionId);
-    if (currentActivity === 'idle') {
-      trackerLog(`${sessionId.slice(0, 8)} onData idle->thinking`);
+    if (this.callbacks.getActivity(sessionId) === 'idle') {
       this.callbacks.onThinking(sessionId);
     }
 
-    trackerLog(`${sessionId.slice(0, 8)} resetSilenceTimer (${PTY_SILENCE_THRESHOLD_MS}ms)`);
     this.resetSilenceTimer(sessionId);
   }
 
@@ -124,12 +112,10 @@ export class PtyActivityTracker {
 
     const timer = setTimeout(() => {
       this.silenceTimers.delete(sessionId);
-      if (this.suppressed.has(sessionId)) { trackerLog(`${sessionId.slice(0, 8)} TIMER: suppressed`); return; }
-      if (!this.callbacks.isSessionRunning(sessionId)) { trackerLog(`${sessionId.slice(0, 8)} TIMER: not running`); return; }
-      const activity = this.callbacks.getActivity(sessionId);
-      if (activity !== 'thinking') { trackerLog(`${sessionId.slice(0, 8)} TIMER: skip (state=${activity})`); return; }
+      if (this.suppressed.has(sessionId)) return;
+      if (!this.callbacks.isSessionRunning(sessionId)) return;
+      if (this.callbacks.getActivity(sessionId) !== 'thinking') return;
 
-      trackerLog(`${sessionId.slice(0, 8)} TIMER: FIRING -> idle`);
       this.callbacks.onIdle(sessionId, IdleReason.Silence);
     }, PTY_SILENCE_THRESHOLD_MS);
     timer.unref();

@@ -14,22 +14,6 @@ import { TranscriptWriter, stripAnsiEscapes } from './transcript-writer';
 import { SessionIdScanner } from './session-id-scanner';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
-
-// Diagnostic log file for PTY activity debugging.
-// Write to user home directory for reliable cross-platform access.
-const PTY_DEBUG_LOG = `${os.homedir()}\\kangentic-pty-debug.log`;
-try {
-  fs.writeFileSync(PTY_DEBUG_LOG, `[startup] session-manager loaded at ${new Date().toISOString()}\n`);
-  console.log(`[pty-debug] Log initialized at ${PTY_DEBUG_LOG}`);
-} catch (error) {
-  console.error(`[pty-debug] Failed to initialize log at ${PTY_DEBUG_LOG}:`, error);
-}
-function ptyLog(message: string): void {
-  const timestamp = new Date().toISOString().slice(11, 23);
-  const line = `[${timestamp}] ${message}\n`;
-  console.log(line.trimEnd());
-  try { fs.appendFileSync(PTY_DEBUG_LOG, line); } catch { /* ignore */ }
-}
 import { trackEvent, sanitizeErrorMessage } from '../analytics/analytics';
 import { isShuttingDown } from '../shutdown-state';
 import type { TranscriptRepository } from '../db/repositories/transcript-repository';
@@ -635,7 +619,6 @@ export class SessionManager extends EventEmitter {
       const strategy = input.agentParser?.runtime?.activity;
       if (strategy && strategy.kind !== 'hooks') {
         if (strategy.detectIdle?.(data)) {
-          ptyLog(`${id.slice(0, 8)} IDLE-MATCH detectIdle fired`);
           this.usageTracker.notifyPtyIdle(id);
         } else if (data.length > 0) {
           // Content dedup: TUI agents (Codex, Gemini) repaint the entire
@@ -648,12 +631,7 @@ export class SessionManager extends EventEmitter {
           const previousContent = this.lastPtyContent.get(id);
           if (stripped.length > 0 && stripped !== previousContent) {
             this.lastPtyContent.set(id, stripped);
-            ptyLog(`${id.slice(0, 8)} NEW ${stripped.length}B "${stripped.slice(0, 60).replace(/\n/g, '\\n')}"`);
             this.usageTracker.notifyPtyData(id);
-          } else if (stripped.length > 0) {
-            ptyLog(`${id.slice(0, 8)} DUP ${stripped.length}B (same as prev)`);
-          } else {
-            ptyLog(`${id.slice(0, 8)} ANSI ${data.length}B (empty after strip)`);
           }
         }
       }

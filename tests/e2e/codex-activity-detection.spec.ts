@@ -207,9 +207,9 @@ test.describe('Codex Agent - Idle Detection with TUI Redraws', () => {
     await moveTaskIpc(page, taskId, swimlaneIds.planning);
     await waitForScrollback(page, 'MOCK_CODEX_SESSION:');
 
-    // Despite continuous ANSI redraws every 500ms, the isSignificantOutput
-    // filter should classify them as noise. The silence timer (10s) should
-    // fire and transition to idle.
+    // Despite continuous ANSI redraws every 500ms, the content dedup in
+    // SessionManager should classify identical frames as noise. The
+    // silence timer (3s) should fire and transition to idle.
     await expect.poll(async () => {
       const activity = await page.evaluate(() => window.electronAPI.sessions.getActivity());
       return Object.values(activity as Record<string, ActivityState>);
