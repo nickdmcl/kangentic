@@ -1,10 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
-import path from 'node:path';
 import { IdleReason } from '../../shared/types';
 import type { ActivityState } from '../../shared/types';
 
-const PTY_DEBUG_LOG = path.join(os.tmpdir(), 'kangentic-pty-debug.log');
+const PTY_DEBUG_LOG = `${os.homedir()}\\kangentic-pty-debug.log`;
 function trackerLog(message: string): void {
   const timestamp = new Date().toISOString().slice(11, 23);
   const line = `[${timestamp}] [tracker] ${message}\n`;

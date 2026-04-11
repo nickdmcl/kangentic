@@ -14,10 +14,16 @@ import { TranscriptWriter, stripAnsiEscapes } from './transcript-writer';
 import { SessionIdScanner } from './session-id-scanner';
 import { detectPR } from './pr-connectors';
 import { adaptCommandForShell, isUncPath } from '../../shared/paths';
-import path from 'node:path';
 
-// Diagnostic log file for PTY activity debugging
-const PTY_DEBUG_LOG = path.join(os.tmpdir(), 'kangentic-pty-debug.log');
+// Diagnostic log file for PTY activity debugging.
+// Write to user home directory for reliable cross-platform access.
+const PTY_DEBUG_LOG = `${os.homedir()}\\kangentic-pty-debug.log`;
+try {
+  fs.writeFileSync(PTY_DEBUG_LOG, `[startup] session-manager loaded at ${new Date().toISOString()}\n`);
+  console.log(`[pty-debug] Log initialized at ${PTY_DEBUG_LOG}`);
+} catch (error) {
+  console.error(`[pty-debug] Failed to initialize log at ${PTY_DEBUG_LOG}:`, error);
+}
 function ptyLog(message: string): void {
   const timestamp = new Date().toISOString().slice(11, 23);
   const line = `[${timestamp}] ${message}\n`;
@@ -189,7 +195,7 @@ export class SessionManager extends EventEmitter {
         // data (model, tokens) but NOT real-time activity signals, so the
         // silence timer must remain active.
         const session = this.sessions.get(sessionId);
-        const activityKind = session?.input?.agentParser?.runtime?.activity?.kind;
+        const activityKind = session?.agentParser?.runtime?.activity?.kind;
         if (activityKind === 'hooks_and_pty') {
           this.usageTracker.suppressPty(sessionId);
         }
