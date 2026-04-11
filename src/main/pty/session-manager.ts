@@ -182,7 +182,18 @@ export class SessionManager extends EventEmitter {
       onUsageUpdate: (sessionId, usage) => this.usageTracker.setSessionUsage(sessionId, usage),
       onEvents: (sessionId, events) => this.usageTracker.ingestEvents(sessionId, events),
       onActivity: (sessionId, activity) => this.usageTracker.forceActivity(sessionId, activity),
-      onFirstTelemetry: (sessionId) => this.usageTracker.suppressPty(sessionId),
+      onFirstTelemetry: (sessionId) => {
+        // Only suppress PTY detection when the adapter uses hooks_and_pty
+        // (meaning hook-based events can drive activity transitions). For
+        // pure PTY adapters (Codex, Aider), session history provides usage
+        // data (model, tokens) but NOT real-time activity signals, so the
+        // silence timer must remain active.
+        const session = this.sessions.get(sessionId);
+        const activityKind = session?.input?.agentParser?.runtime?.activity?.kind;
+        if (activityKind === 'hooks_and_pty') {
+          this.usageTracker.suppressPty(sessionId);
+        }
+      },
     });
 
     this.statusFileReader = new StatusFileReader({
