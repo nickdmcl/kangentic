@@ -4,11 +4,10 @@ import fs from 'node:fs';
 import { hero, inline } from '../helpers/resolutions';
 import { launchCapturePage } from '../helpers/capture-page';
 import { buildMarketingPreConfig } from '../helpers/marketing-fixture';
+import { getOutputDir } from '../helpers/output-dir';
 
-const OUTPUT_DIR = path.join(__dirname, '..', '..', '..', 'captures', 'task-detail');
+const OUTPUT_DIR = getOutputDir('task-detail');
 const THEMES = ['dark', 'light'] as const;
-
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 const preConfigScript = buildMarketingPreConfig();
 

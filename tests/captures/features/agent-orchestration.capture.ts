@@ -4,12 +4,10 @@ import fs from 'node:fs';
 import { ALL_RESOLUTIONS, hero } from '../helpers/resolutions';
 import { launchCapturePage } from '../helpers/capture-page';
 import { buildMarketingPreConfig } from '../helpers/marketing-fixture';
+import { getOutputDir } from '../helpers/output-dir';
 
-const OUTPUT_DIR = path.join(__dirname, '..', '..', '..', 'captures', 'agent-orchestration');
+const OUTPUT_DIR = getOutputDir('agent-orchestration');
 const THEMES = ['dark', 'light'] as const;
-
-// Ensure output directory exists
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 const preConfigScript = buildMarketingPreConfig();
 
@@ -78,5 +76,9 @@ test.describe('Agent Orchestration Captures', () => {
       const dest = path.join(OUTPUT_DIR, 'dark-interaction.webm');
       fs.copyFileSync(videoPath, dest);
     }
+
+    // Clean up temp video directory to prevent file locking
+    const videoTmpDir = path.join(__dirname, '..', '..', '..', 'captures', '_video-tmp');
+    try { fs.rmSync(videoTmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
   });
 });

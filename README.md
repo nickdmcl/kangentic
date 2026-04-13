@@ -5,7 +5,7 @@
 <h1 align="center"><a href="https://www.kangentic.com">Kangentic</a></h1>
 
 <p align="center">
-  <strong>Visual Agent Orchestration for Claude Code</strong>
+  <strong>Visual Agent Orchestration for Coding Agents</strong>
 </p>
 
 <p align="center">
@@ -20,9 +20,9 @@
 
 ---
 
-<p align="center">One board to manage all your Claude Code agents.</p>
+<p align="center">One board for Claude Code, Codex, Gemini, and Aider.</p>
 
-<p align="center">Managing multiple Claude Code sessions with terminal tabs is chaotic. Kangentic replaces that with a drag-and-drop board where every column transition controls agent lifecycle automatically. Free to use, fully local, no accounts required.</p>
+<p align="center">Managing multiple coding agents across terminal tabs is chaotic. Kangentic replaces that with a drag-and-drop board where every column transition controls agent lifecycle automatically. Free to use, fully local, no accounts required.</p>
 
 <p align="center">
   <a href="https://www.kangentic.com"><img src="resources/kanban-demo.png" alt="Kangentic Kanban Board" width="800" /></a>
@@ -33,7 +33,7 @@
 
 ## Features
 
-- **Visual agent orchestration** - drag tasks between columns to spawn, suspend, and resume Claude Code sessions automatically
+- **Visual agent orchestration** - drag tasks between columns to spawn, suspend, and resume agent sessions automatically
 - **Git worktree isolation** - each agent works on its own branch in a dedicated checkout, no merge conflicts between parallel agents
 - **Built-in terminals** - full xterm.js terminals with WebGL rendering, per-session tabs, and drag-to-resize panels
 - **Session persistence** - close the app, reopen it, resume right where you left off via `--resume`
@@ -50,21 +50,43 @@
 ## How It Works
 
 1. **Add tasks** to your board, describing the work in plain text
-2. **Drag a task** into an active column. Kangentic spawns a Claude Code agent in an isolated git worktree.
+2. **Drag a task** into an active column. Kangentic spawns an agent in an isolated git worktree.
 3. **Watch progress** in the built-in terminal, or let it run and check back later
 4. **Review and merge** when the agent finishes
 
-## What Kangentic Is Not
+## Supported Agents
 
-- **Not a task tracker.** No sprints, story points, or backlog grooming. The board exists to control agents, not to manage project management metadata.
-- **Not a CI system.** It does not run pipelines or deploy artifacts. It orchestrates interactive Claude Code sessions on your local machine.
-- **Not a web API wrapper.** Kangentic spawns real terminal sessions with full PTY support via the Claude Code CLI directly.
+Run any of these coding agent CLIs from a single Kanban board:
+
+| Agent | Status |
+|-------|--------|
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | Supported |
+| [OpenAI Codex](https://github.com/openai/codex) | Supported |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Supported |
+| [Aider](https://aider.chat/) | Supported |
+| GitHub Copilot | Coming soon |
+| Cursor | Coming soon |
+| Warp | Coming soon |
+
+## Import Sources
+
+Bring issues and work items from your existing tools into the backlog:
+
+| Source | Status |
+|--------|--------|
+| GitHub Issues | Supported |
+| GitHub Projects | Supported |
+| Azure DevOps | Supported |
+| Asana | Coming soon |
+| Jira | Coming soon |
+| Linear | Coming soon |
+| Trello | Coming soon |
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20+ (for npx)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - [Git 2.25+](https://git-scm.com/)
+- At least one supported agent CLI (see [Supported Agents](#supported-agents))
 
 ## Setup
 

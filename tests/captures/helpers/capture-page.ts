@@ -52,8 +52,9 @@ export async function launchCapturePage(options: CaptureOptions): Promise<Captur
   };
 
   if (options.video) {
+    const { CAPTURES_ROOT } = require('./output-dir');
     contextOptions.recordVideo = {
-      dir: path.join(__dirname, '..', '..', '..', 'captures', '_video-tmp'),
+      dir: path.join(CAPTURES_ROOT, '_video-tmp'),
       size: options.resolution.viewport,
     };
   }
