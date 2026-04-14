@@ -87,6 +87,7 @@
     hasCompletedFirstRun: true,
     showBoardSearch: true,
     skipDeleteConfirm: false,
+    skipDoneWorktreeConfirm: false,
     skipBoardConfigConfirm: false,
     autoFocusIdleSession: false,
     activateAllProjectsOnStartup: true,

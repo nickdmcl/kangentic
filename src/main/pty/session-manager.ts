@@ -1014,6 +1014,26 @@ export class SessionManager extends EventEmitter {
         const ptyRef = session.pty;
         session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
         ptyRef.kill();
+
+        // Wait for the kill to propagate into an 'exit' event before returning.
+        // Otherwise callers that immediately delete the session's CWD (worktree
+        // removal on move-to-Done) race against conhost still holding CWD
+        // handles on Windows. Bounded at 1500ms so a hung exit never blocks
+        // shutdown; removeWorktree's own retry handles the remaining cases.
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            this.removeListener('exit', onExit);
+            resolve();
+          }, 1500);
+          const onExit = (exitedSessionId: string) => {
+            if (exitedSessionId === sessionId) {
+              clearTimeout(timeout);
+              this.removeListener('exit', onExit);
+              resolve();
+            }
+          };
+          this.on('exit', onExit);
+        });
       }
     }
 

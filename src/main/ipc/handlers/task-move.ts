@@ -13,6 +13,7 @@ import {
   ensureTaskBranchCheckout,
   createTransitionEngine,
   cleanupTaskResources,
+  deleteTaskWorktree,
   spawnAgent,
   buildAutoCommandVars,
 } from '../helpers';
@@ -215,6 +216,20 @@ export async function handleTaskMove(
           await captureGitStats(task, sessionRepo, latestRecord.id, resolvedProjectPath, effectiveDefaultBranch);
         } catch {
           // Git stats capture is best-effort
+        }
+      }
+
+      // Delete the local worktree to reclaim disk. Preserve branch_name and
+      // session records so moving back out of Done can restore both.
+      if (task.worktree_path) {
+        const worktreeDeleted = await deleteTaskWorktree(context, task, tasks, resolvedProjectPath);
+        if (worktreeDeleted) {
+          console.log(`[TASK_MOVE] Deleted worktree for task ${task.id.slice(0, 8)} (moved to Done; branch + session preserved)`);
+        } else {
+          console.warn(`[TASK_MOVE] Partial worktree delete for task ${task.id.slice(0, 8)} (moved to Done; directory could not be deleted - will retry on next startup)`);
+        }
+        if (resolvedProjectPath) {
+          WorktreeManager.scheduleBackgroundPrune(resolvedProjectPath);
         }
       }
 

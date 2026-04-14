@@ -59,9 +59,9 @@ Dragging between active columns (e.g., Executing to Code Review) keeps the sessi
 
 ### Complete a Task
 
-Drag to Done. The session is suspended (not destroyed), the task is archived, and the conversation ID is preserved. If you later unarchive the task and drag it to an active column, the agent resumes with full conversation context.
+Drag to Done. A confirmation dialog asks you to approve deleting the local worktree (with a "Delete automatically in the future" checkbox to suppress future prompts). On confirm, the worktree directory is removed to reclaim disk, the session is suspended (not destroyed), the task is archived, and both the branch and conversation ID are preserved. If you later unarchive the task and drag it to an active column, Kangentic recreates the worktree from the preserved branch and the agent resumes with full conversation context.
 
-Clicking a completed task opens a session summary showing: duration, model, cost, token usage, tool call count, files changed, and lines added/removed. The Done column also supports searching completed tasks by title and sorting by date, cost, tokens, or duration.
+Clicking a completed task opens a session summary showing: duration, model, cost, token usage, tool call count, files changed, and lines added/removed. Done cards whose worktrees have been reclaimed show a small "worktree deleted" badge. The Done column also supports searching completed tasks by title and sorting by date, cost, tokens, or duration.
 
 ### Task Card Context Menu
 
@@ -359,6 +359,7 @@ These are global-only settings that apply to the entire app.
 | Max Concurrent Sessions | Limit how many agents can run at the same time |
 | When Max Sessions Reached | How new agent requests are handled when all slots are in use (Queue or Reject) |
 | Skip Task Delete Confirmation | Delete tasks immediately without a confirmation dialog |
+| Auto-Delete Worktree on Done | Delete the local worktree without asking each time a task moves to Done. Branch and session history are always preserved. |
 | Auto-Focus Idle Sessions | Automatically switch the bottom panel to the most recently idle session. Off by default - idle sessions show an amber dot on their tab instead. |
 | Launch All Projects on Startup | Start agents across all projects on launch, not just the current one |
 | Restore Window Position | Remember window size and position between launches |
@@ -512,4 +513,4 @@ Token and cost values pulse briefly when they change. The selected period persis
 - **Plan mode workflow:** Use a Planning column with `permission_mode='plan'` and `plan_exit_target_id` pointing to your Executing column. The agent plans first, then auto-moves to execution.
 - **Auto commands:** Set `auto_command` on a Code Review column to automatically ask the agent to review its own code when tasks arrive.
 - **Concurrent agents:** Increase `maxConcurrentSessions` to run more agents in parallel. Each needs its own worktree to avoid conflicts.
-- **Resume from Done:** Unarchive a completed task and drag it back to an active column. The agent picks up exactly where it left off.
+- **Resume from Done:** Unarchive a completed task and drag it back to an active column. Kangentic recreates the worktree from the preserved branch on the fly, and the agent picks up exactly where it left off.

@@ -108,3 +108,48 @@ export async function cleanupTaskResources(
     }
   }
 }
+
+/**
+ * Delete only the local worktree directory, preserving branch_name and
+ * all session records. `worktree_path` is nulled on success so the task
+ * reads as "deleted-but-resumable". Moving out of Done re-creates the
+ * worktree from the preserved branch via ensureTaskWorktree().
+ *
+ * Returns true when the directory was actually removed and the DB field
+ * was cleared, false when there was nothing to delete or the removal
+ * failed. Callers use the return value for log classification; callers
+ * that want to retry on failure rely on the preserved `worktree_path`.
+ *
+ * LOCK CONTRACT: callers MUST hold a `withTaskLock(taskId, ...)` for the
+ * duration of this call. Crosses an await boundary and mutates per-task
+ * state (`worktree_path`, plus filesystem state under the project's
+ * worktrees directory). Without the lock, a concurrent ensureTaskWorktree
+ * or cleanupTaskResources for the same task can interleave with the
+ * removal and corrupt git's worktree metadata.
+ *
+ * Used by TASK_MOVE -> Done.
+ */
+export async function deleteTaskWorktree(
+  context: IpcContext,
+  task: { id: string; worktree_path: string | null; branch_name: string | null },
+  tasks: TaskRepository,
+  projectPath?: string | null,
+): Promise<boolean> {
+  const resolvedProjectPath = projectPath ?? context.currentProjectPath;
+  if (!task.worktree_path || !resolvedProjectPath) return false;
+
+  let removed = false;
+  try {
+    const worktreeManager = new WorktreeManager(resolvedProjectPath);
+    await worktreeManager.withLock(async () => {
+      removed = await worktreeManager.removeWorktree(task.worktree_path!);
+    });
+  } catch (err) {
+    console.error(`[WORKTREE] Failed to delete worktree for task ${task.id.slice(0, 8)}:`, err);
+  }
+
+  if (removed) {
+    tasks.update({ id: task.id, worktree_path: null });
+  }
+  return removed;
+}

@@ -91,13 +91,34 @@ interface MoveConfirmSlice {
   cancelPendingMove: () => void;
 }
 
+/**
+ * When a task is dropped on Done, the move is deferred until the user
+ * confirms via the "Delete worktree?" dialog. Two shapes:
+ * - `animated`: the usual drop flow, with a fly-into-Done animation.
+ * - `direct`: fallback when the drag origin rect was lost mid-drag (HMR /
+ *   DOM destruction). Skips the animation but still routes through the
+ *   confirm dialog so the destructive worktree delete isn't silent.
+ * `task` is kept on both shapes so the dialog can show the task title.
+ */
+type PendingDoneConfirm =
+  | { kind: 'animated'; task: Task; completing: CompletingTask }
+  | { kind: 'direct'; task: Task; input: TaskMoveInput };
+
+interface DoneConfirmSlice {
+  pendingDoneConfirm: PendingDoneConfirm | null;
+  requestDoneConfirmAnimated: (completing: CompletingTask) => void;
+  requestDoneConfirmDirect: (task: Task, input: TaskMoveInput) => void;
+  confirmPendingDone: () => Promise<void>;
+  cancelPendingDone: () => void;
+}
+
 interface ViewSlice {
   activeView: 'board' | 'backlog';
   setActiveView: (view: 'board' | 'backlog') => void;
 }
 
 type BoardStore = TaskSlice & SwimlaneSlice & ArchiveSlice & CompletionSlice
-  & SearchSlice & BoardConfigSlice & BoardLifecycleSlice & MoveConfirmSlice & ViewSlice;
+  & SearchSlice & BoardConfigSlice & BoardLifecycleSlice & MoveConfirmSlice & DoneConfirmSlice & ViewSlice;
 
 // ---------------------------------------------------------------------------
 // Shared module-level state
@@ -695,6 +716,34 @@ const createViewSlice: StateCreator<BoardStore, [], [], ViewSlice> = (set) => ({
   setActiveView: (view) => set({ activeView: view }),
 });
 
+const createDoneConfirmSlice: StateCreator<BoardStore, [], [], DoneConfirmSlice> = (set, get) => ({
+  pendingDoneConfirm: null,
+  requestDoneConfirmAnimated: (completing) => {
+    set({ pendingDoneConfirm: { kind: 'animated', task: completing.task, completing } });
+  },
+  requestDoneConfirmDirect: (task, input) => {
+    set({ pendingDoneConfirm: { kind: 'direct', task, input } });
+  },
+  confirmPendingDone: async () => {
+    const pending = get().pendingDoneConfirm;
+    if (!pending) return;
+    set({ pendingDoneConfirm: null });
+    if (pending.kind === 'animated') {
+      // Hand off to the existing fly-into-Done animation, which calls
+      // moveTask via finalizeCompletion on transition end.
+      get().setCompletingTask(pending.completing);
+    } else {
+      // Drop-fallback path: skip the animation and move directly.
+      await get().moveTask(pending.input);
+    }
+  },
+  cancelPendingDone: () => {
+    // Full no-op: the drag ended without ever committing the move, so the
+    // task is still in its original column in both the store and the DB.
+    set({ pendingDoneConfirm: null });
+  },
+});
+
 export const useBoardStore = create<BoardStore>((...args) => ({
   ...createTaskSlice(...args),
   ...createSwimlaneSlice(...args),
@@ -704,5 +753,6 @@ export const useBoardStore = create<BoardStore>((...args) => ({
   ...createBoardConfigSlice(...args),
   ...createBoardLifecycleSlice(...args),
   ...createMoveConfirmSlice(...args),
+  ...createDoneConfirmSlice(...args),
   ...createViewSlice(...args),
 }));

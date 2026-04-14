@@ -1075,13 +1075,28 @@ describe('Shell Detection', () => {
   it('all detected shells have valid paths or commands', () => {
     const shells = detectAvailableShells();
 
+    // fs.existsSync uses fs.statSync under the hood, which fails with EACCES
+    // on Windows App Execution Alias reparse points (the zero-byte .exe
+    // stubs under %LOCALAPPDATA%\Microsoft\WindowsApps that forward to the
+    // Microsoft Store). fs.accessSync(..., F_OK) traverses the reparse point
+    // and correctly reports the alias as existing, which matches what
+    // `where` surfaces and what node-pty can spawn.
+    function pathExists(candidate: string): boolean {
+      try {
+        fs.accessSync(candidate, fs.constants.F_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     for (const shell of shells) {
       expect(shell.name).toBeTruthy();
       expect(shell.path).toBeTruthy();
       if (shell.name.startsWith('WSL:')) {
         expect(shell.path).toMatch(/^wsl /);
       } else {
-        expect(fs.existsSync(shell.path)).toBeTruthy();
+        expect(pathExists(shell.path)).toBeTruthy();
       }
     }
   });

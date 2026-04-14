@@ -485,6 +485,12 @@ function BehaviorTab({ globalConfig }: { globalConfig: AppConfig }) {
           onChange={(value) => updateGlobal({ skipDeleteConfirm: value })}
         />
       </SettingRow>
+      <SettingRow {...settingProps('skipDoneWorktreeConfirm')}>
+        <ToggleSwitch
+          checked={globalConfig.skipDoneWorktreeConfirm}
+          onChange={(value) => updateGlobal({ skipDoneWorktreeConfirm: value })}
+        />
+      </SettingRow>
       <SettingRow {...settingProps('autoFocusIdleSession')}>
         <ToggleSwitch
           checked={globalConfig.autoFocusIdleSession}

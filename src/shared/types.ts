@@ -621,6 +621,7 @@ export interface AppConfig {
   hasCompletedFirstRun: boolean;
   showBoardSearch: boolean;
   skipDeleteConfirm: boolean;
+  skipDoneWorktreeConfirm: boolean;
   skipBoardConfigConfirm: boolean;
   autoFocusIdleSession: boolean;
   activateAllProjectsOnStartup: boolean;
@@ -707,6 +708,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   hasCompletedFirstRun: false,
   showBoardSearch: true,
   skipDeleteConfirm: false,
+  skipDoneWorktreeConfirm: false,
   skipBoardConfigConfirm: false,
   autoFocusIdleSession: false,
   activateAllProjectsOnStartup: true,

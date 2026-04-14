@@ -229,6 +229,9 @@ export function KanbanBoard() {
   const pendingMoveConfirm = useBoardStore((s) => s.pendingMoveConfirm);
   const confirmPendingMove = useBoardStore((s) => s.confirmPendingMove);
   const cancelPendingMove = useBoardStore((s) => s.cancelPendingMove);
+  const pendingDoneConfirm = useBoardStore((s) => s.pendingDoneConfirm);
+  const confirmPendingDone = useBoardStore((s) => s.confirmPendingDone);
+  const cancelPendingDone = useBoardStore((s) => s.cancelPendingDone);
   const updateConfig = useConfigStore((s) => s.updateConfig);
   const showBoardSearch = useConfigStore((s) => s.config.showBoardSearch);
   const priorities = useConfigStore((s) => s.config.backlog?.priorities) ?? [
@@ -411,6 +414,33 @@ export function KanbanBoard() {
           }
           onConfirm={() => confirmPendingMove()}
           onCancel={cancelPendingMove}
+        />
+      )}
+
+      {pendingDoneConfirm && (
+        <ConfirmDialog
+          title="Delete worktree?"
+          variant="danger"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          showDontAskAgain
+          dontAskAgainLabel="Delete automatically in the future"
+          message={
+            <div className="space-y-2">
+              <p>
+                Moving <span className="font-medium">"{pendingDoneConfirm.task.title}"</span> to Done will delete its local worktree.
+              </p>
+              <p>
+                Your session history and branch are preserved. The worktree is
+                recreated automatically if you move the task back out of Done.
+              </p>
+            </div>
+          }
+          onConfirm={(dontAskAgain) => {
+            if (dontAskAgain) updateConfig({ skipDoneWorktreeConfirm: true });
+            void confirmPendingDone();
+          }}
+          onCancel={cancelPendingDone}
         />
       )}
     </div>
