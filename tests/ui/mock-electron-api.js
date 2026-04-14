@@ -966,6 +966,14 @@
             ],
             defaultPermission: 'bypassPermissions',
           },
+          {
+            name: 'cursor', displayName: 'Cursor CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'default', label: 'Interactive (Confirm Changes)' },
+              { mode: 'bypassPermissions', label: 'Non-Interactive (Full Access)' },
+            ],
+            defaultPermission: 'default',
+          },
         ];
       },
     },

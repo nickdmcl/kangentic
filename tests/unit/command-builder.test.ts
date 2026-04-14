@@ -1095,6 +1095,12 @@ describe('Shell Detection', () => {
       expect(shell.path).toBeTruthy();
       if (shell.name.startsWith('WSL:')) {
         expect(shell.path).toMatch(/^wsl /);
+      } else if (process.platform === 'win32' && shell.path.includes('WindowsApps')) {
+        // Windows app execution aliases (reparse points) are valid
+        // executables resolved by `where`, but fs.existsSync returns
+        // false because Node can't stat the reparse point. The `where`
+        // check in detectAvailableShells already confirmed executability.
+        expect(shell.path).toMatch(/\.exe$/i);
       } else {
         expect(pathExists(shell.path)).toBeTruthy();
       }
