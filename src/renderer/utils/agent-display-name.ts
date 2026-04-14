@@ -33,6 +33,11 @@ const AGENT_META: Record<string, AgentMeta> = {
     short: 'Aider',
     installUrl: 'https://aider.chat',
   },
+  warp: {
+    display: 'Warp',
+    short: 'Warp',
+    installUrl: 'https://docs.warp.dev/reference/cli/cli',
+  },
 };
 
 /** Full product name for an agent identifier (e.g. 'claude' -> 'Claude Code'). */

@@ -974,6 +974,15 @@
             ],
             defaultPermission: 'default',
           },
+          {
+            name: 'warp', displayName: 'Warp', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'plan', label: 'Plan Only (Read-Only)' },
+              { mode: 'default', label: 'Default' },
+              { mode: 'bypassPermissions', label: 'Auto (Skip Confirmations)' },
+            ],
+            defaultPermission: 'default',
+          },
         ];
       },
     },

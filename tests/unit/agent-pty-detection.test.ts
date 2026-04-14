@@ -26,6 +26,7 @@ import os from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 import { CodexAdapter } from '../../src/main/agent/adapters/codex';
 import { GeminiAdapter } from '../../src/main/agent/adapters/gemini';
+import { WarpAdapter } from '../../src/main/agent/adapters/warp';
 import { sessionOutputPaths } from '../../src/main/engine/session-paths';
 import type { AgentAdapter } from '../../src/main/agent/agent-adapter';
 
@@ -279,6 +280,9 @@ const cases: AgentCase[] = [
   // dialog both CLIs paint when started with an empty HOME.
   { name: 'codex', binaryName: 'codex', adapter: new CodexAdapter(), phase1TimeoutMs: 8000, phase2DurationMs: 4000, postIdleInput: '1\r' },
   { name: 'gemini', binaryName: 'gemini', adapter: new GeminiAdapter(), phase1TimeoutMs: 12000, phase2DurationMs: 4000, postIdleInput: '1\r' },
+  // Warp (oz) streams output immediately and has no trust dialog. Phase 2
+  // sends a newline to advance past any initial prompt.
+  { name: 'warp', binaryName: 'oz', adapter: new WarpAdapter(), phase1TimeoutMs: 10000, phase2DurationMs: 4000, postIdleInput: '\r' },
 ];
 
 describe('Agent PTY detection (real CLI boot)', () => {
@@ -350,6 +354,25 @@ describe('Agent PTY detection (real CLI boot)', () => {
       const adapter = new GeminiAdapter();
       expect(adapter.detectFirstOutput('\x1b[?25l')).toBe(true);
       expect(adapter.detectFirstOutput('plain text')).toBe(false);
+    });
+
+    it('WarpAdapter detectFirstOutput fires on any non-empty data', () => {
+      const adapter = new WarpAdapter();
+      expect(adapter.detectFirstOutput('any output')).toBe(true);
+      expect(adapter.detectFirstOutput('\x1b[?25l')).toBe(true);
+      expect(adapter.detectFirstOutput('')).toBe(false);
+    });
+
+    it('WarpAdapter has no detectIdle (silence-timer only)', () => {
+      // oz agent run is a one-shot cloud runner that exits when done.
+      // There's no interactive idle prompt to detect. The PTY silence
+      // timer is the sole idle detection mechanism.
+      const adapter = new WarpAdapter();
+      const strategy = adapter.runtime.activity;
+      const detectIdle = (strategy.kind === 'pty' || strategy.kind === 'hooks_and_pty')
+        ? strategy.detectIdle
+        : undefined;
+      expect(detectIdle).toBeUndefined();
     });
   });
 });

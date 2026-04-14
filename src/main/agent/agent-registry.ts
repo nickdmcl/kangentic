@@ -4,6 +4,7 @@ import { CodexAdapter } from './adapters/codex';
 import { GeminiAdapter } from './adapters/gemini';
 import { AiderAdapter } from './adapters/aider';
 import { CursorAdapter } from './adapters/cursor';
+import { WarpAdapter } from './adapters/warp';
 
 class AgentRegistry {
   private adapters = new Map<string, AgentAdapter>();
@@ -51,3 +52,4 @@ agentRegistry.register(new CodexAdapter());
 agentRegistry.register(new GeminiAdapter());
 agentRegistry.register(new AiderAdapter());
 agentRegistry.register(new CursorAdapter());
+agentRegistry.register(new WarpAdapter());
