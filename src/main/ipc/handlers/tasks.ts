@@ -16,6 +16,7 @@ import {
 import { handleTaskMove, guardActiveNonWorktreeSessions } from './task-move';
 import { carryUncommittedChanges } from './task-branch';
 import { interpolateTemplate } from '../../agent/shared';
+import { withTaskLock } from '../task-lifecycle-lock';
 import type { IpcContext } from '../ipc-context';
 import type { TaskSwitchBranchInput } from '../../../shared/types';
 
@@ -120,8 +121,14 @@ export function registerTaskHandlers(context: IpcContext): void {
         console.log(`[TASK_UPDATE] Skipping branch rename - worktree path missing: ${existing.worktree_path}`);
       } else {
         const worktreeManager = new WorktreeManager(resolvedProjectPath);
+        const effectiveConfig = context.configManager.getEffectiveConfig(resolvedProjectPath);
+        const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
+        const defaultBaseBranch = boardDefaultBranch || effectiveConfig.git.defaultBaseBranch || 'main';
         const newBranchName = await worktreeManager.withLock(() =>
-          worktreeManager.renameBranch(input.id, existing.branch_name!, input.title),
+          worktreeManager.renameBranch(input.id, existing.branch_name!, input.title, {
+            baseBranch: existing.base_branch,
+            defaultBaseBranch,
+          }),
         );
         if (newBranchName) {
           console.log(`[TASK_UPDATE] Branch renamed: ${existing.branch_name} -> ${newBranchName}`);
@@ -139,12 +146,16 @@ export function registerTaskHandlers(context: IpcContext): void {
     const resolvedProjectId = context.currentProjectId;
     const resolvedProjectPath = context.currentProjectPath;
     const { tasks, attachments } = getProjectRepos(context, resolvedProjectId);
-    const task = tasks.getById(id);
-    if (task) {
-      attachments.deleteByTaskId(id);
-      await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
-    }
-    tasks.delete(id);
+    // Serialize against any in-flight session lifecycle op for this task so
+    // the long awaits inside cleanup don't race with spawn/resume/etc.
+    await withTaskLock(id, async () => {
+      const task = tasks.getById(id);
+      if (task) {
+        attachments.deleteByTaskId(id);
+        await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
+      }
+      tasks.delete(id);
+    });
   });
 
   ipcMain.handle(IPC.TASK_MOVE, async (_, input) => handleTaskMove(context, input));
@@ -234,13 +245,32 @@ export function registerTaskHandlers(context: IpcContext): void {
     const resolvedProjectId = context.currentProjectId;
     const resolvedProjectPath = context.currentProjectPath;
     const { tasks, attachments } = getProjectRepos(context, resolvedProjectId);
+    const failures: Array<{ id: string; error: string }> = [];
     for (const id of ids) {
-      const task = tasks.getById(id);
-      if (task) {
-        attachments.deleteByTaskId(id);
-        await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
+      try {
+        // Per-task lock so each delete serializes against any in-flight
+        // session op for that task while different tasks stay independent.
+        await withTaskLock(id, async () => {
+          const task = tasks.getById(id);
+          if (task) {
+            attachments.deleteByTaskId(id);
+            await cleanupTaskResources(context, task, tasks, resolvedProjectId, resolvedProjectPath);
+          }
+          tasks.delete(id);
+        });
+      } catch (error) {
+        // One failure should not abort the whole batch. Collect and report
+        // aggregate at the end.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[TASK_BULK_DELETE] Failed for task ${id.slice(0, 8)}:`, error);
+        failures.push({ id, error: message });
       }
-      tasks.delete(id);
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `Bulk delete completed with ${failures.length} failure${failures.length === 1 ? '' : 's'}: `
+        + failures.map((failure) => `${failure.id.slice(0, 8)} (${failure.error})`).join(', '),
+      );
     }
   });
 

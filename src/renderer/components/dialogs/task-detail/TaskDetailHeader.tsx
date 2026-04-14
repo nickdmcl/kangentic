@@ -8,6 +8,7 @@ import { Pill } from '../../Pill';
 import { KebabMenu, KebabMenuItem, KebabMenuDivider } from '../../KebabMenu';
 import { CommandPalettePopover } from './CommandPalettePopover';
 import { PriorityBadge } from '../../backlog/PriorityBadge';
+import { useConfigStore } from '../../../stores/config-store';
 import type { Task, AgentCommand, ShortcutConfig, Swimlane } from '../../../../shared/types';
 
 interface TaskDetailHeaderProps {
@@ -64,6 +65,8 @@ export function TaskDetailHeader({
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const commandButtonRef = useRef<HTMLDivElement>(null);
   const { copied: displayIdCopied, copy: copyDisplayId } = useCopyDisplayId(task.display_id);
+  const defaultBaseBranch = useConfigStore((s) => s.config.git.defaultBaseBranch);
+  const worktreeBaseBranch = task.base_branch || defaultBaseBranch || null;
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 min-w-0">
@@ -157,19 +160,19 @@ export function TaskDetailHeader({
               shape="square"
               onClick={() => window.electronAPI.shell.openPath(task.worktree_path ?? projectPath!)}
               className="bg-surface-hover/50 text-fg-muted hover:text-fg-secondary hover:bg-surface-hover transition-colors flex-shrink-0"
-              title={[task.branch_name, task.worktree_path ?? projectPath].filter(Boolean).join('\n') || 'Open working directory'}
+              title={[
+                task.branch_name,
+                worktreeBaseBranch ? `from ${worktreeBaseBranch}` : null,
+                task.worktree_path ?? projectPath,
+              ].filter(Boolean).join('\n') || 'Open working directory'}
               data-testid="branch-pill"
             >
-              {task.worktree_path ? (
-                <>
-                  <FolderGit2 size={14} />
-                  Worktree
-                </>
-              ) : (
-                <>
-                  <FolderOpen size={14} />
-                  Project
-                </>
+              {task.worktree_path ? <FolderGit2 size={14} /> : <FolderOpen size={14} />}
+              {task.worktree_path ? 'Worktree' : 'Project'}
+              {worktreeBaseBranch && (
+                <span className="text-fg-faint" data-testid="branch-pill-base">
+                  ({worktreeBaseBranch})
+                </span>
               )}
             </Pill>
           )}

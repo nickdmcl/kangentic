@@ -31,7 +31,11 @@ export async function cleanupTaskSession(
       await context.sessionManager.awaitExit(task.session_id);
       context.sessionManager.remove(task.session_id);
     } catch { /* may already be dead */ }
-    tasks.update({ id: task.id, session_id: null });
+    // Guard against concurrent delete: the task row may already be gone by
+    // the time awaitExit resolves. Update is idempotent - skip when absent.
+    if (tasks.getById(task.id)) {
+      tasks.update({ id: task.id, session_id: null });
+    }
   }
 
   // Safety net: kill any PTY session for this task that was spawned by a
@@ -97,7 +101,9 @@ export async function cleanupTaskResources(
     }
     // Only clear DB fields if the directory was actually removed.
     // Keeping them set allows resource-cleanup to retry on next startup.
-    if (removed) {
+    // Guard against concurrent delete: the task row may already be gone
+    // by the time removeWorktree resolves. Update is idempotent.
+    if (removed && tasks.getById(task.id)) {
       tasks.update({ id: task.id, worktree_path: null, branch_name: null });
     }
   }
