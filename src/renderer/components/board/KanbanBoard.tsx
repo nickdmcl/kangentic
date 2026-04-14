@@ -8,7 +8,7 @@ import {
   horizontalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { AlertTriangle, Filter, X } from 'lucide-react';
+import { AlertTriangle, Filter, X, Trash2, Check } from 'lucide-react';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
@@ -419,21 +419,39 @@ export function KanbanBoard() {
 
       {pendingDoneConfirm && (
         <ConfirmDialog
-          title="Delete worktree?"
-          variant="danger"
-          confirmLabel="Delete"
+          title="Move to Done?"
+          variant="warning"
+          confirmLabel="Move"
           cancelLabel="Cancel"
           showDontAskAgain
           dontAskAgainLabel="Delete automatically in the future"
           message={
             <div className="space-y-2">
               <p>
-                Moving <span className="font-medium">"{pendingDoneConfirm.task.title}"</span> to Done will delete its local worktree.
+                Move <span className="font-medium">"{pendingDoneConfirm.task.title}"</span> to Done.
               </p>
-              <p>
-                Your session history and branch are preserved. The worktree is
-                recreated automatically if you move the task back out of Done.
-              </p>
+              <ul className="space-y-1.5">
+                <li className="flex items-start gap-2">
+                  <Trash2 size={14} className="text-yellow-500 mt-0.5 shrink-0" aria-hidden />
+                  <span>Local worktree will be deleted</span>
+                </li>
+                {pendingDoneConfirm.task.branch_name && (
+                  <li className="flex items-start gap-2">
+                    <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                    <span>
+                      Branch{' '}
+                      <code className="font-mono text-[11px] bg-surface px-1 py-0.5 rounded break-all">
+                        {pendingDoneConfirm.task.branch_name}
+                      </code>{' '}
+                      is kept and stays pushable
+                    </span>
+                  </li>
+                )}
+                <li className="flex items-start gap-2">
+                  <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                  <span>Session history is kept; the agent resumes if you move the task back out</span>
+                </li>
+              </ul>
             </div>
           }
           onConfirm={(dontAskAgain) => {

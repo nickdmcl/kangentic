@@ -151,13 +151,17 @@ test.describe('Move to Done - Delete Worktree Confirmation', () => {
 
       await dragTaskToColumn(page, 'Ready To Ship', 'Done');
 
-      const dialog = page.locator('text=Delete worktree?');
+      const dialog = page.locator('text=Move to Done?');
       await expect(dialog).toBeVisible({ timeout: 3000 });
 
-      // Dialog mentions that branch + session history are preserved
-      await expect(page.locator('text=session history and branch are preserved')).toBeVisible();
+      // Dialog enumerates the trade-off as bullets: worktree deleted,
+      // branch preserved (with concrete branch name shown), session preserved.
+      await expect(page.locator('text=Local worktree will be deleted')).toBeVisible();
+      await expect(page.locator('text=is kept and stays pushable')).toBeVisible();
+      await expect(page.locator('text=ready-to-ship-abcd1234')).toBeVisible();
+      await expect(page.locator('text=Session history is kept')).toBeVisible();
 
-      await expect(page.locator('button:has-text("Delete")').first()).toBeVisible();
+      await expect(page.locator('button:has-text("Move")').first()).toBeVisible();
       await expect(page.locator('button:has-text("Cancel")')).toBeVisible();
       await expect(page.locator('text=Delete automatically in the future')).toBeVisible();
     } finally {
@@ -172,11 +176,11 @@ test.describe('Move to Done - Delete Worktree Confirmation', () => {
       await page.locator('[data-swimlane-name="Done"]').waitFor({ state: 'visible', timeout: 15000 });
 
       await dragTaskToColumn(page, 'Ready To Ship', 'Done');
-      await expect(page.locator('text=Delete worktree?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Move to Done?')).toBeVisible({ timeout: 3000 });
 
       await page.locator('button:has-text("Cancel")').click();
 
-      await expect(page.locator('text=Delete worktree?')).toBeHidden({ timeout: 3000 });
+      await expect(page.locator('text=Move to Done?')).toBeHidden({ timeout: 3000 });
 
       const executingColumn = page.locator('[data-swimlane-name="Executing"]');
       await expect(executingColumn.locator('text=Ready To Ship')).toBeVisible();
@@ -199,14 +203,14 @@ test.describe('Move to Done - Delete Worktree Confirmation', () => {
       await page.locator('[data-swimlane-name="Done"]').waitFor({ state: 'visible', timeout: 15000 });
 
       await dragTaskToColumn(page, 'Ready To Ship', 'Done');
-      await expect(page.locator('text=Delete worktree?')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=Move to Done?')).toBeVisible({ timeout: 3000 });
 
       // Tick the "Delete automatically in the future" checkbox
       const toggle = page.locator('text=Delete automatically in the future');
       await toggle.click();
 
-      await page.locator('button:has-text("Delete")').first().click();
-      await expect(page.locator('text=Delete worktree?')).toBeHidden({ timeout: 3000 });
+      await page.locator('button:has-text("Move")').first().click();
+      await expect(page.locator('text=Move to Done?')).toBeHidden({ timeout: 3000 });
 
       // Config should now be flipped so future Done drops skip the dialog
       const skipConfirm = await page.evaluate(async () => {
@@ -228,7 +232,66 @@ test.describe('Move to Done - Delete Worktree Confirmation', () => {
       await dragTaskToColumn(page, 'Ready To Ship', 'Done');
 
       // No confirmation dialog at all
-      await expect(page.locator('text=Delete worktree?')).toBeHidden({ timeout: 2000 });
+      await expect(page.locator('text=Move to Done?')).toBeHidden({ timeout: 2000 });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('no dialog when the task has no worktree to delete', async () => {
+    // Tasks that go straight from To Do to Done never created a worktree;
+    // there's nothing destructive about the move, so the dialog is suppressed.
+    const noWorktreeConfig = `
+      window.__mockPreConfigure(function (state) {
+        var ts = new Date().toISOString();
+        state.projects.push({
+          id: '${PROJECT_ID}',
+          name: 'No Worktree Test',
+          path: '/mock/no-worktree-test',
+          github_url: null,
+          default_agent: 'claude',
+          last_opened: ts,
+          created_at: ts,
+        });
+        var laneIds = {};
+        state.DEFAULT_SWIMLANES.forEach(function (s, i) {
+          var id = 'lane-' + s.name.toLowerCase().replace(/\\s+/g, '-');
+          laneIds[s.name] = id;
+          state.swimlanes.push(Object.assign({}, s, { id: id, position: i, created_at: ts }));
+        });
+        state.tasks.push({
+          id: '${TASK_ID}',
+          title: 'Quick Done',
+          description: 'A task that never created a worktree',
+          swimlane_id: laneIds['Executing'],
+          position: 0,
+          agent: 'claude',
+          session_id: null,
+          worktree_path: null,
+          branch_name: null,
+          pr_number: null,
+          pr_url: null,
+          base_branch: 'main',
+          use_worktree: 1,
+          labels: [],
+          priority: 0,
+          attachment_count: 0,
+          archived_at: null,
+          created_at: ts,
+          updated_at: ts,
+        });
+        return { currentProjectId: '${PROJECT_ID}' };
+      });
+    `;
+    const { browser, page } = await launchWithState(noWorktreeConfig);
+
+    try {
+      await page.locator('[data-swimlane-name="Done"]').waitFor({ state: 'visible', timeout: 15000 });
+
+      await dragTaskToColumn(page, 'Quick Done', 'Done');
+
+      // No dialog appeared
+      await expect(page.locator('text=Move to Done?')).toBeHidden({ timeout: 2000 });
     } finally {
       await browser.close();
     }

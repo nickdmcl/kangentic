@@ -361,7 +361,13 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
     if (doneLane && targetSwimlaneId === doneLane.id && originalSwimlane) {
       const task = state.tasks.find((candidate) => candidate.id === taskId);
       if (!task) return;
-      const skipConfirm = useConfigStore.getState().config.skipDoneWorktreeConfirm;
+      // Skip the dialog when there is no worktree to delete - the user opted
+      // into auto-delete OR the task never created one (To Do -> Done direct).
+      // The dialog only exists to warn about worktree removal; without that
+      // side effect, the move is purely an archive operation.
+      const skipConfirm =
+        useConfigStore.getState().config.skipDoneWorktreeConfirm
+        || !task.worktree_path;
       const directInput = { taskId, targetSwimlaneId, targetPosition };
 
       // Capture where the DragOverlay was at drop time. A missing rect means
