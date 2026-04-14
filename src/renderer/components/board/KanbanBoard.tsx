@@ -8,7 +8,7 @@ import {
   horizontalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { AlertTriangle, Filter, X, Trash2, Check } from 'lucide-react';
+import { AlertTriangle, Filter, X, Check } from 'lucide-react';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
@@ -427,12 +427,12 @@ export function KanbanBoard() {
           dontAskAgainLabel="Delete automatically in the future"
           message={
             <div className="space-y-2">
-              <p>
-                Move <span className="font-medium">"{pendingDoneConfirm.task.title}"</span> to Done.
+              <p className="font-medium text-fg break-words">
+                "{pendingDoneConfirm.task.title}"
               </p>
               <ul className="space-y-1.5">
                 <li className="flex items-start gap-2">
-                  <Trash2 size={14} className="text-yellow-500 mt-0.5 shrink-0" aria-hidden />
+                  <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
                   <span>Local worktree will be deleted</span>
                 </li>
                 {pendingDoneConfirm.task.branch_name && (
@@ -443,15 +443,18 @@ export function KanbanBoard() {
                       <code className="font-mono text-[11px] bg-surface px-1 py-0.5 rounded break-all">
                         {pendingDoneConfirm.task.branch_name}
                       </code>{' '}
-                      is kept and stays pushable
+                      will be unaffected
                     </span>
                   </li>
                 )}
                 <li className="flex items-start gap-2">
                   <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
-                  <span>Session history is kept; the agent resumes if you move the task back out</span>
+                  <span>Session history will be kept</span>
                 </li>
               </ul>
+              <p className="text-fg-muted">
+                If this task is resumed, session history and worktree will be restored.
+              </p>
             </div>
           }
           onConfirm={(dontAskAgain) => {

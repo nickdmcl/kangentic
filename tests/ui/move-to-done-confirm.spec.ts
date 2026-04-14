@@ -155,11 +155,13 @@ test.describe('Move to Done - Delete Worktree Confirmation', () => {
       await expect(dialog).toBeVisible({ timeout: 3000 });
 
       // Dialog enumerates the trade-off as bullets: worktree deleted,
-      // branch preserved (with concrete branch name shown), session preserved.
+      // branch unaffected (with concrete branch name shown), session kept.
+      // Plus a closing line about resume restoring both.
       await expect(page.locator('text=Local worktree will be deleted')).toBeVisible();
-      await expect(page.locator('text=is kept and stays pushable')).toBeVisible();
+      await expect(page.locator('text=will be unaffected')).toBeVisible();
       await expect(page.locator('text=ready-to-ship-abcd1234')).toBeVisible();
-      await expect(page.locator('text=Session history is kept')).toBeVisible();
+      await expect(page.locator('text=Session history will be kept')).toBeVisible();
+      await expect(page.locator('text=session history and worktree will be restored')).toBeVisible();
 
       await expect(page.locator('button:has-text("Move")').first()).toBeVisible();
       await expect(page.locator('button:has-text("Cancel")')).toBeVisible();
