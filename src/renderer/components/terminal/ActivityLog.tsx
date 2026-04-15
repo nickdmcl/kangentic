@@ -230,7 +230,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     >
       {/* Single sticky header — prompt banner and/or session filter (combined to avoid two sticky top-0 elements overlapping) */}
       {(lastPromptText || showFilter) && (
-        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2.5 pb-2 mb-1 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2.5 pb-2 mb-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
           {lastPromptText && (
             <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/15 px-2 py-1.5 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
               <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
@@ -325,11 +325,11 @@ function AiReadyLine({ ts, label, colorClass, showLabel }: {
 }
 
 /** Dim italic text line (no detail). */
-function DimLine({ ts, label, colorClass, showLabel, text }: {
-  ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
+function DimLine({ ts, label, colorClass, showLabel, text, tinted = false }: {
+  ts: number; label: string; colorClass: string; showLabel: boolean; text: string; tinted?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r">
+    <div className={`flex items-baseline gap-1.5${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -338,11 +338,11 @@ function DimLine({ ts, label, colorClass, showLabel, text }: {
 }
 
 /** Dim italic text line with optional trailing detail. */
-function DimDetailLine({ ts, label, colorClass, showLabel, text, detail }: {
-  ts: number; label: string; colorClass: string; showLabel: boolean; text: string; detail?: string;
+function DimDetailLine({ ts, label, colorClass, showLabel, text, detail, tinted = false }: {
+  ts: number; label: string; colorClass: string; showLabel: boolean; text: string; detail?: string; tinted?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5 min-w-0 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r">
+    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -352,15 +352,17 @@ function DimDetailLine({ ts, label, colorClass, showLabel, text, detail }: {
 }
 
 /** Badge line: colored pill label with optional trailing detail. */
-function BadgeLine({ ts, label, colorClass, showLabel, badge, detail, variant = 'default' }: {
+function BadgeLine({ ts, label, colorClass, showLabel, badge, detail, variant = 'default', tinted = false }: {
   ts: number; label: string; colorClass: string; showLabel: boolean;
-  badge: string; detail?: string; variant?: 'default' | 'warn';
+  badge: string; detail?: string; variant?: 'default' | 'warn'; tinted?: boolean;
 }) {
   const badgeClass = variant === 'warn'
     ? 'bg-amber-900/30 text-amber-400'
-    : 'bg-violet-900/40 text-violet-300';
+    : tinted
+      ? 'bg-violet-900/40 text-violet-300'
+      : 'bg-surface-raised text-fg-secondary';
   return (
-    <div className="flex items-baseline gap-1.5 min-w-0 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5">
+    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className={`${badgeClass} px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none`}>
@@ -376,7 +378,7 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
 
   switch (event.type) {
     case EventType.ToolStart:
-      return <BadgeLine {...common} badge={event.tool || 'Tool'} detail={event.detail} />;
+      return <BadgeLine {...common} badge={event.tool || 'Tool'} detail={event.detail} tinted />;
 
     case EventType.ToolEnd:
       return null;
@@ -386,13 +388,13 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
 
     case EventType.Idle:
       return event.detail === IdleReason.Timeout
-        ? <DimLine {...common} text="Idle (no activity detected)" />
+        ? <DimLine {...common} text="Idle (no activity detected)" tinted />
         : <AiReadyLine {...common} />;
 
     case EventType.Prompt:
       return event.detail
         ? <PromptLine {...common} text={event.detail} />
-        : <DimLine {...common} text="Thinking..." />;
+        : <DimLine {...common} text="Thinking..." tinted />;
 
     case EventType.SessionStart:
       return <DimLine {...common} text="Session started" />;
@@ -401,16 +403,16 @@ function EventLine({ event, label, colorClass, showLabel }: EventLineProps) {
       return <DimLine {...common} text="Session ended" />;
 
     case EventType.SubagentStart:
-      return <BadgeLine {...common} badge="Subagent" detail={event.detail} />;
+      return <BadgeLine {...common} badge="Subagent" detail={event.detail} tinted />;
 
     case EventType.SubagentStop:
-      return <BadgeLine {...common} badge="Subagent done" detail={event.detail} />;
+      return <BadgeLine {...common} badge="Subagent done" detail={event.detail} tinted />;
 
     case EventType.Notification:
       return <BadgeLine {...common} badge="Notice" detail={event.detail} variant="warn" />;
 
     case EventType.Compact:
-      return <DimLine {...common} text="Compacting context..." />;
+      return <DimLine {...common} text="Compacting context..." tinted />;
 
     case EventType.TeammateIdle:
       return <DimDetailLine {...common} text="Teammate idle" detail={event.detail} />;
