@@ -1,7 +1,6 @@
 # Claude Code
 
 # Per-project data (runtime databases, sessions, worktrees)
-.kangentic/
 
 # Agent runtime config directories (injected hooks, settings)
 .codex/
@@ -116,9 +115,7 @@ test-results/
 playwright-report/
 e2e-timings*.json
 .kangentic-test-sandbox-*
-.claude/settings.local.json
 .claude/scheduled_tasks.lock
-kangentic.local.json
 
 # Marketing captures output (regenerated on release tags)
 /captures/
