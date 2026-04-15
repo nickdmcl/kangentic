@@ -31,6 +31,7 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
   const deleteArchivedTask = useBoardStore((state) => state.deleteArchivedTask);
   const recentlyArchivedId = useBoardStore((state) => state.recentlyArchivedId);
   const clearRecentlyArchived = useBoardStore((state) => state.clearRecentlyArchived);
+  const completingTaskIds = useBoardStore((state) => state.completingTaskIds);
   const skipDeleteConfirm = useConfigStore((state) => state.config.skipDeleteConfirm);
   const updateConfig = useConfigStore((state) => state.updateConfig);
   const widthClass = useColumnWidthClass();
@@ -51,7 +52,16 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
     setPendingDeleteId(null);
   }, [pendingDeleteId, deleteArchivedTask, updateConfig]);
 
-  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  // Filter out tasks that are actively flowing through the Done completion
+  // pipeline. A racing loadBoard() can re-inject them with swimlane_id = Done
+  // between task-move.ts's tasks.move() and tasks.archive() calls; the filter
+  // keeps them out of the dropzone until moveTask's reload settles.
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => !completingTaskIds.has(t.id)),
+    [tasks, completingTaskIds],
+  );
+
+  const taskIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
 
   const { setNodeRef, isOver } = useDroppable({
     id: swimlane.id,
@@ -105,7 +115,7 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
           </span>
         </button>
 
-        <CountBadge count={tasks.length} />
+        <CountBadge count={visibleTasks.length} />
 
         <button
           type="button"
@@ -135,9 +145,9 @@ export const DoneSwimlane = React.memo(function DoneSwimlane({ swimlane, tasks }
         >
           <div className="relative z-10 w-full">
             <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-              {tasks.length > 0 ? (
+              {visibleTasks.length > 0 ? (
                 <div className="space-y-2 w-full">
-                  {tasks.map((task) => (
+                  {visibleTasks.map((task) => (
                     <TaskCard key={task.id} task={task} />
                   ))}
                 </div>

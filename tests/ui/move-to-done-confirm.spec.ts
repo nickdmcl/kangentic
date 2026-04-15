@@ -115,11 +115,11 @@ async function dragTaskToColumn(page: Page, taskTitle: string, targetColumn: str
   await target.waitFor({ state: 'visible', timeout: 5000 });
 
   await page.evaluate((targetCol: string) => {
-    const targetElement = document.querySelector(`[data-swimlane-name="${targetCol}"]`);
-    if (targetElement) targetElement.scrollIntoView({ inline: 'nearest', behavior: 'instant' });
+    document.querySelector(`[data-swimlane-name="${targetCol}"]`)?.scrollIntoView({ inline: 'nearest', behavior: 'instant' });
   }, targetColumn);
-  await page.waitForTimeout(100);
 
+  // boundingBox() forces a layout flush, so the post-scroll geometry is
+  // accurate without a fixed wait.
   const cardBox = await card.boundingBox();
   const targetBox = await target.boundingBox();
   if (!cardBox || !targetBox) throw new Error('Could not get bounding boxes for drag');
@@ -131,12 +131,25 @@ async function dragTaskToColumn(page: Page, taskTitle: string, targetColumn: str
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
+  // The 10px shift + steps satisfies dnd-kit's PointerSensor activation
+  // distance; poll the store's activeTask instead of guessing with a sleep.
   await page.mouse.move(startX + 10, startY, { steps: 3 });
-  await page.waitForTimeout(100);
+  await expect.poll(async () => page.evaluate(() => {
+    const stores = (window as unknown as {
+      __zustandStores?: { board: { getState: () => { activeTask: { id: string } | null } } };
+    }).__zustandStores;
+    return stores?.board.getState().activeTask !== null;
+  }), { timeout: 2000 }).toBe(true);
+
   await page.mouse.move(endX, endY, { steps: 15 });
-  await page.waitForTimeout(200);
+  // Done is the only target this helper drags to, and DoneSwimlane toggles
+  // the `drop-zone-active` class via dnd-kit's isOver. Poll for it so the
+  // drop fires only after the hover state is registered.
+  await expect(target.locator('.drop-zone-active')).toBeVisible({ timeout: 2000 });
+
   await page.mouse.up();
-  await page.waitForTimeout(500);
+  // Drop outcome (dialog, archive, etc.) varies per test - the caller's own
+  // assertion does the post-drop wait.
 }
 
 test.describe('Move to Done - Delete Worktree Confirmation', () => {

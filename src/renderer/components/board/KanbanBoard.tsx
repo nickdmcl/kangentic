@@ -73,23 +73,54 @@ const SortableSwimlane = React.memo(function SortableSwimlane({ swimlane, tasks 
   );
 });
 
-/** Fixed-position card that flies from the drop position into the Done drop zone. */
+/** Fixed-position card that flies from the drop position into the Done drop zone.
+ *  Fallback timer guarantees finalizeCompletion() fires even when
+ *  onTransitionEnd never does (drop zone not in DOM, propertyName mismatch,
+ *  element scrolled offscreen). Without this, a missed transitionend leaves
+ *  completingTask set forever and the card stuck on screen. */
 function FlyingCard() {
   const completingTask = useBoardStore((s) => s.completingTask);
   const finalizeCompletion = useBoardStore((s) => s.finalizeCompletion);
   const [flying, setFlying] = React.useState(false);
+  const fallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearFallback = React.useCallback(() => {
+    if (fallbackTimerRef.current !== null) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }, []);
 
   React.useEffect(() => {
-    if (completingTask) {
-      setFlying(false);
-      // Trigger transition on next frame so browser paints at start position first
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setFlying(true);
-        });
-      });
+    if (!completingTask) {
+      clearFallback();
+      return;
     }
-  }, [completingTask]);
+
+    setFlying(false);
+    const hasTarget = document.querySelector('[data-done-drop-zone]') !== null;
+
+    // Trigger transition on next frame so browser paints at start position first
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setFlying(true);
+        // When the drop zone isn't in the DOM, no transition will run and
+        // onTransitionEnd will never fire. Finalize immediately so the move
+        // still persists and the card unmounts. Otherwise arm a 700ms
+        // fallback (500ms transition + 200ms safety margin).
+        if (!hasTarget) {
+          finalizeCompletion();
+        } else {
+          fallbackTimerRef.current = setTimeout(() => {
+            fallbackTimerRef.current = null;
+            finalizeCompletion();
+          }, 700);
+        }
+      });
+    });
+
+    return clearFallback;
+  }, [completingTask, finalizeCompletion, clearFallback]);
 
   if (!completingTask) return null;
 
@@ -122,6 +153,7 @@ function FlyingCard() {
       style={style}
       onTransitionEnd={(e) => {
         if (e.propertyName === 'transform') {
+          clearFallback();
           finalizeCompletion();
         }
       }}

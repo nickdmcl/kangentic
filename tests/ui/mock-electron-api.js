@@ -549,6 +549,20 @@
           position: newPosition,
           updated_at: now(),
         });
+
+        // Mirror main-process behavior: moving into a lane with role 'done'
+        // archives the task. See src/main/ipc/handlers/task-move.ts L236.
+        // NOTE: after a Done move, tasks.list() will NOT return this task and
+        // tasks.listArchived() WILL. Tests that call loadBoard() after a Done
+        // move should probe archivedTasks, not tasks.
+        var targetLane = swimlanes.find(function (s) { return s.id === newSwimlaneId; });
+        if (targetLane && targetLane.role === 'done') {
+          var archived = Object.assign({}, tasks[idx], {
+            archived_at: now(),
+          });
+          archivedTasks.push(archived);
+          tasks.splice(idx, 1);
+        }
       },
       listArchived: async function () {
         return withAttachmentCounts(archivedTasks);
