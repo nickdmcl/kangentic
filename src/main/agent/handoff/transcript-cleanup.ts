@@ -14,6 +14,7 @@
 import { cleanClaudeTranscript } from '../adapters/claude/transcript-cleanup';
 import { cleanCodexTranscript } from '../adapters/codex/transcript-cleanup';
 import { cleanGeminiTranscript } from '../adapters/gemini/transcript-cleanup';
+import { cleanAiderTranscript } from '../adapters/aider/transcript-cleanup';
 
 // ---------------------------------------------------------------------------
 // Shared utilities (exported for use by adapter transcript-cleanup files)
@@ -121,8 +122,10 @@ export function cleanTranscriptForHandoff(
       return cleanCodexTranscript(rawTranscript);
     case 'gemini':
       return cleanGeminiTranscript(rawTranscript);
+    case 'aider':
+      return cleanAiderTranscript(rawTranscript);
     default:
-      // Aider and unknown agents: no TUI, just basic cleanup
+      // Unknown agents: no TUI-specific cleanup, just basic finalization
       return finalizeTranscript(rawTranscript);
   }
 }

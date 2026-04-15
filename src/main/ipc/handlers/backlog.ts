@@ -26,8 +26,7 @@ import type {
   ImportExecuteInput,
   Task,
 } from '../../../shared/types';
-import { createImporterRegistry, getImporter } from '../../import/importer-registry';
-import { ImportSourceStore } from '../../import/import-source-store';
+import { boardRegistry, ImportSourceStore } from '../../boards';
 
 /**
  * Per-task AbortControllers for in-flight backlog promotions.
@@ -354,23 +353,21 @@ export function registerBacklogHandlers(context: IpcContext): void {
 
   // --- Import handlers ---
 
-  const importers = createImporterRegistry();
-
   ipcMain.handle(IPC.BACKLOG_IMPORT_CHECK_CLI, async (_, source: ExternalSource) => {
-    const importer = importers[source];
-    if (!importer) {
+    const adapter = boardRegistry.get(source);
+    if (!adapter) {
       return { available: false, authenticated: false, error: `Unsupported source: ${source}` };
     }
-    return importer.checkCli();
+    return adapter.checkCli();
   });
 
   ipcMain.handle(IPC.BACKLOG_IMPORT_FETCH, async (_, input: ImportFetchInput) => {
     if (!context.currentProjectId) throw new Error('No project is currently open');
     const db = getProjectDb(context.currentProjectId);
     const backlogRepo = new BacklogRepository(db);
-    const importer = getImporter(importers, input.source);
+    const adapter = boardRegistry.requireStable(input.source);
 
-    return importer.fetch(input, (source, externalIds) => backlogRepo.findByExternalIds(source, externalIds));
+    return adapter.fetch(input, (source, externalIds) => backlogRepo.findByExternalIds(source, externalIds));
   });
 
   ipcMain.handle(IPC.BACKLOG_IMPORT_EXECUTE, async (_, input: ImportExecuteInput) => {
@@ -379,7 +376,7 @@ export function registerBacklogHandlers(context: IpcContext): void {
     }
     const db = getProjectDb(context.currentProjectId);
     const backlogRepo = new BacklogRepository(db);
-    const importer = getImporter(importers, input.source);
+    const adapter = boardRegistry.requireStable(input.source);
 
     const externalIds = input.issues.map((issue) => issue.externalId);
     const alreadyImportedIds = backlogRepo.findByExternalIds(input.source, externalIds);
@@ -396,14 +393,14 @@ export function registerBacklogHandlers(context: IpcContext): void {
 
       // Download inline images from the issue body (source-agnostic)
       const { attachments: inlineAttachments, skippedCount: inlineSkipped } =
-        await importer.downloadImages(issue.body);
+        await adapter.downloadImages(issue.body);
       totalSkippedAttachments += inlineSkipped;
 
       // Download file attachments if the source supports them (e.g. Azure DevOps AttachedFile relations)
       const downloadedAttachments = [...inlineAttachments];
-      if (importer.downloadFileAttachments && issue.fileAttachments?.length) {
+      if (adapter.downloadFileAttachments && issue.fileAttachments?.length) {
         const { attachments: fileAttachments, skippedCount: fileSkipped } =
-          await importer.downloadFileAttachments(issue.fileAttachments);
+          await adapter.downloadFileAttachments(issue.fileAttachments);
         downloadedAttachments.push(...fileAttachments);
         totalSkippedAttachments += fileSkipped;
       }

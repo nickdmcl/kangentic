@@ -161,6 +161,11 @@ describe('AiderAdapter', () => {
       expect(command).toContain('--no-auto-commits');
     });
 
+    it('always includes --no-suggest-shell-commands', () => {
+      const command = adapter.buildCommand(makeOptions());
+      expect(command).toContain('--no-suggest-shell-commands');
+    });
+
     // ── Permission mode mapping ──────────────────────────────────────────
 
     describe('permission mode mapping', () => {
@@ -207,7 +212,22 @@ describe('AiderAdapter', () => {
 
     // ── Ignored options ──────────────────────────────────────────────────
 
-    it('ignores resume flag (Aider has no session resume)', () => {
+    it('adds --restore-chat-history when resume is true', () => {
+      const command = adapter.buildCommand(makeOptions({ resume: true }));
+      expect(command).toContain('--restore-chat-history');
+    });
+
+    it('omits --restore-chat-history when resume is false', () => {
+      const command = adapter.buildCommand(makeOptions({ resume: false }));
+      expect(command).not.toContain('--restore-chat-history');
+    });
+
+    it('omits --restore-chat-history when resume is absent', () => {
+      const command = adapter.buildCommand(makeOptions());
+      expect(command).not.toContain('--restore-chat-history');
+    });
+
+    it('does not use --resume or --session-id (Aider has no session IDs)', () => {
       const command = adapter.buildCommand(makeOptions({
         sessionId: 'session-123',
         resume: true,
@@ -228,6 +248,15 @@ describe('AiderAdapter', () => {
         shell: 'bash',
       }));
       expect(command.startsWith(quoteArg('/usr/local/bin/aider', 'bash'))).toBe(true);
+    });
+  });
+
+  // ── Exit sequence ────────────────────────────────────────────────────────
+
+  describe('getExitSequence', () => {
+    it('sends Ctrl+C then /exit for graceful shutdown', () => {
+      const sequence = adapter.getExitSequence();
+      expect(sequence).toEqual(['\x03', '/exit\r']);
     });
   });
 

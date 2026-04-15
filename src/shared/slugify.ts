@@ -32,3 +32,29 @@ export function computeSlugBudget(projectPath: string): number {
 
   return Math.max(0, Math.min(available, 20));
 }
+
+/**
+ * Compose the auto-generated branch name. When branching off a non-default
+ * base, the base is encoded as a namespace prefix (with any '/' flattened to
+ * '-') so `git branch` / GitHub branch lists group work by base.
+ *
+ * Example: base='bugfix/inacc-adjustments', default='main',
+ * slug='task-title', shortId='ab12cd34'
+ *   produces 'bugfix-inacc-adjustments/task-title-ab12cd34'
+ *
+ * When base equals default (or is empty), the legacy unprefixed form is used:
+ *   produces 'task-title-ab12cd34'
+ */
+export function computeAutoBranchName(
+  baseBranch: string,
+  defaultBaseBranch: string,
+  slug: string,
+  shortId: string,
+): string {
+  const trimmedBase = (baseBranch ?? '').trim();
+  const trimmedDefault = (defaultBaseBranch ?? '').trim();
+  const suffix = `${slug}-${shortId}`;
+  if (!trimmedBase || trimmedBase === trimmedDefault) return suffix;
+  const flattenedBase = trimmedBase.replace(/\//g, '-');
+  return `${flattenedBase}/${suffix}`;
+}

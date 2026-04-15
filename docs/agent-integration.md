@@ -1,6 +1,6 @@
 # Agent Integration
 
-Kangentic supports four AI coding agents: Claude Code, Codex CLI, Gemini CLI, and Aider. Each agent is wrapped behind a common `AgentAdapter` interface that handles CLI detection, command building, permission mapping, session lifecycle hooks, and cross-agent handoff. This doc covers the adapter system, agent-specific details, and shared infrastructure.
+Kangentic supports seven AI coding agents: Claude Code, Codex CLI, Gemini CLI, Cursor CLI, GitHub Copilot CLI, Aider, and Oz CLI (Warp). Each agent is wrapped behind a common `AgentAdapter` interface that handles CLI detection, command building, permission mapping, session lifecycle hooks, and cross-agent handoff. This doc covers the adapter system, agent-specific details, and shared infrastructure.
 
 ## Agent Adapter Interface
 
@@ -26,7 +26,7 @@ Every agent implements the `AgentAdapter` interface. Each adapter lives in `src/
 
 | Property | Type | Purpose |
 |----------|------|---------|
-| `name` | `string` | Unique identifier (`'claude'`, `'codex'`, `'gemini'`, `'aider'`) |
+| `name` | `string` | Unique identifier (`'claude'`, `'codex'`, `'gemini'`, `'cursor'`, `'copilot'`, `'aider'`, `'warp'`) |
 | `displayName` | `string` | Human-readable product name |
 | `sessionType` | `SessionRecord['session_type']` | Value stored in the sessions DB table |
 | `supportsCallerSessionId` | `boolean` | True when the CLI accepts a caller-supplied session ID via `--session-id` (Claude). When false, Kangentic captures the agent's own ID via `runtime.sessionId` for `--resume`. |
@@ -49,8 +49,12 @@ One scannable block per adapter for activity-state derivation and session ID cap
 | `sessionHistory?.locate({agentSessionId, cwd})` | `(options) => Promise<string \| null>` | Locate the agent's native session history file on disk for a captured session UUID. Used by `SessionHistoryReader` (`src/main/pty/session-history-reader.ts`) to start tailing. See [Adapter Session History](adapter-session-history.md) for the full pipeline. |
 | `sessionHistory?.parse(content, mode)` | `(string, 'full' \| 'append') => SessionHistoryParseResult` | Parse newly-appended bytes (Codex JSONL) or full file content (Gemini JSON) into a `SessionHistoryParseResult` containing `usage`, `events[]`, and an optional `activity` hint. |
 | `sessionHistory?.isFullRewrite` | `boolean` | `true` for whole-file-rewrite agents (Gemini), `false` for append-only JSONL (Codex). Tells the watcher whether to track a byte cursor. |
+| `statusFile?.parseStatus(raw)` | `(string) => SessionUsage \| null` | Decode the rewritten contents of a per-session `status.json` (written by Kangentic's status-bridge hook) into a `SessionUsage` snapshot. Used by Claude Code and Copilot. |
+| `statusFile?.parseEvent(line)` | `(string) => SessionEvent \| null` | Decode one appended line from the per-session `events.jsonl` (written by the event-bridge hook) into a `SessionEvent`. |
+| `statusFile?.isFullRewrite` | `boolean` | `true` when `status.json` is fully rewritten on every update. The events file is always append-only regardless of this flag. |
+| `streamOutput?.createParser()` | `() => StreamOutputParser` | Build a per-session parser that consumes raw PTY stdout for telemetry. Used by agents that emit machine-readable NDJSON to the terminal (Cursor's `--output-format stream-json` init event carries `model` + `session_id`). The returned object exposes `parseTelemetry(data)` returning `{ usage?, events? } \| null`; `SessionManager` invokes it on every PTY chunk. Each spawn gets a fresh parser so per-session rolling buffers can survive across chunk boundaries. |
 
-Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--session-id`) or that have no resume mechanism (Aider). Omit `sessionHistory` for agents without a native session log file (Claude uses the hook-based status.json pipeline; Aider has no equivalent).
+Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--session-id`) or that have no resume mechanism (Aider). Omit `sessionHistory` for agents without a native session log file. Omit `statusFile` for agents that don't emit hook-driven `status.json` / `events.jsonl` (only Claude and Copilot use this pipeline today). Omit `streamOutput` for agents that don't emit machine-readable NDJSON to PTY stdout (everyone except Cursor today).
 
 ### `SpawnSessionInput` extras
 
@@ -65,7 +69,10 @@ Omit `sessionId` entirely for agents that use caller-owned IDs (Claude via `--se
 | Claude Code | `claude-adapter.ts` | `claude` | `--resume <id>` | Yes (status.json + events.jsonl) | Yes (`--settings`) | Yes (`~/.claude.json`) |
 | Codex CLI | `codex-adapter.ts` | `codex` | `resume <id>` | Partial (events.jsonl only) | No | No |
 | Gemini CLI | `gemini-adapter.ts` | `gemini` | `--resume <id>` | Yes (status.json + events.jsonl) | Yes (`.gemini/settings.json`) | No |
+| Cursor CLI | `cursor-adapter.ts` | `agent` | `--resume="<id>"` | No | No | No |
+| GitHub Copilot CLI | `copilot-adapter.ts` | `copilot` | `--resume <uuid>` (caller-owned) | Partial (events.jsonl + status parser) | Per-session `--config-dir` | Runtime `--add-dir` |
 | Aider | `aider-adapter.ts` | `aider` | No | No | No | No |
+| Oz CLI (Warp) | `warp-adapter.ts` | `oz` | No | No | No | No |
 
 ## Agent Resolution
 
@@ -90,7 +97,10 @@ Each adapter implements `detectFirstOutput(data)` to signal when the agent's TUI
 | Claude Code | `\x1b[?25l` (cursor hide) | TUI hides cursor when it takes over the terminal |
 | Codex CLI | `\x1b[?25l` (cursor hide) | Same TUI pattern as Claude |
 | Gemini CLI | `\x1b[?25l` (cursor hide) | Same TUI pattern as Claude |
+| GitHub Copilot CLI | `\x1b[?25l` (cursor hide) | Same TUI pattern as Claude |
+| Cursor CLI | `data.length > 0` | Streams output immediately (no alternate screen buffer) |
 | Aider | `data.length > 0` | Aider writes output immediately (no TUI alternate screen) |
+| Oz CLI (Warp) | `data.length > 0` | `oz agent run` streams output, no alternate screen |
 
 The `\x1b[?25l` (ANSI cursor hide) sequence fires after the shell prompt noise but before the TUI draws its startup banner. This keeps the shell command hidden behind the shimmer overlay.
 
@@ -103,7 +113,10 @@ Graceful exit sequences written to the PTY during `SessionManager.suspend()`:
 | Claude Code | `Ctrl+C`, `/exit` | Flushes conversation state to JSONL transcript |
 | Codex CLI | `Ctrl+C` | API-backed sessions, no local state to flush |
 | Gemini CLI | `Ctrl+C`, `/quit` | Triggers clean shutdown |
+| Cursor CLI | `Ctrl+C` | No graceful exit needed |
+| GitHub Copilot CLI | `Ctrl+C`, `/exit` | Same TUI exit pattern as Claude |
 | Aider | `Ctrl+C` | No session resume, clean exit sufficient |
+| Oz CLI (Warp) | `Ctrl+C` | No session resume mechanism |
 
 ## Session History File Location
 
@@ -114,7 +127,10 @@ During cross-agent handoff, each adapter's `locateSessionHistoryFile()` finds th
 | Claude Code | `~/.claude/projects/<slug>/<sessionId>.jsonl` | Direct path computation |
 | Codex CLI | `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<uuid>.jsonl` | Directory scan with polling |
 | Gemini CLI | `~/.gemini/tmp/<projectDir>/chats/session-<id>.json` | Directory scan with polling |
+| Cursor CLI | N/A | Returns null (location not yet known) |
+| GitHub Copilot CLI | N/A | Returns null (not yet empirically verified; activity flows through hooks JSONL) |
 | Aider | N/A | Returns null (no native session files) |
+| Oz CLI (Warp) | N/A | Returns null (no CLI-accessible session history) |
 
 ## Claude Code
 
@@ -369,6 +385,132 @@ aider --message "prompt text" --chat-mode <mode> --no-auto-commits
 - No structured status or event output
 - No hooks, settings merge, or trust mechanism
 - No TUI alternate screen - uses streaming text output
+
+## Cursor CLI
+
+### CLI Detection
+
+Detection uses the shared `AgentDetector` with binary name `agent`. Because `agent` is a generic name that may collide with other tools, `parseVersion` accepts patterns like `1.0.0`, `agent 1.0.0`, or `Cursor Agent 1.0.0` and rejects non-version output.
+
+### Command Building
+
+`src/main/agent/adapters/cursor/cursor-adapter.ts`
+
+#### New Session (Interactive)
+
+```
+agent "prompt text"
+```
+
+User confirms changes in the PTY. Default mode.
+
+#### New Session (Non-Interactive)
+
+```
+agent -p "prompt text" --output-format stream-json
+```
+
+Selected when `permissionMode === 'bypassPermissions'` or `nonInteractive` is set. Has full write access. The NDJSON `init` event carries `session_id`, which `runtime.sessionId.fromOutput` captures for resume.
+
+#### Resumed Session
+
+```
+agent --resume="<chat-id>"
+```
+
+The `=` sits outside the quote boundary (`--resume='id'` on unix, `--resume="id"` on Windows).
+
+### Permission Modes
+
+| Mode | Behavior | Cursor Mode |
+|------|----------|-------------|
+| `default` | (no special flag) | Interactive (Confirm Changes) |
+| `bypassPermissions` | `-p ... --output-format stream-json` | Non-Interactive (Full Access) |
+
+### Limitations
+
+- No hooks, no structured status pipeline (PTY silence timer only)
+- No settings merge, no trust mechanism
+- No `transcript-cleanup.ts` (uses streaming text output, not a TUI alternate screen)
+- `locateSessionHistoryFile` returns null - session history file location is not yet known
+
+## GitHub Copilot CLI
+
+### CLI Detection
+
+`src/main/agent/adapters/copilot/detector.ts`
+
+Detection follows the standard pattern: check `config.agent.cliPaths.copilot`, fall back to `PATH` via `which`, run `copilot --version`.
+
+### Command Building
+
+`src/main/agent/adapters/copilot/command-builder.ts`
+
+Copilot CLI v1.0+ supports caller-owned session IDs via `--resume <uuid>` (same semantics as Claude's `--session-id`): passing a new UUID starts a fresh session with that ID, passing an existing UUID resumes it.
+
+Per-session config is written to `<eventsOutputPath dir>/copilot-config/`, enabling inline hooks (`preToolUse`, `postToolUse`, `agentStop`, `preCompact`) and `statusLine`. The adapter tracks these directories keyed by project root and `taskId` so `removeHooks(directory, taskId?)` can clean up the right one.
+
+### Permission Modes
+
+| Mode | Flag | Copilot Mode |
+|------|------|--------------|
+| `plan` | `--plan` | Plan (Read-Only) |
+| `dontAsk` | `--plan` (non-interactive) | Plan Non-Interactive (CI) |
+| `default` | (no flag) | Default (Confirm Actions) |
+| `acceptEdits` | (configured tool allowlist) | Allow All Tools |
+| `auto` | (configured tool allowlist) | Autopilot (Allow All Tools) |
+| `bypassPermissions` | `--yolo` | YOLO (Full Access) |
+
+`defaultPermission` is `acceptEdits`.
+
+### Status & Events
+
+The `CopilotStatusParser` reads a `status.json` written by Copilot's `statusLine` config (full-rewrite). Activity uses `hooksAndPty` - hooks primary, PTY silence timer as fallback.
+
+### Limitations
+
+- No `transcript-cleanup.ts` despite being a TUI agent (`\x1b[?25l` cursor hide). Handoff transcripts may contain rendering artifacts.
+- `locateSessionHistoryFile` returns null - file location is not yet empirically verified.
+- Trust is handled at runtime via `--add-dir`, not pre-approved.
+
+## Oz CLI (Warp)
+
+### CLI Detection
+
+`src/main/agent/adapters/warp/version-detector.ts`
+
+Detection is custom because `oz` does not support `--version` - it uses `dump-debug-info` instead. The detector inlines the same caching and inflight-deduplication pattern as `AgentDetector` but with the alternate version command. Override path is checked first, then `which('oz')` falls back to PATH.
+
+### Command Building
+
+`src/main/agent/adapters/warp/warp-adapter.ts`
+
+```
+oz agent run -C <cwd> --name <taskId> -- --prompt "prompt text"
+```
+
+- `oz agent run` is a one-shot cloud agent runner - it streams output then exits
+- `-C <cwd>` sets the working directory
+- `--name <taskId>` provides traceability/grouping
+- `--` end-of-options guard prevents prompt content starting with `-` from being parsed as a flag
+
+### Permission Modes
+
+Warp manages permissions via agent profiles (`--profile <ID>`), not individual CLI flags. The labels below are informational only - no permission-mode-to-flag mapping exists in `buildCommand()`.
+
+| Mode | Oz Mode |
+|------|---------|
+| `plan` | Plan Only (Read-Only) |
+| `default` | Default |
+| `bypassPermissions` | Auto (Skip Confirmations) |
+
+### Limitations
+
+- No session resume (`oz agent run` is one-shot)
+- No hooks, no settings merge, no trust mechanism
+- No structured status or event output - PTY silence timer is the sole idle detection
+- No `transcript-cleanup.ts` (streams text output, not a TUI alternate screen)
+- `locateSessionHistoryFile` returns null - no CLI-accessible session history
 
 ## Prompt Templates
 

@@ -472,6 +472,35 @@ describe('WorktreeManager -- renameBranch', () => {
     errorSpy.mockRestore();
   });
 
+  it('preserves the base-branch namespace prefix when renaming', async () => {
+    const mgr = new WorktreeManager('/project');
+    const result = await mgr.renameBranch(
+      'abcd1234-0000-0000-0000-000000000000',
+      'bugfix-inacc-adjustments/old-title-abcd1234',
+      'New Title',
+      { baseBranch: 'bugfix/inacc-adjustments', defaultBaseBranch: 'main' },
+    );
+
+    expect(result).toBe('bugfix-inacc-adjustments/new-title-abcd1234');
+    expect(mockProjectGit.raw).toHaveBeenCalledWith([
+      'branch', '-m',
+      'bugfix-inacc-adjustments/old-title-abcd1234',
+      'bugfix-inacc-adjustments/new-title-abcd1234',
+    ]);
+  });
+
+  it('drops the prefix when base equals the default', async () => {
+    const mgr = new WorktreeManager('/project');
+    const result = await mgr.renameBranch(
+      'abcd1234-0000-0000-0000-000000000000',
+      'old-title-abcd1234',
+      'New Title',
+      { baseBranch: 'main', defaultBaseBranch: 'main' },
+    );
+
+    expect(result).toBe('new-title-abcd1234');
+  });
+
   it('falls back to "task" slug when the title produces an empty slug', async () => {
     const mgr = new WorktreeManager('/project');
     // A title of only punctuation produces an empty slug string before the
@@ -601,7 +630,9 @@ describe('WorktreeManager -- ensureWorktree', () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result!.branchName).toBe('test-abcd1234');
+    // Branch name encodes the non-default base as a namespace prefix so the
+    // worktree's origin is visible at-a-glance in git log / GitHub branch lists.
+    expect(result!.branchName).toBe('develop/test-abcd1234');
     // Should have used 'develop' (task override) not 'main' (config default)
     expect(mockProjectGit.raw).toHaveBeenCalledWith(['fetch', 'origin', 'develop']);
   });

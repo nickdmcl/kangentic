@@ -8,7 +8,7 @@ import {
   horizontalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { AlertTriangle, Filter, X } from 'lucide-react';
+import { AlertTriangle, Filter, X, Check } from 'lucide-react';
 import { Swimlane, type SwimlaneProps } from './Swimlane';
 import { DoneSwimlane } from './DoneSwimlane';
 import { TaskCard } from './TaskCard';
@@ -73,23 +73,54 @@ const SortableSwimlane = React.memo(function SortableSwimlane({ swimlane, tasks 
   );
 });
 
-/** Fixed-position card that flies from the drop position into the Done drop zone. */
+/** Fixed-position card that flies from the drop position into the Done drop zone.
+ *  Fallback timer guarantees finalizeCompletion() fires even when
+ *  onTransitionEnd never does (drop zone not in DOM, propertyName mismatch,
+ *  element scrolled offscreen). Without this, a missed transitionend leaves
+ *  completingTask set forever and the card stuck on screen. */
 function FlyingCard() {
   const completingTask = useBoardStore((s) => s.completingTask);
   const finalizeCompletion = useBoardStore((s) => s.finalizeCompletion);
   const [flying, setFlying] = React.useState(false);
+  const fallbackTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearFallback = React.useCallback(() => {
+    if (fallbackTimerRef.current !== null) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+  }, []);
 
   React.useEffect(() => {
-    if (completingTask) {
-      setFlying(false);
-      // Trigger transition on next frame so browser paints at start position first
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setFlying(true);
-        });
-      });
+    if (!completingTask) {
+      clearFallback();
+      return;
     }
-  }, [completingTask]);
+
+    setFlying(false);
+    const hasTarget = document.querySelector('[data-done-drop-zone]') !== null;
+
+    // Trigger transition on next frame so browser paints at start position first
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setFlying(true);
+        // When the drop zone isn't in the DOM, no transition will run and
+        // onTransitionEnd will never fire. Finalize immediately so the move
+        // still persists and the card unmounts. Otherwise arm a 700ms
+        // fallback (500ms transition + 200ms safety margin).
+        if (!hasTarget) {
+          finalizeCompletion();
+        } else {
+          fallbackTimerRef.current = setTimeout(() => {
+            fallbackTimerRef.current = null;
+            finalizeCompletion();
+          }, 700);
+        }
+      });
+    });
+
+    return clearFallback;
+  }, [completingTask, finalizeCompletion, clearFallback]);
 
   if (!completingTask) return null;
 
@@ -122,6 +153,7 @@ function FlyingCard() {
       style={style}
       onTransitionEnd={(e) => {
         if (e.propertyName === 'transform') {
+          clearFallback();
           finalizeCompletion();
         }
       }}
@@ -229,6 +261,9 @@ export function KanbanBoard() {
   const pendingMoveConfirm = useBoardStore((s) => s.pendingMoveConfirm);
   const confirmPendingMove = useBoardStore((s) => s.confirmPendingMove);
   const cancelPendingMove = useBoardStore((s) => s.cancelPendingMove);
+  const pendingDoneConfirm = useBoardStore((s) => s.pendingDoneConfirm);
+  const confirmPendingDone = useBoardStore((s) => s.confirmPendingDone);
+  const cancelPendingDone = useBoardStore((s) => s.cancelPendingDone);
   const updateConfig = useConfigStore((s) => s.updateConfig);
   const showBoardSearch = useConfigStore((s) => s.config.showBoardSearch);
   const priorities = useConfigStore((s) => s.config.backlog?.priorities) ?? [
@@ -411,6 +446,54 @@ export function KanbanBoard() {
           }
           onConfirm={() => confirmPendingMove()}
           onCancel={cancelPendingMove}
+        />
+      )}
+
+      {pendingDoneConfirm && (
+        <ConfirmDialog
+          title="Move to Done?"
+          variant="warning"
+          confirmLabel="Move"
+          cancelLabel="Cancel"
+          showDontAskAgain
+          dontAskAgainLabel="Delete automatically in the future"
+          message={
+            <div className="space-y-2">
+              <p className="font-medium text-fg break-words">
+                "{pendingDoneConfirm.task.title}"
+              </p>
+              <ul className="space-y-1.5">
+                <li className="flex items-start gap-2">
+                  <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                  <span>Local worktree will be deleted</span>
+                </li>
+                {pendingDoneConfirm.task.branch_name && (
+                  <li className="flex items-start gap-2">
+                    <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                    <span>
+                      Branch{' '}
+                      <code className="font-mono text-[11px] bg-surface px-1 py-0.5 rounded break-all">
+                        {pendingDoneConfirm.task.branch_name}
+                      </code>{' '}
+                      will be unaffected
+                    </span>
+                  </li>
+                )}
+                <li className="flex items-start gap-2">
+                  <Check size={14} className="text-emerald-500 mt-0.5 shrink-0" aria-hidden />
+                  <span>Session history will be kept</span>
+                </li>
+              </ul>
+              <p className="text-fg-muted">
+                If this task is resumed, session history and worktree will be restored.
+              </p>
+            </div>
+          }
+          onConfirm={(dontAskAgain) => {
+            if (dontAskAgain) updateConfig({ skipDoneWorktreeConfirm: true });
+            void confirmPendingDone();
+          }}
+          onCancel={cancelPendingDone}
         />
       )}
     </div>

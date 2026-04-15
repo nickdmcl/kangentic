@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format } from 'date-fns';
 import { useShallow } from 'zustand/react/shallow';
+import { formatTime } from '../../lib/datetime';
 import { useSessionStore } from '../../stores/session-store';
 import { ChevronDown } from 'lucide-react';
 import { EventType, IdleReason } from '../../../shared/types';
@@ -278,10 +278,6 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
   );
 }
 
-
-function formatTime(ts: number): string {
-  return format(ts, 'HH:mm:ss');
-}
 
 interface EventLineProps {
   sessionId: string;

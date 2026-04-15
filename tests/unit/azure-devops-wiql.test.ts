@@ -45,10 +45,11 @@ describe('GitHub URL parsers', () => {
   let buildGitHubLabel: (repository: string) => string;
 
   beforeAll(async () => {
-    const module = await import('../../src/main/import/github/url-parser');
-    parseGitHubIssuesUrl = module.parseGitHubIssuesUrl;
-    parseGitHubProjectsUrl = module.parseGitHubProjectsUrl;
-    buildGitHubLabel = module.buildGitHubLabel;
+    const issuesModule = await import('../../src/main/boards/adapters/github-issues/url-parser');
+    const projectsModule = await import('../../src/main/boards/adapters/github-projects/url-parser');
+    parseGitHubIssuesUrl = issuesModule.parseGitHubIssuesUrl;
+    parseGitHubProjectsUrl = projectsModule.parseGitHubProjectsUrl;
+    buildGitHubLabel = issuesModule.buildGitHubLabel;
   });
 
   describe('parseGitHubIssuesUrl', () => {

@@ -33,6 +33,16 @@ const AGENT_META: Record<string, AgentMeta> = {
     short: 'Aider',
     installUrl: 'https://aider.chat',
   },
+  warp: {
+    display: 'Oz CLI',
+    short: 'Oz',
+    installUrl: 'https://docs.warp.dev/reference/cli/cli',
+  },
+  copilot: {
+    display: 'GitHub Copilot CLI',
+    short: 'Copilot',
+    installUrl: 'https://docs.github.com/en/copilot/how-tos/copilot-cli/cli-getting-started',
+  },
 };
 
 /** Full product name for an agent identifier (e.g. 'claude' -> 'Claude Code'). */

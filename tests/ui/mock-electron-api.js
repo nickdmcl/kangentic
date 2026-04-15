@@ -87,6 +87,7 @@
     hasCompletedFirstRun: true,
     showBoardSearch: true,
     skipDeleteConfirm: false,
+    skipDoneWorktreeConfirm: false,
     skipBoardConfigConfirm: false,
     autoFocusIdleSession: false,
     activateAllProjectsOnStartup: true,
@@ -548,6 +549,20 @@
           position: newPosition,
           updated_at: now(),
         });
+
+        // Mirror main-process behavior: moving into a lane with role 'done'
+        // archives the task. See src/main/ipc/handlers/task-move.ts L236.
+        // NOTE: after a Done move, tasks.list() will NOT return this task and
+        // tasks.listArchived() WILL. Tests that call loadBoard() after a Done
+        // move should probe archivedTasks, not tasks.
+        var targetLane = swimlanes.find(function (s) { return s.id === newSwimlaneId; });
+        if (targetLane && targetLane.role === 'done') {
+          var archived = Object.assign({}, tasks[idx], {
+            archived_at: now(),
+          });
+          archivedTasks.push(archived);
+          tasks.splice(idx, 1);
+        }
       },
       listArchived: async function () {
         return withAttachmentCounts(archivedTasks);
@@ -964,6 +979,35 @@
               { mode: 'bypassPermissions', label: 'Auto-Approve (--yes)' },
             ],
             defaultPermission: 'bypassPermissions',
+          },
+          {
+            name: 'cursor', displayName: 'Cursor CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'default', label: 'Interactive (Confirm Changes)' },
+              { mode: 'bypassPermissions', label: 'Non-Interactive (Full Access)' },
+            ],
+            defaultPermission: 'default',
+          },
+          {
+            name: 'warp', displayName: 'Oz CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'plan', label: 'Plan Only (Read-Only)' },
+              { mode: 'default', label: 'Default' },
+              { mode: 'bypassPermissions', label: 'Auto (Skip Confirmations)' },
+            ],
+            defaultPermission: 'default',
+          },
+          {
+            name: 'copilot', displayName: 'GitHub Copilot CLI', found: false, path: null, version: null,
+            permissions: [
+              { mode: 'plan', label: 'Plan (Read-Only)' },
+              { mode: 'dontAsk', label: 'Plan Non-Interactive (CI)' },
+              { mode: 'default', label: 'Default (Confirm Actions)' },
+              { mode: 'acceptEdits', label: 'Allow All Tools' },
+              { mode: 'auto', label: 'Autopilot (Allow All Tools)' },
+              { mode: 'bypassPermissions', label: 'YOLO (Full Access)' },
+            ],
+            defaultPermission: 'acceptEdits',
           },
         ];
       },

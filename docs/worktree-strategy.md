@@ -154,13 +154,17 @@ Task moved between active columns (e.g., Planning → Code Review)
   → If auto_command configured on target: suspend and resume with command as prompt
 
 Task moved to Done
+  → Confirmation dialog (suppressible via skipDoneWorktreeConfirm)
   → Session suspended (PTY killed, DB record preserved)
   → Status: suspended
-  → Session files persist on disk
+  → Local worktree directory deleted; worktree_path cleared in DB
+  → branch_name and session files preserved on disk for resume
   → Task archived
 
-Task moved back from Done
-  → Resume: claude --resume <uuid> (no prompt, continues context)
+Task moved back from Done (into any non-todo, non-done column)
+  → Worktree recreated from preserved branch_name via ensureTaskWorktree
+    (runs regardless of auto_spawn so the code is always on disk)
+  → If target has auto_spawn: claude --resume <uuid> (no prompt, continues context)
   → Status: running
 
 Task moved to To Do

@@ -11,7 +11,7 @@ import { WorktreeChip } from './WorktreeChip';
 import { Select } from '../settings/shared';
 import { LabelInput } from '../LabelInput';
 import { isValidGitBranchName } from '../../../shared/git-utils';
-import { slugify } from '../../../shared/slugify';
+import { slugify, computeAutoBranchName } from '../../../shared/slugify';
 import { DEFAULT_PRIORITY_CONFIG } from '../../../shared/types';
 import { DescriptionEditor } from '../DescriptionEditor';
 import { MAX_ATTACHMENT_BYTES, MEDIA_TYPE_EXT, resolveMediaType, isImageMediaType, getFileTypeIcon, getExtension } from './attachment-utils';
@@ -65,7 +65,7 @@ export function NewTaskDialog({ swimlaneId, onClose }: NewTaskDialogProps) {
   const branchPlaceholder = (() => {
     if (effectiveWorktree) {
       const slug = slugify(title.trim()) || 'task-title';
-      return `${slug}-ab12cd34`;
+      return computeAutoBranchName(effectiveBaseBranch, defaultBaseBranch || 'main', slug, 'ab12cd34');
     }
     return effectiveBaseBranch;
   })();

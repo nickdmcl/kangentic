@@ -621,6 +621,7 @@ export interface AppConfig {
   hasCompletedFirstRun: boolean;
   showBoardSearch: boolean;
   skipDeleteConfirm: boolean;
+  skipDoneWorktreeConfirm: boolean;
   skipBoardConfigConfirm: boolean;
   autoFocusIdleSession: boolean;
   activateAllProjectsOnStartup: boolean;
@@ -707,6 +708,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   hasCompletedFirstRun: false,
   showBoardSearch: true,
   skipDeleteConfirm: false,
+  skipDoneWorktreeConfirm: false,
   skipBoardConfigConfirm: false,
   autoFocusIdleSession: false,
   activateAllProjectsOnStartup: true,
@@ -811,7 +813,20 @@ export interface BacklogDemoteInput {
 
 // === External Import Types ===
 
-export type ExternalSource = 'github_issues' | 'github_projects' | 'azure_devops';
+/**
+ * Discriminator for board integration providers. Existing values keep
+ * snake_case for DB back-compat; new stub providers use plain lowercase.
+ * Do not "normalize" casing across providers - existing DB rows rely on
+ * the snake_case spellings.
+ */
+export type ExternalSource =
+  | 'github_issues'
+  | 'github_projects'
+  | 'azure_devops'
+  | 'asana'
+  | 'jira'
+  | 'linear'
+  | 'trello';
 
 export interface ImportSource {
   id: string;
@@ -1164,6 +1179,36 @@ export interface AdapterRuntimeStrategy {
      */
     readonly isFullRewrite: boolean;
   };
+
+  /**
+   * How the agent surfaces telemetry through its own PTY stdout (no
+   * external file, no hook). Used by agents that emit machine-readable
+   * NDJSON to the terminal (Cursor's `--output-format stream-json`).
+   * Each spawn gets its own parser instance so per-session rolling
+   * buffers can survive across PTY chunk boundaries.
+   */
+  readonly streamOutput?: {
+    /** Build a fresh parser bound to a single session. */
+    createParser(): StreamOutputParser;
+  };
+}
+
+/**
+ * Per-session PTY telemetry parser produced by
+ * AdapterRuntimeStrategy.streamOutput.createParser(). Owns whatever
+ * carry-over state the adapter needs (e.g. trailing partial JSON line)
+ * across PTY chunks within one spawn.
+ */
+export interface StreamOutputParser {
+  /**
+   * Parse a PTY data chunk for usage and/or events. Returns null when
+   * the chunk yielded no recognizable telemetry (the common case for
+   * non-init lines), so callers can short-circuit without allocating.
+   */
+  parseTelemetry(data: string): {
+    usage?: Partial<SessionUsage>;
+    events?: SessionEvent[];
+  } | null;
 }
 
 /**

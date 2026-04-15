@@ -46,6 +46,38 @@ interface ManagedSession {
   sessionIdScanner?: import('./session-id-scanner').SessionIdScanner;
   /** One-shot timer that warns if session-ID capture fails within the timeout. */
   sessionIdCaptureTimer?: ReturnType<typeof setTimeout>;
+  /** Per-session telemetry parser for adapters that emit machine-readable
+   *  output over the PTY (e.g. Cursor's stream-json). Built on first PTY
+   *  data via `agentParser.runtime.streamOutput.createParser()`. */
+  streamParser?: import('../../shared/types').StreamOutputParser;
+}
+
+/**
+ * Kill a node-pty instance without propagating errors.
+ *
+ * On Windows, libuv returns EACCES from the underlying kill syscall when the
+ * child PID handle is dead (e.g. Claude Code already flushed `/exit` before
+ * we got here, or node-pty's conpty bridge closed the handle). On POSIX the
+ * equivalent is ESRCH. The calling site has already nulled the pty reference
+ * to prevent double-kill, so the session state is consistent - any throw is
+ * just log noise that can abort surrounding cleanup loops like killAll() or
+ * syncShutdownCleanup().
+ *
+ * Returns true if the kill landed on a live process, false if the process was
+ * already dead. Callers that wait on the 'exit' event can use the return
+ * value to skip the wait - the event already fired before we got here.
+ */
+function safeKillPty(ptyRef: pty.IPty): boolean {
+  try {
+    ptyRef.kill();
+    return true;
+  } catch (error) {
+    const errnoCode = (error as NodeJS.ErrnoException)?.code;
+    if (errnoCode !== 'EACCES' && errnoCode !== 'ESRCH') {
+      console.warn('[SESSION] pty.kill() failed:', error);
+    }
+    return false;
+  }
 }
 
 export class SessionManager extends EventEmitter {
@@ -356,7 +388,7 @@ export class SessionManager extends EventEmitter {
     if (existing?.pty) {
       const ptyRef = existing.pty;
       existing.pty = null;
-      ptyRef.kill();
+      safeKillPty(ptyRef);
     }
 
     // Stop any existing watchers for this task
@@ -632,6 +664,23 @@ export class SessionManager extends EventEmitter {
           this.usageTracker.notifyAgentSessionId(id, capturedId);
         }
       }
+      // Per-adapter stream telemetry (e.g. Cursor stream-json: model from
+      // the init event, ToolStart/ToolEnd events for activity tracking).
+      // Each adapter owns whatever carry-over state it needs across PTY
+      // chunks (the parser is constructed lazily on first chunk).
+      const streamFactory = input.agentParser?.runtime?.streamOutput;
+      if (streamFactory) {
+        if (!session.streamParser) {
+          session.streamParser = streamFactory.createParser();
+        }
+        const result = session.streamParser.parseTelemetry(data);
+        if (result?.usage) {
+          this.usageTracker.setSessionUsage(id, result.usage);
+        }
+        if (result?.events && result.events.length > 0) {
+          this.usageTracker.ingestEvents(id, result.events);
+        }
+      }
       // PTY-based activity detection for agents using 'pty' or 'hooks_and_pty'
       // strategies. For 'hooks_and_pty', yields to hook-based detection once
       // hooks deliver a thinking event.
@@ -867,7 +916,7 @@ export class SessionManager extends EventEmitter {
     if (session?.pty) {
       const ptyRef = session.pty;
       session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
-      ptyRef.kill();
+      safeKillPty(ptyRef);
     }
     // Remove from queue if queued, and mark as exited.
     // Queued sessions have no PTY, so onExit never fires. Emit the exit
@@ -1013,7 +1062,33 @@ export class SessionManager extends EventEmitter {
       if (!exitedNaturally && session.pty) {
         const ptyRef = session.pty;
         session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
-        ptyRef.kill();
+        const killLanded = safeKillPty(ptyRef);
+
+        // Wait for the kill to propagate into an 'exit' event before returning.
+        // Otherwise callers that immediately delete the session's CWD (worktree
+        // removal on move-to-Done) race against conhost still holding CWD
+        // handles on Windows. Bounded at 1500ms so a hung exit never blocks
+        // shutdown; removeWorktree's own retry handles the remaining cases.
+        //
+        // Skip the wait entirely if kill reported EACCES/ESRCH (already dead):
+        // the 'exit' event already fired before we got here, so awaiting it
+        // would just burn the full 1500ms timeout.
+        if (killLanded) {
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              this.removeListener('exit', onExit);
+              resolve();
+            }, 1500);
+            const onExit = (exitedSessionId: string) => {
+              if (exitedSessionId === sessionId) {
+                clearTimeout(timeout);
+                this.removeListener('exit', onExit);
+                resolve();
+              }
+            };
+            this.on('exit', onExit);
+          });
+        }
       }
     }
 
@@ -1256,7 +1331,7 @@ export class SessionManager extends EventEmitter {
         session.pty = null;
         // Null file paths before kill so onExit doesn't clean them up
         this.fileWatcher.nullifyPaths(session.id);
-        try { ptyRef.kill(); } catch { /* already dead */ }
+        safeKillPty(ptyRef);
       }
     }
 
@@ -1275,7 +1350,7 @@ export class SessionManager extends EventEmitter {
         }
         const ptyRef = session.pty;
         session.pty = null; // prevent double-kill (conpty heap corruption on Windows)
-        ptyRef.kill();
+        safeKillPty(ptyRef);
       }
       // Clean up watchers and files
       this.fileWatcher.cleanupAndRemove(session.id);

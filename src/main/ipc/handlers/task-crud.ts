@@ -119,8 +119,14 @@ export function registerTaskCrudHandlers(context: IpcContext): void {
         console.log(`[TASK_UPDATE] Skipping branch rename -- worktree path missing: ${existing.worktree_path}`);
       } else {
         const worktreeManager = new WorktreeManager(resolvedProjectPath);
+        const effectiveConfig = context.configManager.getEffectiveConfig(resolvedProjectPath);
+        const boardDefaultBranch = context.boardConfigManager.getDefaultBaseBranch();
+        const defaultBaseBranch = boardDefaultBranch || effectiveConfig.git.defaultBaseBranch || 'main';
         const newBranchName = await worktreeManager.withLock(() =>
-          worktreeManager.renameBranch(input.id, existing.branch_name!, input.title),
+          worktreeManager.renameBranch(input.id, existing.branch_name!, input.title, {
+            baseBranch: existing.base_branch,
+            defaultBaseBranch,
+          }),
         );
         if (newBranchName) {
           console.log(`[TASK_UPDATE] Branch renamed: ${existing.branch_name} -> ${newBranchName}`);
@@ -174,16 +180,39 @@ export function registerTaskCrudHandlers(context: IpcContext): void {
 
       const toLane = swimlanes.getById(input.targetSwimlaneId);
 
-      // Guard: don't resume if target doesn't auto-spawn (backlog, done, or custom with auto_spawn=false)
-      if (!toLane?.auto_spawn) {
-        return tasks.getById(input.id);
+      // Recreate the worktree whenever the target column expects code to
+      // exist on disk (anything other than To Do / Done / missing lane).
+      // Done drops delete the worktree but preserve branch_name + session
+      // records; ensureTaskWorktree restores the directory from that branch.
+      const needsWorktree = !!toLane
+        && toLane.role !== 'todo'
+        && toLane.role !== 'done';
+      if (needsWorktree) {
+        try {
+          await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
+        } catch (worktreeError) {
+          // Revert the unarchive so the task doesn't end up stranded in a
+          // custom column with no worktree and no way for the user to tell
+          // something went wrong. Move it back to the Done swimlane and
+          // re-archive so it lands in the Completed list again. Rethrow so
+          // the renderer surfaces a toast.
+          console.error('[TASK_UNARCHIVE] Worktree recreation failed, reverting unarchive:', worktreeError);
+          try {
+            const doneLane = swimlanes.list().find((lane) => lane.role === 'done');
+            if (doneLane) {
+              tasks.move({ taskId: input.id, targetSwimlaneId: doneLane.id, targetPosition: 0 });
+            }
+            tasks.archive(input.id);
+          } catch (revertError) {
+            console.error('[TASK_UNARCHIVE] Failed to revert unarchive:', revertError);
+          }
+          const message = worktreeError instanceof Error ? worktreeError.message : String(worktreeError);
+          throw new Error(`Worktree recreation failed: ${message}`);
+        }
       }
 
-      // Create worktree if needed (any non-backlog column gets an agent)
-      try {
-        await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
-      } catch (worktreeError) {
-        console.error('[TASK_UNARCHIVE] Worktree creation failed:', worktreeError);
+      // Guard: don't resume if target doesn't auto-spawn (todo, done, or custom with auto_spawn=false)
+      if (!toLane?.auto_spawn) {
         return tasks.getById(input.id);
       }
 
@@ -251,14 +280,35 @@ export function registerTaskCrudHandlers(context: IpcContext): void {
         const position = laneTasks.length;
         const task = tasks.unarchive(id, targetSwimlaneId, position);
 
-        if (!toLane?.auto_spawn) return;
-
-        try {
-          await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
-        } catch (worktreeError) {
-          console.error(`[TASK_BULK_UNARCHIVE] Worktree creation failed for task ${id.slice(0, 8)}:`, worktreeError);
-          return;
+        // Recreate the worktree whenever the target column expects code to
+        // exist on disk (anything other than To Do / Done). Matches single-
+        // task TASK_UNARCHIVE semantics.
+        const needsWorktree = !!toLane
+          && toLane.role !== 'todo'
+          && toLane.role !== 'done';
+        if (needsWorktree) {
+          try {
+            await ensureTaskWorktree(context, task, tasks, resolvedProjectPath);
+          } catch (worktreeError) {
+            // Revert this task's unarchive so it stays in Done rather than
+            // stranding in the target column without a worktree. Bulk
+            // operations swallow per-task errors so the rest of the batch
+            // continues; the user can retry the failed task individually.
+            console.error(`[TASK_BULK_UNARCHIVE] Worktree recreation failed for task ${id.slice(0, 8)}, reverting:`, worktreeError);
+            try {
+              const doneLane = swimlanes.list().find((lane) => lane.role === 'done');
+              if (doneLane) {
+                tasks.move({ taskId: id, targetSwimlaneId: doneLane.id, targetPosition: 0 });
+              }
+              tasks.archive(id);
+            } catch (revertError) {
+              console.error(`[TASK_BULK_UNARCHIVE] Failed to revert unarchive for task ${id.slice(0, 8)}:`, revertError);
+            }
+            return;
+          }
         }
+
+        if (!toLane?.auto_spawn) return;
 
         // Checkout the task's branch in the main repo (non-worktree tasks only).
         // Catch per-task so one failure doesn't block the entire batch.

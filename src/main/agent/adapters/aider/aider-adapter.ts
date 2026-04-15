@@ -2,6 +2,7 @@ import { AgentDetector } from '../../shared/agent-detector';
 import { interpolateTemplate } from '../../shared/template-utils';
 import { quoteArg, isUnixLikeShell, toForwardSlash } from '../../../../shared/paths';
 import { resolveBridgeScript } from '../../shared/bridge-utils';
+import { AiderSessionHistoryParser } from './session-history-parser';
 import type { AgentAdapter, AgentInfo, SpawnCommandOptions } from '../../agent-adapter';
 import type { AgentPermissionEntry, PermissionMode, AdapterRuntimeStrategy } from '../../../../shared/types';
 import { ActivityDetection } from '../../../../shared/types';
@@ -77,6 +78,18 @@ export class AiderAdapter implements AgentAdapter {
     // Prevent Aider from auto-committing (Kangentic manages git)
     parts.push('--no-auto-commits');
 
+    // Suppress shell command suggestions in the terminal. Aider suggests
+    // shell commands by default (args.py --suggest-shell-commands=True),
+    // which adds noise in Kangentic-managed sessions.
+    parts.push('--no-suggest-shell-commands');
+
+    // Restore previous chat context when resuming a task.
+    // This isn't session resume (Aider has no session IDs), but it
+    // reloads .aider.chat.history.md so the agent remembers prior work.
+    if (options.resume) {
+      parts.push('--restore-chat-history');
+    }
+
     // Inject --notifications-command to write idle events via event-bridge.
     // Aider fires this when the LLM finishes generating and is waiting for input.
     if (options.eventsOutputPath) {
@@ -95,17 +108,32 @@ export class AiderAdapter implements AgentAdapter {
   }
 
   /**
-   * Runtime strategy: Aider has no hooks and no session resume.
+   * Runtime strategy: Aider has no hooks and no native session IDs.
    *
    * - Activity: PTY-only. Idle is detected via prompt regex matching
-   *   "> ", "aider> ", or "architect> " at end of output.
+   *   Aider's mode-specific prompts at end of output.
    * - Session ID: omitted - Aider has no resume mechanism.
+   * - Session history: parsed from .aider.chat.history.md to extract
+   *   session cost and token counts for the session usage card.
+   *
+   * Prompt format (from aider/io.py get_input): `{edit_format}> `
+   * where edit_format varies by mode:
+   *   code (default) → `> ` (bare, model default matches so no prefix)
+   *   ask            → `ask> `
+   *   architect      → `architect> `
+   *   help           → `help> `
+   *   context        → `context> `
    */
   readonly runtime: AdapterRuntimeStrategy = {
     activity: ActivityDetection.pty((data: string) => {
       const clean = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-      return /(?:^|\n)\s*(?:aider|architect)?>\s*$/.test(clean);
+      return /(?:^|\n)\s*(?:architect|ask|help|context)?>\s*$/.test(clean);
     }),
+    sessionHistory: {
+      locate: (options) => AiderSessionHistoryParser.locate(options),
+      parse: (content, mode) => AiderSessionHistoryParser.parse(content, mode),
+      isFullRewrite: true,
+    },
   };
 
   // Aider does not use hooks - no-op
@@ -115,8 +143,9 @@ export class AiderAdapter implements AgentAdapter {
   clearSettingsCache(): void {}
 
   getExitSequence(): string[] {
-    // Aider has no session resume mechanism. Ctrl+C exits cleanly.
-    return ['\x03'];
+    // Ctrl+C to interrupt, then /exit for graceful shutdown so Aider
+    // can flush .aider.chat.history.md before termination.
+    return ['\x03', '/exit\r'];
   }
 
   detectFirstOutput(data: string): boolean {
@@ -125,8 +154,7 @@ export class AiderAdapter implements AgentAdapter {
     return data.length > 0;
   }
 
-  async locateSessionHistoryFile(_agentSessionId: string, _cwd: string): Promise<string | null> {
-    // Aider has no native session history files.
-    return null;
+  async locateSessionHistoryFile(agentSessionId: string, cwd: string): Promise<string | null> {
+    return AiderSessionHistoryParser.locate({ agentSessionId, cwd });
   }
 }

@@ -1384,3 +1384,219 @@ describe('fromFilesystem session-ID capture wiring', () => {
     expect(capturedIds).not.toContain('bbbb2222-cccc-dddd-eeee-ffffffffffff');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 14. safeKillPty behavior (tested via observable effects on public API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a mock PTY whose .kill() throws a synthetic errno error.
+ *
+ * Used to exercise safeKillPty's error-swallowing logic without importing the
+ * private helper directly. The factory returns the same shape as createMockPty
+ * but never auto-fires the exit handler on kill - callers must trigger it
+ * manually if they need the exit event, or simply observe that the public
+ * method (killAll / suspend) did not throw.
+ */
+function createAlreadyDeadPty(errnoCode: string) {
+  let exitHandler: ((e: { exitCode: number }) => void) | null = null;
+
+  const killError = new Error(`kill ESRCH`) as NodeJS.ErrnoException;
+  killError.code = errnoCode;
+  killError.syscall = 'kill';
+
+  const mockPty = {
+    pid: 99999,
+    onData: vi.fn((_cb: (data: string) => void) => {}),
+    onExit: vi.fn((cb: (e: { exitCode: number }) => void) => {
+      exitHandler = cb;
+    }),
+    write: vi.fn(),
+    resize: vi.fn(),
+    kill: vi.fn(() => {
+      throw killError;
+    }),
+  };
+
+  return {
+    mockPty,
+    triggerExit: (exitCode = 0) => exitHandler?.({ exitCode }),
+  };
+}
+
+describe('safeKillPty behavior', () => {
+  let manager: SessionManager;
+
+  beforeEach(() => {
+    manager = new SessionManager();
+  });
+
+  afterEach(async () => {
+    manager.killAll();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+  // -- killAll surface tests (EACCES, ESRCH, EPERM) -------------------------
+
+  it('killAll does not throw when PTY.kill() raises EACCES (already dead - Windows)', async () => {
+    const dead = createAlreadyDeadPty('EACCES');
+    vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+    await manager.spawn({ taskId: 'task-dead-eacces', command: '', cwd: tmpDir });
+
+    // If safeKillPty propagated the error, killAll() would throw here.
+    expect(() => manager.killAll()).not.toThrow();
+  });
+
+  it('killAll does not throw when PTY.kill() raises ESRCH (already dead - POSIX)', async () => {
+    const dead = createAlreadyDeadPty('ESRCH');
+    vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+    await manager.spawn({ taskId: 'task-dead-esrch', command: '', cwd: tmpDir });
+
+    expect(() => manager.killAll()).not.toThrow();
+  });
+
+  it('killAll does not throw on unexpected errno (EPERM) but emits console.warn', async () => {
+    const dead = createAlreadyDeadPty('EPERM');
+    vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+    await manager.spawn({ taskId: 'task-dead-eperm', command: '', cwd: tmpDir });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(() => manager.killAll()).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[SESSION]'),
+        expect.anything(),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('killAll does NOT emit console.warn for EACCES (expected errno)', async () => {
+    const dead = createAlreadyDeadPty('EACCES');
+    vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+    await manager.spawn({ taskId: 'task-dead-eacces-quiet', command: '', cwd: tmpDir });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      manager.killAll();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('killAll does NOT emit console.warn for ESRCH (expected errno)', async () => {
+    const dead = createAlreadyDeadPty('ESRCH');
+    vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+    await manager.spawn({ taskId: 'task-dead-esrch-quiet', command: '', cwd: tmpDir });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      manager.killAll();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  // -- suspend() skips 1500ms post-kill wait when kill returns false --------
+
+  /**
+   * The regression this test locks in:
+   *
+   * suspend() sends the exit sequence, waits up to 1500ms for a natural exit,
+   * then force-kills. If the PTY is already dead (EACCES/ESRCH), safeKillPty
+   * returns false and the second 1500ms wait must be SKIPPED entirely.
+   * Without the `if (killLanded)` guard, suspend() would burn a full 1500ms
+   * on every shutdown operation involving an already-dead process.
+   *
+   * We verify this by measuring wall-clock time: if the wait is skipped,
+   * suspend() resolves well under 200ms. If the wait is not skipped it would
+   * take at least 1500ms - a 7x difference that is not attributable to
+   * timer jitter.
+   */
+  /**
+   * Authoritative timing test using fake timers.
+   *
+   * Sequence of events inside suspend() after the PTY's exit sequence is sent:
+   *  T+0ms    natural-exit wait starts (1500ms timeout)
+   *  T+1500ms timeout fires, exitedNaturally=false
+   *  T+1500ms force-kill attempted: PTY.kill() throws EACCES -> killLanded=false
+   *  T+1500ms `if (killLanded)` is false -> second wait SKIPPED -> suspend() returns
+   *
+   * With real timers: suspend() resolves at T+1500ms.
+   * With fake timers advanced by 1500ms: suspend() resolves immediately after
+   *   the advance, with no further timer pending.
+   *
+   * We advance fake time by 1500ms and then confirm suspend() has settled.
+   * If the second wait were NOT skipped, a further 1500ms advance would be
+   * required - the test would hang waiting on the unresolved promise.
+   */
+  it('suspend() skips 1500ms post-kill wait when PTY.kill() throws EACCES (killLanded=false)', async () => {
+    vi.useFakeTimers();
+    try {
+      const dead = createAlreadyDeadPty('EACCES');
+      vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+      const freshManager = new SessionManager();
+
+      const session = await freshManager.spawn({ taskId: 'task-kill-skip-eacces', command: '', cwd: tmpDir });
+
+      // Start suspend() - it will block on the natural-exit wait (1500ms timer).
+      // Do NOT emit the 'exit' event - we want exitedNaturally=false so the
+      // force-kill path runs.
+      let settled = false;
+      const suspendPromise = freshManager.suspend(session.id).then(() => { settled = true; });
+
+      // Advance past the natural-exit timeout only. If killLanded=false correctly
+      // skips the second 1500ms wait, the promise resolves after this advance.
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // Flush any queued microtasks.
+      await Promise.resolve();
+
+      expect(settled).toBe(true);
+
+      // Advance another 1500ms to confirm no second wait is pending.
+      await vi.advanceTimersByTimeAsync(1500);
+      await suspendPromise;
+
+      freshManager.killAll();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('suspend() skips 1500ms post-kill wait when PTY.kill() throws ESRCH (killLanded=false)', async () => {
+    vi.useFakeTimers();
+    try {
+      const dead = createAlreadyDeadPty('ESRCH');
+      vi.mocked(pty.spawn).mockReturnValue(dead.mockPty as unknown as pty.IPty);
+
+      const freshManager = new SessionManager();
+
+      const session = await freshManager.spawn({ taskId: 'task-kill-skip-esrch', command: '', cwd: tmpDir });
+
+      let settled = false;
+      const suspendPromise = freshManager.suspend(session.id).then(() => { settled = true; });
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await Promise.resolve();
+
+      expect(settled).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1500);
+      await suspendPromise;
+
+      freshManager.killAll();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

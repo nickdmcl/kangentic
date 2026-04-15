@@ -340,6 +340,58 @@ await dialog.waitFor({ state: 'hidden', timeout: 3000 });
 
 Every spec that opens a dialog containing xterm MUST use the `document.dispatchEvent` pattern. A lingering dialog in one test causes selector ambiguity in later tests within the same file.
 
+### Anti-pattern 11: Fixed `waitForTimeout` calls inside drag-and-drop helpers
+
+Drag helpers commonly grow a chain of fixed sleeps - one after `scrollIntoView`, one after the activation move, one after the final move, one after `mouse.up()`. Every one of them is removable with a polled condition. Each unnecessary sleep is paid by every test that calls the helper, on every run.
+
+```ts
+// WRONG - ~900ms of fixed waits per drag, slows the whole spec
+await page.evaluate(scrollTargetIntoView);
+await page.waitForTimeout(100);                       // wait for scroll
+await page.mouse.down();
+await page.mouse.move(startX + 10, startY, { steps: 3 });
+await page.waitForTimeout(100);                       // wait for drag activation
+await page.mouse.move(endX, endY, { steps: 15 });
+await page.waitForTimeout(200);                       // wait for hover state
+await page.mouse.up();
+await page.waitForTimeout(500);                       // wait for drop handler
+```
+
+```ts
+// RIGHT - poll the actual conditions; let the caller assert the drop outcome
+await page.evaluate(scrollTargetIntoView);
+// boundingBox() forces a layout flush, no sleep needed for scroll
+const cardBox = await card.boundingBox();
+const targetBox = await target.boundingBox();
+
+await page.mouse.down();
+await page.mouse.move(startX + 10, startY, { steps: 3 });
+// dnd-kit sets activeTask in the board store when activation distance is hit
+await expect.poll(async () => page.evaluate(() => {
+  const stores = (window as unknown as {
+    __zustandStores?: { board: { getState: () => { activeTask: { id: string } | null } } };
+  }).__zustandStores;
+  return stores?.board.getState().activeTask !== null;
+}), { timeout: 2000 }).toBe(true);
+
+await page.mouse.move(endX, endY, { steps: 15 });
+// DoneSwimlane toggles `.drop-zone-active` via dnd-kit's isOver
+await expect(target.locator('.drop-zone-active')).toBeVisible({ timeout: 2000 });
+
+await page.mouse.up();
+// Drop outcome (dialog open, archive completed, etc.) is the caller's
+// concern - their next assertion handles the post-drop wait. Do NOT add
+// a trailing `waitForTimeout(500)` here.
+```
+
+Available signals to poll on inside drag helpers:
+- **Drag started**: `__zustandStores.board.getState().activeTask !== null` (set by `useBoardDragDrop`'s `onDragStart`).
+- **Hover registered on Done**: `.drop-zone-active` class on the target column (DoneSwimlane only - regular columns don't surface `isOver`).
+- **DragOverlay rendered**: a duplicate `<TaskCard isDragOverlay>` in the DOM, but using count > 1 of a text locator is fragile - prefer the store probe.
+- **Drop completed**: caller-specific - dialog visible, task in `archivedTasks`, optimistic move applied, etc. Never put this in the helper.
+
+When migrating an existing helper, remove the trailing `waitForTimeout(500)` first - that one is almost always pure waste because every caller already has an assertion that polls for the actual drop outcome. The earlier sleeps usually only need replacing if the test starts flaking after the trailing sleep is removed.
+
 ### Acceptable Fixed Waits
 
 Some `waitForTimeout` calls ARE intentional and should stay. Always document why with a comment.

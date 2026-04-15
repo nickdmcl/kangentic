@@ -72,13 +72,18 @@ src/
       transition-engine.ts # Executes action chains on swimlane transitions
     git/
       worktree-manager.ts  # Worktree creation, sparse-checkout, cleanup
-    import/                # External issue import subsystem
-      importer.ts          # Base importer interface and types
-      importer-registry.ts # Registry of available import providers
-      import-source-store.ts # Persists import source configuration
-      download-file.ts     # File download utility for attachments
-      github/              # GitHub import adapters (Issues, Projects)
-      azure-devops/        # Azure DevOps import adapter
+    boards/                # Board integration adapter subsystem
+      board-registry.ts    # BoardRegistry + boardRegistry singleton
+      shared/              # BoardAdapter interface, auth, mapping, download, source-store
+      adapters/
+        github-common/     # Shared `gh` CLI client for both GitHub adapters
+        github-issues/     # GitHub Issues adapter (stable)
+        github-projects/   # GitHub Projects v2 adapter (stable)
+        azure-devops/      # Azure DevOps adapter (stable)
+        asana/             # Asana adapter (stub)
+        jira/              # Jira adapter (stub)
+        linear/            # Linear adapter (stub)
+        trello/            # Trello adapter (stub)
     ipc/
       register-all.ts      # Thin orchestrator, creates IpcContext, re-exports
       ipc-context.ts       # Shared IpcContext interface

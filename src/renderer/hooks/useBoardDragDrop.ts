@@ -18,6 +18,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { useBoardStore } from '../stores/board-store';
+import { useConfigStore } from '../stores/config-store';
 import { useToastStore } from '../stores/toast-store';
 import type { Task, Swimlane as SwimlaneType } from '../../shared/types';
 
@@ -79,6 +80,8 @@ function getInsertionIndex(
 export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDragDropParams): UseBoardDragDropResult {
   const moveTask = useBoardStore((s) => s.moveTask);
   const setCompletingTask = useBoardStore((s) => s.setCompletingTask);
+  const requestDoneConfirmAnimated = useBoardStore((s) => s.requestDoneConfirmAnimated);
+  const requestDoneConfirmDirect = useBoardStore((s) => s.requestDoneConfirmDirect);
   const reorderSwimlanes = useBoardStore((s) => s.reorderSwimlanes);
   const reorderTaskInColumn = useBoardStore((s) => s.reorderTaskInColumn);
 
@@ -350,32 +353,56 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
       .sort((a, b) => a.position - b.position);
     const targetPosition = getInsertionIndex(event, laneTasks, swimlaneIds);
 
-    // Done target: defer moveTask and fly the card into the drop zone
+    // Done target: defer moveTask and fly the card into the drop zone.
+    // Moving to Done deletes the local worktree (branch + session preserved),
+    // so a confirmation dialog runs first unless the user has opted into
+    // silent auto-delete via config.skipDoneWorktreeConfirm.
     const doneLane = swimlanes.find((swimlane) => swimlane.role === 'done');
     if (doneLane && targetSwimlaneId === doneLane.id && originalSwimlane) {
       const task = state.tasks.find((candidate) => candidate.id === taskId);
       if (!task) return;
-      // Capture where the DragOverlay was at drop time
+      // Skip the dialog when there is no worktree to delete - the user opted
+      // into auto-delete OR the task never created one (To Do -> Done direct).
+      // The dialog only exists to warn about worktree removal; without that
+      // side effect, the move is purely an archive operation.
+      const skipConfirm =
+        useConfigStore.getState().config.skipDoneWorktreeConfirm
+        || !task.worktree_path;
+      const directInput = { taskId, targetSwimlaneId, targetPosition };
+
+      // Capture where the DragOverlay was at drop time. A missing rect means
+      // the DOM element was destroyed mid-drag (HMR / re-render), so there's
+      // nothing to animate from - fall through to the direct path.
       const initialRect = active.rect.current.initial;
       if (!initialRect) {
-        // DOM element was destroyed mid-drag - skip animation, move directly
-        await moveTask({ taskId, targetSwimlaneId, targetPosition });
+        if (skipConfirm) {
+          await moveTask(directInput);
+        } else {
+          requestDoneConfirmDirect(task, directInput);
+        }
         return;
       }
+
       const startRect = {
         left: initialRect.left + event.delta.x,
         top: initialRect.top + event.delta.y,
         width: initialRect.width,
         height: initialRect.height,
       };
-      setCompletingTask({
+      const completing = {
         taskId,
         targetSwimlaneId,
         targetPosition,
         originSwimlaneId: originalSwimlane,
         task,
         startRect,
-      });
+      };
+
+      if (skipConfirm) {
+        setCompletingTask(completing);
+      } else {
+        requestDoneConfirmAnimated(completing);
+      }
       return;
     }
 
@@ -390,7 +417,7 @@ export function useBoardDragDrop({ swimlanes, tasks, archivedTasks }: UseBoardDr
         variant: 'error',
       });
     }
-  }, [moveTask, setCompletingTask, findSwimlane, swimlanes, swimlaneIds, reorderSwimlanes, reorderTaskInColumn, updateDropHighlight]);
+  }, [moveTask, setCompletingTask, requestDoneConfirmAnimated, requestDoneConfirmDirect, findSwimlane, swimlanes, swimlaneIds, reorderSwimlanes, reorderTaskInColumn, updateDropHighlight]);
 
   const handleDragCancel = useCallback(() => {
     setActiveTask(null);

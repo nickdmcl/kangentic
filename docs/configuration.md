@@ -31,7 +31,7 @@ These settings appear only in App Settings and cannot be overridden per-project:
 - `showBoardSearch`, `restoreWindowPosition`
 - `agent.cliPaths`, `agent.maxConcurrentSessions`, `agent.queueOverflow`
 - `terminal.panelHeight`, `terminal.showPreview`
-- `skipDeleteConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`
+- `skipDeleteConfirm`, `skipDoneWorktreeConfirm`, `autoFocusIdleSession`, `activateAllProjectsOnStartup`
 - `contextBar.*` (all context bar visibility toggles)
 - `notifications.*` (all notification settings)
 - `agent.idleTimeoutMinutes`
@@ -60,6 +60,7 @@ These settings appear in both App Settings (as defaults) and Project Settings (a
 | `animationsEnabled` | boolean | `true` | Enable CSS keyframe animations (idle pulse, dialog fades, status bar pulses). Global-only. |
 | `statusBarVisible` | boolean | `true` | Show the status bar at the bottom of the window. Global-only. |
 | `skipDeleteConfirm` | boolean | `false` | Skip confirmation dialog on task delete |
+| `skipDoneWorktreeConfirm` | boolean | `false` | Delete the local worktree without asking each time a task moves to Done. Branch and session history are always preserved. |
 | `autoFocusIdleSession` | boolean | `false` | Auto-switch to session tab when agent goes idle. Idle tabs are always highlighted regardless of this setting. |
 | `activateAllProjectsOnStartup` | boolean | `true` | Open all projects on app launch (not just the last one). Global-only. |
 | `restoreWindowPosition` | boolean | `true` | Remember window size and position between launches. Global-only. |
@@ -102,7 +103,7 @@ PermissionMode values:
 - `auto` -- `--permission-mode auto` (classifier-based auto-approval)
 - `bypassPermissions` -- `--dangerously-skip-permissions` (no prompts at all)
 
-All six modes are available in both the global App Settings "Permissions" dropdown and the per-column Edit Column dialog. The dropdown shows only the modes supported by the active agent (e.g., Aider only shows Interactive and Auto-Approve).
+All six modes are available in both the global App Settings "Permissions" dropdown and the per-column Edit Column dialog. The dropdown shows only the modes supported by the active agent (e.g., Cursor CLI only exposes Interactive and Non-Interactive; Oz CLI exposes Plan, Default, and Auto via Warp agent profiles).
 
 ### git.*
 

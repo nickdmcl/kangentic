@@ -536,35 +536,64 @@ On project open (`src/main/engine/session-recovery.ts`):
 - **Output batching** -- 16ms flush interval prevents per-character IPC overhead
 - **Scrollback cap** -- 512KB prevents unbounded memory growth
 
-## Import Subsystem
+## Board Adapters
 
-`src/main/import/`
+`src/main/boards/`
 
-Provides external issue import into the backlog. Uses an adapter pattern with a central registry:
+Provides external issue import (and future write-back / discovery) for board providers. Mirrors the per-agent adapter layout under `src/main/agent/adapters/`. Each provider lives in its own folder with isolated auth, fetch, and mapping logic; the central registry dispatches by `ExternalSource` id, so IPC handlers contain zero provider-specific branching.
 
-- **`importer-registry.ts`** -- maps source types to importer instances. Currently supports `github-issues`, `github-projects`, and `azure-devops`.
-- **`importer.ts`** -- defines the `Importer` interface: `checkCli()` (verify CLI tool is installed and authenticated), `fetch()` (retrieve items from external source), `execute()` (import selected items with attachment download).
-- **`import-source-store.ts`** -- persists saved import source configurations in the project config file.
-- **`download-file.ts`** -- shared utility for downloading attachment files during import.
+### Layout
 
-### GitHub Importers (`github/`)
+```
+src/main/boards/
+  shared/             # BoardAdapter interface + cross-provider helpers
+    types.ts          # interface, Credentials, RemoteIssue, PrerequisiteResult
+    auth.ts           # safeStorage credential helpers
+    mapping.ts        # extractInlineImageUrls and other mapping helpers
+    download-file.ts  # authenticated HTTP downloader with size cap + redirects
+    rate-limit.ts     # withBackoff helper for HTTP-based providers
+    source-store.ts   # ImportSourceStore + URL parser registry
+  adapters/
+    github-common/    # shared `gh` CLI client used by both GitHub adapters
+    github-issues/    # adapter.ts, url-parser.ts (status: stable)
+    github-projects/  # adapter.ts, url-parser.ts (status: stable)
+    azure-devops/     # adapter.ts, client.ts, url-parser.ts (status: stable)
+    asana/            # stub (status: stub) - tracked in #480
+    jira/             # stub (status: stub) - tracked in #481
+    linear/           # stub (status: stub) - tracked in #482
+    trello/           # stub (status: stub) - tracked in #483
+  board-registry.ts   # BoardRegistry + boardRegistry singleton
+  index.ts            # public exports
+```
 
-- **`github-issues-adapter.ts`** -- fetches issues from a GitHub repository via `gh` CLI. Maps issue fields (title, body, labels, assignee, milestone) to backlog task fields.
-- **`github-projects-adapter.ts`** -- fetches items from a GitHub Projects (v2) board via `gh` CLI. Maps project item fields to backlog task fields.
-- **`url-parser.ts`** -- extracts owner/repo/project-number from GitHub URLs.
+### Interface
 
-### Azure DevOps Importer (`azure-devops/`)
+`BoardAdapter` (in `shared/types.ts`) declares:
+- Required metadata: `id` (matches `ExternalSource`), `displayName`, `icon`, `status` (`'stable' | 'stub'`).
+- Required setup methods: `checkPrerequisites()` (structured CLI + auth check), `checkCli()` (legacy wrapper for back-compat).
+- Required import methods: `fetch()`, `downloadImages()`. Optional `downloadFileAttachments()` for providers with explicit attachment relations (Azure DevOps).
+- Optional future methods: `authenticate()`, `listProjects()`, `listIssues()`, `pushUpdates()`. Reserved for live discovery and write-back. No provider implements these yet.
 
-- **`azure-devops-importer.ts`** -- fetches work items from Azure DevOps via `az` CLI.
-- **`azure-devops-adapter.ts`** -- maps Azure DevOps work item fields to backlog task fields.
-- **`url-parser.ts`** -- extracts organization/project from Azure DevOps URLs.
+Stub adapters (`asana`, `jira`, `linear`, `trello`) implement the required surface with method bodies that throw `Error('<Provider> adapter is not yet implemented')`. The IPC handler short-circuits stubs by checking `adapter.status === 'stub'` before dispatch, returning a structured error to the renderer.
 
-IPC channels for import are in the Backlog Import group (6 channels): `backlog:importCheckCli`, `backlog:importFetch`, `backlog:importExecute`, `backlog:importSourcesList`, `backlog:importSourcesAdd`, `backlog:importSourcesRemove`.
+### Adding a new provider
+
+1. Create `src/main/boards/adapters/<provider>/` with `adapter.ts` (implementing `BoardAdapter`) and `index.ts`.
+2. Extend the `ExternalSource` union in `src/shared/types.ts`. Use snake_case to match existing DB rows or plain lowercase for new providers.
+3. Register the adapter in `src/main/boards/board-registry.ts`.
+4. (Optional) Register a URL parser via `registerSourceUrlParser()` so user-pasted URLs route to the right adapter.
+
+No edits to IPC handlers or the renderer are required - dispatch is registry-driven. The contract is locked in by `tests/unit/board-registry.test.ts`, which fails if a provider is added to the union but not registered.
+
+### IPC channels
+
+Backlog Import group (6 channels): `backlog:importCheckCli`, `backlog:importFetch`, `backlog:importExecute`, `backlog:importSourcesList`, `backlog:importSourcesAdd`, `backlog:importSourcesRemove`. All dispatch through `boardRegistry.getOrThrow(source)` in `src/main/ipc/handlers/backlog.ts`.
 
 ## See Also
 
 - [Session Lifecycle](session-lifecycle.md) -- Full state machine, spawn flow, queue, crash recovery
 - [Agent Integration](agent-integration.md) -- Adapter interface, per-agent CLI details, permission modes, hooks, trust
+- [Board Integration](board-integration.md) -- BoardAdapter interface, registry, how to add a new provider
 - [Transition Engine](transition-engine.md) -- Action types, templates, priority rules
 - [Database](database.md) -- Full schema reference, migrations, repository pattern
 - [Configuration](configuration.md) -- Config cascade, all settings keys

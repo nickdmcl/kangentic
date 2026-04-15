@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useConfigStore } from '../../../stores/config-store';
 import { isValidGitBranchName } from '../../../../shared/git-utils';
-import { slugify } from '../../../../shared/slugify';
+import { slugify, computeAutoBranchName } from '../../../../shared/slugify';
 import type { Task } from '../../../../shared/types';
 
 export function useBranchConfig(task: Task, title: string, isInTodo: boolean) {
@@ -41,10 +41,10 @@ export function useBranchConfig(task: Task, title: string, isInTodo: boolean) {
   const branchPlaceholder = useMemo(() => {
     if (effectiveWorktree) {
       const slug = slugify(title.trim()) || 'task-title';
-      return `${slug}-ab12cd34`;
+      return computeAutoBranchName(effectiveBaseBranch, defaultBaseBranch || 'main', slug, 'ab12cd34');
     }
     return effectiveBaseBranch;
-  }, [effectiveWorktree, title, effectiveBaseBranch]);
+  }, [effectiveWorktree, title, effectiveBaseBranch, defaultBaseBranch]);
 
   const branchHint = useMemo(() => {
     const pill = (text: string) => (
