@@ -101,8 +101,15 @@ export function registerSessionHandlers(context: IpcContext): void {
       const task = tasks.getById(taskId);
       if (!task) throw new Error(`Task ${taskId} not found`);
 
-      // Guard: don't resume if already has an active session
-      if (task.session_id) throw new Error(`Task ${taskId} already has an active session`);
+      // If task.session_id is set, the PTY may still be alive (re-attach) or
+      // it may be a ghost from an unclean shutdown / crashed renderer. Probe
+      // the session manager: live session means re-attach, absent means clear
+      // the stale reference and fall through to the normal resume path.
+      if (task.session_id) {
+        const existingSession = context.sessionManager.getSession(task.session_id);
+        if (existingSession) return existingSession;
+        tasks.update({ id: task.id, session_id: null });
+      }
 
       const lane = swimlanes.getById(task.swimlane_id);
 
