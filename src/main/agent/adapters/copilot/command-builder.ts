@@ -118,6 +118,7 @@ export class CopilotCommandBuilder {
       const mcpConfig = {
         mcpServers: {
           kangentic: {
+            type: 'http' as const,
             url: options.mcpServerUrl,
             headers: {
               'X-Kangentic-Token': options.mcpServerToken,

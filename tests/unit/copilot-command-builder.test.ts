@@ -249,6 +249,69 @@ describe('CopilotCommandBuilder', () => {
     });
   });
 
+  // ── --additional-mcp-config flag ─────────────────────────────────────────
+
+  describe('--additional-mcp-config flag', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-mcp-test-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('writes a config with type:"http" so Copilot CLI accepts it', () => {
+      // Regression: Copilot CLI's --additional-mcp-config schema is a
+      // discriminated union on `type`. Without it the entry is rejected
+      // as "mcpServers.kangentic: Invalid input" and Copilot exits.
+      const eventsOutputPath = path.join(tmpDir, 'events.jsonl');
+      buildCommand({
+        eventsOutputPath,
+        mcpServerEnabled: true,
+        mcpServerUrl: 'http://127.0.0.1:5555/mcp/project-123',
+        mcpServerToken: 'secret-token',
+      });
+      const mcpConfigPath = path.join(tmpDir, 'copilot-mcp.json');
+      expect(fs.existsSync(mcpConfigPath)).toBe(true);
+      const written = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf-8'));
+      expect(written).toEqual({
+        mcpServers: {
+          kangentic: {
+            type: 'http',
+            url: 'http://127.0.0.1:5555/mcp/project-123',
+            headers: { 'X-Kangentic-Token': 'secret-token' },
+          },
+        },
+      });
+    });
+
+    it('passes --additional-mcp-config @<path> to Copilot when MCP is enabled', () => {
+      const eventsOutputPath = path.join(tmpDir, 'events.jsonl');
+      const command = buildCommand({
+        eventsOutputPath,
+        mcpServerEnabled: true,
+        mcpServerUrl: 'http://127.0.0.1:5555/mcp/project-123',
+        mcpServerToken: 'secret-token',
+      });
+      expect(command).toContain('--additional-mcp-config');
+      expect(command).toContain('@');
+      expect(command).toContain('copilot-mcp.json');
+    });
+
+    it('omits --additional-mcp-config when MCP is disabled', () => {
+      const eventsOutputPath = path.join(tmpDir, 'events.jsonl');
+      const command = buildCommand({
+        eventsOutputPath,
+        mcpServerEnabled: false,
+        mcpServerUrl: 'http://127.0.0.1:5555/mcp/project-123',
+        mcpServerToken: 'secret-token',
+      });
+      expect(command).not.toContain('--additional-mcp-config');
+    });
+  });
+
   // ── interpolateTemplate ──────────────────────────────────────────────────
 
   describe('interpolateTemplate', () => {
