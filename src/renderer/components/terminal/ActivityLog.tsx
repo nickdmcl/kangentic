@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { formatTime } from '../../lib/datetime';
 import { useSessionStore } from '../../stores/session-store';
@@ -230,9 +230,9 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     >
       {/* Single sticky header — prompt banner and/or session filter (combined to avoid two sticky top-0 elements overlapping) */}
       {(lastPromptText || showFilter) && (
-        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2 pb-1.5 mb-1">
+        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2.5 pb-2 mb-1 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
           {lastPromptText && (
-            <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/10 px-2 py-1 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
+            <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/15 px-2 py-1.5 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
               <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
               <span className="text-fg-tertiary text-xs leading-4 truncate min-w-0">
                 {lastPromptText.length > PROMPT_DISPLAY_CHARS
@@ -264,16 +264,21 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
           )}
         </div>
       )}
-      {displayEvents.map((item, i) => (
-        <EventLine
-          key={`${item.sessionId}-${item.event.ts}-${i}`}
-          sessionId={item.sessionId}
-          event={item.event}
-          label={taskLabelMap.get(item.sessionId) || item.sessionId.slice(0, 8)}
-          colorClass={BADGE_COLORS[getColorIndex(item.sessionId)]}
-          showLabel={!filterSessionId && sessionIds.length > 1}
-        />
-      ))}
+      {displayEvents.map((item, i) => {
+        const isPrompt = item.event.type === EventType.Prompt && !!item.event.detail;
+        return (
+          <Fragment key={`${item.sessionId}-${item.event.ts}-${i}`}>
+            {isPrompt && i > 0 && <div className="border-t border-edge-subtle my-3" />}
+            <EventLine
+              sessionId={item.sessionId}
+              event={item.event}
+              label={taskLabelMap.get(item.sessionId) || item.sessionId.slice(0, 8)}
+              colorClass={BADGE_COLORS[getColorIndex(item.sessionId)]}
+              showLabel={!filterSessionId && sessionIds.length > 1}
+            />
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -295,7 +300,7 @@ function PromptLine({ ts, label, colorClass, showLabel, text }: {
     ? text.slice(0, PROMPT_DISPLAY_CHARS) + '…'
     : text;
   return (
-    <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-sky-500 bg-sky-500/10 pl-2 pr-1 py-1 rounded-r min-w-0">
+    <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-sky-500 bg-sky-500/15 pl-2 pr-1 py-1 rounded-r min-w-0">
       <span className="text-zinc-600 shrink-0 mt-0.5">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0 mt-0.5`}>[{label}]</span>}
       <div className="flex flex-col min-w-0">
@@ -324,7 +329,7 @@ function DimLine({ ts, label, colorClass, showLabel, text }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-1.5 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -337,7 +342,7 @@ function DimDetailLine({ ts, label, colorClass, showLabel, text, detail }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string; detail?: string;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5 min-w-0">
+    <div className="flex items-baseline gap-1.5 min-w-0 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -353,9 +358,9 @@ function BadgeLine({ ts, label, colorClass, showLabel, badge, detail, variant = 
 }) {
   const badgeClass = variant === 'warn'
     ? 'bg-amber-900/30 text-amber-400'
-    : 'bg-surface-raised text-fg-secondary';
+    : 'bg-violet-900/40 text-violet-300';
   return (
-    <div className="flex items-baseline gap-1.5 min-w-0">
+    <div className="flex items-baseline gap-1.5 min-w-0 border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className={`${badgeClass} px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none`}>
