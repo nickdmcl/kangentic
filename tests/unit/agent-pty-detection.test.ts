@@ -723,7 +723,13 @@ describe('Agent hook bridge (real CLI invocation)', () => {
   });
 
   // Layer 2: live CLI invocation. Skipped if binary missing.
-  for (const testCase of cases) {
+  // Warp is excluded - it has no hook config (runtime.activity.kind === 'pty',
+  // not 'hooks_and_pty'), so there's nothing for this layer to verify. Warp's
+  // event delivery is covered by the Warp E2E tests under tests/e2e/.
+  const hookCapableCases = cases.filter(
+    (testCase) => testCase.adapter.runtime.activity.kind === 'hooks_and_pty',
+  );
+  for (const testCase of hookCapableCases) {
     const binary = resolveBinary(testCase.binaryName);
     const describeOrSkip = binary ? describe : describe.skip;
 

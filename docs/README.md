@@ -28,6 +28,7 @@ Kangentic is a cross-platform desktop Kanban for AI coding agents. Drag tasks be
 
 ### Integration
 - [Agent Integration](agent-integration.md) -- Adapter interface, Claude/Codex/Gemini/Aider CLI details, permission modes, detection, command building
+- [Board Integration](board-integration.md) -- BoardAdapter interface, registry, GitHub/Azure DevOps/Jira/Linear/etc., how to add a new provider
 - [Handoff](handoff.md) -- Cross-agent context transfer: extraction, packaging, markdown rendering, prompt delivery
 - [MCP Server](mcp-server.md) -- Board management tools for agents, file-based command queue, .mcp.json safety
 - [Activity Detection](activity-detection.md) -- Event pipeline, thinking/idle state, subagent-aware transitions

@@ -1,8 +1,8 @@
 import which from 'which';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ExternalIssue } from '../../../shared/types';
-import { extractInlineImageUrls } from '../github/github-importer';
+import type { ExternalIssue } from '../../../../shared/types';
+import { extractInlineImageUrls } from '../../shared';
 
 const execFileAsync = promisify(execFile);
 

@@ -813,7 +813,20 @@ export interface BacklogDemoteInput {
 
 // === External Import Types ===
 
-export type ExternalSource = 'github_issues' | 'github_projects' | 'azure_devops';
+/**
+ * Discriminator for board integration providers. Existing values keep
+ * snake_case for DB back-compat; new stub providers use plain lowercase.
+ * Do not "normalize" casing across providers - existing DB rows rely on
+ * the snake_case spellings.
+ */
+export type ExternalSource =
+  | 'github_issues'
+  | 'github_projects'
+  | 'azure_devops'
+  | 'asana'
+  | 'jira'
+  | 'linear'
+  | 'trello';
 
 export interface ImportSource {
   id: string;

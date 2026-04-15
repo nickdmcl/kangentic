@@ -1,26 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import type { ExternalSource, ImportSource } from '../../shared/types';
-import { parseGitHubIssuesUrl, parseGitHubProjectsUrl, buildGitHubLabel } from './github/url-parser';
-import { parseAzureDevOpsUrl, buildAzureDevOpsLabel } from './azure-devops/url-parser';
+import type { ExternalSource, ImportSource } from '../../../shared/types';
 
 interface ProjectImportConfig {
   importSources?: ImportSource[];
 }
 
-/** URL parser for a specific source type. */
-interface SourceUrlParser {
+/** URL parser contract. Each adapter registers one via registerSourceUrlParser(). */
+export interface SourceUrlParser {
   parse: (url: string) => { repository: string };
   buildLabel: (repository: string) => string;
 }
 
-/** Registry of URL parsers keyed by ExternalSource. */
-const urlParsers: Record<ExternalSource, SourceUrlParser> = {
-  github_issues: { parse: parseGitHubIssuesUrl, buildLabel: buildGitHubLabel },
-  github_projects: { parse: parseGitHubProjectsUrl, buildLabel: buildGitHubLabel },
-  azure_devops: { parse: parseAzureDevOpsUrl, buildLabel: buildAzureDevOpsLabel },
-};
+const urlParsers = new Map<ExternalSource, SourceUrlParser>();
+
+/** Register a URL parser for an ExternalSource. Called once per adapter at load time. */
+export function registerSourceUrlParser(source: ExternalSource, parser: SourceUrlParser): void {
+  urlParsers.set(source, parser);
+}
+
+/** Parse a URL for a specific source type, returning the repository identifier. */
+export function parseUrlForSource(source: ExternalSource, url: string): { repository: string } {
+  const trimmed = url.trim().replace(/\/+$/, '');
+  const parser = urlParsers.get(source);
+  if (!parser) {
+    throw new Error(`Unsupported source type: ${source}`);
+  }
+  return parser.parse(trimmed);
+}
 
 /**
  * Persists saved import sources in the project's .kangentic/config.json file
@@ -44,7 +52,6 @@ export class ImportSourceStore {
 
     const { repository } = parseUrlForSource(source, url);
 
-    // Check for duplicate (same source + repository)
     const existing = sources.find(
       (existingSource) => existingSource.source === source && existingSource.repository === repository,
     );
@@ -52,7 +59,7 @@ export class ImportSourceStore {
       return existing;
     }
 
-    const parser = urlParsers[source];
+    const parser = urlParsers.get(source);
     const newSource: ImportSource = {
       id: uuidv4(),
       source,
@@ -89,24 +96,15 @@ export class ImportSourceStore {
       fs.mkdirSync(directory, { recursive: true });
     }
 
-    // Preserve existing config keys, only update importSources
     let existing: Record<string, unknown> = {};
     try {
       const raw = fs.readFileSync(this.configPath, 'utf-8');
       existing = JSON.parse(raw) as Record<string, unknown>;
-    } catch { /* start fresh */ }
+    } catch {
+      /* start fresh */
+    }
 
     existing.importSources = config.importSources;
     fs.writeFileSync(this.configPath, JSON.stringify(existing, null, 2));
   }
-}
-
-/** Parse a URL for a specific source type, returning the repository identifier. */
-export function parseUrlForSource(source: ExternalSource, url: string): { repository: string } {
-  const trimmed = url.trim().replace(/\/+$/, '');
-  const parser = urlParsers[source];
-  if (!parser) {
-    throw new Error(`Unsupported source type: ${source}`);
-  }
-  return parser.parse(trimmed);
 }

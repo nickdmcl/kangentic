@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertHtmlToMarkdown } from '../../src/main/import/azure-devops/azure-devops-importer';
+import { convertHtmlToMarkdown } from '../../src/main/boards/adapters/azure-devops/client';
 
 describe('convertHtmlToMarkdown', () => {
   it('returns empty string for empty input', () => {

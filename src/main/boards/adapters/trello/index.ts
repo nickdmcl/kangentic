@@ -1,0 +1,1 @@
+export { TrelloAdapter } from './adapter';

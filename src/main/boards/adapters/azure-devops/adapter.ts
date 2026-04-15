@@ -1,38 +1,60 @@
-import type { ExternalSource, ImportCheckCliResult, ImportFetchInput, ImportFetchResult } from '../../../shared/types';
-import type { Importer, DownloadedAttachment } from '../importer';
-import { downloadFile, DOWNLOAD_CONCURRENCY } from '../download-file';
-import { extractInlineImageUrls } from '../github/github-importer';
-import { AzureDevOpsImporter } from './azure-devops-importer';
+import type {
+  ExternalSource,
+  ImportCheckCliResult,
+  ImportFetchInput,
+  ImportFetchResult,
+} from '../../../../shared/types';
+import {
+  type BoardAdapter,
+  type AdapterStatus,
+  type DownloadedAttachment,
+  type PrerequisiteResult,
+  prerequisiteToCheckCli,
+  registerSourceUrlParser,
+  downloadFile,
+  DOWNLOAD_CONCURRENCY,
+  extractInlineImageUrls,
+} from '../../shared';
+import { AzureDevOpsImporter } from './client';
+import { parseAzureDevOpsUrl, buildAzureDevOpsLabel } from './url-parser';
+
+registerSourceUrlParser('azure_devops', { parse: parseAzureDevOpsUrl, buildLabel: buildAzureDevOpsLabel });
 
 const AZURE_DEVOPS_HOST = 'dev.azure.com';
 
 /**
- * Adapter that wraps AzureDevOpsImporter,
- * implementing the common Importer interface.
+ * Board adapter for Azure DevOps work items.
  *
  * Downloads inline images with bearer token auth for Azure DevOps URLs
  * (comment screenshots are hosted on dev.azure.com and require authentication).
  * Adds authenticated file attachment downloading for Azure DevOps AttachedFile relations.
  */
-export class AzureDevOpsAdapter implements Importer {
-  constructor(
-    private readonly azure: AzureDevOpsImporter,
-  ) {}
+export class AzureDevOpsAdapter implements BoardAdapter {
+  readonly id: ExternalSource = 'azure_devops';
+  readonly displayName = 'Azure DevOps';
+  readonly icon = 'cloud';
+  readonly status: AdapterStatus = 'stable';
 
-  async checkCli(): Promise<ImportCheckCliResult> {
+  constructor(private readonly azure: AzureDevOpsImporter = new AzureDevOpsImporter()) {}
+
+  async checkPrerequisites(): Promise<PrerequisiteResult> {
     const available = await this.azure.detect();
     if (!available) {
-      return { available: false, authenticated: false, error: 'Azure CLI not found. Install it from https://aka.ms/azure-cli' };
+      return { cliOk: false, authOk: false, message: 'Azure CLI not found. Install it from https://aka.ms/azure-cli' };
     }
     const authResult = await this.azure.checkAuth();
     if (!authResult.authenticated) {
-      return { available: true, authenticated: false, error: authResult.error };
+      return { cliOk: true, authOk: false, message: authResult.error };
     }
     const extensionResult = await this.azure.checkDevOpsExtension();
     if (!extensionResult.installed) {
-      return { available: true, authenticated: false, error: extensionResult.error };
+      return { cliOk: true, authOk: false, message: extensionResult.error };
     }
-    return { available: true, authenticated: true };
+    return { cliOk: true, authOk: true };
+  }
+
+  async checkCli(): Promise<ImportCheckCliResult> {
+    return prerequisiteToCheckCli(await this.checkPrerequisites());
   }
 
   async fetch(
@@ -54,7 +76,7 @@ export class AzureDevOpsAdapter implements Importer {
     const externalIds = workItemIds.map(String);
     const alreadyImportedIds = findAlreadyImported('azure_devops', externalIds);
 
-    // Fetch comments and relations in parallel for all work items
+    // Fetch comments and relations in parallel (both are independent per-item REST calls).
     const [commentsMap, relationsMap] = await Promise.all([
       this.azure.fetchCommentsForItems(organization, project, workItemIds),
       this.azure.fetchWorkItemsWithRelations(organization, project, workItemIds),
@@ -67,18 +89,12 @@ export class AzureDevOpsAdapter implements Importer {
     return { issues, totalCount, hasNextPage };
   }
 
-  /**
-   * Download inline images from markdown body.
-   * Uses bearer token auth for Azure DevOps URLs (comment screenshots)
-   * and unauthenticated HTTP for external URLs.
-   */
   async downloadImages(markdownBody: string): Promise<{ attachments: DownloadedAttachment[]; skippedCount: number }> {
     const imageUrls = extractInlineImageUrls(markdownBody);
     if (imageUrls.length === 0) {
       return { attachments: [], skippedCount: 0 };
     }
 
-    // Check if any URLs need Azure DevOps authentication
     const needsAuth = imageUrls.some((image) => image.url.includes(AZURE_DEVOPS_HOST));
     const authHeaders = needsAuth
       ? { Authorization: `Bearer ${await this.azure.getAccessToken()}` }
@@ -91,7 +107,8 @@ export class AzureDevOpsAdapter implements Importer {
       const batch = imageUrls.slice(batchStart, batchStart + DOWNLOAD_CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map((imageInfo) => {
-          // Only pass auth headers for Azure DevOps URLs
+          // Only attach the bearer token to dev.azure.com URLs - sending it
+          // to external image hosts would leak credentials.
           const headers = imageInfo.url.includes(AZURE_DEVOPS_HOST) ? authHeaders : undefined;
           return downloadFile(imageInfo.url, imageInfo.filename, headers ? { headers } : undefined);
         }),
@@ -109,10 +126,6 @@ export class AzureDevOpsAdapter implements Importer {
     return { attachments, skippedCount };
   }
 
-  /**
-   * Download file attachments from Azure DevOps using authenticated HTTP.
-   * AttachedFile relation URLs require a bearer token for access.
-   */
   async downloadFileAttachments(
     attachments: Array<{ url: string; filename: string; sizeBytes: number }>,
   ): Promise<{ attachments: DownloadedAttachment[]; skippedCount: number }> {

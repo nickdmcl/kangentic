@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAzureDevOpsUrl, buildAzureDevOpsLabel } from '../../src/main/import/azure-devops/url-parser';
+import { parseAzureDevOpsUrl, buildAzureDevOpsLabel } from '../../src/main/boards/adapters/azure-devops/url-parser';
 
 describe('parseAzureDevOpsUrl', () => {
   describe('modern format (dev.azure.com)', () => {

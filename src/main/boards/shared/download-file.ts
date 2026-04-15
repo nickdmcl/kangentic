@@ -1,7 +1,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import { URL } from 'node:url';
-import type { DownloadedAttachment } from './importer';
+import type { DownloadedAttachment } from './types';
 
 export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 export const DOWNLOAD_CONCURRENCY = 3;
@@ -38,14 +38,12 @@ export async function downloadFile(
       headers: options?.headers,
     };
     const request = protocol.get(url, requestOptions, (response) => {
-      // Follow redirects with depth limit
       if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         request.destroy();
         if (remainingRedirects <= 0) {
           resolve(null);
           return;
         }
-        // Drop auth headers on cross-origin redirects (e.g. Azure DevOps -> Azure Blob Storage)
         const redirectUrl = response.headers.location;
         let redirectOptions = options;
         if (options?.headers && redirectUrl.startsWith('http')) {
@@ -58,7 +56,9 @@ export async function downloadFile(
               );
               redirectOptions = { headers: Object.keys(filteredHeaders).length > 0 ? filteredHeaders : undefined };
             }
-          } catch { /* keep original options on URL parse failure */ }
+          } catch {
+            /* keep original options on URL parse failure */
+          }
         }
         downloadFile(redirectUrl, filename, redirectOptions, remainingRedirects - 1).then(resolve).catch(() => resolve(null));
         return;
@@ -70,7 +70,6 @@ export async function downloadFile(
         return;
       }
 
-      // Check content-length header first
       const contentLength = parseInt(response.headers['content-length'] ?? '0', 10);
       if (contentLength > MAX_ATTACHMENT_SIZE) {
         request.destroy();

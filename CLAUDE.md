@@ -64,6 +64,10 @@ src/
       shared/     # Shared utilities (interpolateTemplate, resolveBridgeScript, execVersion)
       adapters/   # Per-agent subfolders (claude/, codex/, gemini/, aider/)
       commands/   # MCP command handlers
+    boards/       # Board integration adapter system (mirrors agent/)
+      shared/     # BoardAdapter interface + auth, mapping, download, rate-limit helpers
+      adapters/   # Per-provider subfolders (github-issues/, azure-devops/, jira/, etc.)
+      board-registry.ts  # Central BoardRegistry + boardRegistry singleton
     db/           # SQLite database, migrations, repositories
     engine/       # Transition engine (action execution)
     git/          # Worktree manager
