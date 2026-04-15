@@ -1,5 +1,5 @@
 ---
-status: executing
+status: complete
 task_id: 8
 ---
 
