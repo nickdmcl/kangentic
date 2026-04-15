@@ -15,13 +15,16 @@
       "color": "#8b5cf6",
       "autoSpawn": true,
       "permissionMode": "plan",
-      "planExitTarget": "Executing"
+      "planExitTarget": "Executing",
+      "autoCommand": "Orient yourself with the current git state before producing any plan. This is a read-only step — do not modify files.\n\nBefore starting, read this task and fix the title and description by proposing and asking the user. Also ask any questions to clarify the intent and objective before proceeding.\n\n**Branch:** Run `git branch --show-current` and note the active branch.\n\n**Recent History:** Run `git log --oneline -10` to understand what has been shipped recently and what direction the codebase is moving.\n\n**Prior Features:** Before planning, check `docs/features/` for any existing feature docs related to this task. If found, read them — they provide context from prior work that may inform this plan.\n\n**Context Summary:** Before presenting the plan, open with a one-paragraph git context summary — current branch and recent commit history relevant to this task.\n\n**Complexity Check:** Classify this task as SIMPLE or COMPLEX. SIMPLE: single-file change, config edit, dependency bump, typo fix, or one obvious step. COMPLEX: multi-file changes, new feature, architectural change, integration work, or ambiguous requirements. State your classification in one line.\n\n**If COMPLEX — Enhanced Planning Protocol:**\n\n1. *Brainstorm* — Before committing to an approach, identify 2-3 possible designs. For each, note the key trade-off (complexity, risk, maintainability). Recommend one with a one-sentence justification.\n2. *Scope the unknowns* — List anything you are uncertain about (API behaviour, library constraints, existing patterns you have not yet verified). Read the relevant code to resolve each unknown before proceeding.\n3. *Granular steps* — Break the implementation into steps that each take 2-5 minutes of agent work. Each step should name the target file, describe the change, and state the expected outcome. Group steps into phases if there are natural checkpoints.\n\n**If SIMPLE — skip the Enhanced Planning Protocol and produce the plan directly.**\n\nOnce you have reported the git context summary (and, if COMPLEX, the brainstorm and unknowns), produce a detailed, step-by-step implementation plan. Be specific about which files to change and in what order. Flag any risks or open questions.\n\n**Save:** At the end of your session, call `kangentic_update_task` to append the full plan to the card description, so the Executing agent can reference it."
     },
     {
       "id": "dc9f2b38-5882-4182-8f09-923f2a583b08",
       "name": "Executing",
       "icon": "square-terminal",
-      "autoSpawn": true
+      "autoSpawn": true,
+      "color": "#3b82f6",
+      "autoCommand": "Check the git baseline before making any changes.\n\n**Branch:** Run `git branch --show-current` and confirm you are on the correct worktree branch for this task. Do not create a new branch — this task already runs in an isolated worktree.\n\n**Status:** Run `git status` and `git diff --stat`. Identify any uncommitted changes.\n\n**WIP Checkpoint:** If there are uncommitted changes that are unrelated to this task, stage tracked changes only with `git add -u` and commit with the message: \"wip: checkpoint before \" followed by the task name.\n\n**Prior Plan:** Before writing any code, use `kangentic_get_session_history` to read the Planning session output for this task. Execute the plan steps in the stated order. Note any deviations in your report.\n\n**Report:** State the current branch and whether the working tree was clean or required a WIP commit. Then proceed with the task.\n\n**Completion:** When implementation is complete, call `kangentic_update_task` to append a summary of what was done, what files changed, and any open questions to the card description. Then report back."
     },
     {
       "id": "623a36ef-9045-4437-b9c8-f67312dc5437",
@@ -29,7 +32,7 @@
       "icon": "code",
       "color": "#f59e0b",
       "autoSpawn": true,
-      "autoCommand": "/code-review"
+      "autoCommand": "Perform an adversarial code review on the current changes. Pretend you are a skeptical Principal Engineer who hates technical debt.\n\n**Standards Check:** Before reviewing, read `../Standards/README.md` to identify which standards apply to the files changed. Read the applicable standard files and check the changes against them. When raising a Standards violation, cite the specific file and rule (e.g. \"Violates `../Standards/style_clean.md` — bare `except:` not allowed\"). Note: some standards are alternatives (e.g. two UI styles) — if the project's existing code makes it clear which applies, use that one; if not, flag the ambiguity rather than guessing.\n\nIdentify subtle logic bugs or race conditions.\n\nLook for 'vibe coding' hallucinations (methods that don't exist or incorrect imports).\n\nCheck for security vulnerabilities (injection, auth leaks).\n\nPoint out where I've duplicated existing logic instead of reusing components.\nBe brutal. Do not tell me it looks good unless it is perfect.\n\n---\n\n**Decision Logic & Hand-off**\n\nEnd with a Status & Path report:\n\n**STATUS:** [PASSED | MINOR FIXES | REJECTED]\n\n- **PASSED** — No significant issues. Call `kangentic_update_task` to record the review outcome, then report back.\n- **MINOR FIXES** — Issues found but fixable in-place. Apply the fix directly, then re-run the full review from the top. If it now passes, call `kangentic_update_task` to record the outcome, then report back.\n- **REJECTED** — Fundamental logic or architectural problems. Call `kangentic_update_task` to write a summary of what failed and the required refactor into the card description, then report back."
     },
     {
       "id": "1da886f1-804b-42ea-960e-2109f776d451",
@@ -37,38 +40,22 @@
       "icon": "flask-conical",
       "color": "#06b6d4",
       "autoSpawn": true,
-      "autoCommand": "/test"
+      "autoCommand": "I need a full verification of these changes. Do the following before reporting back:\n\n**Analyze:** Check the repository for existing test suites (unit/integration). Run them first using the project's standard commands (e.g. npm test, pytest, etc.).\n\n**Optional Playwright:** If the changes involve UI, routing, or complex user flows, use Playwright to verify the interface in a real browser. If it is a pure backend/logic change, skip Playwright.\n\n**Fix on Failure:** If any existing tests fail or Playwright identifies a regression, fix the code immediately and re-run the tests.\n\n**Edge Cases:** If no tests exist for the logic I just changed, write a new test file to cover the happy path and at least one error state.\n\nOnly signal 'Ready' once you have a green build.\n\n---\n\n**Decision Logic & Hand-off**\n\nEnd with a Status & Path report:\n\n**STATUS:** [PASSED | MINOR FIXES | REJECTED]\n\n- **PASSED** — Green build, no regressions. Call `kangentic_update_task` to record the test outcome, then report back.\n- **MINOR FIXES** — Failures fixable in-place. Apply the fix directly, then re-run the tests from the top. If it now passes, call `kangentic_update_task` to record the outcome, then report back.\n- **REJECTED** — Tests reveal a deeper design flaw. Call `kangentic_update_task` to write a summary of what failed and what needs to be rethought into the card description, then report back."
     },
     {
       "id": "8adfe5cc-955c-4c4f-83a2-461e2a9d3c14",
       "name": "Ship It",
       "icon": "sailboat",
-      "color": "#f97316",
+      "color": "#F97316",
       "autoSpawn": true,
-      "autoCommand": "/merge-back"
-    },
-    {
-      "id": "60acb790-e7ba-4c8a-926c-0a7c354dc65c",
-      "name": "Staging",
-      "icon": "merge",
-      "color": "#06b6d4",
-      "autoSpawn": true,
-      "autoCommand": "A new feature has been merged to the staging branch. Set up the local environment so Nick can test the full combined build.\n\nStep 1 — Update staging branch:\nRun `git rev-parse --show-toplevel` to find the project root, then from that directory:\ngit fetch origin\ngit checkout staging\ngit pull --rebase origin staging\n\nStep 2 — Restart all dev servers (always restart to pick up latest code, whether already running or not):\nCheck this project's standard startup commands (package.json scripts, Makefile, Pipfile, or README). Kill any running instances on the relevant ports and restart all services. If startup commands are unclear, report what you found and ask before proceeding.\n\nStep 3 — Confirm servers are up by hitting the project's health/root endpoints.\n\nStep 4 — Build the test checklist:\n\nGet the raw git changes:\ngit log origin/staging ^origin/main --oneline\ngit diff origin/main origin/staging --stat\n\nThen use the Kangentic MCP tools to list all cards currently in the Staging column. For each card, read its title and description.\n\nCombine both sources to produce a numbered test checklist — one section per feature. Each section should include:\n- The feature name (from the card title)\n- 2–4 specific things to click or verify in the UI, based on what the task description says was built\n- Any edge cases or error states worth checking\n\nKeep each item concrete and actionable: \"Go to X, do Y, confirm Z\" — not just \"test the feature\".\n\n---\nEnd your report with:\n\nStaging ready: [local URL]\n\nTest checklist:\n[numbered checklist here]\n\nWhen all items pass, drag all cards in this column to Notify Dev."
-    },
-    {
-      "id": "b7b01d2b-b600-496d-bc12-3f32f1e4d8b0",
-      "name": "Notify Dev",
-      "icon": "send",
-      "color": "#10b981",
-      "autoSpawn": true,
-      "autoCommand": "A task is ready for deployment. First promote staging to main, then notify the dev team.\n\nStep 1 — Promote staging to main (idempotent):\nRun `git rev-parse --show-toplevel` to find the project root, then from that directory:\ngit fetch origin\ngit merge-base --is-ancestor origin/staging origin/main && echo \"ALREADY_MERGED\" || (\n  git checkout main &&\n  git pull --rebase origin main &&\n  git merge --no-ff staging -m \"Merge staging to main\" &&\n  git push origin main &&\n  echo \"MERGE_DONE\"\n)\n\nIf output is ALREADY_MERGED — staging is already in main (another card in this batch already triggered the merge). Skip to Step 2.\nIf output is MERGE_DONE — confirm the merge succeeded before proceeding.\n\nStep 2 — Notify the dev team via Slack.\n\nUse the kangentic MCP tools to get the current task's title and branch name.\n\nInfer the repo URL:\n  git remote get-url origin\nConvert to a browser URL: git@bitbucket.org:workspace/repo.git → https://bitbucket.org/workspace/repo, or strip credentials and .git from an HTTPS remote URL.\n\nRun `cat ~/Developer/nicks-utils/Kangentic_admin/dev-team.json` to read the available dev team members. Present the list as a numbered list and ask who to notify. Wait for their choice.\n\nRun `grep SLACK_WEBHOOK_URL ~/Developer/nicks-utils/Kangentic_admin/.env | cut -d'=' -f2-` to read the webhook URL.\n\nCompose a Slack message in this format:\n▎ Hey <@SLACK_USER_ID> — [branch-name] is ready to go live. [1-sentence summary of the change and its impact]. [repo-url] — Please deploy when you're ready.\n\nSend it with:\ncurl -s -X POST -H 'Content-type: application/json' \\\n  --data '{\"text\":\"<message>\"}' \\\n  \"<SLACK_WEBHOOK_URL>\"\n\nStep 3 — Confirm: Report \"Slack message sent to [name].\" then move the task to Done using the kangentic MCP tools."
+      "autoCommand": "Finalize this task for shipping.\n\n**Git Flow:** Format code, lint, and commit changes using the project's convention. Push the branch or merge it directly to main — do not open a pull request.\n\n**Tooling Check:** Before formatting, check `package.json` scripts, `Makefile`, `.pre-commit-config.yaml`, or `pyproject.toml` for declared format and lint commands. Prefer project-configured commands over bare tool invocations.\n\n**Feature Doc:** After pushing, update the feature doc for this task.\n\n1. Find the existing feature doc in `docs/features/` by searching for the task ID in frontmatter, or by matching the slug from the task title.\n2. If no feature doc exists (e.g. task was created before this system), create one from scratch using the full template.\n3. Update the frontmatter: set `status: shipped`.\n4. Update the `## What` section if the scope shifted during execution.\n5. Add `## Key Decisions`, `## Files Changed`, and `## Verification` sections.\n6. For files changed, run `git log --oneline --name-only` for this task's commits to identify key files.\n7. Commit: `docs: update feature doc for <task title>`\n8. Push.\n\nIf the task is trivial and was skipped in Planning, skip here too and note \"Feature doc: skipped (trivial change)\".\n\n---\n\n**Final Protocol**\n\nEnd your report with:\n\n**Deployed:** [YES | NO — explain why]"
     },
     {
       "id": "64f9ef9a-c05d-44f8-a846-329a8f15e69f",
       "name": "Done",
       "role": "done",
       "icon": "circle-check-big",
-      "color": "#64748B"
+      "color": "#10b981"
     }
   ],
   "actions": [

@@ -24,11 +24,6 @@ export const ClaudeHookEvent = {
   // Agent teams
   TeammateIdle: 'TeammateIdle',
   TaskCompleted: 'TaskCompleted',
-  // Configuration
-  ConfigChange: 'ConfigChange',
-  // Worktrees
-  WorktreeCreate: 'WorktreeCreate',
-  WorktreeRemove: 'WorktreeRemove',
 } as const;
 export type ClaudeHookEvent = (typeof ClaudeHookEvent)[keyof typeof ClaudeHookEvent];
 
@@ -131,20 +126,6 @@ export function buildHooks(
       ...(existingHooks[H.TaskCompleted] || []),
       { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.TaskCompleted,
         'detail:task,description,name') }] },
-    ],
-    [H.ConfigChange]: [
-      ...(existingHooks[H.ConfigChange] || []),
-      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.ConfigChange) }] },
-    ],
-    [H.WorktreeCreate]: [
-      ...(existingHooks[H.WorktreeCreate] || []),
-      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.WorktreeCreate,
-        'detail:name,path') }] },
-    ],
-    [H.WorktreeRemove]: [
-      ...(existingHooks[H.WorktreeRemove] || []),
-      { matcher: '', hooks: [{ type: 'command', command: buildBridgeCommand(eventBridge, eventsPath, E.WorktreeRemove,
-        'detail:name,path') }] },
     ],
   };
 }

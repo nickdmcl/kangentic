@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('hook-manager', () => {
   describe('buildHooks', () => {
-    it('produces correct hook entries for all 17 event types', () => {
+    it('produces correct hook entries for all 14 event types', () => {
       const hooks = buildHooks(EVENT_BRIDGE, EVENTS_PATH, {});
 
       // PreToolUse: tool_start only (blank matcher)
@@ -94,20 +94,8 @@ describe('hook-manager', () => {
       expect(hooks.TaskCompleted).toHaveLength(1);
       expect(hooks.TaskCompleted[0].hooks[0].command).toContain('task_completed');
 
-      // ConfigChange: config_change
-      expect(hooks.ConfigChange).toHaveLength(1);
-      expect(hooks.ConfigChange[0].hooks[0].command).toContain('config_change');
-
-      // WorktreeCreate: worktree_create
-      expect(hooks.WorktreeCreate).toHaveLength(1);
-      expect(hooks.WorktreeCreate[0].hooks[0].command).toContain('worktree_create');
-
-      // WorktreeRemove: worktree_remove
-      expect(hooks.WorktreeRemove).toHaveLength(1);
-      expect(hooks.WorktreeRemove[0].hooks[0].command).toContain('worktree_remove');
-
-      // Total: 17 hook event keys
-      expect(Object.keys(hooks)).toHaveLength(17);
+      // Total: 14 hook event keys
+      expect(Object.keys(hooks)).toHaveLength(14);
     });
 
     it('preserves existing user hooks', () => {
