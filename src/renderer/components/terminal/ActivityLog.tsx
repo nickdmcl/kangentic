@@ -10,6 +10,9 @@ const MAX_RENDERED_EVENTS = 500;
 const SCROLL_RETURN_DELAY_MS = 3000;
 const PROMPT_DISPLAY_CHARS = 160;
 
+const truncatePrompt = (text: string): string =>
+  text.length > PROMPT_DISPLAY_CHARS ? text.slice(0, PROMPT_DISPLAY_CHARS) + '…' : text;
+
 // 8 distinct colors for session badges (Tailwind-ish)
 const BADGE_COLORS = [
   'text-blue-400',
@@ -235,9 +238,7 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
             <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/15 px-2 py-1.5 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
               <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
               <span className="text-fg-tertiary text-xs leading-4 truncate min-w-0">
-                {lastPromptText.length > PROMPT_DISPLAY_CHARS
-                  ? lastPromptText.slice(0, PROMPT_DISPLAY_CHARS) + '…'
-                  : lastPromptText}
+                {truncatePrompt(lastPromptText)}
               </span>
             </div>
           )}
@@ -296,16 +297,13 @@ interface EventLineProps {
 function PromptLine({ ts, label, colorClass, showLabel, text }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
 }) {
-  const displayText = text.length > PROMPT_DISPLAY_CHARS
-    ? text.slice(0, PROMPT_DISPLAY_CHARS) + '…'
-    : text;
   return (
     <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-sky-500 bg-sky-500/15 pl-2 pr-1 py-1 rounded-r min-w-0">
       <span className="text-zinc-600 shrink-0 mt-0.5">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0 mt-0.5`}>[{label}]</span>}
       <div className="flex flex-col min-w-0">
         <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider select-none leading-4">You</span>
-        <span className="text-fg-tertiary leading-4 break-words">{displayText}</span>
+        <span className="text-fg-tertiary leading-4 break-words">{truncatePrompt(text)}</span>
       </div>
     </div>
   );
