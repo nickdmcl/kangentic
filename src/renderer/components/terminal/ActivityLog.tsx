@@ -329,7 +329,7 @@ function DimLine({ ts, label, colorClass, showLabel, text, tinted = false }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string; tinted?: boolean;
 }) {
   return (
-    <div className={`flex items-baseline gap-1.5${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r' : ''}`}>
+    <div className={`flex items-baseline gap-1.5${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -342,7 +342,7 @@ function DimDetailLine({ ts, label, colorClass, showLabel, text, detail, tinted 
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string; detail?: string; tinted?: boolean;
 }) {
   return (
-    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r' : ''}`}>
+    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
