@@ -63,6 +63,8 @@ mac:
   minimumSystemVersion: "10.15"
   entitlements: build/entitlements.plist
   entitlementsInherit: build/entitlements.plist
+  # Local-dev stable identity. Overridden in CI via CSC_NAME env var.
+  identity: "Kangentic Dev (Self-Signed)"
 
 linux:
   target:
