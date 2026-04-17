@@ -233,10 +233,10 @@ export function ActivityLog({ active, sessionIds, taskLabelMap }: ActivityLogPro
     >
       {/* Single sticky header — prompt banner and/or session filter (combined to avoid two sticky top-0 elements overlapping) */}
       {(lastPromptText || showFilter) && (
-        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2.5 pb-2 mb-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+        <div className="sticky top-0 z-10 bg-surface border-b border-edge pt-2.5 pb-2 mb-1 shadow-sticky">
           {lastPromptText && (
-            <div className={`flex items-start gap-2 border-l-2 border-sky-500 bg-sky-500/15 px-2 py-1.5 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
-              <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
+            <div className={`flex items-start gap-2 border-l-2 border-user-turn-rail bg-user-turn-bg px-2 py-1.5 rounded-r min-w-0${showFilter ? ' mb-1.5' : ''}`}>
+              <span className="text-user-turn-label font-semibold text-[10px] uppercase tracking-wider shrink-0 mt-0.5 select-none">You</span>
               <span className="text-fg-tertiary text-xs leading-4 truncate min-w-0">
                 {truncatePrompt(lastPromptText)}
               </span>
@@ -298,11 +298,11 @@ function PromptLine({ ts, label, colorClass, showLabel, text }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string;
 }) {
   return (
-    <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-sky-500 bg-sky-500/15 pl-2 pr-1 py-1 rounded-r min-w-0">
+    <div className="flex items-start gap-1.5 my-1.5 border-l-2 border-user-turn-rail bg-user-turn-bg pl-2 pr-1 py-1 rounded-r min-w-0">
       <span className="text-zinc-600 shrink-0 mt-0.5">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0 mt-0.5`}>[{label}]</span>}
       <div className="flex flex-col min-w-0">
-        <span className="text-sky-400 font-semibold text-[10px] uppercase tracking-wider select-none leading-4">You</span>
+        <span className="text-user-turn-label font-semibold text-[10px] uppercase tracking-wider select-none leading-4">You</span>
         <span className="text-fg-tertiary leading-4 break-words">{truncatePrompt(text)}</span>
       </div>
     </div>
@@ -314,10 +314,10 @@ function AiReadyLine({ ts, label, colorClass, showLabel }: {
   ts: number; label: string; colorClass: string; showLabel: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5 my-1 border-l-2 border-emerald-500 bg-emerald-500/10 pl-2 pr-1 py-0.5 rounded-r">
+    <div className="flex items-baseline gap-1.5 my-1 border-l-2 border-ai-ready-rail bg-ai-ready-bg pl-2 pr-1 py-0.5 rounded-r">
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
-      <span className="bg-emerald-900/30 text-emerald-400 px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none">AI Ready</span>
+      <span className="bg-ai-ready-badge-bg text-ai-ready-badge-fg px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none">AI Ready</span>
     </div>
   );
 }
@@ -327,7 +327,7 @@ function DimLine({ ts, label, colorClass, showLabel, text, tinted = false }: {
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string; tinted?: boolean;
 }) {
   return (
-    <div className={`flex items-baseline gap-1.5${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
+    <div className={`flex items-baseline gap-1.5${tinted ? ' border-l-2 border-ai-activity-rail bg-ai-activity-bg pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -340,7 +340,7 @@ function DimDetailLine({ ts, label, colorClass, showLabel, text, detail, tinted 
   ts: number; label: string; colorClass: string; showLabel: boolean; text: string; detail?: string; tinted?: boolean;
 }) {
   return (
-    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
+    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-ai-activity-rail bg-ai-activity-bg pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className="text-fg-faint italic">{text}</span>
@@ -355,12 +355,12 @@ function BadgeLine({ ts, label, colorClass, showLabel, badge, detail, variant = 
   badge: string; detail?: string; variant?: 'default' | 'warn'; tinted?: boolean;
 }) {
   const badgeClass = variant === 'warn'
-    ? 'bg-amber-900/30 text-amber-400'
+    ? 'bg-warn-badge-bg text-warn-badge-fg'
     : tinted
-      ? 'bg-violet-900/40 text-violet-300'
+      ? 'bg-ai-activity-badge-bg text-ai-activity-badge-fg'
       : 'bg-surface-raised text-fg-secondary';
   return (
-    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-violet-500 bg-violet-500/[0.08] pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
+    <div className={`flex items-baseline gap-1.5 min-w-0${tinted ? ' border-l-2 border-ai-activity-rail bg-ai-activity-bg pl-2 pr-1 py-0.5 rounded-r my-0.5' : ''}`}>
       <span className="text-zinc-600 shrink-0">{formatTime(ts)}</span>
       {showLabel && <span className={`${colorClass} font-semibold shrink-0`}>[{label}]</span>}
       <span className={`${badgeClass} px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 select-none`}>
