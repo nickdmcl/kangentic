@@ -10,10 +10,11 @@
  * from hooks for Gemini/Codex). If the ID was never captured (session killed
  * too fast, or agent doesn't expose it), `agent_session_id` stays null and
  * a fresh session is spawned.
- *
- * This is a pure function with no side effects - easy to unit test.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { interpolateTemplate } from '../agent/shared';
 import type { SessionRecord } from '../../shared/types';
 import type { SessionRepository } from '../db/repositories/session-repository';
@@ -51,6 +52,29 @@ export function isResumeEligible(record: SessionRecord | undefined): boolean {
 }
 
 /**
+ * Claude stores conversation transcripts at ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl.
+ * If that file is gone (user ran /clear, or Claude garbage-collected it), --resume fails with
+ * "No conversation found" and the PTY dies instantly. A DB record with a stale agent_session_id
+ * looks resumable to isResumeEligible but will always crash on spawn, so we verify the file
+ * exists before committing to a resume.
+ */
+function claudeConversationFileExists(agentSessionId: string): boolean {
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(projectsDir);
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    if (fs.existsSync(path.join(projectsDir, entry, `${agentSessionId}.jsonl`))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Resolve the spawn strategy for a task and target agent.
  *
  * Looks for a resumable session matching the target agent's session_type
@@ -65,7 +89,9 @@ export function resolveSpawnIntent(options: SpawnIntentOptions): SpawnIntent {
   const { taskId, sessionType, sessionRepo, promptTemplate, templateVars, resumePrompt } = options;
 
   const match = sessionRepo?.getLatestForTaskByType(taskId, sessionType);
-  const canResume = isResumeEligible(match);
+  const canResume = isResumeEligible(match)
+    && (match!.session_type !== 'claude_agent'
+        || claudeConversationFileExists(match!.agent_session_id!));
 
   if (canResume) {
     return {

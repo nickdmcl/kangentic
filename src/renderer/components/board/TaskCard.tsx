@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Loader2, Trash2, CirclePause, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy, GitCompare, RefreshCw, FolderMinus } from 'lucide-react';
+import { Loader2, Trash2, Play, Mail, Paperclip, GitPullRequest, Inbox, Pencil, Archive, Copy, GitCompare, RefreshCw, FolderMinus } from 'lucide-react';
 import { formatRelativeTime } from '../../lib/datetime';
 import { TaskDetailDialog } from '../dialogs/TaskDetailDialog';
 import { TaskChangesDialog } from '../dialogs/TaskChangesDialog';
@@ -275,6 +275,7 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [forceEdit, setForceEdit] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isDragOverlay) return;
@@ -356,6 +357,30 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
         message: `Restart failed: ${err instanceof Error ? err.message : String(err)}`,
         variant: 'error',
       });
+    }
+  };
+
+  // Spawn a session for an exited task without requiring the drag-to-column workaround.
+  // resumeSession's main-process handler falls back to a fresh spawn when no
+  // agent_session_id was captured, so this works for both resume and cold-start cases.
+  // The default prompt nudges the agent to continue autonomously after resume -- otherwise
+  // --resume restores the conversation but the CLI just sits waiting for a new user message.
+  // On fresh spawns the lane's auto_command wins, so this prompt is only used on resumes.
+  const handleStart = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      await useSessionStore.getState().resumeSession(
+        task.id,
+        'Where are we up to on this? Please continue from where you last stopped.',
+      );
+    } catch (err) {
+      useToastStore.getState().addToast({
+        message: `Start failed: ${err instanceof Error ? err.message : String(err)}`,
+        variant: 'error',
+      });
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -493,6 +518,30 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
           </div>
         )}
 
+        {/* Inline spawn/resume button for any stopped card (none/exited/suspended).
+            Rendered outside the density-gated switch so it's visible in compact
+            mode too. For suspended tasks this replaces the passive "Paused" label. */}
+        {(displayState.kind === 'none' || displayState.kind === 'exited' || displayState.kind === 'suspended') && (() => {
+          const isSuspended = displayState.kind === 'suspended';
+          const idleLabel = isSuspended ? 'Resume' : 'Start';
+          const busyLabel = isSuspended ? 'Resuming...' : 'Starting...';
+          return (
+            <div className={isCompactDensity ? 'mt-1' : 'mt-2 pt-2 border-t border-edge'} data-testid="status-bar">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleStart(); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                disabled={starting}
+                className="text-xs text-fg-secondary hover:text-fg-primary flex items-center gap-1 disabled:opacity-50"
+                data-testid="task-start-button"
+              >
+                {starting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                {starting ? busyLabel : idleLabel}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Bottom bar -- exhaustive switch on display state */}
         {!isCompactDensity && (() => {
           switch (displayState.kind) {
@@ -576,18 +625,10 @@ const TaskCardInner = function TaskCard({ task, isDragOverlay, compact, onDelete
                 </div>
               );
             case 'suspended':
-              return (
-                <div className="mt-2 pt-2 border-t border-edge" data-testid="status-bar">
-                  <span className="text-xs text-fg-faint flex items-center gap-1">
-                    <CirclePause size={12} />
-                    Paused
-                  </span>
-                </div>
-              );
-            case 'none':
             case 'exited':
+            case 'none':
             default:
-              return null;
+              return null; // Start/Resume button rendered outside this switch (see above).
           }
         })()}
       </div>
